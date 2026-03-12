@@ -16,5 +16,10 @@
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "ws": "^8.19.0",
+    "zod": "^4.3.6"
   }
 }

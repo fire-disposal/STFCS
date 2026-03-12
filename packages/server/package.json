@@ -1,23 +1,34 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "STFCS Backend Server",
+  "main": "src/app/main.ts",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/app/main.ts",
+    "start": "tsx src/app/main.ts",
+    "build": "tsup src/app/main.ts --format cjs --dts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.2.0",
     "@trpc/server": "^11.12.0",
     "fastify": "^5.8.2",
+    "ws": "^8.19.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.1"
+    "@types/node": "^25.4.0",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "vitest": "^3.0.0"
   }
 }
