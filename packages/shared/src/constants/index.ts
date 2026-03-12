@@ -1,0 +1,15 @@
+export const DEFAULT_FLUX_CAPACITY = 100;
+export const DEFAULT_FLUX_DISSIPATION = 10;
+export const SHIELD_EFFICIENCY = 0.5;
+export const SHIELD_FRONT_MAINTENANCE_COST = 5;
+export const SHIELD_FULL_MAINTENANCE_COST = 8;
+export const OVERLOAD_FLUX_PERCENT = 0.5;
+export const ARMOR_QUADRANT_COUNT = 6;
+export const DEFAULT_ARMOR_VALUE = 50;
+export const DEFAULT_HULL_VALUE = 100;
+export const MOVEMENT_PHASES = 3;
+export const TURN_SPEED_DEFAULT = 30;
+export const WEAPON_FIXED_ARC = 10;
+export const WS_HEARTBEAT_INTERVAL = 30000;
+export const WS_RECONNECT_DELAY = 1000;
+export const MAX_RECONNECT_ATTEMPTS = 5;
