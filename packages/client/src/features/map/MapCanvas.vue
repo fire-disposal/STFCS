@@ -43,6 +43,7 @@ let cameraController: CameraController | null = null
 let terrainLayer: TerrainLayer | null = null
 let tokenLayer: TokenLayer | null = null
 let placementOverlay: PlacementOverlay | null = null
+let syncInterval: NodeJS.Timeout | null = null
 
 const worldContainer = new Container()
 const uiContainer = new Container()
@@ -208,19 +209,21 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('wheel', handleWheel, { passive: false })
 
-  const syncInterval = setInterval(syncCamera, 100)
+  syncInterval = setInterval(syncCamera, 100)
+})
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('keydown', handleKeyDown)
-    window.removeEventListener('wheel', handleWheel)
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('wheel', handleWheel)
+  if (syncInterval) {
     clearInterval(syncInterval)
+  }
 
-    app?.destroy(true)
-    cameraController?.destroy()
-    terrainLayer?.destroy()
-    tokenLayer?.destroy()
-    placementOverlay?.destroy()
-  })
+  app?.destroy(true)
+  cameraController?.destroy()
+  terrainLayer?.destroy()
+  tokenLayer?.destroy()
+  placementOverlay?.destroy()
 })
 
 defineExpose({

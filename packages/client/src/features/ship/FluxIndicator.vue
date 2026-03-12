@@ -7,12 +7,10 @@
 
     <div class="flux-bar-container">
       <div
-        v-motion
+        ref="fluxBarRef"
         class="flux-bar-fill"
         :class="fluxBarClass"
-        :initial="{ width: '0%' }"
-        :enter="{ width: `${fluxPercent}%` }"
-        :transition="{ duration: 300, ease: 'easeOut' }"
+        :style="{ width: `${fluxPercent}%` }"
       />
       <div class="flux-bar-threshold" :style="{ left: `${thresholdPercent}%` }" />
     </div>
@@ -41,8 +39,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { FluxState, FluxOverloadState } from '@vt/shared'
+import { useMotion } from '@vueuse/motion'
 
 interface Props {
   flux: FluxState
@@ -52,6 +51,9 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   fluxState: 'normal'
 })
+
+// 添加对DOM元素的引用
+const fluxBarRef = ref<HTMLElement | null>(null)
 
 const fluxPercent = computed(() => {
   return Math.min(100, (props.flux.current / props.flux.capacity) * 100)
@@ -87,6 +89,16 @@ const fluxBarClass = computed(() => {
   if (fluxPercent.value >= 75) return 'high'
   if (fluxPercent.value >= 50) return 'medium'
   return 'low'
+})
+
+// 初始化motion动画
+onMounted(() => {
+  if (fluxBarRef.value) {
+    useMotion(fluxBarRef.value as HTMLElement, {
+      initial: { width: '0%' },
+      enter: { width: `${fluxPercent.value}%`, transition: { duration: 300, ease: 'easeOut' as any } }
+    })
+  }
 })
 </script>
 
