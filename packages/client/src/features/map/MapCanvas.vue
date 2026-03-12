@@ -1,5 +1,5 @@
 <template>
-  <div class="map-canvas-container">
+  <div ref="containerRef" class="map-canvas-container">
     <canvas ref="canvasRef"></canvas>
     <div class="map-ui-overlay">
       <slot name="overlay"></slot>
@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { Application, Container } from 'pixi.js'
 import { useMapStore } from '@/stores/useMapStore'
 import { CameraController } from './CameraController'
@@ -35,6 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const containerRef = ref<HTMLDivElement | null>(null)
 
 const mapStore = useMapStore()
 
@@ -49,14 +50,17 @@ const worldContainer = new Container()
 const uiContainer = new Container()
 
 async function initPixi(): Promise<void> {
-  if (!canvasRef.value) return
+  if (!canvasRef.value || !containerRef.value) return
+
+  const containerWidth = containerRef.value.clientWidth
+  const containerHeight = containerRef.value.clientHeight
 
   app = new Application()
 
   await app.init({
     canvas: canvasRef.value,
-    width: props.width,
-    height: props.height,
+    width: containerWidth,
+    height: containerHeight,
     backgroundColor: props.backgroundColor,
     antialias: true,
     resolution: window.devicePixelRatio || 1
@@ -68,6 +72,21 @@ async function initPixi(): Promise<void> {
   initLayers()
   initCamera()
   setupInteraction()
+  
+  setupResizeObserver()
+}
+
+function setupResizeObserver(): void {
+  if (!app || !containerRef.value) return
+
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect
+      app!.renderer.resize(width, height)
+    }
+  })
+  
+  resizeObserver.observe(containerRef.value)
 }
 
 function initLayers(): void {

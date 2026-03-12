@@ -1,5 +1,5 @@
 <template>
-  <div class="ship-canvas-container">
+  <div ref="containerRef" class="ship-canvas-container">
     <canvas ref="canvasRef"></canvas>
     <div class="ship-ui-layer">
       <slot name="ui"></slot>
@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Application, Container } from 'pixi.js'
 import { useShipStore } from '@/stores/useShipStore'
 import { ShipToken } from './ShipToken'
@@ -37,6 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const containerRef = ref<HTMLDivElement | null>(null)
 
 const shipStore = useShipStore()
 
@@ -49,14 +50,17 @@ const shieldOverlays = new Map<string, ShieldOverlay>()
 let combatOverlay: ICombatOverlay | null = null
 
 async function initPixi(): Promise<void> {
-  if (!canvasRef.value) return
+  if (!canvasRef.value || !containerRef.value) return
+
+  const containerWidth = containerRef.value.clientWidth
+  const containerHeight = containerRef.value.clientHeight
 
   app = new Application()
 
   await app.init({
     canvas: canvasRef.value,
-    width: props.width,
-    height: props.height,
+    width: containerWidth,
+    height: containerHeight,
     backgroundColor: props.backgroundColor,
     antialias: true,
     resolution: window.devicePixelRatio || 1
@@ -65,6 +69,7 @@ async function initPixi(): Promise<void> {
   app.stage.addChild(shipContainer)
 
   setupInteraction()
+  setupResizeObserver()
 }
 
 function setupInteraction(): void {
@@ -85,6 +90,19 @@ function setupInteraction(): void {
     const shipId = hit && 'shipId' in hit ? (hit as any).shipId : null
     emit('shipRightClick', shipId ?? '', e.global.x, e.global.y)
   })
+}
+
+function setupResizeObserver(): void {
+  if (!app || !containerRef.value) return
+
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect
+      app!.renderer.resize(width, height)
+    }
+  })
+  
+  resizeObserver.observe(containerRef.value)
 }
 
 function createShipToken(shipId: string): void {
