@@ -54,13 +54,13 @@ export class CameraController {
 
   private setupInteraction(): void {
     this.container.eventMode = 'static'
-    this.container.hitArea = new Rectangle(0, 0, this.container.width, this.container.height)
+    this.container.hitArea = new Rectangle(0, 0, 4096, 4096)  /* 假设固定大小 */
 
     this.container.on('pointerdown', this.onPointerDown.bind(this))
     this.container.on('pointermove', this.onPointerMove.bind(this))
     this.container.on('pointerup', this.onPointerUp.bind(this))
     this.container.on('pointerupoutside', this.onPointerUp.bind(this))
-    this.container.on('wheel', this.onWheel.bind(this) as any)
+    this.container.on('wheel', this.onWheel.bind(this))
   }
 
   private setupKeyboard(): void {
@@ -209,12 +209,4 @@ export class CameraController {
     window.removeEventListener('keyup', this.onKeyUp.bind(this))
     this.container.removeAllListeners()
   }
-}
-
-export interface IMapCamera {
-  x: number
-  y: number
-  zoom: number
-  minZoom: number
-  maxZoom: number
 }

@@ -92,8 +92,8 @@ export class PlacementOverlay extends Container {
     ctx.fillRect(8, 8, size - 16, size - 16)
 
     ctx.strokeStyle = '#AAAAAA'
+    ctx.lineWidth = 2;
     ctx.setLineDash([5, 5])
-    ctx.lineWidth = 2
     ctx.strokeRect(8, 8, size - 16, size - 16)
 
     return Texture.from(canvas)

@@ -190,6 +190,13 @@ watch(() => mapStore.selectedTokenId, syncTokens)
 watch(() => mapStore.placementPreview, syncPlacement, { deep: true })
 
 function handleKeyDown(e: KeyboardEvent): void {
+  // 检查事件目标是否为输入元素，避免在输入框中输入时触发快捷键
+  if (e.target instanceof HTMLInputElement || 
+      e.target instanceof HTMLTextAreaElement || 
+      e.target instanceof HTMLSelectElement) {
+    return
+  }
+  
   if (e.code === 'Escape' && mapStore.placementMode) {
     mapStore.setPlacementMode(false)
   }
