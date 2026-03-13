@@ -2,124 +2,22 @@
 
 > 基于代码审查和项目需求分析
 > 生成日期: 2025-03-12
+> 更新日期：2026-03-13
 
 ---
 
 ## 📋 项目背景
 
-**STFCS** 是一个战术太空战棋游戏项目，采用 Vue + PixiJS/Konva + TypeScript 技术栈，使用 DDD（领域驱动设计）架构。项目包含舰船管理、地图交互、战斗系统等核心功能。
+**STFCS** 是一个战术太空战棋游戏项目，采用 Vue + PixiJS + TypeScript 技术栈，使用 DDD（领域驱动设计）架构。项目包含舰船管理、地图交互、战斗系统等核心功能。
 
 **核心技术栈:**
-- 前端: Vue 3 + Pinia + Motion Vue + PixiJS 8.17 + Konva 10.2
+- 前端: Vue 3 + Pinia + Motion Vue + PixiJS 8.17
 - 后端: Fastify + tRPC
 - 架构: Monorepo (pnpm workspace)
 
 ---
 
 ## 🔴 严重问题 (Critical)
-
-### 1. [架构] 双重 Canvas 架构导致维护困难
-**位置:** `packages/client/src/features/ship/ShipCanvas.vue:3-4`
-
-**问题描述:**
-同时叠加使用 PixiJS 和 Konva 两个渲染库，造成：
-- 内存占用翻倍
-- 事件处理混乱（需要 pointer-events: none 规避）
-- 渲染同步困难
-- 学习曲线陡峭
-
-**影响:** 长期维护成本极高，新成员难以快速上手
-
-**建议:** 根据文档规范统一技术选型：
-- PixiJS 负责: 粒子效果、护盾渲染、爆炸动画
-- Konva 负责: 路径绘制、标记、UI 交互
-- 移除混合使用场景
-
----
-
-### 2. [功能] v-motion 指令使用错误
-**位置:** `packages/client/src/features/ship/FluxIndicator.vue:10`
-
-**问题描述:**
-使用了 `@vueuse/motion` 的 `v-motion` 指令，但未在组件中导入，且未配置 Motion 插件。
-
-**代码:**
-```vue
-<div
-  v-motion
-  class="flux-bar-fill"
-  :initial="{ width: '0%' }"
-  :enter="{ width: `${fluxPercent}%` }"
-/>
-```
-
-**影响:** 组件可能无法正常工作，Flux 条动画失效
-
-**建议:**
-```typescript
-import { vMotion } from '@vueuse/motion'
-// 或在 main.ts 全局注册
-```
-
----
-
-### 3. [交互] 定时器清理逻辑位置错误
-**位置:** `packages/client/src/features/map/MapCanvas.vue:211-217`
-
-**问题描述:**
-`onBeforeUnmount` 被定义在 `onMounted` 内部，如果组件多次挂载/卸载，会导致：
-- 多个定时器同时运行
-- 事件监听器重复添加/移除
-
-**代码:**
-```typescript
-onMounted(async () => {
-  // ... 初始化代码
-  const syncInterval = setInterval(syncCamera, 100)
-  
-  onBeforeUnmount(() => {  // ❌ 嵌套在 onMounted 内部
-    clearInterval(syncInterval)
-  })
-})
-```
-
-**影响:** 内存泄漏，性能下降
-
-**建议:** 将清理逻辑移到顶层或使用 `try-finally`
-
----
-
-### 4. [响应式] 画布尺寸硬编码
-**位置:**
-- `MapCanvas.vue:26-27`
-- `ShipCanvas.vue:29-30`
-
-**问题描述:**
-```typescript
-width: 1920,
-height: 1080
-```
-
-画布使用固定 1920x1080 分辨率，无法适应：
-- 不同屏幕尺寸（笔记本、4K 显示器）
-- 窗口大小变化
-- 移动端设备
-
-**影响:** 在小屏幕上内容被裁剪，在大屏幕上显示过小
-
-**建议:**
-```typescript
-// 监听容器尺寸变化
-const resizeObserver = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    const { width, height } = entry.contentRect
-    app.renderer.resize(width, height)
-  }
-})
-```
-
----
-
 ## 🟠 高优先级问题 (High)
 
 ### 5. [交互] 键盘事件缺乏上下文感知
@@ -481,34 +379,33 @@ this.showGrid = this.options.showGrid !== false
 
 | 优先级 | 数量 | 占比 |
 |--------|------|------|
-| 🔴 Critical | 4 | 12.5% |
-| 🟠 High | 6 | 18.75% |
-| 🟡 Medium | 10 | 31.25% |
-| 🟢 Low | 12 | 37.5% |
-| **总计** | **32** | **100%** |
+| 🟠 High | 6 | 20.7% |
+| 🟡 Medium | 10 | 34.5% |
+| 🟢 Low | 13 | 44.8% |
+| **总计** | **29** | **100%** |
 
 ---
 
 ## 🎯 修复建议优先级
 
-### Sprint 1 (立即)
-1. 修复 v-motion 导入问题
-2. 修复定时器清理逻辑
-3. 实现响应式画布尺寸
-4. 修复 TypeScript 类型错误 (FiringArcOverlay, CameraController)
+### Sprint 1 (已完成) ✅
+1. [x] 修复 v-motion 导入问题 ✅
+2. [x] 修复定时器清理逻辑 ✅
+3. [x] 实现响应式画布尺寸 ✅
+4. [x] 修复 TypeScript 类型错误 (FiringArcOverlay, CameraController) ✅
 
 ### Sprint 2 (本周)
-5. 添加键盘事件上下文检查
-6. 统一颜色方案
-7. 优化 Flux 指示器动画
-8. 清理未使用的变量和函数
+5. [ ] 添加键盘事件上下文检查
+6. [ ] 统一颜色方案
+7. [ ] 优化 Flux 指示器动画
+8. [ ] 清理未使用的变量和函数
 
 ### Sprint 3 (本月)
-9. 重构双重 Canvas 架构
-10. 修复相机边界逻辑
-11. 优化 Canvas 创建性能
-12. 增强选中状态视觉反馈
-13. 修复 hitArea 类型问题
+9. [x] 重构双重 Canvas 架构 ✅
+10. [ ] 修复相机边界逻辑
+11. [ ] 优化 Canvas 创建性能
+12. [ ] 增强选中状态视觉反馈
+13. [ ] 修复 hitArea 类型问题
 
 ### Backlog
 - 移动端适配
@@ -521,6 +418,6 @@ this.showGrid = this.options.showGrid !== false
 
 ## 📝 备注
 
-- 本清单基于 2025-03-12 的代码审查
+- 本清单基于 2025-03-12 的代码审查，更新于 2026-03-13
 - 部分问题可能影响游戏核心体验，建议优先处理
 - 建议定期（每月）更新此清单
