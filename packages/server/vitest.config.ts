@@ -9,7 +9,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@stfcs/shared': path.resolve(__dirname, '../shared/src'),
+      '@vt/shared': path.resolve(__dirname, '../shared/src'),
     },
   },
 });

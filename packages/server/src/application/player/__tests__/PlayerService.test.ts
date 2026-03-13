@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlayerService } from '../PlayerService';
-import type { PlayerInfo } from '@stfcs/shared/types';
+import type { PlayerInfo } from '@vt/shared/types';
 
 describe('PlayerService', () => {
   let service: PlayerService;

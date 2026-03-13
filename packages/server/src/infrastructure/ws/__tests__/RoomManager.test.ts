@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RoomManager } from '../RoomManager';
-import type { PlayerInfo } from '@stfcs/shared/types';
+import type { PlayerInfo } from '@vt/shared/types';
 
 describe('RoomManager', () => {
   let manager: RoomManager;

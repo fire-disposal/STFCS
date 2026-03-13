@@ -16,8 +16,8 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@stfcs/shared/*": ["../shared/src/*"],
-      "@stfcs/shared": ["../shared/src/index.ts"]
+      "@vt/shared/*": ["../shared/src/*"],
+      "@vt/shared": ["../shared/src/index.ts"]
     },
     "types": ["node", "vitest/globals"]
   },
