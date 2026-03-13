@@ -2,6 +2,7 @@ export interface PlayerInfo {
   id: string;
   name: string;
   joinedAt: number;
+  isActive?: boolean;
 }
 
 export type ArmorQuadrant = 'front_left' | 'front_right' | 'left' | 'right' | 'rear_left' | 'rear_right';
@@ -9,6 +10,7 @@ export type ArmorQuadrant = 'front_left' | 'front_right' | 'left' | 'right' | 'r
 export interface ArmorState {
   quadrants: Record<ArmorQuadrant, number>;
   maxArmor: number;
+  maxQuadArmor: number; // 根据规格统一最大值
 }
 
 export type FluxType = 'soft' | 'hard';
@@ -19,6 +21,13 @@ export interface FluxState {
   dissipation: number;
   softFlux: number;
   hardFlux: number;
+}
+
+export interface PlayerGameState {
+  currentShipId: string | null;
+  hasActivatedFluxVenting: boolean;
+  readyForNextPhase: boolean;
+  selectedWeapons: string[];
 }
 
 export type FluxOverloadState = 'normal' | 'venting' | 'overloaded';
@@ -45,6 +54,7 @@ export interface ShipStatus {
   speed: number;
   maneuverability: number;
   disabled: boolean;
+  owner?: string; // 添加舰船所有权字段
 }
 
 export interface ShipMovement {

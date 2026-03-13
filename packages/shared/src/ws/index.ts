@@ -25,6 +25,10 @@ export const WS_MESSAGE_TYPES = {
   CAMERA_UPDATED: 'CAMERA_UPDATED',
   WEAPON_FIRED: 'WEAPON_FIRED',
   DAMAGE_DEALT: 'DAMAGE_DEALT',
+  DRAWING_ADD: 'DRAWING_ADD',
+  DRAWING_CLEAR: 'DRAWING_CLEAR',
+  DRAWING_SYNC: 'DRAWING_SYNC',
+  CHAT_MESSAGE: 'CHAT_MESSAGE',
   ERROR: 'ERROR',
 } as const;
 
@@ -141,6 +145,52 @@ export interface DamageDealtMessage {
   payload: CombatResult;
 }
 
+export interface DrawingElement {
+  type: 'path' | 'line' | 'arrow' | 'rect' | 'circle';
+  color: string;
+  lineWidth: number;
+  path?: string;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  cx?: number;
+  cy?: number;
+  radius?: number;
+}
+
+export interface DrawingAddMessage {
+  type: typeof WS_MESSAGE_TYPES.DRAWING_ADD;
+  payload: {
+    playerId: string;
+    element: DrawingElement;
+  };
+}
+
+export interface DrawingClearMessage {
+  type: typeof WS_MESSAGE_TYPES.DRAWING_CLEAR;
+  payload: {
+    playerId: string;
+  };
+}
+
+export interface DrawingSyncMessage {
+  type: typeof WS_MESSAGE_TYPES.DRAWING_SYNC;
+  payload: {
+    elements: DrawingElement[];
+  };
+}
+
+export interface ChatMessagePayload {
+  type: typeof WS_MESSAGE_TYPES.CHAT_MESSAGE;
+  payload: {
+    senderId: string;
+    senderName: string;
+    content: string;
+    timestamp: number;
+  };
+}
+
 export type WSMessage =
   | PlayerJoinedMessage
   | PlayerLeftMessage
@@ -156,6 +206,10 @@ export type WSMessage =
   | CameraUpdatedMessage
   | WeaponFiredMessage
   | DamageDealtMessage
+  | DrawingAddMessage
+  | DrawingClearMessage
+  | DrawingSyncMessage
+  | ChatMessagePayload
   | ErrorMessage;
 
 export interface IWSServer {
