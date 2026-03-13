@@ -2,6 +2,24 @@
   "name": "@vt/shared",
   "version": "0.0.0",
   "private": true,
-  "main": "src/index.ts",
-  "type": "module"
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./ws": {
+      "import": "./dist/ws/index.js",
+      "types": "./dist/ws/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

@@ -1,0 +1,261 @@
+# =============================================
+# STFCS CI/CD Pipeline
+# Lint → Test → Build → Push → Deploy
+# =============================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  REGISTRY: ghcr.io
+  SERVER_IMAGE: ${{ github.repository }}-server
+  CLIENT_IMAGE: ${{ github.repository }}-client
+
+jobs:
+  # ===========================================
+  # Job 1: Lint & Type Check
+  # ===========================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Type check (Server)
+        run: pnpm --filter server exec tsc --noEmit
+
+      - name: Type check (Client)
+        run: pnpm --filter client exec vue-tsc --noEmit
+
+  # ===========================================
+  # Job 2: Test
+  # ===========================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+  # ===========================================
+  # Job 3: Build & Push Docker Images
+  # ===========================================
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Server
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata (tags, labels) for Client
+        id: meta-client
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.CLIENT_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packages/server/Dockerfile
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push Client image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packages/client/Dockerfile
+          push: true
+          tags: ${{ steps.meta-client.outputs.tags }}
+          labels: ${{ steps.meta-client.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # ===========================================
+  # Job 4: Deploy to Production Server
+  # ===========================================
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          log-public-key: false
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          REGISTRY: ${{ env.REGISTRY }}
+          SERVER_IMAGE: ${{ env.SERVER_IMAGE }}
+          CLIENT_IMAGE: ${{ env.CLIENT_IMAGE }}
+        run: |
+          echo "🚀 Deploying to production server..."
+          
+          # Create deployment script
+          cat > deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "📦 Pulling latest images..."
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          docker pull $REGISTRY/$SERVER_IMAGE:latest
+          docker pull $REGISTRY/$CLIENT_IMAGE:latest
+          
+          echo "🛑 Stopping existing containers..."
+          cd ~/stfcs
+          docker-compose down --timeout 30
+          
+          echo "📝 Updating docker-compose..."
+          cat > docker-compose.yml << 'COMPOSE'
+          version: '3.8'
+          
+          services:
+            server:
+              image: $REGISTRY/$SERVER_IMAGE:latest
+              container_name: stfcs-server
+              restart: unless-stopped
+              ports:
+                - "3000:3000"
+                - "3001:3001"
+              environment:
+                - NODE_ENV=production
+                - HTTP_PORT=3000
+                - WS_PORT=3001
+                - CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+                - LOG_LEVEL=info
+                - MAX_PLAYERS_PER_ROOM=8
+              networks:
+                - stfcs-network
+            
+            client:
+              image: $REGISTRY/$CLIENT_IMAGE:latest
+              container_name: stfcs-client
+              restart: unless-stopped
+              ports:
+                - "8080:80"
+              depends_on:
+                - server
+              networks:
+                - stfcs-network
+          
+          networks:
+            stfcs-network:
+              driver: bridge
+          COMPOSE
+          
+          echo "🏃 Starting new containers..."
+          docker-compose up -d
+          
+          echo "🧹 Cleaning up old images..."
+          docker image prune -af --filter "until=168h"
+          
+          echo "✅ Deployment completed!"
+          EOF
+          
+          chmod +x deploy.sh
+          
+          # Copy and execute deployment script on server
+          scp deploy.sh $SERVER_USER@$SERVER_HOST:~/deploy.sh
+          ssh $SERVER_USER@$SERVER_HOST 'bash ~/deploy.sh && rm ~/deploy.sh'
+          
+          rm deploy.sh
+
+      - name: Verify deployment
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 10
+          curl -f http://$SERVER_HOST:3000/health || exit 1
+          echo "✅ Server is healthy!"

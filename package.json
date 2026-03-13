@@ -1,21 +1,32 @@
 {
   "name": "virtual-tabletop",
   "version": "1.0.0",
-  "description": "",
+  "description": "STFCS - Tactical Space Fleet Combat System",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint . --ext .ts,.tsx,.vue",
+    "lint:fix": "eslint . --ext .ts,.tsx,.vue --fix",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/node": "^25.4.0",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.16.0",
+    "@typescript-eslint/parser": "^8.16.0",
+    "eslint": "^9.15.0",
+    "eslint-plugin-vue": "^9.31.0",
+    "globals": "^15.12.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vue-eslint-parser": "^9.4.3"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
