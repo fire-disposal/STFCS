@@ -1,6 +1,6 @@
-import type { WSMessage } from '@stfcs/shared/ws';
-import type { IWSServer } from '@stfcs/shared/ws';
-import type { PlayerInfo } from '@stfcs/shared/types';
+import type { WSMessage } from '@vt/shared/ws';
+import type { IWSServer } from '@vt/shared/ws';
+import type { PlayerInfo } from '@vt/shared/types';
 
 export interface Room {
   id: string;

@@ -1,6 +1,6 @@
-import { router, publicProcedure, z } from './trpc';
-import type { ShipService } from '../application/ship/ShipService';
-import type { ShipStatus } from '@stfcs/shared/types';
+import { router, publicProcedure, z } from '../trpc';
+import type { ShipService } from '../../application/ship/ShipService';
+import type { ShipStatus } from '@vt/shared/types';
 
 export interface ShipRouterDeps {
   shipService: ShipService;

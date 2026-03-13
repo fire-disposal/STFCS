@@ -1,6 +1,6 @@
-import { router, publicProcedure, z } from './trpc';
-import type { PlayerService } from '../application/player/PlayerService';
-import type { PlayerInfo } from '@stfcs/shared/types';
+import { router, publicProcedure, z } from '../trpc';
+import type { PlayerService } from '../../application/player/PlayerService';
+import type { PlayerInfo } from '@vt/shared/types';
 
 export interface PlayerRouterDeps {
   playerService: PlayerService;

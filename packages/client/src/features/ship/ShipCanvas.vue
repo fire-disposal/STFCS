@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Application, Container } from 'pixi.js'
 import { useShipStore } from '@/stores/useShipStore'
 import { ShipToken } from './ShipToken'

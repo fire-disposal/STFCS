@@ -8,7 +8,7 @@ import { PlayerService } from '../application/player/PlayerService';
 import { ShipService } from '../application/ship/ShipService';
 import { createAppRouter, AppRouter } from '../api/routers';
 import { config } from '../config';
-import type { WSMessage } from '@stfcs/shared/ws';
+import type { WSMessage } from '@vt/shared/ws';
 
 export interface ServerOptions {
   httpPort?: number;
@@ -127,7 +127,7 @@ export class Application {
   }
 
   private async _setupErrorHandler(): Promise<void> {
-    this._fastify.setErrorHandler((error, request, reply) => {
+    this._fastify.setErrorHandler((error: any, request, reply) => {
       this._fastify.log.error(error);
 
       reply.status(error.statusCode ?? 500).send({

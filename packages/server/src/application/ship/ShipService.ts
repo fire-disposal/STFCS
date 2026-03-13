@@ -2,9 +2,9 @@ import { Ship } from '../../domain/ship/Ship';
 import type { ShipConfig, ShipMovementPhase, MovementValidationResult } from '../../domain/ship/types';
 import type { ShipEvent } from '../../domain/ship/events';
 import type { ShipStatus as DomainShipStatus } from '../../domain/ship/ShipStatus';
-import type { ShipStatus, ShipMovement } from '@stfcs/shared/types';
-import { WS_MESSAGE_TYPES } from '@stfcs/shared/ws';
-import type { IWSServer } from '@stfcs/shared/ws';
+import type { ShipStatus, ShipMovement } from '@vt/shared/types';
+import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
+import type { IWSServer } from '@vt/shared/ws';
 import type { RoomManager } from '../../infrastructure/ws/RoomManager';
 
 export interface MoveShipCommand {

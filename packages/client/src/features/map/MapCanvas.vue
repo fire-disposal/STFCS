@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Application, Container } from 'pixi.js'
 import { useMapStore } from '@/stores/useMapStore'
 import { CameraController } from './CameraController'
@@ -44,7 +44,7 @@ let cameraController: CameraController | null = null
 let terrainLayer: TerrainLayer | null = null
 let tokenLayer: TokenLayer | null = null
 let placementOverlay: PlacementOverlay | null = null
-let syncInterval: NodeJS.Timeout | null = null
+let syncInterval: ReturnType<typeof setInterval> | null = null
 
 const worldContainer = new Container()
 const uiContainer = new Container()

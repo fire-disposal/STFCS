@@ -1,6 +1,6 @@
-import type { PlayerInfo } from '@stfcs/shared/types';
-import { WS_MESSAGE_TYPES } from '@stfcs/shared/ws';
-import type { IWSServer } from '@stfcs/shared/ws';
+import type { PlayerInfo } from '@vt/shared/types';
+import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
+import type { IWSServer } from '@vt/shared/ws';
 import type { RoomManager } from '../../infrastructure/ws/RoomManager';
 
 export interface JoinPlayerResult {

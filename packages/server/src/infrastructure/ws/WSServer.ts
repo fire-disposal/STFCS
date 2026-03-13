@@ -1,6 +1,6 @@
 import WebSocket, { WebSocketServer } from 'ws';
-import type { WSMessage } from '@stfcs/shared/ws';
-import type { IWSServer } from '@stfcs/shared/ws';
+import type { WSMessage } from '@vt/shared/ws';
+import type { IWSServer } from '@vt/shared/ws';
 import { config } from '../../config';
 
 export interface WSServerOptions {

@@ -1,6 +1,41 @@
 import type { IWSClient, WSMessage, WSMessageType, WSMessage as SharedWSMessage } from '@vt/shared'
 import { useShipStore } from '@/stores/useShipStore'
 import { useCombatStore } from '@/stores/useCombatStore'
+import { useDrawingStore } from '@/stores/useDrawingStore'
+import { useChatStore } from '@/stores/useChatStore'
+
+let shipStoreInstance: ReturnType<typeof useShipStore> | null = null
+let combatStoreInstance: ReturnType<typeof useCombatStore> | null = null
+let drawingStoreInstance: ReturnType<typeof useDrawingStore> | null = null
+let chatStoreInstance: ReturnType<typeof useChatStore> | null = null
+
+function getShipStore() {
+  if (!shipStoreInstance) {
+    shipStoreInstance = useShipStore()
+  }
+  return shipStoreInstance
+}
+
+function getCombatStore() {
+  if (!combatStoreInstance) {
+    combatStoreInstance = useCombatStore()
+  }
+  return combatStoreInstance
+}
+
+function getDrawingStore() {
+  if (!drawingStoreInstance) {
+    drawingStoreInstance = useDrawingStore()
+  }
+  return drawingStoreInstance
+}
+
+function getChatStore() {
+  if (!chatStoreInstance) {
+    chatStoreInstance = useChatStore()
+  }
+  return chatStoreInstance
+}
 
 export class WSClient implements IWSClient {
   private ws: WebSocket | null = null
@@ -10,9 +45,6 @@ export class WSClient implements IWSClient {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-
-  private shipStore = useShipStore()
-  private combatStore = useCombatStore()
 
   constructor(url: string) {
     this.url = url
@@ -90,6 +122,15 @@ export class WSClient implements IWSClient {
       case 'COMBAT_EVENT':
         this.handleCombatEvent(message.payload as any)
         break
+      case 'DRAWING_ADD':
+        this.handleDrawingAdd(message.payload as any)
+        break
+      case 'DRAWING_CLEAR':
+        this.handleDrawingClear(message.payload as any)
+        break
+      case 'CHAT_MESSAGE':
+        this.handleChatMessage(message.payload as any)
+        break
       case 'ERROR':
         this.handleError(message.payload as any)
         break
@@ -98,33 +139,36 @@ export class WSClient implements IWSClient {
 
   private handlePlayerJoined(payload: any): void {
     console.log('[WSClient] Player joined:', payload)
+    getChatStore().addSystemMessage(`${payload.name} joined the room`)
   }
 
   private handlePlayerLeft(payload: any): void {
     console.log('[WSClient] Player left:', payload)
+    getChatStore().addSystemMessage(`Player left the room`)
   }
 
   private handleShipMoved(payload: any): void {
     const { shipId, newX, newY, newHeading } = payload
-    this.shipStore.updateShip(shipId, {
+    getShipStore().updateShip(shipId, {
       position: { x: newX, y: newY },
       heading: newHeading
     })
   }
 
   private handleShipStatusUpdate(payload: any): void {
-    this.shipStore.updateShip(payload.id, payload)
+    getShipStore().updateShip(payload.id, payload)
   }
 
   private handleExplosion(payload: any): void {
-    this.combatStore.showExplosion(payload)
+    getCombatStore().showExplosion(payload)
   }
 
   private handleShieldUpdate(payload: any): void {
     const { shipId, active, type, coverageAngle } = payload
-    const ship = this.shipStore.ships.get(shipId)
+    const shipStore = getShipStore()
+    const ship = shipStore.ships.get(shipId)
     if (ship) {
-      this.shipStore.updateShip(shipId, {
+      shipStore.updateShip(shipId, {
         shield: {
           ...ship.shield,
           active,
@@ -137,9 +181,10 @@ export class WSClient implements IWSClient {
 
   private handleFluxState(payload: any): void {
     const { shipId, fluxState, currentFlux, softFlux, hardFlux } = payload
-    const ship = this.shipStore.ships.get(shipId)
+    const shipStore = getShipStore()
+    const ship = shipStore.ships.get(shipId)
     if (ship) {
-      this.shipStore.updateShip(shipId, {
+      shipStore.updateShip(shipId, {
         flux: {
           ...ship.flux,
           current: currentFlux,
@@ -153,10 +198,11 @@ export class WSClient implements IWSClient {
 
   private handleCombatEvent(payload: any): void {
     const { sourceShipId, targetShipId, weaponId, hit, damage, hitQuadrant } = payload
-    const ship = this.shipStore.ships.get(targetShipId)
+    const shipStore = getShipStore()
+    const ship = shipStore.ships.get(targetShipId)
     const position = ship ? ship.position : { x: 0, y: 0 }
 
-    this.combatStore.handleCombatEvent(
+    getCombatStore().handleCombatEvent(
       sourceShipId,
       targetShipId,
       weaponId,
@@ -165,6 +211,18 @@ export class WSClient implements IWSClient {
       hitQuadrant,
       position
     )
+  }
+
+  private handleDrawingAdd(payload: { playerId: string; element: any }): void {
+    getDrawingStore().addElement(payload.element)
+  }
+
+  private handleDrawingClear(_payload: { playerId: string }): void {
+    getDrawingStore().clear()
+  }
+
+  private handleChatMessage(payload: { senderId: string; senderName: string; content: string; timestamp: number }): void {
+    getChatStore().handleWSMessage(payload)
   }
 
   private handleError(payload: any): void {
@@ -204,6 +262,20 @@ export class WSClient implements IWSClient {
       return
     }
     this.ws.send(JSON.stringify(message))
+  }
+
+  sendDrawing(element: any): void {
+    this.send({
+      type: 'DRAWING_ADD' as any,
+      payload: { element }
+    } as any)
+  }
+
+  sendChat(content: string): void {
+    this.send({
+      type: 'CHAT_MESSAGE' as any,
+      payload: { content }
+    } as any)
   }
 
   on(type: WSMessageType, handler: (payload: unknown) => void): void {
