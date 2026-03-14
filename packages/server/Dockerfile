@@ -15,6 +15,7 @@ RUN npm install -g pnpm@10.32.1
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/server/package.json ./packages/server/
+COPY packages/client/package.json ./packages/client/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -34,9 +35,13 @@ COPY --from=deps /app/packages/server/node_modules ./packages/server/node_module
 COPY pnpm-workspace.yaml package.json ./
 COPY packages/shared ./packages/shared
 COPY packages/server ./packages/server
+COPY packages/client ./packages/client
 
 # Build shared package first
 RUN pnpm --filter @vt/shared build
+
+# Build client
+RUN pnpm --filter client build
 
 # Build server
 RUN pnpm --filter server build
@@ -56,6 +61,7 @@ COPY --from=builder /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/server/package.json ./packages/server/
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
+COPY --from=builder /app/packages/client/dist ./packages/server/dist/public
 
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile

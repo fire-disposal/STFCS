@@ -1,4 +1,6 @@
 import fastifyCors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
+import path from "path";
 import type { WSMessage } from "@vt/shared/ws";
 import Fastify, { FastifyInstance, type FastifyError } from "fastify";
 import { PlayerService } from "../application/player/PlayerService";
@@ -44,6 +46,23 @@ export class Application {
 
 	async initialize(): Promise<void> {
 		await this._setupCors();
+
+		// Serve client static assets if present
+		try {
+			const publicDir = path.resolve(process.cwd(), "packages/server/dist/public");
+			this._fastify.register(fastifyStatic, {
+				root: publicDir,
+				prefix: "/",
+				index: "index.html",
+			});
+
+			// SPA fallback to index.html for client-side routing
+			this._fastify.setNotFoundHandler((request, reply) => {
+				reply.sendFile("index.html");
+			});
+		} catch (err) {
+			this._fastify.log.info("No static client files found (skipping static serve)");
+		}
 		await this._setupHealthCheck();
 		await this._setupErrorHandler();
 
