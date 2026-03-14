@@ -88,7 +88,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppReturn {
 	return {
 		app: appRef.current,
 		stage: stageRef.current,
-		canvasRef,
+		canvasRef: canvasRef as React.RefObject<HTMLDivElement>,
 		isReady,
 	};
 }
