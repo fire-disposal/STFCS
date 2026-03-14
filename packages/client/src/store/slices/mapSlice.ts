@@ -1,5 +1,5 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { MapConfig, TokenInfo } from "@vt/shared/types";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
+import type { MapConfig, PlayerCamera, TokenInfo } from "@vt/shared/types";
 
 export interface MapTile {
 	x: number;
@@ -28,13 +28,8 @@ interface MapState {
 	selectedTokenId: string | null;
 	placementMode: boolean;
 	placementPreview: PlacementPreview | null;
-	camera: {
-		x: number;
-		y: number;
-		zoom: number;
-		minZoom: number;
-		maxZoom: number;
-	};
+	// 其他玩家的相机状态（用于预览）
+	otherPlayersCameras: Record<string, PlayerCamera>;
 }
 
 const initialState: MapState = {
@@ -49,17 +44,63 @@ const initialState: MapState = {
 		gridColor: 0x1a1a3e,
 		showGrid: true,
 	},
-	tokens: {},
+	tokens: {
+		ship_1: {
+			id: "ship_1",
+			ownerId: "player_1",
+			position: { x: 1000, y: 1000 },
+			heading: 45,
+			type: "ship",
+			size: 50,
+			scale: 1.0,
+			turnState: "waiting",
+			maxMovement: 300,
+			remainingMovement: 300,
+			actionsPerTurn: 3,
+			remainingActions: 3,
+			layer: 1,
+			collisionRadius: 60,
+			metadata: { class: "battlecruiser", faction: "terran" },
+		},
+		station_1: {
+			id: "station_1",
+			ownerId: "neutral",
+			position: { x: 2000, y: 1500 },
+			heading: 0,
+			type: "station",
+			size: 100,
+			scale: 1.0,
+			turnState: "waiting",
+			maxMovement: 0,
+			remainingMovement: 0,
+			actionsPerTurn: 0,
+			remainingActions: 0,
+			layer: 2,
+			collisionRadius: 120,
+			metadata: { type: "research_station" },
+		},
+		asteroid_1: {
+			id: "asteroid_1",
+			ownerId: "environment",
+			position: { x: 1500, y: 800 },
+			heading: 0,
+			type: "asteroid",
+			size: 30,
+			scale: 1.0,
+			turnState: "waiting",
+			maxMovement: 0,
+			remainingMovement: 0,
+			actionsPerTurn: 0,
+			remainingActions: 0,
+			layer: 0,
+			collisionRadius: 40,
+			metadata: { size: "large", composition: "metallic" },
+		},
+	},
 	selectedTokenId: null,
 	placementMode: false,
 	placementPreview: null,
-	camera: {
-		x: 0,
-		y: 0,
-		zoom: 1,
-		minZoom: 0.5,
-		maxZoom: 4,
-	},
+	otherPlayersCameras: {},
 };
 
 const mapSlice = createSlice({
@@ -72,10 +113,7 @@ const mapSlice = createSlice({
 		addToken: (state, action: PayloadAction<TokenInfo>) => {
 			state.tokens[action.payload.id] = action.payload;
 		},
-		updateToken: (
-			state,
-			action: PayloadAction<{ id: string; updates: Partial<TokenInfo> }>,
-		) => {
+		updateToken: (state, action: PayloadAction<{ id: string; updates: Partial<TokenInfo> }>) => {
 			const token = state.tokens[action.payload.id];
 			if (token) {
 				state.tokens[action.payload.id] = {
@@ -99,45 +137,23 @@ const mapSlice = createSlice({
 				state.placementPreview = null;
 			}
 		},
-		updatePlacementPreview: (
-			state,
-			action: PayloadAction<PlacementPreview | null>,
-		) => {
+		updatePlacementPreview: (state, action: PayloadAction<PlacementPreview | null>) => {
 			state.placementPreview = action.payload;
-		},
-		updateCamera: (
-			state,
-			action: PayloadAction<Partial<MapState["camera"]>>,
-		) => {
-			const newZoom = Math.max(
-				state.camera.minZoom,
-				Math.min(
-					state.camera.maxZoom,
-					action.payload.zoom ?? state.camera.zoom,
-				),
-			);
-
-			state.camera = {
-				...state.camera,
-				...action.payload,
-				zoom: newZoom,
-			};
-
-			// 限制相机边界
-			state.camera.x = Math.max(
-				-(state.config.width * newZoom - window.innerWidth) / newZoom,
-				Math.min(0, state.camera.x),
-			);
-			state.camera.y = Math.max(
-				-(state.config.height * newZoom - window.innerHeight) / newZoom,
-				Math.min(0, state.camera.y),
-			);
-		},
-		resetCamera: (state) => {
-			state.camera = initialState.camera;
 		},
 		toggleGrid: (state) => {
 			state.config.showGrid = !state.config.showGrid;
+		},
+		// 更新其他玩家的相机状态
+		updateOtherPlayerCamera: (state, action: PayloadAction<PlayerCamera>) => {
+			state.otherPlayersCameras[action.payload.playerId] = action.payload;
+		},
+		// 移除其他玩家的相机状态（玩家离开时）
+		removeOtherPlayerCamera: (state, action: PayloadAction<string>) => {
+			delete state.otherPlayersCameras[action.payload];
+		},
+		// 清空所有其他玩家的相机状态
+		clearOtherPlayersCameras: (state) => {
+			state.otherPlayersCameras = {};
 		},
 	},
 });
@@ -150,9 +166,10 @@ export const {
 	selectToken,
 	setPlacementMode,
 	updatePlacementPreview,
-	updateCamera,
-	resetCamera,
 	toggleGrid,
+	updateOtherPlayerCamera,
+	removeOtherPlayerCamera,
+	clearOtherPlayersCameras,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;

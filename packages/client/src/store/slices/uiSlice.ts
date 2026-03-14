@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 
 export interface PanelState {
 	id: string;
@@ -32,8 +32,15 @@ export interface ConnectionState {
 	serverUrl: string;
 	playerId: string | null;
 	roomId: string | null;
+	playerName: string;
 	isConnecting: boolean;
 	lastPing: number;
+}
+
+export interface DMPlayerState {
+	id: string;
+	name: string;
+	isDMMode: boolean;
 }
 
 interface UIState {
@@ -55,6 +62,10 @@ interface UIState {
 		timestamp: number;
 		timeout: number;
 	}>;
+	dmMode: {
+		isDMMode: boolean;
+		players: DMPlayerState[];
+	};
 }
 
 const initialState: UIState = {
@@ -95,6 +106,7 @@ const initialState: UIState = {
 		serverUrl: "ws://localhost:3001",
 		playerId: null,
 		roomId: null,
+		playerName: "",
 		isConnecting: false,
 		lastPing: 0,
 	},
@@ -106,6 +118,10 @@ const initialState: UIState = {
 	zoomLevel: 1,
 	theme: "dark",
 	notifications: [],
+	dmMode: {
+		isDMMode: false,
+		players: [],
+	},
 };
 
 const uiSlice = createSlice({
@@ -118,16 +134,10 @@ const uiSlice = createSlice({
 				panel.collapsed = !panel.collapsed;
 			}
 		},
-		setPanelWidth: (
-			state,
-			action: PayloadAction<{ id: string; width: number }>,
-		) => {
+		setPanelWidth: (state, action: PayloadAction<{ id: string; width: number }>) => {
 			const panel = state.panels[action.payload.id];
 			if (panel) {
-				panel.width = Math.max(
-					panel.minWidth,
-					Math.min(panel.maxWidth, action.payload.width),
-				);
+				panel.width = Math.max(panel.minWidth, Math.min(panel.maxWidth, action.payload.width));
 			}
 		},
 		addChatMessage: (state, action: PayloadAction<ChatMessage>) => {
@@ -159,16 +169,13 @@ const uiSlice = createSlice({
 		},
 		removeDrawingElement: (state, action: PayloadAction<string>) => {
 			state.drawingElements = state.drawingElements.filter(
-				(element) => element.id !== action.payload,
+				(element) => element.id !== action.payload
 			);
 		},
 		clearDrawingElements: (state) => {
 			state.drawingElements = [];
 		},
-		setConnectionState: (
-			state,
-			action: PayloadAction<Partial<ConnectionState>>,
-		) => {
+		setConnectionState: (state, action: PayloadAction<Partial<ConnectionState>>) => {
 			state.connection = { ...state.connection, ...action.payload };
 		},
 		setConnected: (state, action: PayloadAction<boolean>) => {
@@ -191,13 +198,13 @@ const uiSlice = createSlice({
 		setRoomId: (state, action: PayloadAction<string | null>) => {
 			state.connection.roomId = action.payload;
 		},
+		setPlayerName: (state, action: PayloadAction<string>) => {
+			state.connection.playerName = action.payload;
+		},
 		updatePing: (state) => {
 			state.connection.lastPing = Date.now();
 		},
-		setSelectedTool: (
-			state,
-			action: PayloadAction<UIState["selectedTool"]>,
-		) => {
+		setSelectedTool: (state, action: PayloadAction<UIState["selectedTool"]>) => {
 			state.selectedTool = action.payload;
 		},
 		setDrawingColor: (state, action: PayloadAction<string>) => {
@@ -224,7 +231,7 @@ const uiSlice = createSlice({
 				message: string;
 				type: UIState["notifications"][0]["type"];
 				timeout?: number;
-			}>,
+			}>
 		) => {
 			const notification = {
 				id: `notification_${Date.now()}`,
@@ -237,7 +244,7 @@ const uiSlice = createSlice({
 		},
 		removeNotification: (state, action: PayloadAction<string>) => {
 			state.notifications = state.notifications.filter(
-				(notification) => notification.id !== action.payload,
+				(notification) => notification.id !== action.payload
 			);
 		},
 		clearNotifications: (state) => {
@@ -254,6 +261,16 @@ const uiSlice = createSlice({
 			state.showCoordinates = initialState.showCoordinates;
 			state.zoomLevel = initialState.zoomLevel;
 			state.notifications = [];
+		},
+		setDMMode: (state, action: PayloadAction<boolean>) => {
+			state.dmMode.isDMMode = action.payload;
+		},
+		updateDMPlayers: (state, action: PayloadAction<DMPlayerState[]>) => {
+			state.dmMode.players = action.payload;
+			const currentPlayer = state.dmMode.players.find(
+				(p) => p.id === state.connection.playerId
+			);
+			state.dmMode.isDMMode = currentPlayer?.isDMMode || false;
 		},
 	},
 });
@@ -273,6 +290,7 @@ export const {
 	setServerUrl,
 	setPlayerId,
 	setRoomId,
+	setPlayerName,
 	updatePing,
 	setSelectedTool,
 	setDrawingColor,
@@ -285,6 +303,8 @@ export const {
 	removeNotification,
 	clearNotifications,
 	resetUI,
+	setDMMode,
+	updateDMPlayers,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -1,9 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { useAppDispatch, useAppSelector } from "@/store";
-import { selectShip } from "@/store/slices/shipSlice";
-import { selectToken } from "@/store/slices/mapSlice";
-import { setSelectedTool } from "@/store/slices/uiSlice";
+import GameCanvas from "@/components/map/GameCanvas";
 import { websocketService } from "@/services/websocket";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { selectToken } from "@/store/slices/mapSlice";
+import { selectShip } from "@/store/slices/shipSlice";
+import { setSelectedTool } from "@/store/slices/uiSlice";
+import {
+	nextTurnUnit,
+	selectTurnOrder,
+	selectCurrentUnit,
+} from "@/store/slices/turnSlice";
+import TurnIndicator from "@/features/ui/TurnIndicator";
+import DMToggleButton from "@/features/ui/DMToggleButton";
+import { TopZoomIndicator } from "@/features/ui/TopZoomIndicator";
+import React, { useState, useEffect, useRef } from "react";
+import {
+	MousePointer,
+	Hand,
+	Edit3,
+	Ruler,
+	MapPin,
+	SkipForward,
+	LogOut,
+	Circle,
+} from "lucide-react";
 
 interface GameViewProps {
 	onDisconnect: () => void;
@@ -15,20 +34,42 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 	const [chatExpanded, setChatExpanded] = useState(false);
 
+	// 获取相机状态用于显示
+	const camera = useAppSelector((state) => state.camera.local);
+
+	// 获取 canvas ref 用于缩放控制
+	const canvasRef = useRef<HTMLDivElement>(null);
+
+	// 缩放控制处理
+	const handleZoomIn = () => {
+		// 通过自定义事件通知 GameCanvas
+		window.dispatchEvent(new CustomEvent("game-zoom", { detail: { action: "in" } }));
+	};
+
+	const handleZoomOut = () => {
+		window.dispatchEvent(new CustomEvent("game-zoom", { detail: { action: "out" } }));
+	};
+
+	const handleResetZoom = () => {
+		window.dispatchEvent(new CustomEvent("game-zoom", { detail: { action: "reset" } }));
+	};
+
 	// 在组件顶层获取所有需要的状态
 	const { selectedShipId } = useAppSelector((state) => state.ship);
 	const { selectedTokenId, tokens } = useAppSelector((state) => state.map);
 	const { selectedTool } = useAppSelector((state) => state.ui);
 	const { roomId, currentPlayerId, players } = useAppSelector((state) => state.player);
+	const turnOrder = useAppSelector(selectTurnOrder);
+	const currentUnit = useAppSelector(selectCurrentUnit);
 
-	// 获取选中的token
+	// 获取选中的 token
 	const selectedToken = selectedTokenId ? tokens[selectedTokenId] : null;
 
-	// 处理token点击
+	// 处理 token 点击
 	const handleTokenClick = (tokenId: string) => {
 		dispatch(selectToken(tokenId));
 
-		// 如果是舰船token，也选中对应的舰船
+		// 如果是舰船 token，也选中对应的舰船
 		const token = tokens[tokenId];
 		if (token && token.type === "ship") {
 			dispatch(selectShip(token.id));
@@ -45,12 +86,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		if (currentPlayerId && content.trim()) {
 			const player = players[currentPlayerId];
 			if (player) {
-				websocketService.sendChatMessage(
-					content,
-					currentPlayerId,
-					player.name,
-					"player"
-				);
+				websocketService.sendChatMessage(content, currentPlayerId, player.name, "player");
 			}
 		}
 	};
@@ -90,7 +126,25 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		});
 	};
 
-	// 初始化WebSocket消息处理器
+	// 处理单位点击
+	const handleUnitClick = (unit: any) => {
+		console.log("Unit clicked:", unit);
+		// 可以在这里添加选中单位对应的 token 或舰船
+	};
+
+	// 处理单位悬停
+	const handleUnitHover = (unit: any) => {
+		if (unit) {
+			console.log("Unit hovered:", unit);
+		}
+	};
+
+	// 处理下一回合
+	const handleNextTurn = () => {
+		dispatch(nextTurnUnit());
+	};
+
+	// 初始化 WebSocket 消息处理器
 	useEffect(() => {
 		// 设置舰船移动处理器
 		websocketService.on("SHIP_MOVED", (payload) => {
@@ -116,31 +170,35 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 			<div className="game-toolbar">
 				<div className="toolbar">
 					<div className="toolbar-section">
+						{/* 顶栏缩放指示器 */}
+						<TopZoomIndicator
+							zoom={camera.zoom}
+							minZoom={camera.minZoom}
+							maxZoom={camera.maxZoom}
+							onZoomIn={handleZoomIn}
+							onZoomOut={handleZoomOut}
+							onReset={handleResetZoom}
+						/>
+					</div>
+
+					<div className="toolbar-section">
 						<div className="toolbar-title">Tools</div>
 						<div className="tool-buttons">
 							{["select", "pan", "draw", "measure", "place"].map((tool) => (
 								<button
 									key={tool}
-									className={`tool-button ${
-										selectedTool === tool ? "active" : ""
-									}`}
+									className={`tool-button ${selectedTool === tool ? "active" : ""}`}
 									onClick={() => handleToolSelect(tool)}
 									title={tool.charAt(0).toUpperCase() + tool.slice(1)}
 								>
 									<span className="tool-icon">
-										{tool === "select"
-											? "🖱️"
-											: tool === "pan"
-											? "✋"
-											: tool === "draw"
-											? "✏️"
-											: tool === "measure"
-											? "📏"
-											: "📍"}
+										{tool === "select" ? <MousePointer size={16} /> :
+											tool === "pan" ? <Hand size={16} /> :
+												tool === "draw" ? <Edit3 size={16} /> :
+													tool === "measure" ? <Ruler size={16} /> :
+														<MapPin size={16} />}
 									</span>
-									<span className="tool-label">
-										{tool.charAt(0).toUpperCase() + tool.slice(1)}
-									</span>
+									<span className="tool-label">{tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
 								</button>
 							))}
 						</div>
@@ -149,20 +207,12 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					<div className="toolbar-section">
 						<div className="toolbar-title">Game</div>
 						<div className="game-controls">
-							<button
-								className="game-button"
-								onClick={handleEndTurn}
-								title="End Turn"
-							>
-								<span className="game-icon">⏭️</span>
+							<button className="game-button" onClick={handleEndTurn} title="End Turn">
+								<span className="game-icon"><SkipForward size={16} /></span>
 								<span className="game-label">End Turn</span>
 							</button>
-							<button
-								className="game-button danger"
-								onClick={onDisconnect}
-								title="Disconnect"
-							>
-								<span className="game-icon">🚪</span>
+							<button className="game-button danger" onClick={onDisconnect} title="Disconnect">
+								<span className="game-icon"><LogOut size={16} /></span>
 								<span className="game-label">Disconnect</span>
 							</button>
 						</div>
@@ -172,9 +222,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 
 			<div className="game-content">
 				{/* 左侧面板 - 房间和玩家信息 */}
-				<aside
-					className={`game-sidebar left ${leftPanelCollapsed ? "collapsed" : ""}`}
-				>
+				<aside className={`game-sidebar left ${leftPanelCollapsed ? "collapsed" : ""}`}>
 					<button
 						className="panel-toggle"
 						onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
@@ -196,7 +244,11 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 													player.isConnected ? "connected" : "disconnected"
 												}`}
 											>
-												{player.isConnected ? "●" : "○"}
+												{player.isConnected ? (
+													<Circle size={12} style={{ color: "#4ade80" }} />
+												) : (
+													<Circle size={12} style={{ color: "#ef4444" }} />
+												)}
 											</span>
 										</div>
 									))}
@@ -216,67 +268,19 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					)}
 				</aside>
 
-				{/* 主游戏区域 */}
+				{/* 主游戏区域 - 使用 GameCanvas */}
 				<main className="game-main">
-					<div className="map-canvas-placeholder">
-						<div className="map-header">
-							<h3>Map Canvas</h3>
-							<p>Selected Token: {selectedTokenId || "None"}</p>
-							<p>Selected Ship: {selectedShipId || "None"}</p>
-						</div>
-						<div className="map-grid">
-							{/* 简化的网格展示 */}
-							{Array.from({ length: 8 }).map((_, row) => (
-								<div key={row} className="grid-row">
-									{Array.from({ length: 12 }).map((_, col) => (
-										<div key={col} className="grid-cell">
-											{selectedTokenId && row === 3 && col === 5 ? "🚀" : ""}
-										</div>
-									))}
-								</div>
-							))}
-						</div>
-						<div className="map-controls">
-							<button onClick={() => handleTokenClick("test_ship_1")}>
-								Select Test Ship
-							</button>
-							<button
-								onClick={() =>
-									handleShipMove("test_ship_1", { x: 100, y: 100 }, 45, 10)
-								}
-							>
-								Move Ship
-							</button>
-						</div>
-					</div>
-
-					{/* 选中的舰船信息卡片 */}
-					{selectedShipId && (
-						<div className="ship-info-placeholder">
-							<h3>Ship Info</h3>
-							<p>Ship ID: {selectedShipId}</p>
-							<p>Type: Battlecruiser</p>
-							<p>Position: x: 100, y: 100</p>
-							<p>Health: 85%</p>
-							<button
-								onClick={() => {
-									dispatch(selectShip(null));
-									dispatch(selectToken(null));
-								}}
-								className="close-button"
-							>
-								Close
-							</button>
-						</div>
-					)}
+					<GameCanvas />
+					{/* 回合指示器 - 位于右上角 */}
+					<TurnIndicator
+						onUnitClick={handleUnitClick}
+						onUnitHover={handleUnitHover}
+						onNextTurn={handleNextTurn}
+					/>
 				</main>
 
 				{/* 右侧面板 - 战斗日志和系统信息 */}
-				<aside
-					className={`game-sidebar right ${
-						rightPanelCollapsed ? "collapsed" : ""
-					}`}
-				>
+				<aside className={`game-sidebar right ${rightPanelCollapsed ? "collapsed" : ""}`}>
 					<button
 						className="panel-toggle"
 						onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
@@ -290,9 +294,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 								<div className="log-entries">
 									<div className="log-entry">
 										<span className="log-time">12:30:45</span>
-										<span className="log-text">
-											Player1 fired missiles at EnemyShip
-										</span>
+										<span className="log-text">Player1 fired missiles at EnemyShip</span>
 									</div>
 									<div className="log-entry">
 										<span className="log-time">12:31:10</span>
@@ -300,9 +302,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 									</div>
 									<div className="log-entry">
 										<span className="log-time">12:31:25</span>
-										<span className="log-text">
-											EnemyShip returned fire with laser cannons
-										</span>
+										<span className="log-text">EnemyShip returned fire with laser cannons</span>
 									</div>
 								</div>
 							</div>
@@ -334,9 +334,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 							</div>
 							<div className="chat-input">
 								<input type="text" placeholder="Type a message..." />
-								<button onClick={() => handleChatSend("Test message")}>
-									Send
-								</button>
+								<button onClick={() => handleChatSend("Test message")}>Send</button>
 							</div>
 						</div>
 					)}
@@ -359,15 +357,30 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 				</div>
 				<div className="status-item">
 					<span className="status-label">Turn:</span>
-					<span className="status-value">Player 1's Turn</span>
+					<span className="status-value">
+						{currentUnit ? `${currentUnit.name}'s Turn` : "Waiting..."}
+					</span>
 				</div>
 			</div>
 
+			{/* DM 模式切换按钮 */}
+			<DMToggleButton />
+
 			<style>{`
+				.toolbar {
+					display: flex;
+					gap: 24px;
+					align-items: center;
+				}
+
+				.toolbar-section {
+					display: flex;
+					align-items: center;
+					gap: 12px;
+				}
+
 				.room-panel-placeholder,
 				.player-controls-placeholder,
-				.map-canvas-placeholder,
-				.ship-info-placeholder,
 				.combat-log-placeholder,
 				.chat-panel-placeholder {
 					padding: 12px;
@@ -378,8 +391,6 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 
 				.room-panel-placeholder h3,
 				.player-controls-placeholder h3,
-				.map-canvas-placeholder h3,
-				.ship-info-placeholder h3,
 				.combat-log-placeholder h3,
 				.chat-panel-placeholder h3 {
 					color: #aaccff;
@@ -429,74 +440,21 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					color: #fbbf24;
 				}
 
-				.map-grid {
+				.game-content {
 					display: flex;
-					flex-direction: column;
-					gap: 1px;
-					background: rgba(100, 100, 150, 0.1);
-					padding: 8px;
-					border-radius: 4px;
+					flex: 1;
+					overflow: hidden;
+					position: relative;
 				}
 
-				.grid-row {
+				.game-main {
+					flex: 1;
+					position: relative;
+					overflow: hidden;
+					background: rgba(10, 10, 26, 0.95);
 					display: flex;
-					gap: 1px;
-				}
-
-				.grid-cell {
-					width: 30px;
-					height: 30px;
-					background: rgba(30, 30, 60, 0.5);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					font-size: 20px;
-				}
-
-				.map-controls {
-					display: flex;
-					gap: 8px;
-					margin-top: 12px;
-				}
-
-				.map-controls button {
-					background: rgba(40, 40, 80, 0.5);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #aaccff;
-					padding: 6px 12px;
-					border-radius: 4px;
-					cursor: pointer;
-				}
-
-				.map-controls button:hover {
-					background: rgba(60, 60, 100, 0.6);
-				}
-
-				.ship-info-placeholder {
-					position: absolute;
-					top: 20px;
-					right: 20px;
-					width: 250px;
-					background: rgba(15, 15, 30, 0.95);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					border-radius: 8px;
-					padding: 16px;
-					z-index: 100;
-				}
-
-				.close-button {
-					background: rgba(239, 68, 68, 0.2);
-					border: 1px solid #ef4444;
-					color: #ff8a8a;
-					padding: 6px 12px;
-					border-radius: 4px;
-					cursor: pointer;
-					margin-top: 12px;
-					width: 100%;
-				}
-
-				.close-button:hover {
-					background: rgba(239, 68, 68, 0.3);
+					min-height: 0;
+					min-width: 0;
 				}
 
 				.log-entries {

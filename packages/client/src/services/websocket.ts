@@ -6,6 +6,7 @@ import {
 	setRoomId,
 	updatePing,
 } from "@/store/slices/uiSlice";
+import { removeOtherPlayerCamera } from "@/store/slices/mapSlice";
 import type {
 	WSMessage,
 	WSMessageType,
@@ -24,6 +25,7 @@ import type {
 } from "@vt/shared/ws";
 import type { ShipMovement } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
 
 export type { WSMessage, WSMessageType };
 
@@ -66,8 +68,10 @@ export class WebSocketService {
 		});
 
 		this.on(WS_MESSAGE_TYPES.PLAYER_LEFT, (payload) => {
-			const playerId = payload as { playerId: string; reason?: string };
+			const playerId = (payload as { playerId: string; reason?: string }).playerId;
 			console.log("Player left:", playerId);
+			// 清除离开玩家的相机状态
+			store.dispatch(removeOtherPlayerCamera(playerId));
 		});
 
 		this.on(WS_MESSAGE_TYPES.SHIP_MOVED, (payload) => {
@@ -87,6 +91,12 @@ export class WebSocketService {
 		this.on(WS_MESSAGE_TYPES.ROOM_UPDATE, (payload) => {
 			const data = payload as RoomUpdatePayload;
 			console.log("Room updated:", data);
+		});
+
+		this.on(WS_MESSAGE_TYPES.CAMERA_UPDATED, (payload) => {
+			// payload expected to be PlayerCamera
+			const cam = payload as unknown as import("@vt/shared/types").PlayerCamera;
+			store.dispatch(updateOtherPlayerCamera(cam));
 		});
 
 		// 响应处理器
@@ -290,16 +300,23 @@ export class WebSocketService {
 		}
 	}
 
-	public sendPlayerJoined(playerId: string, playerName: string, roomId: string): void {
+	public sendPlayerJoined(
+		playerId: string,
+		playerName: string,
+		roomId: string
+	): void {
+		void roomId;
 		const message: PlayerJoinedMessage = {
 			type: WS_MESSAGE_TYPES.PLAYER_JOINED,
 			payload: {
 				id: playerId,
 				name: playerName,
 				joinedAt: Date.now(),
+				isActive: true,
+				isDMMode: false,
 			},
 		};
-		this.send(message as WSMessage);
+		this.send(message);
 	}
 
 	public sendShipMovement(movement: ShipMovement): void {
@@ -349,14 +366,14 @@ export class WebSocketService {
 	}
 
 	// 事件处理器管理
-	public on<T extends WSMessageType>(type: T, handler: (payload: WSMessagePayloadMap[T]) => void): void {
+	public on(type: WSMessageType, handler: (payload: unknown) => void): void {
 		if (!this.messageHandlers.has(type)) {
 			this.messageHandlers.set(type, []);
 		}
-		this.messageHandlers.get(type)!.push(handler as (payload: unknown) => void);
+		this.messageHandlers.get(type)!.push(handler);
 	}
 
-	public off<T extends WSMessageType>(type: T, handler?: (payload: WSMessagePayloadMap[T]) => void): void {
+	public off(type: WSMessageType, handler?: (payload: unknown) => void): void {
 		const handlers = this.messageHandlers.get(type);
 		if (!handlers) return;
 
@@ -365,7 +382,7 @@ export class WebSocketService {
 			return;
 		}
 
-		const index = handlers.indexOf(handler as (payload: unknown) => void);
+		const index = handlers.indexOf(handler);
 		if (index > -1) {
 			handlers.splice(index, 1);
 		}
