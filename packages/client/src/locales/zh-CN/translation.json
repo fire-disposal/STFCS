@@ -1,0 +1,84 @@
+{
+  "app": {
+    "title": "STFCS - 太空舰队战术战斗系统",
+    "loading": "加载中..."
+  },
+  "connection": {
+    "title": "加入 STFCS 游戏",
+    "description": "输入您的玩家名称加入太空舰队战术战斗模拟。",
+    "playerName": "玩家名称",
+    "unableToConnect": "无法连接到服务器",
+    "connectionStatusText": "无法连接到 {{url}}。请检查服务器是否正在运行。",
+    "formHelp": "最多 32 个字符。在房间中必须唯一。",
+    "submit": {
+      "joining": "正在加入...",
+      "reconnecting": "正在重新连接...",
+      "joinGame": "加入游戏",
+      "retryConnection": "重试连接"
+    },
+    "error": {
+      "nameRequired": "请输入玩家名称",
+      "nameTooLong": "玩家名称不能超过 32 个字符",
+      "failedToJoin": "加入失败：{{error}}",
+      "failedToReconnect": "重新连接失败：{{error}}"
+    }
+  },
+  "connectionInfo": {
+    "title": "服务器信息",
+    "autoConnect": "自动连接到：{{url}}",
+    "serverRunning": "服务器运行在 localhost:3001",
+    "uniqueName": "玩家名称在每个房间中必须唯一",
+    "changeRooms": "加入后可以切换房间"
+  },
+  "game": {
+    "title": "游戏",
+    "disconnect": "断开连接",
+    "settings": "设置",
+    "language": "语言"
+  },
+  "ui": {
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "close": "关闭",
+    "back": "返回",
+    "next": "下一步",
+    "previous": "上一步"
+  },
+  "token": {
+    "info": "Token 信息",
+    "noSelection": "未选择 Token",
+    "clickToSelect": "点击舰船、空间站或小行星进行选择",
+    "basicInfo": "基本信息",
+    "position": "位置",
+    "heading": "朝向",
+    "size": "大小",
+    "scale": "缩放",
+    "layer": "层级",
+    "collision": "碰撞半径",
+    "turnStatus": "回合状态",
+    "movementPoints": "移动点数",
+    "actionPoints": "行动点数",
+    "metadata": "元数据",
+    "actions": "操作",
+    "rotateLeft": "向左旋转 (-15°)",
+    "rotateRight": "向右旋转 (+15°)",
+    "markMoved": "标记为已移动",
+    "markActed": "标记行动已使用",
+    "endTurn": "结束此 Token 回合"
+  },
+  "ship": {
+    "hull": "船体",
+    "flux": "辐能",
+    "shield": "护盾",
+    "armor": "装甲",
+    "weapons": "武器"
+  },
+  "language": {
+    "switcher": {
+      "label": "语言",
+      "chinese": "简体中文",
+      "english": "English"
+    }
+  }
+}

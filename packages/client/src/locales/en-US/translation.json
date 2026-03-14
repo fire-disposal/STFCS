@@ -1,0 +1,84 @@
+{
+  "app": {
+    "title": "STFCS - Tactical Space Fleet Combat System",
+    "loading": "Loading..."
+  },
+  "connection": {
+    "title": "Join STFCS Game",
+    "description": "Enter your player name to join the tactical space fleet combat simulation.",
+    "playerName": "Player Name",
+    "unableToConnect": "Unable to connect to server",
+    "connectionStatusText": "Unable to connect to {{url}}. Please check if the server is running.",
+    "formHelp": "Maximum 32 characters. Must be unique in the room.",
+    "submit": {
+      "joining": "Joining...",
+      "reconnecting": "Reconnecting...",
+      "joinGame": "Join Game",
+      "retryConnection": "Retry Connection"
+    },
+    "error": {
+      "nameRequired": "Please enter your player name",
+      "nameTooLong": "Player name must be 32 characters or less",
+      "failedToJoin": "Failed to join: {{error}}",
+      "failedToReconnect": "Failed to reconnect: {{error}}"
+    }
+  },
+  "connectionInfo": {
+    "title": "Server Information",
+    "autoConnect": "Auto-connected to: {{url}}",
+    "serverRunning": "Server running on localhost:3001",
+    "uniqueName": "Player names must be unique in each room",
+    "changeRooms": "You can change rooms after joining"
+  },
+  "game": {
+    "title": "Game",
+    "disconnect": "Disconnect",
+    "settings": "Settings",
+    "language": "Language"
+  },
+  "ui": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous"
+  },
+  "token": {
+    "info": "Token Info",
+    "noSelection": "No token selected",
+    "clickToSelect": "Click on a ship, station, or asteroid to select it",
+    "basicInfo": "Basic Information",
+    "position": "Position",
+    "heading": "Heading",
+    "size": "Size",
+    "scale": "Scale",
+    "layer": "Layer",
+    "collision": "Collision Radius",
+    "turnStatus": "Turn Status",
+    "movementPoints": "Movement Points",
+    "actionPoints": "Action Points",
+    "metadata": "Metadata",
+    "actions": "Actions",
+    "rotateLeft": "Rotate Left (-15°)",
+    "rotateRight": "Rotate Right (+15°)",
+    "markMoved": "Mark as Moved",
+    "markActed": "Mark Action Used",
+    "endTurn": "End Turn for This Token"
+  },
+  "ship": {
+    "hull": "Hull",
+    "flux": "Flux",
+    "shield": "Shield",
+    "armor": "Armor",
+    "weapons": "Weapons"
+  },
+  "language": {
+    "switcher": {
+      "label": "Language",
+      "chinese": "简体中文",
+      "english": "English"
+    }
+  }
+}
