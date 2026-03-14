@@ -3,7 +3,6 @@ import type {
 	ExplosionData,
 	AttackCommand,
 	CombatResult,
-	ArmorQuadrant,
 } from "@vt/shared/types";
 
 export interface DamageNumber {

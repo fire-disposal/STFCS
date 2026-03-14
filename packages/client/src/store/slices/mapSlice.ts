@@ -124,12 +124,6 @@ const mapSlice = createSlice({
 		},
 		removeToken: (state, action: PayloadAction<string>) => {
 			delete state.tokens[action.payload];
-			if (state.selectedTokenId === action.payload) {
-				state.selectedTokenId = null;
-			}
-		},
-		selectToken: (state, action: PayloadAction<string | null>) => {
-			state.selectedTokenId = action.payload;
 		},
 		setPlacementMode: (state, action: PayloadAction<boolean>) => {
 			state.placementMode = action.payload;
@@ -154,6 +148,10 @@ const mapSlice = createSlice({
 		// 清空所有其他玩家的相机状态
 		clearOtherPlayersCameras: (state) => {
 			state.otherPlayersCameras = {};
+		},
+		// 选择 Token
+		selectToken: (state, action: PayloadAction<string | null>) => {
+			state.selectedTokenId = action.payload;
 		},
 	},
 });

@@ -116,6 +116,18 @@ export class MessageHandler {
 					await this._handleObjectDeselected(clientId, message);
 					break;
 
+				case WS_MESSAGE_TYPES.TOKEN_DRAG_START:
+					await this._handleTokenDragStart(clientId, message);
+					break;
+
+				case WS_MESSAGE_TYPES.TOKEN_DRAGGING:
+					await this._handleTokenDragging(clientId, message);
+					break;
+
+				case WS_MESSAGE_TYPES.TOKEN_DRAG_END:
+					await this._handleTokenDragEnd(clientId, message);
+					break;
+
 				default:
 					console.warn(`Unhandled WS message type: ${message.type}`);
 			}
@@ -737,6 +749,92 @@ export class MessageHandler {
 	setWSServer(wsServer: WSSender): void {
 		this._wsServer = wsServer;
 	}
+
+	// ===== Token 拖拽消息处理 =====
+
+	private async _handleTokenDragStart(clientId: string, message: object): Promise<void> {
+		const payload = (message as TokenDragStartMessage).payload;
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		const result = await this._selectionService.startTokenDrag({
+			tokenId: payload.tokenId,
+			playerId: clientId,
+			position: payload.position,
+			heading: payload.heading,
+			roomId: playerRoom.id,
+		});
+
+		if (!result.success) {
+			this._sendError(clientId, "DRAG_START_ERROR", result.error ?? "Failed to start drag");
+			return;
+		}
+	}
+
+	private async _handleTokenDragging(clientId: string, message: object): Promise<void> {
+		const payload = (message as TokenDraggingMessage).payload;
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		const result = await this._selectionService.updateTokenDrag({
+			tokenId: payload.tokenId,
+			playerId: clientId,
+			position: payload.position,
+			heading: payload.heading,
+			roomId: playerRoom.id,
+		});
+
+		if (!result.success) {
+			// 拖拽更新失败不报错，只是忽略（可能是延迟消息）
+			console.warn(`Failed to update drag for token ${payload.tokenId}:`, result.error);
+		}
+	}
+
+	private async _handleTokenDragEnd(clientId: string, message: object): Promise<void> {
+		const payload = (message as TokenDragEndMessage).payload;
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		const result = await this._selectionService.endTokenDrag({
+			tokenId: payload.tokenId,
+			playerId: clientId,
+			finalPosition: payload.finalPosition,
+			finalHeading: payload.finalHeading,
+			committed: payload.committed,
+			roomId: playerRoom.id,
+		});
+
+		if (!result.success) {
+			this._sendError(clientId, "DRAG_END_ERROR", result.error ?? "Failed to end drag");
+			return;
+		}
+
+		// 如果确认移动，更新 token 位置
+		if (payload.committed) {
+			// 这里可以调用 MapService 更新 token 位置
+			// 由于 MapService 可能在应用层，这里只广播消息
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.TOKEN_MOVED,
+				payload: {
+					tokenId: payload.tokenId,
+					previousPosition: { x: 0, y: 0 }, // TODO: 从服务获取
+					newPosition: payload.finalPosition,
+					previousHeading: 0, // TODO: 从服务获取
+					newHeading: payload.finalHeading,
+					timestamp: Date.now(),
+				},
+			});
+		}
+	}
 }
 
 export default MessageHandler;
@@ -755,6 +853,26 @@ interface ObjectSelectedMessage {
 interface ObjectDeselectedMessage {
 	type: string;
 	payload: { tokenId: string };
+}
+
+interface TokenDragStartMessage {
+	type: string;
+	payload: { tokenId: string; position: { x: number; y: number }; heading: number };
+}
+
+interface TokenDraggingMessage {
+	type: string;
+	payload: { tokenId: string; position: { x: number; y: number }; heading: number };
+}
+
+interface TokenDragEndMessage {
+	type: string;
+	payload: {
+		tokenId: string;
+		finalPosition: { x: number; y: number };
+		finalHeading: number;
+		committed: boolean;
+	};
 }
 
 interface ShipMovedPayload {

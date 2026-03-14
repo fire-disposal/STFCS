@@ -1,50 +1,16 @@
 /* ============================================
    思源黑体 (Source Han Sans CN) - 中文字体
+   使用 Google Fonts Noto Sans SC
    ============================================ */
-@font-face {
-  font-family: 'Source Han Sans CN';
-  src: 
-    local('Source Han Sans CN Regular'),
-    local('Noto Sans SC Regular'),
-    url('https://fonts.gstatic.com/s/notosanssc/v29/k3s7Z2_NnA7U6eK_X0a-T3Z9.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+F900-FAFF, U+2F800-2FA1F;
-}
-
-@font-face {
-  font-family: 'Source Han Sans CN';
-  src: 
-    local('Source Han Sans CN Medium'),
-    local('Noto Sans SC Medium'),
-    url('https://fonts.gstatic.com/s/notosanssc/v29/k3s7Z2_NnA7U6eK_X0a-T3Z9.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+F900-FAFF, U+2F800-2FA1F;
-}
-
-@font-face {
-  font-family: 'Source Han Sans CN';
-  src: 
-    local('Source Han Sans CN Bold'),
-    local('Noto Sans SC Bold'),
-    url('https://fonts.gstatic.com/s/notosanssc/v29/k3s7Z2_NnA7U6eK_X0a-T3Z9.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+F900-FAFF, U+2F800-2FA1F;
-}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
 
 /* ============================================
-   Fira Code - 英文等宽字体（代码/技术文本）
+   Fira Code - 英文等宽字体
+   使用 jsDelivr CDN
    ============================================ */
 @font-face {
   font-family: 'Fira Code';
-  src: 
-    local('Fira Code Regular'),
-    url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Regular.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -54,9 +20,7 @@
 
 @font-face {
   font-family: 'Fira Code';
-  src: 
-    local('Fira Code Medium'),
-    url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Medium.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -66,9 +30,7 @@
 
 @font-face {
   font-family: 'Fira Code';
-  src: 
-    local('Fira Code Bold'),
-    url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Bold.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/fira-code@6.2.0/distr/woff2/FiraCode-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -81,8 +43,8 @@
    ============================================ */
 
 :root {
-  /* 中文字体栈 */
-  --font-sans-cn: 'Source Han Sans CN', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 中文字体栈 - 使用 Noto Sans SC 作为主要字体 */
+  --font-sans-cn: 'Noto Sans SC', 'Source Han Sans CN', 'PingFang SC', 'Microsoft YaHei', 'SimHei', sans-serif;
   
   /* 英文/代码字体栈 */
   --font-mono-en: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -91,7 +53,7 @@
   --font-sans-en: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 }
 
-/* 全局字体设置 */
+/* 全局字体设置 - 根据 HTML lang 属性切换 */
 html[lang="zh-CN"] {
   font-family: var(--font-sans-cn);
 }

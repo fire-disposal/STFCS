@@ -34,7 +34,8 @@
     "title": "Game",
     "disconnect": "Disconnect",
     "settings": "Settings",
-    "language": "Language"
+    "language": "Language",
+    "tools": "Tools"
   },
   "ui": {
     "cancel": "Cancel",

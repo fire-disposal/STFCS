@@ -1,6 +1,8 @@
 /* STFCS - 基础样式文件 */
 /* 太空舰队战斗系统的核心样式 */
 
+@import './styles/fonts.css';
+
 /* ====== 重置和基础样式 ====== */
 * {
     margin: 0;
@@ -14,12 +16,23 @@ body,
     width: 100%;
     height: 100%;
     overflow: hidden;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-        sans-serif;
+    /* 默认字体，根据语言由 html[lang] 覆盖 */
+    font-family: var(--font-sans-en);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* 中文环境下使用思源黑体 */
+html[lang="zh-CN"],
+html[lang="zh-CN"] body,
+html[lang="zh-CN"] #root {
+    font-family: var(--font-sans-cn);
+}
+
+/* 代码相关元素使用 Fira Code */
+code, pre {
+    font-family: var(--font-mono-en) !important;
+    font-feature-settings: "calt" 1;
 }
 
 /* ====== 应用容器 ====== */
@@ -1062,4 +1075,120 @@ body,
     .turn-indicator__unit-owner {
         display: none;
     }
+}
+
+/* ====== 语言切换器 ====== */
+/* 旧版语言切换器样式 - 保留以防兼容 */
+.language-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 16px;
+}
+
+.language-switcher-icon {
+    color: #aaccff;
+}
+
+.language-select {
+    background: transparent;
+    border: none;
+    color: #c0c0d0;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+}
+
+.language-select option {
+    background: #1a1a3e;
+    color: #c0c0d0;
+}
+
+.language-switcher-container {
+    display: flex;
+    justify-content: center;
+}
+
+/* ====== 科幻风格胶囊开关语言切换器（极简方框） ====== */
+.scifi-language-switcher {
+    display: inline-block;
+}
+
+.scifi-switch-track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100px;
+    height: 28px;
+    background: rgba(20, 20, 40, 0.95);
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.scifi-switch-track:hover {
+    border-color: rgba(100, 100, 150, 0.5);
+}
+
+.scifi-switch-label {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 2;
+    padding: 0;
+}
+
+.scifi-switch-label.active .label-text {
+    color: #aaccff;
+    font-weight: 600;
+}
+
+.label-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #8a8aa8;
+    transition: color 0.2s ease;
+}
+
+/* 胶囊滑块 */
+.scifi-switch-capsule {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 4px);
+    height: calc(100% - 4px);
+    background: rgba(74, 158, 255, 0.2);
+    border: 1px solid rgba(74, 158, 255, 0.4);
+    z-index: 1;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+/* ====== 工具栏中的语言切换器位置 ====== */
+.toolbar-language-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* 登录页面头部（包含标题和语言切换器） */
+.connection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.connection-header h2 {
+    margin: 0;
 }

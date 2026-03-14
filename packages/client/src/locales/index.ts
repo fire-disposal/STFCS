@@ -34,7 +34,15 @@ i18n
     react: {
       useSuspense: false,
     },
+    
+    // 语言切换时更新 HTML lang 属性
+    lng: 'en-US',
   });
+
+// 监听语言变化并更新 HTML lang 属性
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.lang = lng;
+});
 
 export default i18n;
 

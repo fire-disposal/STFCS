@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
 
 import { DEFAULT_WS_URL } from "@/config";
 import GameView from "@/features/game/GameView";
@@ -19,52 +21,58 @@ const PlayerNameView: React.FC<{
 	onJoin: (playerName: string) => Promise<void>;
 	onReconnect: () => Promise<void>;
 }> = ({ isConnecting, isConnected, onJoin, onReconnect }) => {
+	const { t } = useTranslation();
 	const [name, setName] = useState("");
 	const [error, setError] = useState("");
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!isConnected) {
-			// 如果未连接，尝试重新连接
 			try {
 				setError("");
 				await onReconnect();
-				// 重新连接成功后，需要用户重新提交名称
 				return;
 			} catch (err) {
-				setError(`Failed to reconnect: ${err instanceof Error ? err.message : String(err)}`);
+				setError(t("connection.error.failedToReconnect", {
+					error: err instanceof Error ? err.message : String(err),
+				}));
 				return;
 			}
 		}
 
 		if (!name.trim()) {
-			setError("Please enter your player name");
+			setError(t("connection.error.nameRequired"));
 			return;
 		}
 		if (name.length > 32) {
-			setError("Player name must be 32 characters or less");
+			setError(t("connection.error.nameTooLong"));
 			return;
 		}
 		setError("");
 		try {
 			await onJoin(name);
 		} catch (err) {
-			setError(`Failed to join: ${err instanceof Error ? err.message : String(err)}`);
+			setError(t("connection.error.failedToJoin", {
+				error: err instanceof Error ? err.message : String(err),
+			}));
 		}
 	};
 
 	return (
 		<div className="connection-view">
 			<div className="connection-card">
-				<h2>Join STFCS Game</h2>
+				<div className="connection-header">
+					<h2>{t("connection.title")}</h2>
+					<SciFiLanguageSwitcher />
+				</div>
 				<p className="connection-description">
-					Enter your player name to join the tactical space fleet combat simulation.
+					{t("connection.description")}
 				</p>
 
 				<form onSubmit={handleSubmit} className="connection-form">
 					<div className="form-group">
 						<label htmlFor="playerName">
-							{isConnected ? "Player Name" : "Unable to connect to server"}
+							{isConnected ? t("connection.playerName") : t("connection.unableToConnect")}
 						</label>
 						{isConnected ? (
 							<input
@@ -80,13 +88,11 @@ const PlayerNameView: React.FC<{
 							/>
 						) : (
 							<div className="connection-status-text">
-								Unable to connect to {DEFAULT_WS_URL}. Please check if the server is running.
+								{t("connection.connectionStatusText", { url: DEFAULT_WS_URL })}
 							</div>
 						)}
 						{isConnected ? (
-							<small className="form-help">
-								Maximum 32 characters. Must be unique in the room.
-							</small>
+							<small className="form-help">{t("connection.formHelp")}</small>
 						) : null}
 						{error && <div className="form-error">{error}</div>}
 					</div>
@@ -100,24 +106,24 @@ const PlayerNameView: React.FC<{
 							{isConnecting ? (
 								<>
 									<span className="spinner"></span>
-									{isConnected ? "Joining..." : "Reconnecting..."}
+									{isConnected ? t("connection.submit.joining") : t("connection.submit.reconnecting")}
 								</>
 							) : isConnected ? (
-								"Join Game"
+								t("connection.submit.joinGame")
 							) : (
-								"Retry Connection"
+								t("connection.submit.retryConnection")
 							)}
 						</button>
 					</div>
 				</form>
 
 				<div className="connection-info">
-					<h3>Server Information</h3>
+					<h3>{t("connectionInfo.title")}</h3>
 					<ul>
-						<li>Auto-connected to: {DEFAULT_WS_URL}</li>
-						<li>Server running on localhost:3001</li>
-						<li>Player names must be unique in each room</li>
-						<li>You can change rooms after joining</li>
+						<li>{t("connectionInfo.autoConnect", { url: DEFAULT_WS_URL })}</li>
+						<li>{t("connectionInfo.serverRunning")}</li>
+						<li>{t("connectionInfo.uniqueName")}</li>
+						<li>{t("connectionInfo.changeRooms")}</li>
 					</ul>
 				</div>
 			</div>
@@ -129,6 +135,7 @@ const PlayerNameView: React.FC<{
 const App: React.FC = () => {
 	const dispatch = useAppDispatch();
 	const { isConnected, playerName, isConnecting } = useAppSelector((state) => state.ui.connection);
+	const { t } = useTranslation();
 
 	// 初始连接
 	useEffect(() => {
@@ -141,7 +148,6 @@ const App: React.FC = () => {
 					console.log("Connected to server:", DEFAULT_WS_URL);
 				} catch (error) {
 					console.error("Failed to connect to server:", error);
-					// 连接失败时保持 disconnected 状态，不抛出错误
 				} finally {
 					dispatch(setConnecting(false));
 				}
@@ -150,7 +156,6 @@ const App: React.FC = () => {
 
 		initConnection();
 
-		// 设置WebSocket消息处理器
 		const handlePlayerJoined = (payload: any) => {
 			console.log("Player joined:", payload);
 		};
@@ -167,14 +172,12 @@ const App: React.FC = () => {
 			console.error("WebSocket error:", payload);
 		};
 
-		// 注册监听器
 		websocketService.on("PLAYER_JOINED", handlePlayerJoined);
 		websocketService.on("PLAYER_LEFT", handlePlayerLeft);
 		websocketService.on("CHAT_MESSAGE", handleChatMessage);
 		websocketService.on("ERROR", handleWebSocketError);
 
 		return () => {
-			// 清理所有监听器
 			websocketService.off("PLAYER_JOINED", handlePlayerJoined);
 			websocketService.off("PLAYER_LEFT", handlePlayerLeft);
 			websocketService.off("CHAT_MESSAGE", handleChatMessage);
@@ -182,29 +185,23 @@ const App: React.FC = () => {
 		};
 	}, [dispatch]);
 
-	// 处理玩家加入游戏
 	const handlePlayerJoin = async (name: string) => {
 		dispatch(setConnecting(true));
 
 		try {
-			// 检查WebSocket连接状态
 			if (!websocketService.isConnected()) {
 				throw new Error("Not connected to server");
 			}
 
-			// 发送玩家加入消息到服务器
-			// 使用临时玩家ID，服务器会分配正式ID
 			const tempPlayerId = `player_${Date.now()}`;
 			const defaultRoomId = "default_room";
 
-			// 发送玩家加入请求
 			await websocketService.sendRequest("player.join", {
 				id: tempPlayerId,
 				name,
 				roomId: defaultRoomId,
 			});
 
-			// 更新本地状态
 			dispatch(setPlayerName(name));
 			dispatch(setPlayerId(tempPlayerId));
 			dispatch(setRoomId(defaultRoomId));
@@ -218,11 +215,9 @@ const App: React.FC = () => {
 		}
 	};
 
-	// 处理重新连接
 	const handleReconnect = async () => {
 		dispatch(setConnecting(true));
 		try {
-			// 如果已经连接，先断开
 			if (websocketService.isConnected()) {
 				websocketService.disconnect();
 				dispatch(setConnected(false));
@@ -239,19 +234,16 @@ const App: React.FC = () => {
 		}
 	};
 
-	// 处理断开连接
 	const handleDisconnect = () => {
 		websocketService.disconnect();
 		dispatch(setConnected(false));
 		dispatch(setPlayerName(""));
 	};
 
-	// 如果已连接且有玩家名称，显示游戏界面
 	if (isConnected && playerName) {
 		return <GameView onDisconnect={handleDisconnect} />;
 	}
 
-	// 其他情况显示登录界面
 	return (
 		<PlayerNameView
 			isConnecting={isConnecting}

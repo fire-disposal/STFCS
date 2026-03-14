@@ -12,7 +12,6 @@ import type {
 	WSMessageType,
 	RoomUpdateMessage,
 	PingMessage,
-	WSMessagePayloadMap,
 	PlayerJoinedMessage,
 	ShipMovedMessage,
 	ChatMessagePayload,
@@ -22,10 +21,18 @@ import type {
 	RequestOperation,
 	ResponseForOperation,
 	RequestPayload,
+	TokenDragStartMessage,
+	TokenDraggingMessage,
+	TokenDragEndMessage,
 } from "@vt/shared/ws";
 import type { ShipMovement } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
+import {
+	beginTokenDrag,
+	updateTokenDrag,
+	endTokenDrag,
+} from "@/store/slices/selectionSlice";
 
 export type { WSMessage, WSMessageType };
 
@@ -97,6 +104,43 @@ export class WebSocketService {
 			// payload expected to be PlayerCamera
 			const cam = payload as unknown as import("@vt/shared/types").PlayerCamera;
 			store.dispatch(updateOtherPlayerCamera(cam));
+		});
+
+		// Token 拖拽处理器
+		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_START, (payload) => {
+			const data = (payload as TokenDragStartMessage["payload"]);
+			store.dispatch(beginTokenDrag({
+				tokenId: data.tokenId,
+				playerId: data.playerId,
+				playerName: data.playerName,
+				position: data.position,
+				heading: data.heading,
+				timestamp: data.timestamp,
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.TOKEN_DRAGGING, (payload) => {
+			const data = (payload as TokenDraggingMessage["payload"]);
+			store.dispatch(updateTokenDrag({
+				tokenId: data.tokenId,
+				playerId: data.playerId,
+				playerName: data.playerName,
+				position: data.position,
+				heading: data.heading,
+				timestamp: data.timestamp,
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_END, (payload) => {
+			const data = (payload as TokenDragEndMessage["payload"]);
+			store.dispatch(endTokenDrag({
+				tokenId: data.tokenId,
+				playerId: data.playerId,
+				finalPosition: data.finalPosition,
+				finalHeading: data.finalHeading,
+				committed: data.committed,
+				timestamp: data.timestamp,
+			}));
 		});
 
 		// 响应处理器
@@ -361,6 +405,72 @@ export class WebSocketService {
 		const message: WSMessage = {
 			type: WS_MESSAGE_TYPES.DRAWING_CLEAR,
 			payload: { playerId },
+		};
+		this.send(message);
+	}
+
+	// ===== Token 拖拽相关方法 =====
+
+	public sendTokenDragStart(
+		tokenId: string,
+		playerId: string,
+		playerName: string,
+		position: { x: number; y: number },
+		heading: number
+	): void {
+		const message: WSMessage = {
+			type: WS_MESSAGE_TYPES.TOKEN_DRAG_START,
+			payload: {
+				tokenId,
+				playerId,
+				playerName,
+				position,
+				heading,
+				timestamp: Date.now(),
+			},
+		};
+		this.send(message);
+	}
+
+	public sendTokenDragging(
+		tokenId: string,
+		playerId: string,
+		playerName: string,
+		position: { x: number; y: number },
+		heading: number
+	): void {
+		const message: WSMessage = {
+			type: WS_MESSAGE_TYPES.TOKEN_DRAGGING,
+			payload: {
+				tokenId,
+				playerId,
+				playerName,
+				position,
+				heading,
+				timestamp: Date.now(),
+				isDragging: true,
+			},
+		};
+		this.send(message);
+	}
+
+	public sendTokenDragEnd(
+		tokenId: string,
+		playerId: string,
+		finalPosition: { x: number; y: number },
+		finalHeading: number,
+		committed: boolean
+	): void {
+		const message: WSMessage = {
+			type: WS_MESSAGE_TYPES.TOKEN_DRAG_END,
+			payload: {
+				tokenId,
+				playerId,
+				finalPosition,
+				finalHeading,
+				timestamp: Date.now(),
+				committed,
+			},
 		};
 		this.send(message);
 	}

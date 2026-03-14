@@ -278,7 +278,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 				.layer-toggle-button {
 					padding: 4px;
 					background: transparent;
-					border: none;
+					border: 1px solid transparent;
 					cursor: pointer;
 					border-radius: 4px;
 					display: flex;
@@ -289,14 +289,17 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 
 				.layer-toggle-button.visible {
 					color: #4a9eff;
+					border-color: rgba(74, 158, 255, 0.3);
 				}
 
 				.layer-toggle-button.hidden {
-					color: #4a5a7f;
+					color: #8a9ebf;
+					border-color: rgba(138, 158, 191, 0.2);
 				}
 
 				.layer-toggle-button:hover {
-					background: rgba(74, 158, 255, 0.2);
+					background: rgba(74, 158, 255, 0.15);
+					border-color: rgba(74, 158, 255, 0.5);
 				}
 			`}</style>
 		</div>

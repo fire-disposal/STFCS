@@ -1,16 +1,11 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type {
 	ArmorQuadrant,
-	ArmorState,
-	FluxState,
 	FluxOverloadState,
-	ShieldSpec,
 	ShipStatus,
-	WeaponType,
-	WeaponMountType,
+	ShipMovement,
 	WeaponSpec,
 	WeaponMount,
-	ShipMovement,
 } from "@vt/shared/types";
 
 export type FluxType = "soft" | "hard";

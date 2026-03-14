@@ -48,8 +48,10 @@ export const WS_MESSAGE_TYPES = {
 	OBJECT_SELECTED: "OBJECT_SELECTED",
 	OBJECT_DESELECTED: "OBJECT_DESELECTED",
 	SELECTION_UPDATE: "SELECTION_UPDATE",
-	// Real-time dragging message
+	// Real-time dragging messages
+	TOKEN_DRAG_START: "TOKEN_DRAG_START",
 	TOKEN_DRAGGING: "TOKEN_DRAGGING",
+	TOKEN_DRAG_END: "TOKEN_DRAG_END",
 	// Turn system messages
 	TURN_ORDER_INITIALIZED: "TURN_ORDER_INITIALIZED",
 	TURN_ORDER_UPDATED: "TURN_ORDER_UPDATED",
@@ -156,10 +158,35 @@ export interface TokenDraggingMessage {
 	payload: {
 		tokenId: string;
 		playerId: string;
+		playerName: string;
 		position: { x: number; y: number };
 		heading: number;
 		timestamp: number;
 		isDragging: boolean;
+	};
+}
+
+export interface TokenDragStartMessage {
+	type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_START;
+	payload: {
+		tokenId: string;
+		playerId: string;
+		playerName: string;
+		position: { x: number; y: number };
+		heading: number;
+		timestamp: number;
+	};
+}
+
+export interface TokenDragEndMessage {
+	type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END;
+	payload: {
+		tokenId: string;
+		playerId: string;
+		finalPosition: { x: number; y: number };
+		finalHeading: number;
+		timestamp: number;
+		committed: boolean; // true = 确认移动，false = 取消移动
 	};
 }
 
@@ -579,7 +606,9 @@ export type WSMessage =
 	| ObjectSelectedMessage
 	| ObjectDeselectedMessage
 	| SelectionUpdateMessage
+	| TokenDragStartMessage
 	| TokenDraggingMessage
+	| TokenDragEndMessage
 	// Turn system messages
 	| TurnOrderInitializedMessage
 	| TurnOrderUpdatedMessage

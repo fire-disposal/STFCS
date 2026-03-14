@@ -6,6 +6,8 @@ import { BrowserRouter } from "react-router-dom";
 
 import { store } from "@/store";
 import App from "./App";
+import "./locales"; // i18n 配置
+import "./styles/fonts.css"; // 字体样式
 import "./styles.css";
 
 // 创建React Query客户端
