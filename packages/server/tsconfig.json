@@ -3,7 +3,10 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,13 +16,28 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "types": ["node", "vitest/globals"],
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@vt/shared": ["../shared/src/index.ts"],
-      "@vt/shared/*": ["../shared/src/*"]
+      "@vt/shared": [
+        "../shared/src/index.ts"
+      ],
+      "@vt/shared/*": [
+        "../shared/src/*"
+      ]
     }
   },
-  "include": ["src/**/*", "../shared/src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/__tests__/*", "**/*.backup.ts"]
+  "include": [
+    "src/**/*",
+    "../shared/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/__tests__/*",
+    "**/*.backup.ts"
+  ]
 }
