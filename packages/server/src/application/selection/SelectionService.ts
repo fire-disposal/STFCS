@@ -13,6 +13,19 @@ export interface SelectionRecord {
 	roomId: string;
 }
 
+/** Token 拖拽状态记录 */
+export interface TokenDragRecord {
+	tokenId: string;
+	playerId: string;
+	playerName: string;
+	isDMMode: boolean;
+	position: { x: number; y: number };
+	heading: number;
+	startTime: number;
+	lastUpdateTime: number;
+	roomId: string;
+}
+
 export interface SelectionConflict {
 	canSelect: boolean;
 	reason?: string;
@@ -27,8 +40,36 @@ export interface SelectObjectRequest {
 	roomId: string;
 }
 
+export interface TokenDragStartRequest {
+	tokenId: string;
+	playerId: string;
+	position: { x: number; y: number };
+	heading: number;
+	roomId: string;
+}
+
+export interface TokenDragUpdateRequest {
+	tokenId: string;
+	playerId: string;
+	position: { x: number; y: number };
+	heading: number;
+	roomId: string;
+}
+
+export interface TokenDragEndRequest {
+	tokenId: string;
+	playerId: string;
+	finalPosition: { x: number; y: number };
+	finalHeading: number;
+	committed: boolean;
+	roomId: string;
+}
+
 export type SelectObjectResult = Result<SelectionRecord, string | SelectionConflict>;
 export type DeselectObjectResult = Result<void>;
+export type TokenDragStartResult = Result<TokenDragRecord, string>;
+export type TokenDragUpdateResult = Result<TokenDragRecord, string>;
+export type TokenDragEndResult = Result<{ committed: boolean }, string>;
 
 export interface SelectionUpdate {
 	selections: Array<{
@@ -51,16 +92,24 @@ export interface ISelectionService {
 	getAllSelections(roomId: string): SelectionRecord[];
 	broadcastSelectionUpdate(roomId: string): void;
 	canSelect(tokenId: string, playerId: string, isDMMode: boolean, roomId: string): SelectionConflict;
+	// Token 拖拽相关方法
+	startTokenDrag(request: TokenDragStartRequest): Promise<TokenDragStartResult>;
+	updateTokenDrag(request: TokenDragUpdateRequest): Promise<TokenDragUpdateResult>;
+	endTokenDrag(request: TokenDragEndRequest): Promise<TokenDragEndResult>;
+	getTokenDrag(tokenId: string, roomId: string): TokenDragRecord | null;
+	clearTokenDrag(tokenId: string, roomId: string): boolean;
 }
 
 export class SelectionService extends BaseService implements ISelectionService {
 	private _selections: Map<string, Map<string, SelectionRecord>>; // roomId -> Map<tokenId, selection>
 	private _playerSelections: Map<string, Map<string, Set<string>>>; // roomId -> Map<playerId, Set<tokenId>>
+	private _tokenDrags: Map<string, Map<string, TokenDragRecord>>; // roomId -> Map<tokenId, dragRecord>
 
 	constructor() {
 		super();
 		this._selections = new Map();
 		this._playerSelections = new Map();
+		this._tokenDrags = new Map();
 	}
 
 	private _getSelectionsForRoom(roomId: string): Map<string, SelectionRecord> {
@@ -355,6 +404,145 @@ export class SelectionService extends BaseService implements ISelectionService {
 
 	handlePlayerLeave(playerId: string, roomId: string): void {
 		this.clearPlayerSelections(playerId, roomId);
+	}
+
+	// ===== Token 拖拽相关方法 =====
+
+	private _getDragsForRoom(roomId: string): Map<string, TokenDragRecord> {
+		let roomDrags = this._tokenDrags.get(roomId);
+		if (!roomDrags) {
+			roomDrags = new Map();
+			this._tokenDrags.set(roomId, roomDrags);
+		}
+		return roomDrags;
+	}
+
+	async startTokenDrag(request: TokenDragStartRequest): Promise<TokenDragStartResult> {
+		const { tokenId, playerId, position, heading, roomId } = request;
+
+		let playerInfo: PlayerInfo | null = null;
+		if (this._roomManager) {
+			const room = this._roomManager.getRoom(roomId);
+			if (room) {
+				playerInfo = room.players.get(playerId) ?? null;
+			}
+		}
+
+		if (!playerInfo) {
+			return { success: false, error: "Player not found in room" };
+		}
+
+		const now = Date.now();
+		const dragRecord: TokenDragRecord = {
+			tokenId,
+			playerId,
+			playerName: playerInfo.name,
+			isDMMode: playerInfo.isDMMode,
+			position,
+			heading,
+			startTime: now,
+			lastUpdateTime: now,
+			roomId,
+		};
+
+		const roomDrags = this._getDragsForRoom(roomId);
+		roomDrags.set(tokenId, dragRecord);
+
+		// 广播拖拽开始
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.TOKEN_DRAG_START,
+				payload: {
+					tokenId,
+					playerId,
+					playerName: playerInfo.name,
+					position,
+					heading,
+					timestamp: now,
+				},
+			});
+		}
+
+		return { success: true, data: dragRecord };
+	}
+
+	async updateTokenDrag(request: TokenDragUpdateRequest): Promise<TokenDragUpdateResult> {
+		const { tokenId, playerId, position, heading, roomId } = request;
+
+		const roomDrags = this._getDragsForRoom(roomId);
+		const dragRecord = roomDrags.get(tokenId);
+
+		if (!dragRecord || dragRecord.playerId !== playerId) {
+			return { success: false, error: "No active drag for this token/player" };
+		}
+
+		// 更新拖拽记录
+		dragRecord.position = position;
+		dragRecord.heading = heading;
+		dragRecord.lastUpdateTime = Date.now();
+
+		// 广播拖拽更新
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.TOKEN_DRAGGING,
+				payload: {
+					tokenId,
+					playerId: dragRecord.playerId,
+					playerName: dragRecord.playerName,
+					position,
+					heading,
+					timestamp: dragRecord.lastUpdateTime,
+					isDragging: true,
+				},
+			});
+		}
+
+		return { success: true, data: dragRecord };
+	}
+
+	async endTokenDrag(request: TokenDragEndRequest): Promise<TokenDragEndResult> {
+		const { tokenId, playerId, finalPosition, finalHeading, committed, roomId } = request;
+
+		const roomDrags = this._getDragsForRoom(roomId);
+		const dragRecord = roomDrags.get(tokenId);
+
+		if (!dragRecord || dragRecord.playerId !== playerId) {
+			return { success: false, error: "No active drag for this token/player" };
+		}
+
+		// 清除拖拽记录
+		roomDrags.delete(tokenId);
+
+		// 广播拖拽结束
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.TOKEN_DRAG_END,
+				payload: {
+					tokenId,
+					playerId,
+					finalPosition,
+					finalHeading,
+					timestamp: Date.now(),
+					committed,
+				},
+			});
+		}
+
+		return { success: true, data: { committed } };
+	}
+
+	getTokenDrag(tokenId: string, roomId: string): TokenDragRecord | null {
+		const roomDrags = this._getDragsForRoom(roomId);
+		return roomDrags.get(tokenId) ?? null;
+	}
+
+	clearTokenDrag(tokenId: string, roomId: string): boolean {
+		const roomDrags = this._getDragsForRoom(roomId);
+		return roomDrags.delete(tokenId);
+	}
+
+	clearRoomDrags(roomId: string): void {
+		this._tokenDrags.delete(roomId);
 	}
 }
 
