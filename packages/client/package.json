@@ -22,8 +22,10 @@
     "@pixi/react": "^8.0.0",
     "@reduxjs/toolkit": "^2.5.0",
     "@tanstack/react-query": "^5.60.0",
+    "@vt/shared": "workspace:*",
     "framer-motion": "^11.18.0",
     "konva": "^9.3.15",
+    "lucide-react": "^0.271.0",
     "pixi.js": "^8.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -31,10 +33,10 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.28.0",
     "zod": "^4.3.6",
-    "zustand": "^5.0.2",
-    "@vt/shared": "workspace:*"
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@eslint/js": "^9.15.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
@@ -42,7 +44,6 @@
     "@types/node": "^25.4.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@biomejs/biome": "^1.9.4",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "typescript": "~5.9.3",
