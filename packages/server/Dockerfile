@@ -30,6 +30,7 @@ RUN npm install -g pnpm@10.32.1
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/packages/server/node_modules ./packages/server/node_modules
+COPY --from=deps /app/packages/client/node_modules ./packages/client/node_modules
 
 # Copy source code
 COPY pnpm-workspace.yaml package.json tsconfig.base.json ./
