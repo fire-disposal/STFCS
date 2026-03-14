@@ -15,5 +15,5 @@ export const WS_RECONNECT_DELAY = 1000;
 export const MAX_RECONNECT_ATTEMPTS = 5;
 export const DEFAULT_WS_URL =
 	typeof window !== "undefined" && typeof location !== "undefined"
-		? `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:3001`
+		? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
 		: "ws://localhost:3001";
