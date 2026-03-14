@@ -8,12 +8,12 @@ export const playerInfoSchema = z.object({
 });
 
 export const armorQuadrantSchema = z.enum([
-  'front_left',
-  'front_right',
-  'left',
-  'right',
-  'rear_left',
-  'rear_right',
+  "FRONT_TOP",
+  "FRONT_BOTTOM",
+  "LEFT_TOP",
+  "LEFT_BOTTOM",
+  "RIGHT_TOP",
+  "RIGHT_BOTTOM",
 ]);
 
 export const armorStateSchema = z.object({

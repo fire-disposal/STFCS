@@ -13,3 +13,4 @@ export const WEAPON_FIXED_ARC = 10;
 export const WS_HEARTBEAT_INTERVAL = 30000;
 export const WS_RECONNECT_DELAY = 1000;
 export const MAX_RECONNECT_ATTEMPTS = 5;
+export const DEFAULT_WS_URL = "ws://localhost:3001";
