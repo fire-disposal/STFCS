@@ -34,9 +34,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome lint src --diagnostic-level=error",
+    "lint:fix": "biome lint --write src --diagnostic-level=error",
+    "format": "biome format --write src",
+    "format:check": "biome format src"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@biomejs/biome": "^1.9.4"
   }
 }

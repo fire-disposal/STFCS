@@ -41,14 +41,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
+      - name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.ref_name }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Run Biome lint pipeline
         run: pnpm lint
 
-      - name: Type check (Server)
-        run: pnpm --filter server exec tsc --noEmit
-
-      - name: Type check (Client)
-        run: pnpm --filter client exec vue-tsc --noEmit
+      - name: Run TypeScript typecheck pipeline
+        run: pnpm typecheck
 
   # ===========================================
   # Job 2: Test
