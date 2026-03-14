@@ -145,7 +145,7 @@ export class DamageCalculator {
         sourceShip.position
       );
       
-      const shieldCenterAngle = shield.type === 'front' 
+      const shieldCenterAngle = shield.type === 'FRONT' 
         ? targetShip.heading 
         : shield.centerOffset.x;
 

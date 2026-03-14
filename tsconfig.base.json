@@ -17,6 +17,11 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@vt/shared": ["packages/shared/src/index.ts"],
+      "@vt/shared/*": ["packages/shared/src/*"]
+    },
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true

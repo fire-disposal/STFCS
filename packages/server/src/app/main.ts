@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, type FastifyError } from 'fastify';
 import fastifyCors from '@fastify/cors';
 import { WSServer } from '../infrastructure/ws/WSServer';
 import { RoomManager } from '../infrastructure/ws/RoomManager';
@@ -96,7 +96,7 @@ export class Application {
   }
 
   private async _setupErrorHandler(): Promise<void> {
-    this._fastify.setErrorHandler((error: any, request, reply) => {
+    this._fastify.setErrorHandler((error: FastifyError, request, reply) => {
       this._fastify.log.error(error);
 
       reply.status(error.statusCode ?? 500).send({

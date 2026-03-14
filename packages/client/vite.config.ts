@@ -1,26 +1,21 @@
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
 	plugins: [react()],
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "src"),
-			"@vt/shared": resolve(__dirname, "../shared/src/index.ts"),
-			"@vt/shared/trpc": resolve(__dirname, "../shared/src/trpc.ts"),
+			"@vt/shared": resolve(__dirname, "../shared/src"),
 			"@vt/shared/ws": resolve(__dirname, "../shared/src/ws/index.ts"),
+			"@vt/shared/types": resolve(__dirname, "../shared/src/types/index.ts"),
 		},
 	},
 	server: {
 		port: 5173,
 		host: true,
 		proxy: {
-			"/trpc": {
-				target: "http://localhost:3000",
-				changeOrigin: true,
-				secure: false,
-			},
 			"/api": {
 				target: "http://localhost:3000",
 				changeOrigin: true,

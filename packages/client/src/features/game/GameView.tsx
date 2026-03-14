@@ -78,7 +78,16 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		heading: number,
 		speed: number
 	) => {
-		websocketService.sendShipMovement(shipId, position, heading, speed);
+		websocketService.sendShipMovement({
+			shipId,
+			phase: 1,
+			type: "straight",
+			distance: speed,
+			newX: position.x,
+			newY: position.y,
+			newHeading: heading,
+			timestamp: Date.now(),
+		});
 	};
 
 	// 初始化WebSocket消息处理器
@@ -90,14 +99,14 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		});
 
 		// 设置战斗结果处理器
-		websocketService.on("COMBAT_RESULT", (payload) => {
+		websocketService.on("COMBAT_EVENT", (payload) => {
 			console.log("Combat result:", payload);
 		});
 
 		return () => {
 			// 清理处理器
 			websocketService.off("SHIP_MOVED", () => {});
-			websocketService.off("COMBAT_RESULT", () => {});
+			websocketService.off("COMBAT_EVENT", () => {});
 		};
 	}, []);
 

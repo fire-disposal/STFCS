@@ -65,7 +65,7 @@ describe('Application', () => {
 
       const response = await app.fastify.inject({
         method: 'OPTIONS',
-        url: '/trpc/player.join',
+        url: '/health',
         headers: {
           origin: 'http://localhost:5173',
           'access-control-request-method': 'POST',
