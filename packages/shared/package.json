@@ -8,22 +8,38 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./*": {
+      "import": "./dist/*.js",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js",
+      "types": "./dist/*.d.ts"
     },
     "./ws": {
       "import": "./dist/ws/index.js",
+      "require": "./dist/ws/index.js",
+      "default": "./dist/ws/index.js",
       "types": "./dist/ws/index.d.ts"
     },
     "./types": {
       "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js",
+      "default": "./dist/types/index.js",
       "types": "./dist/types/index.d.ts"
     },
     "./schemas": {
       "import": "./dist/schemas/index.js",
+      "require": "./dist/schemas/index.js",
+      "default": "./dist/schemas/index.js",
       "types": "./dist/schemas/index.d.ts"
     },
     "./constants": {
       "import": "./dist/constants/index.js",
+      "require": "./dist/constants/index.js",
+      "default": "./dist/constants/index.js",
       "types": "./dist/constants/index.d.ts"
     }
   },
