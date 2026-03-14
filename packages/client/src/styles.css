@@ -374,13 +374,6 @@ code, pre {
     overflow: hidden;
 }
 
-.game-toolbar {
-    background: rgba(20, 20, 40, 0.9);
-    border-bottom: 1px solid rgba(74, 158, 255, 0.2);
-    padding: 8px 16px;
-    flex-shrink: 0;
-}
-
 .game-content {
     flex: 1;
     display: flex;
@@ -395,6 +388,11 @@ code, pre {
     transition: width 0.3s ease;
     flex-shrink: 0;
     overflow: hidden;
+}
+
+.game-sidebar.left {
+    border-right: 1px solid rgba(100, 100, 150, 0.3);
+    border-left: none;
 }
 
 .game-sidebar.right {
@@ -498,6 +496,14 @@ code, pre {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* 语言切换器工具栏节 - 特殊处理为水平布局 */
+.toolbar-section.toolbar-language-switcher {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0;
 }
 
 .toolbar-title {
@@ -1130,6 +1136,13 @@ code, pre {
     overflow: hidden;
     cursor: pointer;
     transition: border-color 0.2s ease;
+    /* 强制字体颜色，防止被父组件污染 */
+    color: #8a8aa8 !important;
+}
+
+.scifi-switch-track * {
+    /* 强制所有子元素字体颜色一致 */
+    color: inherit !important;
 }
 
 .scifi-switch-track:hover {
@@ -1147,17 +1160,22 @@ code, pre {
     cursor: pointer;
     z-index: 2;
     padding: 0;
+    color: inherit !important;
+}
+
+.scifi-switch-label.active {
+    color: #aaccff !important;
 }
 
 .scifi-switch-label.active .label-text {
-    color: #aaccff;
+    color: #aaccff !important;
     font-weight: 600;
 }
 
 .label-text {
     font-size: 12px;
     font-weight: 500;
-    color: #8a8aa8;
+    color: inherit !important;
     transition: color 0.2s ease;
 }
 
@@ -1174,11 +1192,360 @@ code, pre {
     transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-/* ====== 工具栏中的语言切换器位置 ====== */
-.toolbar-language-switcher {
+/* ====== 顶栏样式（现代化游戏风格） ====== */
+.top-bar-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: rgba(20, 20, 40, 0.98);
+    border-bottom: 1px solid rgba(100, 100, 150, 0.3);
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 1000;
+    /* 强制颜色，防止被覆盖 */
+    color: #aaccff !important;
+}
+
+.top-bar-menu * {
+    color: inherit !important;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 顶栏中的缩放指示器容器 */
+.top-bar-zoom {
+    margin-left: 8px;
+}
+
+.top-bar-zoom .top-zoom-indicator {
+    padding: 4px 12px;
+    gap: 12px;
+}
+
+.top-bar-zoom .top-zoom-indicator__info {
+    min-width: 60px;
+}
+
+.top-bar-zoom .top-zoom-indicator__bar {
+    min-width: 120px;
+    max-width: 200px;
+}
+
+.top-bar-zoom .zoom-control-button {
+    width: 28px;
+    height: 28px;
+}
+
+.top-bar-zoom .zoom-control-button--reset {
+    width: 32px;
+}
+
+.top-bar-zoom .zoom-percentage {
+    font-size: 16px;
+}
+
+.top-bar-zoom .zoom-scale {
+    font-size: 9px;
+}
+
+.menu-toggle {
+    background: transparent;
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    color: #aaccff !important;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.menu-toggle:hover {
+    background: rgba(74, 158, 255, 0.1);
+    border-color: rgba(74, 158, 255, 0.5);
+}
+
+.game-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #aaccff !important;
+    letter-spacing: 1px;
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 语言切换器 */
+.top-bar-language {
+    display: flex;
+    gap: 4px;
+    background: rgba(40, 40, 80, 0.5);
+    padding: 2px;
+    border-radius: 4px;
+    border: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.lang-button {
+    background: transparent;
+    border: none;
+    color: #8a8aa8 !important;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.lang-button.active {
+    background: rgba(74, 158, 255, 0.2);
+    color: #aaccff !important;
+}
+
+.lang-button:hover:not(.active) {
+    color: #aaccff !important;
+}
+
+/* 图标按钮 */
+.icon-button {
+    background: transparent;
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    color: #aaccff !important;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+    background: rgba(74, 158, 255, 0.1);
+    border-color: rgba(74, 158, 255, 0.5);
+}
+
+/* 玩家信息 */
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(40, 40, 80, 0.5);
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.player-name {
+    font-size: 12px;
+    color: #aaccff !important;
+    font-weight: 500;
+}
+
+/* 断开连接按钮 */
+.disconnect-button {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444 !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.disconnect-button:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ====== 弹出菜单 ====== */
+.menu-overlay {
+    position: fixed;
+    top: 48px; /* 顶栏下方 */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1001;
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 40px;
+}
+
+.menu-panel {
+    width: 360px;
+    max-height: calc(100vh - 48px - 80px);
+    background: rgba(20, 20, 40, 0.98);
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    border-radius: 12px;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.menu-panel--center {
+    /* 居中面板特殊样式 */
+}
+
+.menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.menu-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #aaccff !important;
+}
+
+.close-menu {
+    background: transparent;
+    border: none;
+    color: #8a8aa8 !important;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.close-menu:hover {
+    background: rgba(100, 100, 150, 0.1);
+    color: #aaccff !important;
+}
+
+.menu-content {
+    padding: 16px;
+}
+
+.menu-section {
+    margin-bottom: 24px;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8a8aa8 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(40, 40, 80, 0.3);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.menu-item:hover {
+    background: rgba(40, 40, 80, 0.5);
+}
+
+.menu-item.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.menu-item span {
+    flex: 1;
+    font-size: 13px;
+    color: #aaccff !important;
+}
+
+.menu-language {
+    display: flex;
+    gap: 4px;
+}
+
+.mini-lang {
+    background: rgba(40, 40, 80, 0.5);
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    color: #8a8aa8 !important;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mini-lang.active {
+    background: rgba(74, 158, 255, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
+    color: #aaccff !important;
+}
+
+/* 开关切换 */
+.toggle-switch {
+    width: 40px;
+    height: 20px;
+    background: rgba(100, 100, 150, 0.3);
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    padding: 0;
+}
+
+.toggle-inner {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #8a8aa8;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.toggle-inner.on {
+    left: calc(100% - 18px);
+    background: #4ade80;
+}
+
+.toggle-inner.off {
+    left: 2px;
+    background: #8a8aa8;
 }
 
 /* 登录页面头部（包含标题和语言切换器） */

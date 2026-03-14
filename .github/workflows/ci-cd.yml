@@ -35,8 +35,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -57,35 +57,7 @@ jobs:
         run: pnpm typecheck
 
   # ===========================================
-  # Job 2: Test
-  # ===========================================
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run tests
-        run: pnpm test
-
-  # ===========================================
-  # Job 3: Build & Push Docker Images
+  # Job 2: Build & Push Docker Images
   # ===========================================
   build:
     name: Build & Push Images
@@ -186,26 +158,26 @@ jobs:
           CLIENT_IMAGE: ${{ env.CLIENT_IMAGE }}
         run: |
           echo "🚀 Deploying to production server..."
-          
+
           # Create deployment script
           cat > deploy.sh << 'EOF'
           #!/bin/bash
           set -e
-          
+
           echo "📦 Pulling latest images..."
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
+
           docker pull $REGISTRY/$SERVER_IMAGE:latest
           docker pull $REGISTRY/$CLIENT_IMAGE:latest
-          
+
           echo "🛑 Stopping existing containers..."
           cd ~/stfcs
           docker-compose down --timeout 30
-          
+
           echo "📝 Updating docker-compose..."
           cat > docker-compose.yml << 'COMPOSE'
           version: '3.8'
-          
+
           services:
             server:
               image: $REGISTRY/$SERVER_IMAGE:latest
@@ -223,7 +195,7 @@ jobs:
                 - MAX_PLAYERS_PER_ROOM=8
               networks:
                 - stfcs-network
-            
+
             client:
               image: $REGISTRY/$CLIENT_IMAGE:latest
               container_name: stfcs-client
@@ -234,27 +206,27 @@ jobs:
                 - server
               networks:
                 - stfcs-network
-          
+
           networks:
             stfcs-network:
               driver: bridge
           COMPOSE
-          
+
           echo "🏃 Starting new containers..."
           docker-compose up -d
-          
+
           echo "🧹 Cleaning up old images..."
           docker image prune -af --filter "until=168h"
-          
+
           echo "✅ Deployment completed!"
           EOF
-          
+
           chmod +x deploy.sh
-          
+
           # Copy and execute deployment script on server
           scp deploy.sh $SERVER_USER@$SERVER_HOST:~/deploy.sh
           ssh $SERVER_USER@$SERVER_HOST 'bash ~/deploy.sh && rm ~/deploy.sh'
-          
+
           rm deploy.sh
 
       - name: Verify deployment

@@ -106,26 +106,22 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 									return (
 										<div key={layerId} className="layer-item">
 											<span className="layer-name">{layer.name}</span>
-											<div className="layer-controls">
-												<button
-													className={`layer-toggle-button ${
-														layer.visible ? "visible" : "hidden"
-													}`}
-													onClick={() =>
-														layerManager.setLayerVisibility(
-															layerId,
-															!layer.visible
-														)
-													}
-													title={layer.visible ? "隐藏" : "显示"}
-												>
-													{layer.visible ? (
-														<Eye size={14} />
-													) : (
-														<EyeOff size={14} />
-													)}
-												</button>
-											</div>
+											<button
+												className="layer-toggle-button"
+												onClick={() =>
+													layerManager.setLayerVisibility(
+														layerId,
+														!layer.visible
+													)
+												}
+												title={layer.visible ? "隐藏" : "显示"}
+											>
+												{layer.visible ? (
+													<Eye size={14} />
+												) : (
+													<EyeOff size={14} />
+												)}
+											</button>
 										</div>
 									);
 								})}
@@ -260,7 +256,6 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 					padding: 6px 10px;
 					background: rgba(20, 20, 40, 0.5);
 					border-radius: 4px;
-					gap: 8px;
 				}
 
 				.layer-name {
@@ -269,16 +264,11 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 					font-size: 11px;
 				}
 
-				.layer-controls {
-					display: flex;
-					gap: 4px;
-					align-items: center;
-				}
-
 				.layer-toggle-button {
 					padding: 4px;
 					background: transparent;
-					border: 1px solid transparent;
+					border: none;
+					color: #6a7a9f;
 					cursor: pointer;
 					border-radius: 4px;
 					display: flex;
@@ -287,19 +277,9 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 					transition: all 0.2s ease;
 				}
 
-				.layer-toggle-button.visible {
-					color: #4a9eff;
-					border-color: rgba(74, 158, 255, 0.3);
-				}
-
-				.layer-toggle-button.hidden {
-					color: #8a9ebf;
-					border-color: rgba(138, 158, 191, 0.2);
-				}
-
 				.layer-toggle-button:hover {
-					background: rgba(74, 158, 255, 0.15);
-					border-color: rgba(74, 158, 255, 0.5);
+					background: rgba(74, 158, 255, 0.2);
+					color: #4a9eff;
 				}
 			`}</style>
 		</div>

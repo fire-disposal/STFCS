@@ -32,10 +32,10 @@ export type { UseWebSocketReturn };
  * @param messageType 要监听的消息类型
  * @param options 配置选项
  */
-export function useWebSocket<T extends WSMessageType>(
-	messageType: T,
+export function useWebSocket(
+	messageType: WSMessageType,
 	options: UseWebSocketOptions = {}
-): UseWebSocketReturn<T> {
+): UseWebSocketReturn {
 	const { autoConnect = true, autoReconnect = true } = options;
 	const handlerRef = useRef<Set<(payload: unknown) => void>>(new Set());
 	const isConnectedRef = useRef(false);

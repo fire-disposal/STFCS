@@ -461,6 +461,11 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		renderAllLayers(false);
 	}, [tokens, selectedTokenId]);
 
+	// 图层可见性变化时更新
+	useEffect(() => {
+		renderAllLayers(false);
+	}, [layerVisibility[LayerId.BACKGROUND_STARS], layerVisibility[LayerId.BACKGROUND_NEBULA], layerVisibility[LayerId.BACKGROUND_GRID]]);
+
 	// 缩放按钮处理 - 通过自定义事件触发
 	useEffect(() => {
 		const handleZoomEvent = (e: Event) => {

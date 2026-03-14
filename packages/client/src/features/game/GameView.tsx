@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
+import { TopBarMenu } from "@/components/ui/TopBarMenu";
 import GameCanvas from "@/components/map/GameCanvas";
 import { LayerControlPanel } from "@/components/map/LayerControlPanel";
 import { websocketService } from "@/services/websocket";
@@ -131,63 +131,18 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 
 	return (
 		<div className="game-view">
-			{/* 顶部工具栏 */}
-			<div className="game-toolbar">
-				<div className="toolbar">
-					<div className="toolbar-section">
-						{/* 顶栏缩放指示器 */}
-						<TopZoomIndicator
-							zoom={camera.zoom}
-							minZoom={camera.minZoom}
-							maxZoom={camera.maxZoom}
-							onZoomIn={handleZoomIn}
-							onZoomOut={handleZoomOut}
-							onReset={handleResetZoom}
-						/>
-					</div>
-
-					<div className="toolbar-section">
-						<div className="toolbar-title">{t("game.tools") || "Tools"}</div>
-						<div className="tool-buttons">
-							{["select", "pan", "draw", "measure", "place"].map((tool) => (
-								<button
-									key={tool}
-									className={`tool-button ${selectedTool === tool ? "active" : ""}`}
-									onClick={() => handleToolSelect(tool)}
-									title={tool.charAt(0).toUpperCase() + tool.slice(1)}
-								>
-									<span className="tool-icon">
-										{tool === "select" ? <MousePointer size={16} /> :
-											tool === "pan" ? <Hand size={16} /> :
-												tool === "draw" ? <Edit3 size={16} /> :
-													tool === "measure" ? <Ruler size={16} /> :
-														<MapPin size={16} />}
-									</span>
-									<span className="tool-label">{tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="toolbar-section">
-						<div className="toolbar-title">{t("game.title") || "Game"}</div>
-						<div className="game-controls">
-							<button className="game-button" onClick={handleEndTurn} title={t("token.endTurn") || "End Turn"}>
-								<span className="game-icon"><SkipForward size={16} /></span>
-								<span className="game-label">{t("token.endTurn") || "End Turn"}</span>
-							</button>
-							<button className="game-button danger" onClick={onDisconnect} title={t("game.disconnect") || "Disconnect"}>
-								<span className="game-icon"><LogOut size={16} /></span>
-								<span className="game-label">{t("game.disconnect") || "Disconnect"}</span>
-							</button>
-						</div>
-					</div>
-
-					<div className="toolbar-section toolbar-language-switcher">
-						<SciFiLanguageSwitcher />
-					</div>
-				</div>
-			</div>
+			{/* 顶部菜单栏 */}
+			<TopBarMenu 
+				onDisconnect={onDisconnect} 
+				playerName={currentPlayerId || 'Player'}
+				// 缩放控制
+				zoom={camera.zoom}
+				minZoom={camera.minZoom}
+				maxZoom={camera.maxZoom}
+				onZoomIn={handleZoomIn}
+				onZoomOut={handleZoomOut}
+				onReset={handleResetZoom}
+			/>
 
 			<div className="game-content">
 				{/* 左侧面板 - 房间和玩家信息 */}

@@ -51,7 +51,7 @@ export function useLayerManager() {
 				id: layerId,
 				name: config?.name || layerId,
 				groupId: config?.groupId || LayerGroupId.OBJECTS,
-				visible: visibility[layerId] ?? true,
+				visible: visibility[layerId] === true,
 				opacity: opacity[layerId] ?? 1,
 			};
 		},
@@ -74,7 +74,7 @@ export function useLayerManager() {
 		(groupId: LayerGroupId): LayerGroupInfo => {
 			const groupConfig = DEFAULT_LAYER_GROUPS.find((g) => g.id === groupId);
 			const layerIds = groupConfig?.layerIds || [];
-			const visibleCount = layerIds.filter((id) => visibility[id]).length;
+			const visibleCount = layerIds.filter((id) => visibility[id] === true).length;
 
 			return {
 				id: groupId,
