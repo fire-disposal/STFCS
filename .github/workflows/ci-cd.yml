@@ -87,15 +87,39 @@ jobs:
       - name: Remote Deploy
         run: |
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            set -euo pipefail
+            mkdir -p ~/stfcs
             cd ~/stfcs
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            docker compose up -d
-            docker image prune -f
+            # Remove existing container if present
+            if docker ps -a --format '{{.Names}}' | grep -q '^stfcs-server$'; then
+              docker rm -f stfcs-server || true
+            fi
+            # Run server container (serves static client files from image)
+            docker run -d \
+              --name stfcs-server \
+              --restart unless-stopped \
+              -p 3000:3000 -p 3001:3001 \
+              -e NODE_ENV=production \
+              -e HTTP_PORT=3000 \
+              -e WS_PORT=3001 \
+              -e CORS_ORIGINS=https://stfcs.205716.xyz \
+              ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
+            docker ps --filter name=stfcs-server --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            docker logs --tail 200 stfcs-server || true
           EOF
 
       - name: Health Check
         run: |
-          sleep 10
-          curl -f http://${{ secrets.SERVER_HOST }}:3000/health
+          # Retry health check up to ~60s
+          for i in $(seq 1 12); do
+            if curl -fsS http://${{ secrets.SERVER_HOST }}:3000/health; then
+              echo "service healthy"; exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check failed after retries. Gathering remote container status and logs..."
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "docker ps -a --filter name=stfcs-server --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' && docker logs --tail 500 stfcs-server" || true
+          exit 1
