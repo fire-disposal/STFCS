@@ -184,6 +184,33 @@ export const responseMessageSchema = z.object({
   }).and(responsePayloadSchema),
 });
 
+export const pingMessageSchema = z.object({
+  type: z.literal(WS_MESSAGE_TYPES.PING),
+  payload: z.object({
+    timestamp: z.number(),
+  }),
+});
+
+export const pongMessageSchema = z.object({
+  type: z.literal(WS_MESSAGE_TYPES.PONG),
+  payload: z.object({
+    timestamp: z.number(),
+  }),
+});
+
+export const roomUpdateMessageSchema = z.object({
+  type: z.literal(WS_MESSAGE_TYPES.ROOM_UPDATE),
+  payload: z.object({
+    roomId: z.string(),
+    players: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      isReady: z.boolean(),
+      currentShipId: z.string().nullable(),
+    })),
+  }),
+});
+
 export const shipMovementSchema = z.object({
   shipId: z.string(),
   phase: phaseSchema,
@@ -346,6 +373,61 @@ export const wsMessageSchema = z.discriminatedUnion('type', [
     type: z.literal(WS_MESSAGE_TYPES.DAMAGE_DEALT),
     payload: combatResultSchema,
   }),
+  z.object({
+    type: z.literal(WS_MESSAGE_TYPES.DRAWING_ADD),
+    payload: z.object({
+      playerId: z.string(),
+      element: z.object({
+        type: z.enum(['path', 'line', 'arrow', 'rect', 'circle']),
+        color: z.string(),
+        lineWidth: z.number(),
+        path: z.string().optional(),
+        x1: z.number().optional(),
+        y1: z.number().optional(),
+        x2: z.number().optional(),
+        y2: z.number().optional(),
+        cx: z.number().optional(),
+        cy: z.number().optional(),
+        radius: z.number().optional(),
+      }),
+    }),
+  }),
+  z.object({
+    type: z.literal(WS_MESSAGE_TYPES.DRAWING_CLEAR),
+    payload: z.object({
+      playerId: z.string(),
+    }),
+  }),
+  z.object({
+    type: z.literal(WS_MESSAGE_TYPES.DRAWING_SYNC),
+    payload: z.object({
+      elements: z.array(z.object({
+        type: z.enum(['path', 'line', 'arrow', 'rect', 'circle']),
+        color: z.string(),
+        lineWidth: z.number(),
+        path: z.string().optional(),
+        x1: z.number().optional(),
+        y1: z.number().optional(),
+        x2: z.number().optional(),
+        y2: z.number().optional(),
+        cx: z.number().optional(),
+        cy: z.number().optional(),
+        radius: z.number().optional(),
+      })),
+    }),
+  }),
+  z.object({
+    type: z.literal(WS_MESSAGE_TYPES.CHAT_MESSAGE),
+    payload: z.object({
+      senderId: z.string(),
+      senderName: z.string(),
+      content: z.string(),
+      timestamp: z.number(),
+    }),
+  }),
+  pingMessageSchema,
+  pongMessageSchema,
+  roomUpdateMessageSchema,
   z.object({
     type: z.literal(WS_MESSAGE_TYPES.ERROR),
     payload: z.object({

@@ -15,7 +15,8 @@
     "check:fix": "biome check --apply .",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit"
   },
   "dependencies": {
     "@pixi/react": "^8.0.0",
@@ -33,7 +34,8 @@
     "react-router-dom": "^6.28.0",
     "tailwindcss": "^3.4.17",
     "zod": "^4.3.6",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "@vt/shared": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

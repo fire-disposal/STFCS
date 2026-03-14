@@ -9,7 +9,9 @@ import {
 import type {
 	WSMessage,
 	WSMessageType,
-	WS_MESSAGE_TYPES,
+	RoomUpdateMessage,
+	PingMessage,
+	WSMessagePayloadMap,
 	PlayerJoinedMessage,
 	ShipMovedMessage,
 	ChatMessagePayload,
@@ -30,6 +32,7 @@ import type {
 	ShipVentRequestPayload,
 	ShipGetStatusRequestPayload,
 } from "@vt/shared/ws";
+import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 
 export type { WSMessage, WSMessageType };
 
@@ -39,15 +42,7 @@ export type ShipMovedPayload = ShipMovedMessage["payload"];
 export type ChatMessagePayloadType = ChatMessagePayload["payload"];
 export type DrawingElementPayload = DrawingAddMessage["payload"]["element"];
 
-export interface RoomUpdatePayload {
-	roomId: string;
-	players: Array<{
-		id: string;
-		name: string;
-		isReady: boolean;
-		currentShipId: string | null;
-	}>;
-}
+export type RoomUpdatePayload = RoomUpdateMessage["payload"];
 
 interface PendingRequest {
 	resolve: (data: any) => void;
@@ -62,7 +57,7 @@ export class WebSocketService {
 	private maxReconnectAttempts = 5;
 	private reconnectDelay = 1000;
 	private pingInterval: NodeJS.Timeout | null = null;
-	private messageHandlers: Map<WSMessageType, Array<(payload: unknown) => void>> =
+	private messageHandlers: Map<WSMessageType, Array<(payload: WSMessagePayloadMap[WSMessageType]) => void>> =
 		new Map();
 	private pendingRequests: Map<string, PendingRequest> = new Map();
 	private requestTimeout = 10000; // 10秒超时
@@ -94,11 +89,11 @@ export class WebSocketService {
 			console.log("Chat message:", data);
 		});
 
-		this.on("PONG", () => {
+		this.on(WS_MESSAGE_TYPES.PONG, () => {
 			store.dispatch(updatePing());
 		});
 
-		this.on("ROOM_UPDATE", (payload) => {
+		this.on(WS_MESSAGE_TYPES.ROOM_UPDATE, (payload) => {
 			const data = payload as RoomUpdatePayload;
 			console.log("Room updated:", data);
 		});
@@ -328,50 +323,49 @@ export class WebSocketService {
 		content: string,
 		senderId: string,
 		senderName: string,
-		type: "player" | "system" | "combat" = "player",
+		_type: "player" | "system" | "combat" = "player",
 	): void {
+		void _type;
 		const message: WSMessage = {
-			type: "CHAT_MESSAGE",
+			type: WS_MESSAGE_TYPES.CHAT_MESSAGE,
 			payload: {
-				id: `chat_${Date.now()}`,
 				content,
 				senderId,
 				senderName,
 				timestamp: Date.now(),
-				type,
 			},
-			timestamp: Date.now(),
 		};
 		this.send(message);
 	}
 
-	public sendDrawingElement(element: DrawingElementPayload): void {
+	public sendDrawingElement(playerId: string, element: DrawingElementPayload): void {
 		const message: WSMessage = {
-			type: "DRAWING_ADD",
-			payload: element,
-			timestamp: Date.now(),
+			type: WS_MESSAGE_TYPES.DRAWING_ADD,
+			payload: {
+				playerId,
+				element,
+			},
 		};
 		this.send(message);
 	}
 
-	public sendDrawingClear(): void {
+	public sendDrawingClear(playerId: string): void {
 		const message: WSMessage = {
-			type: "DRAWING_CLEAR",
-			payload: { clearAll: true },
-			timestamp: Date.now(),
+			type: WS_MESSAGE_TYPES.DRAWING_CLEAR,
+			payload: { playerId },
 		};
 		this.send(message);
 	}
 
 	// 事件处理器管理
-	public on(type: WSMessageType, handler: (payload: unknown) => void): void {
+	public on<T extends WSMessageType>(type: T, handler: (payload: WSMessagePayloadMap[T]) => void): void {
 		if (!this.messageHandlers.has(type)) {
 			this.messageHandlers.set(type, []);
 		}
 		this.messageHandlers.get(type)!.push(handler);
 	}
 
-	public off(type: WSMessageType, handler: (payload: unknown) => void): void {
+	public off<T extends WSMessageType>(type: T, handler: (payload: WSMessagePayloadMap[T]) => void): void {
 		const handlers = this.messageHandlers.get(type);
 		if (handlers) {
 			const index = handlers.indexOf(handler);
@@ -391,10 +385,9 @@ export class WebSocketService {
 	private startPingInterval(): void {
 		this.pingInterval = setInterval(() => {
 			if (this.ws?.readyState === WebSocket.OPEN) {
-				const message: WSMessage = {
-					type: "PING",
+				const message: PingMessage = {
+					type: WS_MESSAGE_TYPES.PING,
 					payload: { timestamp: Date.now() },
-					timestamp: Date.now(),
 				};
 				this.send(message);
 			}
