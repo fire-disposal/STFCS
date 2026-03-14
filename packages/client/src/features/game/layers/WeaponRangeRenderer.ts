@@ -51,7 +51,7 @@ export function renderWeaponRanges(layer: Container, config: WeaponRangeConfig):
 	container.position.set(config.position.x, config.position.y);
 	container.rotation = (config.heading * Math.PI) / 180;
 
-	config.weapons.forEach((weapon, index) => {
+	config.weapons.forEach((weapon) => {
 		const weaponGraphics = new Graphics();
 		const color = getWeaponColor(weapon);
 

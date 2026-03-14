@@ -1,23 +1,17 @@
 import {
 	Container,
 	Graphics,
-	Text,
-	TextStyle,
 	Point,
 	type FederatedPointerEvent,
 } from "pixi.js";
 import type { TokenInfo } from "@vt/shared/types";
-import { ScalableText, createOptimalTextStyle } from "@/features/game/utils/TextRenderer";
+import { ScalableText } from "@/features/game/utils/TextRenderer";
 import {
-	renderAddons,
 	createHeadingIndicator,
 	createAngleDisplay,
 	createArmorQuadrantsIndicator,
 	createSelectionGlow,
 	type AddonConfig,
-	type HeadingIndicatorConfig,
-	type AngleDisplayConfig,
-	type ArmorQuadrantsConfig,
 } from "@/features/game/components/TokenAddons";
 
 /**
@@ -26,7 +20,9 @@ import {
 export interface TokenRendererConfig {
 	selectedTokenId: string | null;
 	onTokenClick?: (token: TokenInfo, event: FederatedPointerEvent) => void;
-	onTokenDrag?: (token: TokenInfo, dx: number, dy: number) => void;
+	onTokenDragStart?: (token: TokenInfo) => void;
+	onTokenDrag?: (token: TokenInfo, newPosition: { x: number; y: number }) => void;
+	onTokenDragEnd?: (token: TokenInfo, finalPosition: { x: number; y: number }, cancelled: boolean) => void;
 	zoom: number;
 	/** 用于存储可缩放文本的数组（外部管理更新） */
 	scalableTexts?: ScalableText[];
@@ -493,21 +489,42 @@ function setupTokenInteraction(
 		isDragging = true;
 		dragStartPos = { x: event.global.x, y: event.global.y };
 		tokenStartPos = { x: token.position.x, y: token.position.y };
+
+		// 触发拖拽开始回调
+		if (config.onTokenDragStart) {
+			config.onTokenDragStart(token);
+		}
 	});
 
 	container.on("pointermove", (event: FederatedPointerEvent) => {
 		if (isDragging && config.onTokenDrag) {
 			const dx = (event.global.x - dragStartPos.x) / config.zoom;
 			const dy = (event.global.y - dragStartPos.y) / config.zoom;
-			config.onTokenDrag(token, dx, dy);
+			const newPosition = {
+				x: tokenStartPos.x + dx,
+				y: tokenStartPos.y + dy,
+			};
+			config.onTokenDrag(token, newPosition);
 		}
 	});
 
 	container.on("pointerup", () => {
+		if (isDragging && config.onTokenDragEnd) {
+			const finalPosition = { x: token.position.x, y: token.position.y };
+			// 检查是否是取消（释放位置与开始位置差异很小）
+			const dx = finalPosition.x - tokenStartPos.x;
+			const dy = finalPosition.y - tokenStartPos.y;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+			const cancelled = distance < 5; // 小于 5 像素视为取消
+			config.onTokenDragEnd(token, finalPosition, cancelled);
+		}
 		isDragging = false;
 	});
 
 	container.on("pointerupoutside", () => {
+		if (isDragging && config.onTokenDragEnd) {
+			config.onTokenDragEnd(token, tokenStartPos, true);
+		}
 		isDragging = false;
 	});
 }

@@ -36,10 +36,10 @@ export const WEBGL_CONFIG = {
  * 预加载纹理以避免 lazy initialization 警告
  * @param textures 纹理数组
  */
-export async function preloadTextures(textures: Texture[]): Promise<void> {
+export async function preloadTextures(_textures: Texture[]): Promise<void> {
 	await Promise.all(
-		textures.map(
-			(texture) =>
+		_textures.map(
+			() =>
 				new Promise<void>((resolve) => {
 					// PixiJS v8 纹理加载检查
 					resolve();

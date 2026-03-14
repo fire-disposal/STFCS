@@ -1,8 +1,10 @@
+import { useTranslation } from "react-i18next";
+import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
 import GameCanvas from "@/components/map/GameCanvas";
+import { LayerControlPanel } from "@/components/map/LayerControlPanel";
 import { websocketService } from "@/services/websocket";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { selectToken } from "@/store/slices/mapSlice";
-import { selectShip } from "@/store/slices/shipSlice";
+import { selectToken } from "@/store/slices/selectionSlice";
 import { setSelectedTool } from "@/store/slices/uiSlice";
 import {
 	nextTurnUnit,
@@ -30,15 +32,13 @@ interface GameViewProps {
 
 const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	const dispatch = useAppDispatch();
+	const { t } = useTranslation();
 	const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
 	const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 	const [chatExpanded, setChatExpanded] = useState(false);
 
 	// 获取相机状态用于显示
 	const camera = useAppSelector((state) => state.camera.local);
-
-	// 获取 canvas ref 用于缩放控制
-	const canvasRef = useRef<HTMLDivElement>(null);
 
 	// 缩放控制处理
 	const handleZoomIn = () => {
@@ -55,26 +55,11 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	};
 
 	// 在组件顶层获取所有需要的状态
-	const { selectedShipId } = useAppSelector((state) => state.ship);
-	const { selectedTokenId, tokens } = useAppSelector((state) => state.map);
+	const { selectedTokenId } = useAppSelector((state) => state.selection);
+	const { tokens } = useAppSelector((state) => state.map);
 	const { selectedTool } = useAppSelector((state) => state.ui);
 	const { roomId, currentPlayerId, players } = useAppSelector((state) => state.player);
-	const turnOrder = useAppSelector(selectTurnOrder);
 	const currentUnit = useAppSelector(selectCurrentUnit);
-
-	// 获取选中的 token
-	const selectedToken = selectedTokenId ? tokens[selectedTokenId] : null;
-
-	// 处理 token 点击
-	const handleTokenClick = (tokenId: string) => {
-		dispatch(selectToken(tokenId));
-
-		// 如果是舰船 token，也选中对应的舰船
-		const token = tokens[tokenId];
-		if (token && token.type === "ship") {
-			dispatch(selectShip(token.id));
-		}
-	};
 
 	// 处理工具选择
 	const handleToolSelect = (tool: string) => {
@@ -107,29 +92,9 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		}
 	};
 
-	// 处理舰船移动
-	const handleShipMove = (
-		shipId: string,
-		position: { x: number; y: number },
-		heading: number,
-		speed: number
-	) => {
-		websocketService.sendShipMovement({
-			shipId,
-			phase: 1,
-			type: "straight",
-			distance: speed,
-			newX: position.x,
-			newY: position.y,
-			newHeading: heading,
-			timestamp: Date.now(),
-		});
-	};
-
 	// 处理单位点击
 	const handleUnitClick = (unit: any) => {
 		console.log("Unit clicked:", unit);
-		// 可以在这里添加选中单位对应的 token 或舰船
 	};
 
 	// 处理单位悬停
@@ -182,7 +147,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					</div>
 
 					<div className="toolbar-section">
-						<div className="toolbar-title">Tools</div>
+						<div className="toolbar-title">{t("game.tools") || "Tools"}</div>
 						<div className="tool-buttons">
 							{["select", "pan", "draw", "measure", "place"].map((tool) => (
 								<button
@@ -205,17 +170,21 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					</div>
 
 					<div className="toolbar-section">
-						<div className="toolbar-title">Game</div>
+						<div className="toolbar-title">{t("game.title") || "Game"}</div>
 						<div className="game-controls">
-							<button className="game-button" onClick={handleEndTurn} title="End Turn">
+							<button className="game-button" onClick={handleEndTurn} title={t("token.endTurn") || "End Turn"}>
 								<span className="game-icon"><SkipForward size={16} /></span>
-								<span className="game-label">End Turn</span>
+								<span className="game-label">{t("token.endTurn") || "End Turn"}</span>
 							</button>
-							<button className="game-button danger" onClick={onDisconnect} title="Disconnect">
+							<button className="game-button danger" onClick={onDisconnect} title={t("game.disconnect") || "Disconnect"}>
 								<span className="game-icon"><LogOut size={16} /></span>
-								<span className="game-label">Disconnect</span>
+								<span className="game-label">{t("game.disconnect") || "Disconnect"}</span>
 							</button>
 						</div>
+					</div>
+
+					<div className="toolbar-section toolbar-language-switcher">
+						<SciFiLanguageSwitcher />
 					</div>
 				</div>
 			</div>
@@ -231,6 +200,9 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					</button>
 					{!leftPanelCollapsed && (
 						<div className="panel-content">
+							{/* 图层控制面板 */}
+							<LayerControlPanel />
+
 							<div className="room-panel-placeholder">
 								<h3>Room Panel</h3>
 								<p>Room ID: {roomId || "Not joined"}</p>

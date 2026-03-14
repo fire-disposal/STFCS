@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Texture, BlurFilter } from "pixi.js";
+import { Container, Graphics, BlurFilter } from "pixi.js";
 
 /**
  * 背景渲染器配置
@@ -64,15 +64,15 @@ export function renderBackground(
 	layer.addChild(nebulaLayer);
 
 	// 3. 创建多层星空（带视差）
-	STAR_LAYERS.forEach((starLayer, index) => {
-		const stars = createStarLayer(starLayer, cfg, camera);
+	STAR_LAYERS.forEach((starLayer) => {
+		const stars = createStarLayer(starLayer, cfg);
 		stars.position.x = -camera.centerX * starLayer.parallax;
 		stars.position.y = -camera.centerY * starLayer.parallax;
 		layer.addChild(stars);
 	});
 
 	// 4. 添加闪烁效果
-	addStarTwinkling(layer, cfg);
+	addStarTwinkling(layer);
 }
 
 /**
@@ -80,12 +80,11 @@ export function renderBackground(
  */
 function createDeepSpaceBackground(config: BackgroundConfig): Graphics {
 	const background = new Graphics();
-	
+
 	// 创建渐变效果
-	const gradient = background.context;
 	const centerX = config.width / 2;
 	const centerY = config.height / 2;
-	
+
 	background.rect(0, 0, config.width, config.height);
 	background.fill({
 		color: config.backgroundColor!,
@@ -142,7 +141,6 @@ function createNebulaLayer(config: BackgroundConfig): Container {
 function createStarLayer(
 	layerConfig: typeof STAR_LAYERS[0],
 	config: BackgroundConfig,
-	camera: { centerX: number; centerY: number; zoom: number }
 ): Container {
 	const starContainer = new Container();
 	const starPositions = generateStarPositions(
@@ -172,7 +170,7 @@ function createStarLayer(
 /**
  * 添加星星闪烁效果（使用固定种子确保所有玩家看到相同的闪烁）
  */
-function addStarTwinkling(layer: Container, config: BackgroundConfig): void {
+function addStarTwinkling(layer: Container): void {
 	// 在 PixiJS ticker 中更新星星透明度
 	// 这里只标记需要闪烁的星星
 	const allChildren = layer.children.flat();
@@ -218,8 +216,8 @@ export function updateParallax(
 	}
 
 	// 更新各层星空位置（视差系数很小，营造深远空间感）
-	STAR_LAYERS.forEach((starLayer, index) => {
-		const starContainer = layer.children[index + 2] as Container;
+	STAR_LAYERS.forEach((starLayer) => {
+		const starContainer = layer.children[2] as Container;
 		if (starContainer) {
 			starContainer.position.x = -cameraPosition.centerX * starLayer.parallax;
 			starContainer.position.y = -cameraPosition.centerY * starLayer.parallax;

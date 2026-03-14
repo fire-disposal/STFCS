@@ -1,16 +1,16 @@
 import { useAppDispatch, useAppSelector } from "@/store";
-import { selectToken, updateToken } from "@/store/slices/mapSlice";
+import { updateToken } from "@/store/slices/mapSlice";
+import { selectToken } from "@/store/slices/selectionSlice";
 import { updateCamera } from "@/store/slices/cameraSlice";
 import type { CameraState } from "@vt/shared/types";
+import { LayerId } from "@/features/game/layers/types";
 import {
 	Application,
 	Container,
 	type FederatedPointerEvent,
 	Graphics,
-	Text,
-	TextStyle,
 } from "pixi.js";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { websocketService } from "@/services/websocket";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 import {
@@ -24,7 +24,6 @@ import {
 	type LayerRegistry,
 	type TokenRendererConfig,
 } from "@/features/game/layers";
-import { updateTextGroup } from "@/features/game/utils/TextRenderer";
 import { updateParallax } from "@/features/game/layers/BackgroundRenderer";
 
 interface GameCanvasProps {
@@ -32,19 +31,17 @@ interface GameCanvasProps {
 	height?: number;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({
-	width = 800,
-	height = 600,
-}) => {
+const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const dispatch = useAppDispatch();
 	const {
 		config: mapConfig,
 		tokens,
-		selectedTokenId,
-		otherPlayersCameras,
 	} = useAppSelector((state) => state.map);
+	const { selectedTokenId } = useAppSelector((state) => state.selection);
 	const camera = useAppSelector((state) => state.camera.local);
+	const layerVisibility = useAppSelector((state) => state.layers.visibility);
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
+	const currentPlayerName = useAppSelector((state) => state.ui.connection.playerName);
 
 	// 相机 ref - 直接镜像 Redux 状态，用于高性能更新
 	const cameraRef = useRef<CameraState>({ ...camera });
@@ -72,6 +69,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 		dragStart: { x: 0, y: 0 },
 		lastCameraPos: { x: 0, y: 0 },
 	});
+
+	// Token 拖拽状态
+	const draggingTokenRef = useRef<{
+		tokenId: string;
+		originalPosition: { x: number; y: number };
+		isDragging: boolean;
+		lastDragTime?: number;
+	} | null>(null);
 
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const appRef = useRef<Application | null>(null);
@@ -112,25 +117,42 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 		const cfg = mapConfigRef.current;
 		const cam = cameraRef.current;
 
-		if (forceRenderBackground) {
-			renderBackground(layers.background, {
-				width: cfg.width,
-				height: cfg.height,
-				backgroundColor: cfg.backgroundColor,
-			}, { centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom });
-		} else {
-			updateParallax(layers.background, { centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom }, {
-				width: cfg.width,
-				height: cfg.height,
-				backgroundColor: cfg.backgroundColor,
-			});
+		// 背景层
+		const showStars = layerVisibility[LayerId.BACKGROUND_STARS] ?? true;
+		const showNebula = layerVisibility[LayerId.BACKGROUND_NEBULA] ?? true;
+		const showGrid = layerVisibility[LayerId.BACKGROUND_GRID] ?? true;
+
+		if (forceRenderBackground || showStars !== (layers.background as any)._starsVisible) {
+			(layers.background as any)._starsVisible = showStars;
+			if (showStars) {
+				renderBackground(layers.background, {
+					width: cfg.width,
+					height: cfg.height,
+					backgroundColor: cfg.backgroundColor,
+					starCount: 900,
+					nebulaCount: showNebula ? 5 : 0,
+				}, { centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom });
+			} else {
+				layers.background.removeChildren();
+				// 只绘制背景色
+				const bg = new Graphics();
+				bg.rect(0, 0, cfg.width, cfg.height);
+				bg.fill({ color: cfg.backgroundColor, alpha: 1 });
+				layers.background.addChild(bg);
+			}
 		}
 
-		renderGrid(layers.grid, {
-			width: cfg.width,
-			height: cfg.height,
-			showGrid: cfg.showGrid,
-		}, cam.zoom);
+		// 网格层
+		if (showGrid) {
+			renderGrid(layers.grid, {
+				width: cfg.width,
+				height: cfg.height,
+				showGrid: true,
+			}, cam.zoom);
+			layers.grid.visible = true;
+		} else {
+			layers.grid.visible = false;
+		}
 
 		const tokenConfig: TokenRendererConfig = {
 			selectedTokenId: selectedTokenIdRef.current,
@@ -139,11 +161,72 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 				event.stopPropagation();
 				dispatch(selectToken(token.id));
 			},
-			onTokenDrag: (token: any, dx: number, dy: number) => {
+			onTokenDragStart: (token: any) => {
+				// 开始拖拽时，记录原始位置并通知其他玩家
+				draggingTokenRef.current = {
+					tokenId: token.id,
+					originalPosition: { ...token.position },
+					isDragging: true,
+				};
+
+				// 发送拖拽开始消息
+				if (currentPlayerId && currentPlayerName) {
+					websocketService.sendTokenDragStart(
+						token.id,
+						currentPlayerId,
+						currentPlayerName,
+						token.position,
+						token.heading || 0
+					);
+				}
+			},
+			onTokenDrag: (token: any, newPosition: { x: number; y: number }) => {
+				// 更新本地 token 位置（视觉反馈）
 				dispatch(updateToken({
 					id: token.id,
-					updates: { position: { x: token.position.x + dx, y: token.position.y + dy } },
+					updates: { position: newPosition },
 				}));
+
+				// 发送拖拽中消息（限流：每 100ms 一次）
+				if (currentPlayerId && currentPlayerName && draggingTokenRef.current?.isDragging) {
+					const now = Date.now();
+					if (!draggingTokenRef.current.lastDragTime || now - draggingTokenRef.current.lastDragTime > 100) {
+						draggingTokenRef.current.lastDragTime = now;
+						websocketService.sendTokenDragging(
+							token.id,
+							currentPlayerId,
+							currentPlayerName,
+							newPosition,
+							token.heading || 0
+						);
+					}
+				}
+			},
+			onTokenDragEnd: (token: any, finalPosition: { x: number; y: number }, cancelled: boolean) => {
+				if (!draggingTokenRef.current) return;
+
+				const committed = !cancelled && draggingTokenRef.current.isDragging;
+
+				// 发送拖拽结束消息
+				if (currentPlayerId && currentPlayerName) {
+					websocketService.sendTokenDragEnd(
+						token.id,
+						currentPlayerId,
+						finalPosition,
+						token.heading || 0,
+						committed
+					);
+				}
+
+				// 如果取消拖拽，恢复原始位置
+				if (cancelled) {
+					dispatch(updateToken({
+						id: token.id,
+						updates: { position: draggingTokenRef.current.originalPosition },
+					}));
+				}
+
+				draggingTokenRef.current = null;
 			},
 		};
 
@@ -332,7 +415,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 			const handleMouseMove = (e: MouseEvent) => {
 				if (interactionRef.current.isDragging) {
 					const cam = cameraRef.current;
-					const rect = canvas.getBoundingClientRect();
 					const dx = e.clientX - interactionRef.current.dragStart.x;
 					const dy = e.clientY - interactionRef.current.dragStart.y;
 					const zoom = cameraRef.current.zoom;

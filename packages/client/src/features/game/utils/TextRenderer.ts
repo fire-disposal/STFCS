@@ -159,7 +159,7 @@ export class TextPool {
 
 	constructor(
 		private baseOptions: ScalableTextOptions,
-		private initialSize: number = 20
+		initialSize: number = 20
 	) {
 		for (let i = 0; i < initialSize; i++) {
 			this.pool.push(new ScalableText("", baseOptions));

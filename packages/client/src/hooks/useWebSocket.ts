@@ -15,7 +15,7 @@ interface UseWebSocketOptions {
 
 export type { UseWebSocketOptions };
 
-interface UseWebSocketReturn<T extends WSMessageType> {
+interface UseWebSocketReturn {
 	isConnected: boolean;
 	isConnecting: boolean;
 	sendMessage: (payload: unknown) => void;

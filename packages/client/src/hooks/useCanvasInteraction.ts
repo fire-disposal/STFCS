@@ -3,7 +3,7 @@
  * 处理画布的拖拽、缩放等交互逻辑
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 
 interface UseCanvasInteractionOptions {
 	minZoom: number;
