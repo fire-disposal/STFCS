@@ -1,10 +1,6 @@
-import { Point } from '../../types/geometry';
-import { IShip, ShipConfig, ShipMovementPhase, MovementValidationResult } from './types';
-import { ArmorQuadrant, ArmorQuadrantType } from './ArmorQuadrant';
-import { Shield, ShieldType } from './Shield';
+import { Shield } from './Shield';
 import { FluxSystem } from './FluxSystem';
 import { ShipStatusValues } from './ShipStatus';
-import { ShipMovedEvent, ShieldToggledEvent, FluxOverloadedEvent, ShieldMaintenanceEvent } from './events';
 
 export class Ship implements IShip {
   private readonly _id: string;
@@ -34,8 +30,8 @@ export class Ship implements IShip {
     this._armorQuadrants = this._initializeArmorQuadrants(config.armor);
     this._shield = config.shield ? new Shield(config.shield, false) : null;
     this._fluxSystem = new FluxSystem(config.flux);
-    this._status = this._fluxSystem.isOverloaded 
-      ? ShipStatusValues.OVERLOADED 
+    this._status = this._fluxSystem.isOverloaded
+      ? ShipStatusValues.OVERLOADED
       : ShipStatusValues.NORMAL;
     this._events = [];
   }

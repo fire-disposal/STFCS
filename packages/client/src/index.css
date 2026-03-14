@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		--background: 222 47% 11%;
+		--foreground: 210 40% 98%;
+		--card: 222 47% 11%;
+		--card-foreground: 210 40% 98%;
+		--popover: 222 47% 11%;
+		--popover-foreground: 210 40% 98%;
+		--primary: 217 91% 60%;
+		--primary-foreground: 222 47% 11%;
+		--secondary: 217 33% 17%;
+		--secondary-foreground: 210 40% 98%;
+		--muted: 217 33% 17%;
+		--muted-foreground: 215 20% 65%;
+		--accent: 217 33% 17%;
+		--accent-foreground: 210 40% 98%;
+		--destructive: 0 84% 60%;
+		--destructive-foreground: 210 40% 98%;
+		--border: 217 33% 17%;
+		--input: 217 33% 17%;
+		--ring: 224 76% 48%;
+		--radius: 0.5rem;
+	}
+
+	* {
+		@apply border-border;
+	}
+
+	body {
+		@apply bg-dark-bg text-dark-text antialiased;
+		font-feature-settings: "rlig" 1, "calt" 1;
+	}
+
+	#root {
+		@apply h-screen w-screen overflow-hidden;
+	}
+}
+
+@layer components {
+	/* 游戏UI组件样式 */
+	.game-panel {
+		@apply bg-dark-surface border border-dark-border rounded-game backdrop-blur-sm;
+	}
+
+	.game-button {
+		@apply px-4 py-2 bg-game-primary text-white rounded-game 
+		       hover:bg-opacity-90 active:scale-95 transition-all duration-200
+		       disabled:opacity-50 disabled:cursor-not-allowed
+		       focus:outline-none focus:ring-2 focus:ring-game-primary focus:ring-opacity-50;
+	}
+
+	.game-button-secondary {
+		@apply px-4 py-2 bg-dark-surface border border-dark-border text-dark-text rounded-game
+		       hover:bg-opacity-80 active:scale-95 transition-all duration-200
+		       disabled:opacity-50 disabled:cursor-not-allowed
+		       focus:outline-none focus:ring-2 focus:ring-game-primary focus:ring-opacity-50;
+	}
+
+	.game-input {
+		@apply px-3 py-2 bg-dark-surface border border-dark-border rounded-game
+		       text-dark-text placeholder-dark-text-secondary
+		       focus:outline-none focus:ring-2 focus:ring-game-primary focus:border-transparent
+		       disabled:opacity-50 disabled:cursor-not-allowed;
+	}
+
+	.game-card {
+		@apply game-panel p-4 space-y-3;
+	}
+
+	.game-tooltip {
+		@apply absolute z-50 px-3 py-2 text-sm bg-dark-surface border border-dark-border 
+		       rounded-game shadow-game-lg max-w-xs;
+	}
+
+	/* 滚动条样式 */
+	.scrollbar-game {
+		scrollbar-width: thin;
+		scrollbar-color: rgba(74, 158, 255, 0.3) transparent;
+	}
+
+	.scrollbar-game::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	.scrollbar-game::-webkit-scrollbar-track {
+		@apply bg-transparent;
+	}
+
+	.scrollbar-game::-webkit-scrollbar-thumb {
+		@apply bg-game-primary bg-opacity-30 rounded-full;
+	}
+
+	.scrollbar-game::-webkit-scrollbar-thumb:hover {
+		@apply bg-game-primary bg-opacity-50;
+	}
+
+	/* 动画类 */
+	.pulse-shield {
+		animation: pulse-shield 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+
+	.pulse-flux {
+		animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+
+	.glow-primary {
+		box-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+	}
+
+	.glow-danger {
+		box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+	}
+
+	.glow-success {
+		box-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+	}
+
+	/* 网格背景 */
+	.grid-pattern {
+		background-image: 
+			linear-gradient(rgba(74, 158, 255, 0.1) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(74, 158, 255, 0.1) 1px, transparent 1px);
+		background-size: 64px 64px;
+	}
+
+	/* 护盾效果 */
+	.shield-effect {
+		background: radial-gradient(circle, rgba(74, 158, 255, 0.1) 0%, transparent 70%);
+	}
+
+	/* 通量效果 */
+	.flux-gradient {
+		background: linear-gradient(90deg, #60a5fa 0%, #f59e0b 50%, #ef4444 100%);
+	}
+
+	/* 连接状态指示器 */
+	.connection-indicator {
+		@apply w-2 h-2 rounded-full;
+	}
+
+	.connection-connected {
+		@apply bg-game-success;
+		animation: glow 2s ease-in-out infinite;
+	}
+
+	.connection-connecting {
+		@apply bg-game-warning;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	.connection-disconnected {
+		@apply bg-game-danger;
+	}
+
+	/* 舰船状态指示器 */
+	.ship-status-indicator {
+		@apply w-3 h-3 rounded-full;
+	}
+
+	.ship-active {
+		@apply bg-game-success;
+		animation: glow 2s ease-in-out infinite;
+	}
+
+	.ship-damaged {
+		@apply bg-game-warning;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	.ship-disabled {
+		@apply bg-game-danger;
+	}
+
+	/* 武器状态 */
+	.weapon-ready {
+		@apply text-game-success;
+	}
+
+	.weapon-cooldown {
+		@apply text-game-warning;
+	}
+
+	.weapon-disabled {
+		@apply text-game-danger opacity-50;
+	}
+
+	/* 聊天消息样式 */
+	.chat-message-system {
+		@apply text-game-info italic;
+	}
+
+	.chat-message-player {
+		@apply text-game-secondary;
+	}
+
+	.chat-message-important {
+		@apply text-game-accent font-medium;
+	}
+
+	/* 战斗日志样式 */
+	.combat-log-hit {
+		@apply text-game-success;
+	}
+
+	.combat-log-miss {
+		@apply text-game-warning;
+	}
+
+	.combat-log-critical {
+		@apply text-game-accent font-bold;
+	}
+
+	.combat-log-damage {
+		@apply text-game-danger;
+	}
+
+	/* 面板切换动画 */
+	.panel-transition {
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	/* 拖拽效果 */
+	.draggable-handle {
+		cursor: move;
+	}
+
+	.draggable-handle:hover {
+		@apply bg-dark-border bg-opacity-30;
+	}
+
+	/* 选择框样式 */
+	.selection-box {
+		@apply border-2 border-dashed border-game-primary bg-game-primary bg-opacity-10;
+	}
+
+	/* 放置预览 */
+	.placement-preview {
+		@apply border-2 border-dashed border-game-success bg-game-success bg-opacity-10;
+	}
+
+	.placement-invalid {
+		@apply border-game-danger bg

@@ -13,6 +13,10 @@
     "./ws": {
       "import": "./dist/ws/index.js",
       "types": "./dist/ws/index.d.ts"
+    },
+    "./trpc": {
+      "import": "./dist/trpc.js",
+      "types": "./dist/trpc.d.ts"
     }
   },
   "scripts": {

@@ -11,7 +11,6 @@ import type {
 } from '../types';
 
 export const WS_MESSAGE_TYPES = {
-  // Event messages (broadcast)
   PLAYER_JOINED: 'PLAYER_JOINED',
   PLAYER_LEFT: 'PLAYER_LEFT',
   SHIP_MOVED: 'SHIP_MOVED',
@@ -31,15 +30,10 @@ export const WS_MESSAGE_TYPES = {
   DRAWING_SYNC: 'DRAWING_SYNC',
   CHAT_MESSAGE: 'CHAT_MESSAGE',
   ERROR: 'ERROR',
-
-  // Request-Response messages
-  REQUEST: 'REQUEST',
-  RESPONSE: 'RESPONSE',
 } as const;
 
 export type WSMessageType = typeof WS_MESSAGE_TYPES[keyof typeof WS_MESSAGE_TYPES];
 
-// Event message interfaces (keep existing for backward compatibility)
 export interface PlayerJoinedMessage {
   type: typeof WS_MESSAGE_TYPES.PLAYER_JOINED;
   payload: PlayerInfo;
@@ -197,124 +191,6 @@ export interface ChatMessagePayload {
   };
 }
 
-// Operation-specific request payloads
-export interface PlayerJoinRequestPayload {
-  id: string;
-  name: string;
-  roomId?: string;
-}
-
-export interface PlayerLeaveRequestPayload {
-  playerId: string;
-  roomId: string;
-}
-
-export interface PlayerListRequestPayload {
-  roomId: string;
-}
-
-export interface ShipMoveRequestPayload {
-  shipId: string;
-  phase: 1 | 2 | 3;
-  type: 'straight' | 'strafe' | 'rotate';
-  distance?: number;
-  angle?: number;
-}
-
-export interface ShipToggleShieldRequestPayload {
-  shipId: string;
-}
-
-export interface ShipVentRequestPayload {
-  shipId: string;
-}
-
-export interface ShipGetStatusRequestPayload {
-  shipId: string;
-}
-
-// Union type for all possible request payloads
-export type RequestPayload =
-  | { operation: 'player.join'; data: PlayerJoinRequestPayload }
-  | { operation: 'player.leave'; data: PlayerLeaveRequestPayload }
-  | { operation: 'player.list'; data: PlayerListRequestPayload }
-  | { operation: 'ship.move'; data: ShipMoveRequestPayload }
-  | { operation: 'ship.toggleShield'; data: ShipToggleShieldRequestPayload }
-  | { operation: 'ship.vent'; data: ShipVentRequestPayload }
-  | { operation: 'ship.getStatus'; data: ShipGetStatusRequestPayload };
-
-// Operation-specific response payloads
-export type PlayerJoinResponsePayload = PlayerInfo;
-export type PlayerLeaveResponsePayload = void;
-export type PlayerListResponsePayload = PlayerInfo[];
-export type ShipMoveResponsePayload = ShipStatus | null;
-export type ShipToggleShieldResponsePayload = ShipStatus | null;
-export type ShipVentResponsePayload = ShipStatus | null;
-export type ShipGetStatusResponsePayload = ShipStatus | null;
-
-// Union type for all possible response payloads
-export type ResponseData =
-  | { operation: 'player.join'; data: PlayerJoinResponsePayload }
-  | { operation: 'player.leave'; data: PlayerLeaveResponsePayload }
-  | { operation: 'player.list'; data: PlayerListResponsePayload }
-  | { operation: 'ship.move'; data: ShipMoveResponsePayload }
-  | { operation: 'ship.toggleShield'; data: ShipToggleShieldResponsePayload }
-  | { operation: 'ship.vent'; data: ShipVentResponsePayload }
-  | { operation: 'ship.getStatus'; data: ShipGetStatusResponsePayload };
-
-export type RequestOperation = RequestPayload['operation'];
-
-export interface RequestMessage {
-  type: typeof WS_MESSAGE_TYPES.REQUEST;
-  payload: {
-    requestId: string;
-  } & RequestPayload;
-}
-
-export interface SuccessResponse<T extends RequestOperation = RequestOperation> {
-  success: true;
-  operation: T;
-  data: Extract<ResponseData, { operation: T }>['data'];
-  timestamp: number;
-}
-
-export interface ErrorResponse {
-  success: false;
-  operation: RequestOperation;
-  error: {
-    code: string;
-    message: string;
-    details?: Record<string, unknown>;
-  };
-  timestamp: number;
-}
-
-export type ResponsePayload<T extends RequestOperation = RequestOperation> =
-  | SuccessResponse<T>
-  | ErrorResponse;
-
-export interface ResponseMessage {
-  type: typeof WS_MESSAGE_TYPES.RESPONSE;
-  payload: {
-    requestId: string;
-  } & ResponsePayload;
-}
-
-// Utility type to extract response data type for an operation
-export type ResponseForOperation<T extends RequestOperation> =
-  Extract<ResponseData, { operation: T }>['data'];
-
-// Generic handler type for request operations
-export type OperationHandler<O extends RequestOperation> =
-  (clientId: string, data: Extract<RequestPayload, { operation: O }>['data']) =>
-    Promise<Extract<ResponseData, { operation: O }>['data']>;
-
-// Utility type to create typed request handlers
-export type RequestHandlers = {
-  [O in RequestOperation]?: OperationHandler<O>;
-};
-
-// Union type for all possible WebSocket messages
 export type WSMessage =
   | PlayerJoinedMessage
   | PlayerLeftMessage
@@ -334,9 +210,7 @@ export type WSMessage =
   | DrawingClearMessage
   | DrawingSyncMessage
   | ChatMessagePayload
-  | ErrorMessage
-  | RequestMessage
-  | ResponseMessage;
+  | ErrorMessage;
 
 export interface IWSServer {
   broadcast(message: WSMessage, excludeClientId?: string): void;

@@ -1,0 +1,578 @@
+/* STFCS - 基础样式文件 */
+/* 太空舰队战斗系统的核心样式 */
+
+/* ====== 重置和基础样式 ====== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ====== 应用容器 ====== */
+.app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a1a;
+  color: #c0c0d0;
+}
+
+.app-header {
+  height: 48px;
+  background: rgba(20, 20, 40, 0.95);
+  border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #aaccff;
+  margin: 0;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-indicator {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator.connected {
+  color: #4ade80;
+}
+
+.status-indicator.disconnected {
+  color: #ef4444;
+}
+
+.disconnect-btn {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+  color: #ff8a8a;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.disconnect-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.app-footer {
+  height: 32px;
+  background: rgba(20, 20, 40, 0.95);
+  border-top: 1px solid rgba(100, 100, 150, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  color: #8a8aa8;
+  flex-shrink: 0;
+}
+
+/* ====== 连接视图 ====== */
+.connection-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.connection-card {
+  background: rgba(15, 15, 30, 0.95);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  border-radius: 8px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.connection-card h2 {
+  color: #aaccff;
+  margin-bottom: 8px;
+  font-size: 24px;
+}
+
+.connection-description {
+  color: #8a8aa8;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.connection-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  color: #aaccff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-input {
+  background: rgba(10, 10, 30, 0.8);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  border-radius: 4px;
+  padding: 10px 12px;
+  color: #c0c0d0;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.form-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-help {
+  color: #8a8aa8;
+  font-size: 12px;
+}
+
+.form-actions {
+  margin-top: 8px;
+}
+
+.connect-button {
+  width: 100%;
+  background: rgba(74, 158, 255, 0.2);
+  border: 1px solid #4a9eff;
+  color: #aaccff;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.connect-button:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.3);
+}
+
+.connect-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #aaccff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.connection-info {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(100, 100, 150, 0.2);
+}
+
+.connection-info h3 {
+  color: #aaccff;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.connection-info ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.connection-info li {
+  color: #8a8aa8;
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  padding-left: 20px;
+  position: relative;
+}
+
+.connection-info li:before {
+  content: "•";
+  color: #4a9eff;
+  position: absolute;
+  left: 0;
+}
+
+/* ====== 游戏视图 ====== */
+.game-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.game-toolbar {
+  height: 64px;
+  background: rgba(20, 20, 40, 0.95);
+  border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.game-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.game-sidebar {
+  width: 280px;
+  background: rgba(15, 15, 30, 0.95);
+  border-right: 1px solid rgba(100, 100, 150, 0.3);
+  position: relative;
+  transition: width 0.3s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.game-sidebar.right {
+  border-right: none;
+  border-left: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.game-sidebar.collapsed {
+  width: 32px;
+}
+
+.panel-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 48px;
+  background: rgba(40, 40, 80, 0.8);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  color: #aaccff;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.game-sidebar.left .panel-toggle {
+  right: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.game-sidebar.right .panel-toggle {
+  left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.panel-toggle:hover {
+  background: rgba(60, 60, 100, 0.9);
+}
+
+.panel-content {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.game-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-chat {
+  height: 200px;
+  background: rgba(15, 15, 30, 0.95);
+  border-top: 1px solid rgba(100, 100, 150, 0.3);
+  flex-shrink: 0;
+}
+
+.game-status {
+  height: 32px;
+  background: rgba(20, 20, 40, 0.95);
+  border-top: 1px solid rgba(100, 100, 150, 0.3);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 24px;
+  font-size: 12px;
+  color: #8a8aa8;
+  flex-shrink: 0;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-label {
+  font-weight: 500;
+  color: #aaccff;
+}
+
+.status-value {
+  color: #c0c0d0;
+}
+
+/* ====== 工具栏样式 ====== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolbar-title {
+  font-size: 11px;
+  color: #8a8aa8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.tool-buttons,
+.view-controls,
+.game-controls,
+.quick-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tool-button,
+.view-button,
+.game-button,
+.quick-action {
+  background: rgba(40, 40, 80, 0.5);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  color: #aaccff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tool-button:hover,
+.view-button:hover,
+.game-button:hover,
+.quick-action:hover {
+  background: rgba(60, 60, 100, 0.6);
+  border-color: #4a9eff;
+}
+
+.tool-button.active,
+.view-button.active {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: #4a9eff;
+}
+
+.game-button.danger {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ff8a8a;
+}
+
+.game-button.danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.tool-icon,
+.view-icon,
+.game-icon,
+.action-icon {
+  font-size: 14px;
+}
+
+.tool-label,
+.view-label,
+.game-label,
+.action-label {
+  font-weight: 500;
+}
+
+/* ====== 响应式设计 ====== */
+@media (max-width: 1200px) {
+  .game-sidebar {
+    width: 240px;
+  }
+
+  .toolbar {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header h1 {
+    font-size: 14px;
+  }
+
+  .game-sidebar {
+    width: 200px;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 8px 0;
+  }
+
+  .toolbar-section {
+    min-width: 120px;
+  }
+}
+
+/* ====== 工具类 ====== */
+.hidden {
+  display: none !important;
+}
+
+.visible {
+  display: block !important;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.p-4 {
+  padding: 16px;
+}
+
+.m-4 {
+  margin: 16px;
+}
+
+.text-primary {
+  color: #aaccff;
+}
+
+.text-secondary {
+  color: #8a8aa8;
+}
+
+.bg-dark {
+  background: #0a0a1a;
+}
+
+.bg-surface {
+  background: rgba(15, 15, 30, 0.95);
+}
+
+.border-light {
+  border: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.rounded {
+  border-radius: 4px;
+}
+
+.rounded-lg {
+  border-radius: 8px;
+}
+
+.shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}

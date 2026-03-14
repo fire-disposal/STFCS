@@ -68,6 +68,122 @@ export const shipStatusSchema = z.object({
 
 const phaseSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
+// WebSocket Request-Response Schemas
+export const requestOperationSchema = z.enum([
+  'player.join',
+  'player.leave',
+  'player.list',
+  'ship.move',
+  'ship.toggleShield',
+  'ship.vent',
+  'ship.getStatus',
+]);
+
+// Operation-specific request payload schemas
+export const playerJoinRequestSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(32),
+  roomId: z.string().optional(),
+});
+
+export const playerLeaveRequestSchema = z.object({
+  playerId: z.string(),
+  roomId: z.string(),
+});
+
+export const playerListRequestSchema = z.object({
+  roomId: z.string(),
+});
+
+export const shipMoveRequestSchema = z.object({
+  shipId: z.string(),
+  phase: phaseSchema,
+  type: z.enum(['straight', 'strafe', 'rotate']),
+  distance: z.number().optional(),
+  angle: z.number().optional(),
+});
+
+export const shipToggleShieldRequestSchema = z.object({
+  shipId: z.string(),
+});
+
+export const shipVentRequestSchema = z.object({
+  shipId: z.string(),
+});
+
+export const shipGetStatusRequestSchema = z.object({
+  shipId: z.string(),
+});
+
+// Union type for request payload based on operation
+export const requestPayloadSchema = z.discriminatedUnion('operation', [
+  z.object({
+    operation: z.literal('player.join'),
+    data: playerJoinRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('player.leave'),
+    data: playerLeaveRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('player.list'),
+    data: playerListRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('ship.move'),
+    data: shipMoveRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('ship.toggleShield'),
+    data: shipToggleShieldRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('ship.vent'),
+    data: shipVentRequestSchema,
+  }),
+  z.object({
+    operation: z.literal('ship.getStatus'),
+    data: shipGetStatusRequestSchema,
+  }),
+]);
+
+export const errorResponseSchema = z.object({
+  success: z.literal(false),
+  operation: requestOperationSchema,
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.record(z.string(), z.unknown()).optional(),
+  }),
+  timestamp: z.number(),
+});
+
+export const successResponseSchema = z.object({
+  success: z.literal(true),
+  operation: requestOperationSchema,
+  data: z.unknown(),
+  timestamp: z.number(),
+});
+
+export const responsePayloadSchema = z.discriminatedUnion('success', [
+  successResponseSchema,
+  errorResponseSchema,
+]);
+
+export const requestMessageSchema = z.object({
+  type: z.literal(WS_MESSAGE_TYPES.REQUEST),
+  payload: z.object({
+    requestId: z.string(),
+  }).and(requestPayloadSchema),
+});
+
+export const responseMessageSchema = z.object({
+  type: z.literal(WS_MESSAGE_TYPES.RESPONSE),
+  payload: z.object({
+    requestId: z.string(),
+  }).and(responsePayloadSchema),
+});
+
 export const shipMovementSchema = z.object({
   shipId: z.string(),
   phase: phaseSchema,
@@ -290,3 +406,12 @@ export const attackCommandSchema = z.object({
   weaponMountId: z.string(),
   timestamp: z.number(),
 });
+
+
+
+// Extended wsMessageSchema that includes REQUEST and RESPONSE types
+export const wsMessageSchemaExtended = z.discriminatedUnion('type', [
+  ...wsMessageSchema.options,
+  requestMessageSchema,
+  responseMessageSchema,
+]);

@@ -1,16 +1,4 @@
-import type {
-  WSMessage,
-  DrawingElement,
-  RequestMessage,
-  ResponseMessage,
-  SuccessResponse,
-  ErrorResponse,
-  RequestOperation,
-  OperationHandler,
-  RequestHandlers,
-  RequestPayload,
-  ResponseData
-} from '@vt/shared/ws';
+import type { WSMessage, DrawingElement } from '@vt/shared/ws';
 import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
 import type { RoomManager } from './RoomManager';
 import type { PlayerService } from '../../application/player/PlayerService';
@@ -27,35 +15,17 @@ export class MessageHandler {
   private _playerService: PlayerService;
   private _shipService: ShipService;
   private _roomDrawings: Map<string, DrawingElement[]>;
-  private _requestHandlers: RequestHandlers;
 
   constructor(options: MessageHandlerOptions) {
     this._roomManager = options.roomManager;
     this._playerService = options.playerService;
     this._shipService = options.shipService;
     this._roomDrawings = new Map();
-    this._requestHandlers = this._createRequestHandlers();
-  }
-
-  private _createRequestHandlers(): RequestHandlers {
-    return {
-      'player.join': this._handlePlayerJoin.bind(this),
-      'player.leave': this._handlePlayerLeave.bind(this),
-      'player.list': this._handlePlayerList.bind(this),
-      'ship.move': this._handleShipMove.bind(this),
-      'ship.toggleShield': this._handleShipToggleShield.bind(this),
-      'ship.vent': this._handleShipVent.bind(this),
-      'ship.getStatus': this._handleShipGetStatus.bind(this),
-    };
   }
 
   async handleMessage(clientId: string, message: WSMessage): Promise<void> {
     try {
       switch (message.type) {
-        case WS_MESSAGE_TYPES.REQUEST:
-          await this._handleRequestMessage(clientId, message);
-          break;
-
         case WS_MESSAGE_TYPES.PLAYER_JOINED:
           await this._handlePlayerJoined(clientId, message.payload as any);
           break;
@@ -97,174 +67,6 @@ export class MessageHandler {
     }
   }
 
-  private async _handleRequestMessage(clientId: string, request: RequestMessage): Promise<void> {
-    const { requestId, operation, data } = request.payload;
-
-    const handler = this._requestHandlers[operation] as OperationHandler<typeof operation>;
-    if (!handler) {
-      const errorResponse: ErrorResponse = {
-        success: false,
-        operation,
-        error: {
-          code: 'INVALID_OPERATION',
-          message: `No handler for operation: ${operation}`,
-        },
-        timestamp: Date.now(),
-      };
-      this._sendResponse(clientId, requestId, errorResponse);
-      return;
-    }
-
-    try {
-      const result = await handler(clientId, data);
-      const successResponse: SuccessResponse<typeof operation> = {
-        success: true,
-        operation,
-        data: result,
-        timestamp: Date.now(),
-      };
-      this._sendResponse(clientId, requestId, successResponse);
-    } catch (error) {
-      const errorResponse: ErrorResponse = {
-        success: false,
-        operation,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        },
-        timestamp: Date.now(),
-      };
-      this._sendResponse(clientId, requestId, errorResponse);
-    }
-  }
-
-  // Operation handlers - these are type-safe and follow OperationHandler<O> signature
-  private async _handlePlayerJoin(clientId: string, data: any): Promise<any> {
-    const playerInfo = {
-      id: data.id,
-      name: data.name,
-      joinedAt: Date.now(),
-    };
-
-    const result = await this._playerService.join(playerInfo);
-    if (!result.success || !result.player) {
-      throw new Error(result.error ?? 'Failed to join');
-    }
-
-    return result.player;
-  }
-
-  private async _handlePlayerLeave(clientId: string, data: any): Promise<any> {
-    const result = await this._playerService.leave(data.playerId, data.roomId);
-    if (!result.success) {
-      throw new Error(result.error ?? 'Failed to leave');
-    }
-    return undefined;
-  }
-
-  private async _handlePlayerList(clientId: string, data: any): Promise<any> {
-    return this._playerService.listPlayers(data.roomId);
-  }
-
-  private async _handleShipMove(clientId: string, data: any): Promise<any> {
-    const playerRoom = this._roomManager.getPlayerRoom(clientId);
-    if (!playerRoom) {
-      throw new Error('Player is not in a room');
-    }
-
-    const result = await this._shipService.moveShip(data.shipId, {
-      shipId: data.shipId,
-      phase: data.phase,
-      type: data.type,
-      distance: data.distance,
-      angle: data.angle,
-    });
-
-    if (!result.success) {
-      throw new Error(result.error ?? 'Movement failed');
-    }
-
-    const status = this._shipService.getShipStatus(data.shipId);
-
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.SHIP_MOVED,
-      payload: {
-        shipId: data.shipId,
-        phase: data.phase,
-        type: data.type,
-        distance: data.distance,
-        angle: data.angle,
-        newX: result.newX ?? 0,
-        newY: result.newY ?? 0,
-        newHeading: result.newHeading ?? 0,
-        timestamp: Date.now(),
-      },
-    }, clientId);
-
-    return status;
-  }
-
-  private async _handleShipToggleShield(clientId: string, data: any): Promise<any> {
-    const playerRoom = this._roomManager.getPlayerRoom(clientId);
-    if (!playerRoom) {
-      throw new Error('Player is not in a room');
-    }
-
-    const success = await this._shipService.toggleShield(data.shipId);
-    if (!success) {
-      throw new Error('Failed to toggle shield');
-    }
-
-    const status = this._shipService.getShipStatus(data.shipId);
-
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.SHIELD_UPDATE,
-      payload: {
-        shipId: data.shipId,
-        active: status?.shield?.active ?? false,
-        type: status?.shield?.type ?? 'front',
-        coverageAngle: status?.shield?.coverageAngle ?? 0,
-      },
-    }, clientId);
-
-    return status;
-  }
-
-  private async _handleShipVent(clientId: string, data: any): Promise<any> {
-    const playerRoom = this._roomManager.getPlayerRoom(clientId);
-    if (!playerRoom) {
-      throw new Error('Player is not in a room');
-    }
-
-    const success = await this._shipService.ventShip(data.shipId);
-    if (!success) {
-      throw new Error('Failed to vent');
-    }
-
-    const status = this._shipService.getShipStatus(data.shipId);
-
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.FLUX_STATE,
-      payload: {
-        shipId: data.shipId,
-        fluxState: status?.fluxState ?? 'normal',
-        currentFlux: status?.flux?.current ?? 0,
-        softFlux: status?.flux?.softFlux ?? 0,
-        hardFlux: status?.flux?.hardFlux ?? 0,
-      },
-    }, clientId);
-
-    return status;
-  }
-
-  private async _handleShipGetStatus(clientId: string, data: any): Promise<any> {
-    return this._shipService.getShipStatus(data.shipId);
-  }
-
-  // Existing event handlers (unchanged except for method renaming)
   private async _handlePlayerJoined(clientId: string, payload: { id: string; name: string; joinedAt: number; roomId?: string }): Promise<void> {
     const playerInfo = {
       id: payload.id,
@@ -285,7 +87,7 @@ export class MessageHandler {
 
   private _sendDrawingsToPlayer(clientId: string, drawings: DrawingElement[]): void {
     if (drawings.length === 0) return;
-
+    
     const roomManager = this._roomManager;
     const wsServer = (roomManager as unknown as { _wsServer?: { sendTo: (id: string, msg: WSMessage) => void } })._wsServer;
     if (wsServer) {
@@ -459,21 +261,6 @@ export class MessageHandler {
         type: WS_MESSAGE_TYPES.ERROR,
         payload: { code, message, details },
       });
-    }
-  }
-
-  private _sendResponse(clientId: string, requestId: string, response: SuccessResponse<any> | ErrorResponse): void {
-    const roomManager = this._roomManager;
-    const wsServer = (roomManager as unknown as { _wsServer?: { sendTo: (id: string, msg: WSMessage) => void } })._wsServer;
-    if (wsServer) {
-      const responseMessage: ResponseMessage = {
-        type: WS_MESSAGE_TYPES.RESPONSE,
-        payload: {
-          requestId,
-          ...response,
-        },
-      };
-      wsServer.sendTo(clientId, responseMessage);
     }
   }
 

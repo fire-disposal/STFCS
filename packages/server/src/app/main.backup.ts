@@ -1,10 +1,12 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import fastifyCors from '@fastify/cors';
+import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { WSServer } from '../infrastructure/ws/WSServer';
 import { RoomManager } from '../infrastructure/ws/RoomManager';
 import { MessageHandler } from '../infrastructure/ws/MessageHandler';
 import { PlayerService } from '../application/player/PlayerService';
 import { ShipService } from '../application/ship/ShipService';
+import { createAppRouter, AppRouter } from '../api/routers';
 import { config } from '../config';
 import type { WSMessage } from '@vt/shared/ws';
 
@@ -21,6 +23,7 @@ export class Application {
   private _messageHandler?: MessageHandler;
   private _playerService: PlayerService;
   private _shipService: ShipService;
+  private _appRouter?: AppRouter;
 
   constructor(options: ServerOptions = {}) {
     this._fastify = Fastify({
@@ -36,6 +39,7 @@ export class Application {
 
   async initialize(): Promise<void> {
     await this._setupCors();
+    await this._setupTRPC();
     await this._setupHealthCheck();
     await this._setupErrorHandler();
 
@@ -76,12 +80,39 @@ export class Application {
     return this._shipService;
   }
 
+  get shipRouterDeps() {
+    return {
+      shipService: this._shipService,
+    };
+  }
+
+  get playerRouterDeps() {
+    return {
+      playerService: this._playerService,
+    };
+  }
+
   private async _setupCors(): Promise<void> {
     await this._fastify.register(fastifyCors, {
       origin: config.corsOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
+    });
+  }
+
+  private async _setupTRPC(): Promise<void> {
+    this._appRouter = createAppRouter({
+      playerService: this._playerService,
+      shipService: this._shipService,
+    });
+
+    this._fastify.register(fastifyTRPCPlugin, {
+      prefix: '/trpc',
+      trpcOptions: {
+        router: this._appRouter,
+        createContext: () => ({}),
+      },
     });
   }
 
