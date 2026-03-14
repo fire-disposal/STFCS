@@ -4,7 +4,7 @@ import type { ShipEvent } from '../../domain/ship/events';
 import type { ShipStatus as DomainShipStatus } from '../../domain/ship/ShipStatus';
 import type { ShipStatus, ShipMovement } from '@vt/shared/types';
 import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
-import type { IWSServer } from '@vt/shared/ws';
+import type { IWSServer, WSMessage } from '@vt/shared/ws';
 import type { RoomManager } from '../../infrastructure/ws/RoomManager';
 
 export interface MoveShipCommand {
@@ -232,6 +232,7 @@ export class ShipService implements IShipService {
       armor: {
         quadrants: armorQuadrantsMap as Record<string, number>,
         maxArmor,
+        maxQuadArmor: Math.max(...Object.values(armorQuadrantsMap), 0),
       },
       flux: {
         current: ship.flux.current,

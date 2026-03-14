@@ -1,6 +1,11 @@
 import { Shield } from './Shield';
 import { FluxSystem } from './FluxSystem';
 import { ShipStatusValues } from './ShipStatus';
+import type { Point } from '../../types/geometry';
+import { ArmorQuadrant, type ArmorQuadrantType } from './ArmorQuadrant';
+import type { ShipEvent } from './events';
+import { type IShip, type MovementValidationResult, type ShipConfig, type ShipMovementPhase } from './types';
+import type { ShipStatus } from './ShipStatus';
 
 export class Ship implements IShip {
   private readonly _id: string;
@@ -12,7 +17,7 @@ export class Ship implements IShip {
   private _shield: Shield | null;
   private readonly _fluxSystem: FluxSystem;
   private _status: ShipStatus;
-  private readonly _events: ShipMovedEvent[];
+  private readonly _events: ShipEvent[];
 
   constructor(config: ShipConfig) {
     if (config.speed <= 0) {
@@ -72,7 +77,7 @@ export class Ship implements IShip {
     return new Map(this._armorQuadrants);
   }
 
-  get events(): ShipMovedEvent[] {
+  get events(): ShipEvent[] {
     return [...this._events];
   }
 
@@ -334,7 +339,7 @@ export class Ship implements IShip {
   }
 
   private _initializeArmorQuadrants(
-    armor: Record<ArmorQuadrantType, { maxValue: number; initialValue?: number }>
+    armor: Partial<Record<ArmorQuadrantType, { maxValue: number; initialValue?: number }>>
   ): Map<ArmorQuadrantType, ArmorQuadrant> {
     const quadrants = new Map<ArmorQuadrantType, ArmorQuadrant>();
     const types: ArmorQuadrantType[] = [

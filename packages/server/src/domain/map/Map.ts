@@ -1,14 +1,7 @@
 import { Point } from '../../types/geometry';
-import { TokenEntity, TokenConfig, TokenType } from './TokenEntity';
+import { TokenEntity, TokenConfig } from './TokenEntity';
 import { Camera, CameraConfig } from './Camera';
-import {
-  MapInitializedEvent,
-  TokenPlacedEvent,
-  TokenMovedEvent,
-  TokenRemovedEvent,
-  CameraUpdatedEvent,
-  MapEvent,
-} from './events';
+import { MapEvent } from './events';
 
 export interface MapConfig {
   id: string;

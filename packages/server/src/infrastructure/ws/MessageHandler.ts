@@ -1,20 +1,31 @@
 import type {
-  WSMessage,
+  ChatMessagePayload,
+  CombatEventMessage,
+  DrawingAddMessage,
+  DrawingClearMessage,
   DrawingElement,
-  RequestMessage,
-  ResponseMessage,
-  SuccessResponse,
   ErrorResponse,
-  RequestOperation,
+  FluxStateMessage,
   OperationHandler,
+  PlayerJoinedMessage,
   RequestHandlers,
+  RequestMessage,
+  RequestOperation,
   RequestPayload,
-  ResponseData
+  ResponseMessage,
+  ShipMovedMessage,
+  ShieldUpdateMessage,
+  SuccessResponse,
+  WSMessage,
 } from '@vt/shared/ws';
 import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
-import type { RoomManager } from './RoomManager';
 import type { PlayerService } from '../../application/player/PlayerService';
 import type { ShipService } from '../../application/ship/ShipService';
+import type { RoomManager } from './RoomManager';
+
+interface WSSender {
+  sendTo: (id: string, msg: WSMessage) => void;
+}
 
 export interface MessageHandlerOptions {
   roomManager: RoomManager;
@@ -37,6 +48,10 @@ export class MessageHandler {
     this._requestHandlers = this._createRequestHandlers();
   }
 
+  private _getWSServer(): WSSender | undefined {
+    return (this._roomManager as unknown as { _wsServer?: WSSender })._wsServer;
+  }
+
   private _createRequestHandlers(): RequestHandlers {
     return {
       'player.join': this._handlePlayerJoin.bind(this),
@@ -57,39 +72,39 @@ export class MessageHandler {
           break;
 
         case WS_MESSAGE_TYPES.PLAYER_JOINED:
-          await this._handlePlayerJoined(clientId, message.payload as any);
+          await this._handlePlayerJoined(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.SHIP_MOVED:
-          await this._handleShipMoved(clientId, message.payload as any);
+          await this._handleShipMoved(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.SHIELD_UPDATE:
-          await this._handleShieldUpdate(clientId, message.payload as any);
+          await this._handleShieldUpdate(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.FLUX_STATE:
-          await this._handleFluxState(clientId, message.payload as any);
+          await this._handleFluxState(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.COMBAT_EVENT:
-          await this._handleCombatEvent(clientId, message.payload as any);
+          await this._handleCombatEvent(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.DRAWING_ADD:
-          await this._handleDrawingAdd(clientId, message.payload as any);
+          await this._handleDrawingAdd(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.DRAWING_CLEAR:
-          await this._handleDrawingClear(clientId, message.payload as any);
+          await this._handleDrawingClear(clientId, message);
           break;
 
         case WS_MESSAGE_TYPES.CHAT_MESSAGE:
-          await this._handleChatMessage(clientId, message.payload as any);
+          await this._handleChatMessage(clientId, message);
           break;
 
         default:
-          console.warn(`Unhandled WS message type: ${(message as { type: string }).type}`);
+          console.warn(`Unhandled WS message type: ${message.type}`);
       }
     } catch (error) {
       console.error(`Error handling message from ${clientId}:`, error);
@@ -100,7 +115,7 @@ export class MessageHandler {
   private async _handleRequestMessage(clientId: string, request: RequestMessage): Promise<void> {
     const { requestId, operation, data } = request.payload;
 
-    const handler = this._requestHandlers[operation] as OperationHandler<typeof operation>;
+    const handler = this._requestHandlers[operation] as OperationHandler<typeof operation> | undefined;
     if (!handler) {
       const errorResponse: ErrorResponse = {
         success: false,
@@ -138,8 +153,10 @@ export class MessageHandler {
     }
   }
 
-  // Operation handlers - these are type-safe and follow OperationHandler<O> signature
-  private async _handlePlayerJoin(clientId: string, data: any): Promise<any> {
+  private async _handlePlayerJoin(
+    _clientId: string,
+    data: Extract<RequestPayload, { operation: 'player.join' }>['data']
+  ) {
     const playerInfo = {
       id: data.id,
       name: data.name,
@@ -154,19 +171,29 @@ export class MessageHandler {
     return result.player;
   }
 
-  private async _handlePlayerLeave(clientId: string, data: any): Promise<any> {
+  private async _handlePlayerLeave(
+    _clientId: string,
+    data: Extract<RequestPayload, { operation: 'player.leave' }>['data']
+  ) {
     const result = await this._playerService.leave(data.playerId, data.roomId);
     if (!result.success) {
       throw new Error(result.error ?? 'Failed to leave');
     }
+
     return undefined;
   }
 
-  private async _handlePlayerList(clientId: string, data: any): Promise<any> {
+  private async _handlePlayerList(
+    _clientId: string,
+    data: Extract<RequestPayload, { operation: 'player.list' }>['data']
+  ) {
     return this._playerService.listPlayers(data.roomId);
   }
 
-  private async _handleShipMove(clientId: string, data: any): Promise<any> {
+  private async _handleShipMove(
+    clientId: string,
+    data: Extract<RequestPayload, { operation: 'ship.move' }>['data']
+  ) {
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       throw new Error('Player is not in a room');
@@ -186,26 +213,32 @@ export class MessageHandler {
 
     const status = this._shipService.getShipStatus(data.shipId);
 
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.SHIP_MOVED,
-      payload: {
-        shipId: data.shipId,
-        phase: data.phase,
-        type: data.type,
-        distance: data.distance,
-        angle: data.angle,
-        newX: result.newX ?? 0,
-        newY: result.newY ?? 0,
-        newHeading: result.newHeading ?? 0,
-        timestamp: Date.now(),
+    this._roomManager.broadcastToRoom(
+      playerRoom.id,
+      {
+        type: WS_MESSAGE_TYPES.SHIP_MOVED,
+        payload: {
+          shipId: data.shipId,
+          phase: data.phase,
+          type: data.type,
+          distance: data.distance,
+          angle: data.angle,
+          newX: status?.position.x ?? 0,
+          newY: status?.position.y ?? 0,
+          newHeading: status?.heading ?? 0,
+          timestamp: Date.now(),
+        },
       },
-    }, clientId);
+      clientId
+    );
 
-    return status;
+    return status ?? null;
   }
 
-  private async _handleShipToggleShield(clientId: string, data: any): Promise<any> {
+  private async _handleShipToggleShield(
+    clientId: string,
+    data: Extract<RequestPayload, { operation: 'ship.toggleShield' }>['data']
+  ) {
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       throw new Error('Player is not in a room');
@@ -218,21 +251,27 @@ export class MessageHandler {
 
     const status = this._shipService.getShipStatus(data.shipId);
 
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.SHIELD_UPDATE,
-      payload: {
-        shipId: data.shipId,
-        active: status?.shield?.active ?? false,
-        type: status?.shield?.type ?? 'front',
-        coverageAngle: status?.shield?.coverageAngle ?? 0,
+    this._roomManager.broadcastToRoom(
+      playerRoom.id,
+      {
+        type: WS_MESSAGE_TYPES.SHIELD_UPDATE,
+        payload: {
+          shipId: data.shipId,
+          active: status?.shield?.active ?? false,
+          type: status?.shield?.type ?? 'front',
+          coverageAngle: status?.shield?.coverageAngle ?? 0,
+        },
       },
-    }, clientId);
+      clientId
+    );
 
-    return status;
+    return status ?? null;
   }
 
-  private async _handleShipVent(clientId: string, data: any): Promise<any> {
+  private async _handleShipVent(
+    clientId: string,
+    data: Extract<RequestPayload, { operation: 'ship.vent' }>['data']
+  ) {
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       throw new Error('Player is not in a room');
@@ -245,34 +284,34 @@ export class MessageHandler {
 
     const status = this._shipService.getShipStatus(data.shipId);
 
-    // Broadcast to other players in the room
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.FLUX_STATE,
-      payload: {
-        shipId: data.shipId,
-        fluxState: status?.fluxState ?? 'normal',
-        currentFlux: status?.flux?.current ?? 0,
-        softFlux: status?.flux?.softFlux ?? 0,
-        hardFlux: status?.flux?.hardFlux ?? 0,
+    this._roomManager.broadcastToRoom(
+      playerRoom.id,
+      {
+        type: WS_MESSAGE_TYPES.FLUX_STATE,
+        payload: {
+          shipId: data.shipId,
+          fluxState: status?.fluxState ?? 'normal',
+          currentFlux: status?.flux?.current ?? 0,
+          softFlux: status?.flux?.softFlux ?? 0,
+          hardFlux: status?.flux?.hardFlux ?? 0,
+        },
       },
-    }, clientId);
+      clientId
+    );
 
-    return status;
+    return status ?? null;
   }
 
-  private async _handleShipGetStatus(clientId: string, data: any): Promise<any> {
-    return this._shipService.getShipStatus(data.shipId);
+  private async _handleShipGetStatus(
+    _clientId: string,
+    data: Extract<RequestPayload, { operation: 'ship.getStatus' }>['data']
+  ) {
+    return this._shipService.getShipStatus(data.shipId) ?? null;
   }
 
-  // Existing event handlers (unchanged except for method renaming)
-  private async _handlePlayerJoined(clientId: string, payload: { id: string; name: string; joinedAt: number; roomId?: string }): Promise<void> {
-    const playerInfo = {
-      id: payload.id,
-      name: payload.name,
-      joinedAt: payload.joinedAt,
-    };
-
-    await this._playerService.join(playerInfo);
+  private async _handlePlayerJoined(clientId: string, message: PlayerJoinedMessage): Promise<void> {
+    const payload = message.payload;
+    await this._playerService.join(payload);
 
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (playerRoom) {
@@ -286,53 +325,44 @@ export class MessageHandler {
   private _sendDrawingsToPlayer(clientId: string, drawings: DrawingElement[]): void {
     if (drawings.length === 0) return;
 
-    const roomManager = this._roomManager;
-    const wsServer = (roomManager as unknown as { _wsServer?: { sendTo: (id: string, msg: WSMessage) => void } })._wsServer;
-    if (wsServer) {
-      wsServer.sendTo(clientId, {
-        type: WS_MESSAGE_TYPES.DRAWING_SYNC,
-        payload: {
-          elements: drawings,
-        },
-      });
-    }
+    const wsServer = this._getWSServer();
+    wsServer?.sendTo(clientId, {
+      type: WS_MESSAGE_TYPES.DRAWING_SYNC,
+      payload: {
+        elements: drawings,
+      },
+    });
   }
 
-  private async _handleShipMoved(clientId: string, payload: { shipId: string; phase: 1 | 2 | 3; type: 'straight' | 'strafe' | 'rotate'; distance?: number; angle?: number; newX: number; newY: number; newHeading: number }): Promise<void> {
+  private async _handleShipMoved(clientId: string, message: ShipMovedMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
       return;
     }
 
-    const movement = {
+    const result = await this._shipService.moveShip(payload.shipId, {
       shipId: payload.shipId,
-      phase: payload.phase as 1 | 2 | 3,
-      type: payload.type as 'straight' | 'strafe' | 'rotate',
+      phase: payload.phase,
+      type: payload.type,
       distance: payload.distance,
       angle: payload.angle,
-    };
+    });
 
-    const result = await this._shipService.moveShip(payload.shipId, movement);
     if (result.success) {
       this._roomManager.broadcastToRoom(playerRoom.id, {
         type: WS_MESSAGE_TYPES.SHIP_MOVED,
         payload: {
-          shipId: payload.shipId,
-          phase: payload.phase,
-          type: payload.type,
-          distance: payload.distance,
-          angle: payload.angle,
-          newX: payload.newX,
-          newY: payload.newY,
-          newHeading: payload.newHeading,
+          ...payload,
           timestamp: Date.now(),
         },
       });
     }
   }
 
-  private async _handleShieldUpdate(clientId: string, payload: { shipId: string; active: boolean; type: 'front' | 'full'; coverageAngle: number }): Promise<void> {
+  private async _handleShieldUpdate(clientId: string, message: ShieldUpdateMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
@@ -351,7 +381,8 @@ export class MessageHandler {
     });
   }
 
-  private async _handleFluxState(clientId: string, payload: { shipId: string; fluxState: string; currentFlux: number; softFlux: number; hardFlux: number }): Promise<void> {
+  private async _handleFluxState(clientId: string, message: FluxStateMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       return;
@@ -363,17 +394,12 @@ export class MessageHandler {
 
     this._roomManager.broadcastToRoom(playerRoom.id, {
       type: WS_MESSAGE_TYPES.FLUX_STATE,
-      payload: {
-        shipId: payload.shipId,
-        fluxState: payload.fluxState as 'normal' | 'venting' | 'overloaded',
-        currentFlux: payload.currentFlux,
-        softFlux: payload.softFlux,
-        hardFlux: payload.hardFlux,
-      },
+      payload,
     });
   }
 
-  private async _handleCombatEvent(clientId: string, payload: { sourceShipId: string; targetShipId: string; weaponId: string; hit: boolean; damage?: number; hitQuadrant?: string }): Promise<void> {
+  private async _handleCombatEvent(clientId: string, message: CombatEventMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
@@ -389,7 +415,8 @@ export class MessageHandler {
     });
   }
 
-  private async _handleDrawingAdd(clientId: string, payload: { element: DrawingElement }): Promise<void> {
+  private async _handleDrawingAdd(clientId: string, message: DrawingAddMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
@@ -403,23 +430,28 @@ export class MessageHandler {
     }
     drawings.push(payload.element);
 
-    this._roomManager.broadcastToRoom(playerRoom.id, {
-      type: WS_MESSAGE_TYPES.DRAWING_ADD,
-      payload: {
-        playerId: clientId,
-        element: payload.element,
+    this._roomManager.broadcastToRoom(
+      playerRoom.id,
+      {
+        type: WS_MESSAGE_TYPES.DRAWING_ADD,
+        payload: {
+          playerId: clientId,
+          element: payload.element,
+        },
       },
-    }, clientId);
+      clientId
+    );
   }
 
-  private async _handleDrawingClear(clientId: string, payload: { clearAll?: boolean }): Promise<void> {
+  private async _handleDrawingClear(clientId: string, message: DrawingClearMessage): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
       return;
     }
 
-    if (payload.clearAll) {
+    if (payload.playerId === clientId) {
       this._roomDrawings.set(playerRoom.id, []);
     }
 
@@ -431,7 +463,8 @@ export class MessageHandler {
     });
   }
 
-  private async _handleChatMessage(clientId: string, payload: { content: string }): Promise<void> {
+  private async _handleChatMessage(clientId: string, message: ChatMessagePayload): Promise<void> {
+    const payload = message.payload;
     const playerRoom = this._roomManager.getPlayerRoom(clientId);
     if (!playerRoom) {
       this._sendError(clientId, 'NOT_IN_ROOM', 'Player is not in a room');
@@ -452,29 +485,30 @@ export class MessageHandler {
   }
 
   private _sendError(clientId: string, code: string, message: string, details?: Record<string, unknown>): void {
-    const roomManager = this._roomManager;
-    const wsServer = (roomManager as unknown as { _wsServer?: { sendTo: (id: string, msg: WSMessage) => void } })._wsServer;
-    if (wsServer) {
-      wsServer.sendTo(clientId, {
-        type: WS_MESSAGE_TYPES.ERROR,
-        payload: { code, message, details },
-      });
-    }
+    const wsServer = this._getWSServer();
+    wsServer?.sendTo(clientId, {
+      type: WS_MESSAGE_TYPES.ERROR,
+      payload: { code, message, details },
+    });
   }
 
-  private _sendResponse(clientId: string, requestId: string, response: SuccessResponse<any> | ErrorResponse): void {
-    const roomManager = this._roomManager;
-    const wsServer = (roomManager as unknown as { _wsServer?: { sendTo: (id: string, msg: WSMessage) => void } })._wsServer;
-    if (wsServer) {
-      const responseMessage: ResponseMessage = {
-        type: WS_MESSAGE_TYPES.RESPONSE,
-        payload: {
-          requestId,
-          ...response,
-        },
-      };
-      wsServer.sendTo(clientId, responseMessage);
-    }
+  private _sendResponse(
+    clientId: string,
+    requestId: string,
+    response: SuccessResponse<RequestOperation> | ErrorResponse
+  ): void {
+    const wsServer = this._getWSServer();
+    if (!wsServer) return;
+
+    const responseMessage: ResponseMessage = {
+      type: WS_MESSAGE_TYPES.RESPONSE,
+      payload: {
+        requestId,
+        ...response,
+      },
+    };
+
+    wsServer.sendTo(clientId, responseMessage);
   }
 
   getRoomDrawings(roomId: string): DrawingElement[] {

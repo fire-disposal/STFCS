@@ -7,22 +7,6 @@ export * from "./constants";
 // 导出模式验证
 export * from "./schemas";
 
-// 导出tRPC类型（不包含WebSocket类型）
-export type {
-  AppRouter,
-  PlayerJoinInput,
-  PlayerLeaveInput,
-  PlayerListInput,
-  ShipMoveInput,
-  ShipToggleShieldInput,
-  ShipVentInput,
-  ShipGetStatusInput,
-  InferRouterInput,
-  InferRouterOutput,
-  InferProcedureInput,
-  InferProcedureOutput,
-} from "./trpc";
-
 // 导出核心类型定义
 export type {
   PlayerInfo,

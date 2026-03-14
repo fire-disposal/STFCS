@@ -16,22 +16,13 @@ import type {
 	ShipMovedMessage,
 	ChatMessagePayload,
 	DrawingAddMessage,
-	DrawingClearMessage,
-	ShipMovement,
 	RequestMessage,
 	ResponseMessage,
-	SuccessResponse,
-	ErrorResponse,
 	RequestOperation,
 	ResponseForOperation,
-	PlayerJoinRequestPayload,
-	PlayerLeaveRequestPayload,
-	PlayerListRequestPayload,
-	ShipMoveRequestPayload,
-	ShipToggleShieldRequestPayload,
-	ShipVentRequestPayload,
-	ShipGetStatusRequestPayload,
+	RequestPayload,
 } from "@vt/shared/ws";
+import type { ShipMovement } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 
 export type { WSMessage, WSMessageType };
@@ -57,7 +48,7 @@ export class WebSocketService {
 	private maxReconnectAttempts = 5;
 	private reconnectDelay = 1000;
 	private pingInterval: NodeJS.Timeout | null = null;
-	private messageHandlers: Map<WSMessageType, Array<(payload: WSMessagePayloadMap[WSMessageType]) => void>> =
+	private messageHandlers: Map<WSMessageType, Array<(payload: unknown) => void>> =
 		new Map();
 	private pendingRequests: Map<string, PendingRequest> = new Map();
 	private requestTimeout = 10000; // 10秒超时
@@ -132,7 +123,7 @@ export class WebSocketService {
 	 */
 	public async sendRequest<T extends RequestOperation>(
 		operation: T,
-		data: any
+		data: Extract<RequestPayload, { operation: T }>["data"]
 	): Promise<ResponseForOperation<T>> {
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
 			throw new Error("WebSocket is not connected");
@@ -145,7 +136,7 @@ export class WebSocketService {
 				requestId,
 				operation,
 				data,
-			},
+			} as RequestMessage["payload"],
 		};
 
 		return new Promise<ResponseForOperation<T>>((resolve, reject) => {
@@ -170,7 +161,7 @@ export class WebSocketService {
 		playerId: string,
 		playerName: string,
 		roomId?: string
-	): Promise<PlayerJoinRequestPayload> {
+	): Promise<ResponseForOperation<"player.join">> {
 		return this.sendRequest("player.join", {
 			id: playerId,
 			name: playerName,
@@ -182,7 +173,7 @@ export class WebSocketService {
 		return this.sendRequest("player.leave", { playerId, roomId });
 	}
 
-	public async listPlayers(roomId: string): Promise<PlayerListRequestPayload> {
+	public async listPlayers(roomId: string): Promise<ResponseForOperation<"player.list">> {
 		return this.sendRequest("player.list", { roomId });
 	}
 
@@ -271,7 +262,7 @@ export class WebSocketService {
 
 	private cleanupPendingRequests(): void {
 		const error = new Error("WebSocket disconnected");
-		for (const [requestId, pending] of this.pendingRequests.entries()) {
+		for (const [, pending] of this.pendingRequests.entries()) {
 			clearTimeout(pending.timeout);
 			pending.reject(error);
 		}
@@ -362,16 +353,21 @@ export class WebSocketService {
 		if (!this.messageHandlers.has(type)) {
 			this.messageHandlers.set(type, []);
 		}
-		this.messageHandlers.get(type)!.push(handler);
+		this.messageHandlers.get(type)!.push(handler as (payload: unknown) => void);
 	}
 
-	public off<T extends WSMessageType>(type: T, handler: (payload: WSMessagePayloadMap[T]) => void): void {
+	public off<T extends WSMessageType>(type: T, handler?: (payload: WSMessagePayloadMap[T]) => void): void {
 		const handlers = this.messageHandlers.get(type);
-		if (handlers) {
-			const index = handlers.indexOf(handler);
-			if (index > -1) {
-				handlers.splice(index, 1);
-			}
+		if (!handlers) return;
+
+		if (!handler) {
+			this.messageHandlers.delete(type);
+			return;
+		}
+
+		const index = handlers.indexOf(handler as (payload: unknown) => void);
+		if (index > -1) {
+			handlers.splice(index, 1);
 		}
 	}
 

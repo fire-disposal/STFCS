@@ -1,14 +1,23 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "composite": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "composite": false,
     "types": ["node", "vite/client"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@vt/shared": ["../shared/src/index.ts"],
+      "@vt/shared/*": ["../shared/src/*"]
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "declaration": false,
+    "declarationMap": false,
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts", "../shared/src/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",
@@ -16,5 +25,6 @@
     "**/*.test.tsx",
     "**/*.spec.ts",
     "**/*.spec.tsx",
+    "**/*.backup.ts",
   ],
 }

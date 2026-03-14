@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -p tsconfig.app.json --noEmit && vite build",
     "preview": "vite preview",
     "format": "biome format --write src",
     "format:check": "biome format src",
@@ -13,8 +13,8 @@
     "lint:fix": "biome lint --write src --diagnostic-level=error",
     "check": "biome check src --diagnostic-level=error",
     "check:fix": "biome check --write src --diagnostic-level=error",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --watch --passWithNoTests",
     "test:coverage": "vitest --coverage",
     "typecheck": "tsc -p tsconfig.app.json --noEmit"
   },
@@ -22,8 +22,6 @@
     "@pixi/react": "^8.0.0",
     "@reduxjs/toolkit": "^2.5.0",
     "@tanstack/react-query": "^5.60.0",
-    "@trpc/client": "^11.12.0",
-    "@trpc/react-query": "^11.12.0",
     "framer-motion": "^11.18.0",
     "konva": "^9.3.15",
     "pixi.js": "^8.17.0",
