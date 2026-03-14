@@ -156,7 +156,7 @@ jobs:
           REGISTRY: ${{ env.REGISTRY }}
           SERVER_IMAGE: ${{ env.SERVER_IMAGE }}
           CLIENT_IMAGE: ${{ env.CLIENT_IMAGE }}
-          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000' }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         run: |
           echo "🚀 Deploying to production server..."
 
