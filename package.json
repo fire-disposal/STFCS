@@ -4,11 +4,13 @@
   "description": "STFCS - Tactical Space Fleet Combat System",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx,.vue",
-    "lint:fix": "eslint . --ext .ts,.tsx,.vue --fix",
-    "test": "pnpm -r test",
-    "build": "pnpm -r build",
-    "dev": "pnpm -r --parallel dev"
+    "lint": "pnpm -r --if-present lint",
+    "lint:fix": "pnpm -r --if-present lint:fix",
+    "test": "pnpm -r --if-present --sort test",
+    "build": "pnpm -r --if-present --sort build",
+    "dev": "pnpm -r --if-present --parallel dev",
+    "typecheck": "pnpm -r --if-present --sort typecheck",
+    "check": "pnpm lint && pnpm typecheck"
   },
   "keywords": [],
   "author": "",

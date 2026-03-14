@@ -35,6 +35,11 @@ export const WS_MESSAGE_TYPES = {
   // Request-Response messages
   REQUEST: 'REQUEST',
   RESPONSE: 'RESPONSE',
+
+  // Connection/control messages
+  PING: 'PING',
+  PONG: 'PONG',
+  ROOM_UPDATE: 'ROOM_UPDATE',
 } as const;
 
 export type WSMessageType = typeof WS_MESSAGE_TYPES[keyof typeof WS_MESSAGE_TYPES];
@@ -197,6 +202,35 @@ export interface ChatMessagePayload {
   };
 }
 
+export interface PingMessage {
+  type: typeof WS_MESSAGE_TYPES.PING;
+  payload: {
+    timestamp: number;
+  };
+}
+
+export interface PongMessage {
+  type: typeof WS_MESSAGE_TYPES.PONG;
+  payload: {
+    timestamp: number;
+  };
+}
+
+export interface RoomPlayerSnapshot {
+  id: string;
+  name: string;
+  isReady: boolean;
+  currentShipId: string | null;
+}
+
+export interface RoomUpdateMessage {
+  type: typeof WS_MESSAGE_TYPES.ROOM_UPDATE;
+  payload: {
+    roomId: string;
+    players: RoomPlayerSnapshot[];
+  };
+}
+
 // Operation-specific request payloads
 export interface PlayerJoinRequestPayload {
   id: string;
@@ -335,8 +369,17 @@ export type WSMessage =
   | DrawingSyncMessage
   | ChatMessagePayload
   | ErrorMessage
+  | PingMessage
+  | PongMessage
+  | RoomUpdateMessage
   | RequestMessage
   | ResponseMessage;
+
+export type WSMessagePayloadMap = {
+  [M in WSMessage as M['type']]: M['payload'];
+};
+
+export type WSMessageOf<T extends WSMessageType> = Extract<WSMessage, { type: T }>;
 
 export interface IWSServer {
   broadcast(message: WSMessage, excludeClientId?: string): void;
@@ -349,7 +392,7 @@ export interface IWSClient {
   connect(): Promise<void>;
   disconnect(): void;
   send(message: WSMessage): void;
-  on(type: WSMessageType, handler: (payload: unknown) => void): void;
-  off(type: WSMessageType, handler?: (payload: unknown) => void): void;
+  on<T extends WSMessageType>(type: T, handler: (payload: WSMessagePayloadMap[T]) => void): void;
+  off<T extends WSMessageType>(type: T, handler?: (payload: WSMessagePayloadMap[T]) => void): void;
   isConnected(): boolean;
 }

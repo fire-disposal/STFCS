@@ -14,11 +14,6 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@vt/shared/*": ["../shared/src/*"],
-      "@vt/shared": ["../shared/src/index.ts"]
-    },
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*"],
