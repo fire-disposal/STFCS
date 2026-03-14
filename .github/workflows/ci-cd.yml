@@ -91,7 +91,7 @@ jobs:
             cd ~/stfcs
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            docker-compose up -d
+            docker compose up -d
             docker image prune -f
           EOF
 
