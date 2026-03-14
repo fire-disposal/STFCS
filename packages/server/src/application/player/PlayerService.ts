@@ -1,114 +1,141 @@
-import type { PlayerInfo } from '@vt/shared/types';
-import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
-import type { IWSServer } from '@vt/shared/ws';
-import type { RoomManager } from '../../infrastructure/ws/RoomManager';
+import type { PlayerInfo, Result } from "@vt/shared/types";
+import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import type { IWSServer } from "@vt/shared/ws";
+import type { RoomManager } from "../../infrastructure/ws/RoomManager";
+import { BaseService } from "../common/BaseService";
 
-export interface JoinPlayerResult {
-  success: boolean;
-  player?: PlayerInfo;
-  error?: string;
-}
-
-export interface LeavePlayerResult {
-  success: boolean;
-  error?: string;
-}
+export type JoinPlayerResult = Result<PlayerInfo>;
+export type LeavePlayerResult = Result<void>;
 
 export interface IPlayerService {
-  join(player: PlayerInfo): Promise<JoinPlayerResult>;
-  leave(playerId: string, roomId: string): Promise<LeavePlayerResult>;
-  getPlayer(playerId: string): PlayerInfo | undefined;
-  listPlayers(roomId: string): PlayerInfo[];
+	join(player: PlayerInfo, roomId?: string): Promise<JoinPlayerResult>;
+	leave(playerId: string, roomId: string): Promise<LeavePlayerResult>;
+	getPlayer(playerId: string): PlayerInfo | undefined;
+	listPlayers(roomId: string): PlayerInfo[];
+	toggleDMMode(playerId: string, enable: boolean): Promise<boolean>;
 }
 
-export class PlayerService implements IPlayerService {
-  private _players: Map<string, PlayerInfo>;
-  private _wsServer?: IWSServer;
-  private _roomManager?: RoomManager;
+export class PlayerService extends BaseService implements IPlayerService {
+	private _players: Map<string, PlayerInfo>;
 
-  constructor() {
-    this._players = new Map();
-  }
+	constructor() {
+		super();
+		this._players = new Map();
+	}
 
-  setWSServer(wsServer: IWSServer): void {
-    this._wsServer = wsServer;
-  }
+	async join(player: PlayerInfo, roomId?: string): Promise<JoinPlayerResult> {
+		const existingPlayer = this._players.get(player.id);
+		if (existingPlayer) {
+			return { success: true, data: existingPlayer };
+		}
 
-  setRoomManager(roomManager: RoomManager): void {
-    this._roomManager = roomManager;
-  }
+		// 初始化可选属性为默认值
+		const completePlayer: PlayerInfo = {
+			...player,
+			isActive: player.isActive ?? true,
+			isDMMode: player.isDMMode ?? false,
+		};
 
-  async join(player: PlayerInfo): Promise<JoinPlayerResult> {
-    if (this._players.has(player.id)) {
-      return {
-        success: true,
-        player: this._players.get(player.id),
-      };
-    }
+		this._players.set(player.id, completePlayer);
 
-    this._players.set(player.id, player);
+		if (this._roomManager) {
+			const targetRoom = roomId ?? "default";
+			this._roomManager.joinRoom(targetRoom, completePlayer);
+		}
 
-    if (this._roomManager) {
-      const defaultRoom = 'default';
-      this._roomManager.joinRoom(defaultRoom, player);
-    }
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.PLAYER_JOINED,
+				payload: completePlayer,
+			});
+		}
 
-    if (this._wsServer) {
-      this._wsServer.broadcast({
-        type: WS_MESSAGE_TYPES.PLAYER_JOINED,
-        payload: player,
-      });
-    }
+		return { success: true, data: completePlayer };
+	}
 
-    return {
-      success: true,
-      player,
-    };
-  }
+	async leave(playerId: string, roomId: string): Promise<LeavePlayerResult> {
+		const player = this._players.get(playerId);
+		if (!player) {
+			return { success: false, error: "Player not found" };
+		}
 
-  async leave(playerId: string, roomId: string): Promise<LeavePlayerResult> {
-    const player = this._players.get(playerId);
-    if (!player) {
-      return {
-        success: false,
-        error: 'Player not found',
-      };
-    }
+		if (this._roomManager) {
+			this._roomManager.leaveRoom(roomId, playerId);
+		}
 
-    if (this._roomManager) {
-      this._roomManager.leaveRoom(roomId, playerId);
-    }
+		this._players.delete(playerId);
 
-    this._players.delete(playerId);
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.PLAYER_LEFT,
+				payload: { playerId, reason: "Player left" },
+			});
+		}
 
-    if (this._wsServer) {
-      this._wsServer.broadcast({
-        type: WS_MESSAGE_TYPES.PLAYER_LEFT,
-        payload: { playerId, reason: 'Player left' },
-      });
-    }
+		return { success: true, data: undefined };
+	}
 
-    return {
-      success: true,
-    };
-  }
+	getPlayer(playerId: string): PlayerInfo | undefined {
+		return this._players.get(playerId);
+	}
 
-  getPlayer(playerId: string): PlayerInfo | undefined {
-    return this._players.get(playerId);
-  }
+	listPlayers(roomId: string): PlayerInfo[] {
+		if (!this._roomManager) {
+			return Array.from(this._players.values());
+		}
 
-  listPlayers(roomId: string): PlayerInfo[] {
-    if (!this._roomManager) {
-      return Array.from(this._players.values());
-    }
+		const room = this._roomManager.getRoom(roomId);
+		if (!room) {
+			return [];
+		}
 
-    const room = this._roomManager.getRoom(roomId);
-    if (!room) {
-      return [];
-    }
+		return Array.from(room.players.values());
+	}
 
-    return Array.from(room.players.values());
-  }
+	async toggleDMMode(playerId: string, enable: boolean): Promise<boolean> {
+		const player = this._players.get(playerId);
+		if (!player) {
+			return false;
+		}
+
+		player.isDMMode = enable;
+		this._players.set(playerId, player);
+
+		if (this._wsServer) {
+			this._wsServer.broadcast({
+				type: WS_MESSAGE_TYPES.DM_TOGGLE,
+				payload: {
+					playerId,
+					playerName: player.name,
+					enable,
+					timestamp: Date.now(),
+				},
+			});
+
+			this._broadcastDMStatus();
+		}
+
+		return true;
+	}
+
+	private _broadcastDMStatus(): void {
+		if (!this._wsServer || !this._roomManager) {
+			return;
+		}
+
+		const dmStatus = Array.from(this._players.values()).map((player) => ({
+			id: player.id,
+			name: player.name,
+			isDMMode: player.isDMMode,
+		}));
+
+		this._wsServer.broadcast({
+			type: WS_MESSAGE_TYPES.DM_STATUS_UPDATE,
+			payload: {
+				players: dmStatus,
+			},
+		});
+	}
 }
 
 export default PlayerService;

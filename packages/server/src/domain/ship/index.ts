@@ -11,7 +11,7 @@ export type {
   MovementValidationResult,
   ArmorQuadrantConfig,
 } from './types';
-export type { IArmorQuadrant, ArmorQuadrantType } from './ArmorQuadrant';
+export type { IArmorQuadrant } from './ArmorQuadrant';
 export type { IShield, ShieldType, ShieldConfig } from './Shield';
 export type { IFluxSystem, FluxSystemConfig } from './FluxSystem';
 export type {

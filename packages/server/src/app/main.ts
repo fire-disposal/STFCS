@@ -1,162 +1,221 @@
-import Fastify, { FastifyInstance, type FastifyError } from 'fastify';
-import fastifyCors from '@fastify/cors';
-import { WSServer } from '../infrastructure/ws/WSServer';
-import { RoomManager } from '../infrastructure/ws/RoomManager';
-import { MessageHandler } from '../infrastructure/ws/MessageHandler';
-import { PlayerService } from '../application/player/PlayerService';
-import { ShipService } from '../application/ship/ShipService';
-import { config } from '../config';
-import type { WSMessage } from '@vt/shared/ws';
+import fastifyCors from "@fastify/cors";
+import type { WSMessage } from "@vt/shared/ws";
+import Fastify, { FastifyInstance, type FastifyError } from "fastify";
+import { PlayerService } from "../application/player/PlayerService";
+import { SelectionService } from "../application/selection/SelectionService";
+import { ShipService } from "../application/ship/ShipService";
+import { config } from "../config";
+import { EventBus } from "../infrastructure/events/EventBus";
+import { WSEventHandler } from "../infrastructure/events/WSEventHandler";
+import { MessageHandler } from "../infrastructure/ws/MessageHandler";
+import { RoomManager } from "../infrastructure/ws/RoomManager";
+import { WSServer } from "../infrastructure/ws/WSServer";
 
 export interface ServerOptions {
-  httpPort?: number;
-  wsPort?: number;
-  corsOrigins?: string[];
+	httpPort?: number;
+	wsPort?: number;
+	corsOrigins?: string[];
 }
 
 export class Application {
-  private _fastify: FastifyInstance;
-  private _wsServer?: WSServer;
-  private _roomManager: RoomManager;
-  private _messageHandler?: MessageHandler;
-  private _playerService: PlayerService;
-  private _shipService: ShipService;
+	private _fastify: FastifyInstance;
+	private _wsServer?: WSServer;
+	private _roomManager: RoomManager;
+	private _messageHandler?: MessageHandler;
+	private _playerService: PlayerService;
+	private _selectionService: SelectionService;
+	private _shipService: ShipService;
+	private _eventBus: EventBus;
+	private _wsEventHandler?: WSEventHandler;
 
-  constructor(options: ServerOptions = {}) {
-    this._fastify = Fastify({
-      logger: {
-        level: config.logLevel,
-      },
-    });
+	constructor(options: ServerOptions = {}) {
+		this._fastify = Fastify({
+			logger: {
+				level: config.logLevel,
+			},
+		});
 
-    this._roomManager = new RoomManager(config.maxPlayersPerRoom);
-    this._playerService = new PlayerService();
-    this._shipService = new ShipService();
-  }
+		this._eventBus = new EventBus();
+		this._roomManager = new RoomManager(config.maxPlayersPerRoom);
+		this._playerService = new PlayerService();
+		this._selectionService = new SelectionService();
+		this._shipService = new ShipService();
+	}
 
-  async initialize(): Promise<void> {
-    await this._setupCors();
-    await this._setupHealthCheck();
-    await this._setupErrorHandler();
+	async initialize(): Promise<void> {
+		await this._setupCors();
+		await this._setupHealthCheck();
+		await this._setupErrorHandler();
 
-    this._initializeServices();
-    this._initializeWS();
-  }
+		this._initializeServices();
+		this._initializeWS();
+		this._initializeEventBus();
+	}
 
-  async start(): Promise<void> {
-    const httpPort = config.httpPort;
-    await this._fastify.listen({ port: httpPort, host: '0.0.0.0' });
-    this._fastify.log.info(`HTTP server listening on port ${httpPort}`);
-  }
+	async start(): Promise<void> {
+		const httpPort = config.httpPort;
+		await this._fastify.listen({ port: httpPort, host: "0.0.0.0" });
+		this._fastify.log.info(`HTTP server listening on port ${httpPort}`);
+	}
 
-  async stop(): Promise<void> {
-    if (this._wsServer) {
-      this._wsServer.close();
-    }
-    await this._fastify.close();
-  }
+	async stop(): Promise<void> {
+		if (this._wsEventHandler) {
+			this._wsEventHandler.dispose();
+		}
+		if (this._wsServer) {
+			this._wsServer.close();
+		}
+		await this._fastify.close();
+	}
 
-  get fastify(): FastifyInstance {
-    return this._fastify;
-  }
+	get fastify(): FastifyInstance {
+		return this._fastify;
+	}
 
-  get wsServer(): WSServer | undefined {
-    return this._wsServer;
-  }
+	get wsServer(): WSServer | undefined {
+		return this._wsServer;
+	}
 
-  get roomManager(): RoomManager {
-    return this._roomManager;
-  }
+	get roomManager(): RoomManager {
+		return this._roomManager;
+	}
 
-  get playerService(): PlayerService {
-    return this._playerService;
-  }
+	get playerService(): PlayerService {
+		return this._playerService;
+	}
 
-  get shipService(): ShipService {
-    return this._shipService;
-  }
+	get shipService(): ShipService {
+		return this._shipService;
+	}
 
-  private async _setupCors(): Promise<void> {
-    await this._fastify.register(fastifyCors, {
-      origin: config.corsOrigins,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      credentials: true,
-    });
-  }
+	private async _setupCors(): Promise<void> {
+		await this._fastify.register(fastifyCors, {
+			origin: config.corsOrigins,
+			methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+			allowedHeaders: ["Content-Type", "Authorization"],
+			credentials: true,
+		});
+	}
 
-  private async _setupHealthCheck(): Promise<void> {
-    this._fastify.get('/health', async () => {
-      return {
-        status: 'ok',
-        timestamp: Date.now(),
-        uptime: process.uptime(),
-      };
-    });
-  }
+	private async _setupHealthCheck(): Promise<void> {
+		this._fastify.get("/health", async () => {
+			return {
+				status: "ok",
+				timestamp: Date.now(),
+				uptime: process.uptime(),
+			};
+		});
+	}
 
-  private async _setupErrorHandler(): Promise<void> {
-    this._fastify.setErrorHandler((error: FastifyError, request, reply) => {
-      this._fastify.log.error(error);
+	private async _setupErrorHandler(): Promise<void> {
+		this._fastify.setErrorHandler((error: FastifyError, request, reply) => {
+			this._fastify.log.error(error);
 
-      reply.status(error.statusCode ?? 500).send({
-        error: {
-          code: error.name,
-          message: error.message,
-          statusCode: error.statusCode ?? 500,
-        },
-      });
-    });
-  }
+			reply.status(error.statusCode ?? 500).send({
+				error: {
+					code: error.name,
+					message: error.message,
+					statusCode: error.statusCode ?? 500,
+				},
+			});
+		});
+	}
 
-  private _initializeServices(): void {
-    this._playerService.setRoomManager(this._roomManager);
-    this._shipService.setRoomManager(this._roomManager);
-  }
+	private _initializeServices(): void {
+		this._playerService.setRoomManager(this._roomManager);
+		this._selectionService.setRoomManager(this._roomManager);
+		this._shipService.setRoomManager(this._roomManager);
+	}
 
-  private _initializeWS(): void {
-    this._wsServer = new WSServer({
-      port: config.wsPort,
-      onConnect: (clientId: string) => {
-        this._fastify.log.info(`Client connected: ${clientId}`);
-      },
-      onDisconnect: (clientId: string) => {
-        this._fastify.log.info(`Client disconnected: ${clientId}`);
-        this._handleClientDisconnect(clientId);
-      },
-      onMessage: async (clientId: string, message: WSMessage) => {
-        if (this._messageHandler) {
-          await this._messageHandler.handleMessage(clientId, message);
-        }
-      },
-    });
+	private _initializeWS(): void {
+		this._wsServer = new WSServer({
+			port: config.wsPort,
+			onConnect: (clientId: string) => {
+				this._fastify.log.info(`Client connected: ${clientId}`);
+			},
+			onDisconnect: (clientId: string) => {
+				this._fastify.log.info(`Client disconnected: ${clientId}`);
+				this._handleClientDisconnect(clientId);
+			},
+			onMessage: async (clientId: string, message: WSMessage) => {
+				if (this._messageHandler) {
+					await this._messageHandler.handleMessage(clientId, message);
+				}
+			},
+		});
 
-    this._roomManager.setWSServer(this._wsServer);
-    this._playerService.setWSServer(this._wsServer);
-    this._shipService.setWSServer(this._wsServer);
+		this._roomManager.setWSServer(this._wsServer);
+		this._playerService.setWSServer(this._wsServer);
+		this._selectionService.setWSServer(this._wsServer);
+		this._shipService.setWSServer(this._wsServer);
 
-    this._messageHandler = new MessageHandler({
-      roomManager: this._roomManager,
-      playerService: this._playerService,
-      shipService: this._shipService,
-    });
+		this._messageHandler = new MessageHandler({
+			roomManager: this._roomManager,
+			playerService: this._playerService,
+			selectionService: this._selectionService,
+			shipService: this._shipService,
+			wsServer: this._wsServer,
+		});
 
-    this._fastify.log.info(`WebSocket server listening on port ${config.wsPort}`);
-  }
+		this._fastify.log.info(`WebSocket server listening on port ${config.wsPort}`);
+	}
 
-  private async _handleClientDisconnect(clientId: string): Promise<void> {
-    const player = this._playerService.getPlayer(clientId);
-    if (player) {
-      const room = this._roomManager.getPlayerRoom(clientId);
-      if (room) {
-        await this._playerService.leave(clientId, room.id);
-      }
-    }
-  }
+	private _initializeEventBus(): void {
+		// 创建 WS 事件处理器，订阅领域事件并广播到 WS
+		if (this._wsServer) {
+			this._wsEventHandler = new WSEventHandler(this._wsServer, this._roomManager, this._eventBus);
+			this._fastify.log.info("Event bus initialized with WS event handler");
+		}
+	}
+
+	private async _handleClientDisconnect(clientId: string): Promise<void> {
+		const player = this._playerService.getPlayer(clientId);
+		if (player) {
+			const room = this._roomManager.getPlayerRoom(clientId);
+			if (room) {
+				await this._playerService.leave(clientId, room.id);
+				// 清理玩家的选中状态
+				this._selectionService.handlePlayerLeave(clientId, room.id);
+			}
+		}
+	}
 }
 
 export const createApplication = (options: ServerOptions = {}): Application => {
-  return new Application(options);
+	return new Application(options);
 };
 
 export default Application;
+
+// Server startup
+const startServer = async () => {
+	try {
+		console.log("Starting STFCS server...");
+		console.log("Environment:", process.env.NODE_ENV || "development");
+
+		const app = createApplication();
+		await app.initialize();
+		await app.start();
+
+		console.log("Server started successfully!");
+		console.log(`HTTP server: http://localhost:${config.httpPort}`);
+		console.log(`WebSocket server: ws://localhost:${config.wsPort}`);
+
+		// Handle graceful shutdown
+		const shutdown = async () => {
+			console.log("Shutting down server...");
+			await app.stop();
+			process.exit(0);
+		};
+
+		process.on("SIGINT", shutdown);
+		process.on("SIGTERM", shutdown);
+	} catch (error) {
+		console.error("Failed to start server:", error);
+		process.exit(1);
+	}
+};
+
+// Always start server when this file is imported/run
+// This ensures the server starts when using tsx watch
+startServer();

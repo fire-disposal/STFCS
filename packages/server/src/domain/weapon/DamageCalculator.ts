@@ -2,7 +2,7 @@ import { Point } from '../../types/geometry';
 import { Weapon } from './Weapon';
 import { Ship } from '../ship/Ship';
 import { Shield } from '../ship/Shield';
-import { ArmorQuadrantType } from '../ship/ArmorQuadrant';
+import type { ArmorQuadrant } from '@vt/shared/types';
 
 export interface DamageCalculationInput {
   weapon: Weapon;
@@ -17,7 +17,7 @@ export interface DamageCalculationResult {
   shieldAbsorbed: number;
   armorReduced: number;
   hullDamage: number;
-  hitQuadrant?: ArmorQuadrantType;
+  hitQuadrant?: ArmorQuadrant;
   softFluxGenerated: number;
   hardFluxGenerated: number;
 }
@@ -60,7 +60,7 @@ export class DamageCalculator {
     return angleDiff <= arc / 2;
   }
 
-  static determineHitQuadrant(hitPosition: Point, shipPosition: Point, shipHeading: number): ArmorQuadrantType {
+  static determineHitQuadrant(hitPosition: Point, shipPosition: Point, shipHeading: number): ArmorQuadrant {
     const localX = hitPosition.x - shipPosition.x;
     const localY = hitPosition.y - shipPosition.y;
     

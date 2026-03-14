@@ -1,364 +1,377 @@
-import { Shield } from './Shield';
-import { FluxSystem } from './FluxSystem';
-import { ShipStatusValues } from './ShipStatus';
-import type { Point } from '../../types/geometry';
-import { ArmorQuadrant, type ArmorQuadrantType } from './ArmorQuadrant';
-import type { ShipEvent } from './events';
-import { type IShip, type MovementValidationResult, type ShipConfig, type ShipMovementPhase } from './types';
-import type { ShipStatus } from './ShipStatus';
+import { Shield } from "./Shield";
+import { FluxSystem } from "./FluxSystem";
+import { ShipStatusValues } from "./ShipStatus";
+import type { Point } from "../../types/geometry";
+import { ArmorQuadrant } from "./ArmorQuadrant";
+import type { ShipEvent } from "./events";
+import {
+	type IShip,
+	type MovementValidationResult,
+	type ShipConfig,
+	type ShipMovementPhase,
+	type ShipArmorQuadrantType,
+} from "./types";
+import type { ShipStatus } from "./ShipStatus";
+
+// 魔法数字常量
+const EPSILON = 0.001;
+
+const SHIP_ARMOR_TYPES: ShipArmorQuadrantType[] = [
+	"FRONT_TOP",
+	"FRONT_BOTTOM",
+	"LEFT_TOP",
+	"LEFT_BOTTOM",
+	"RIGHT_TOP",
+	"RIGHT_BOTTOM",
+];
 
 export class Ship implements IShip {
-  private readonly _id: string;
-  private _position: Point;
-  private _heading: number;
-  private readonly _speed: number;
-  private readonly _maneuverability: number;
-  private readonly _armorQuadrants: Map<ArmorQuadrantType, ArmorQuadrant>;
-  private _shield: Shield | null;
-  private readonly _fluxSystem: FluxSystem;
-  private _status: ShipStatus;
-  private readonly _events: ShipEvent[];
+	private readonly _id: string;
+	private _position: Point;
+	private _heading: number;
+	private readonly _speed: number;
+	private readonly _maneuverability: number;
+	private readonly _armorQuadrants: Map<ShipArmorQuadrantType, ArmorQuadrant<ShipArmorQuadrantType>>;
+	private _shield: Shield | null;
+	private readonly _fluxSystem: FluxSystem;
+	private _status: ShipStatus;
+	private readonly _events: ShipEvent[];
 
-  constructor(config: ShipConfig) {
-    if (config.speed <= 0) {
-      throw new Error('Ship speed must be positive');
-    }
-    if (config.maneuverability <= 0) {
-      throw new Error('Ship maneuverability must be positive');
-    }
+	constructor(config: ShipConfig) {
+		if (config.speed <= 0) {
+			throw new Error("Ship speed must be positive");
+		}
+		if (config.maneuverability <= 0) {
+			throw new Error("Ship maneuverability must be positive");
+		}
 
-    this._id = config.id;
-    this._position = { ...config.initialPosition };
-    this._heading = ((config.initialHeading % 360) + 360) % 360;
-    this._speed = config.speed;
-    this._maneuverability = config.maneuverability;
-    this._armorQuadrants = this._initializeArmorQuadrants(config.armor);
-    this._shield = config.shield ? new Shield(config.shield, false) : null;
-    this._fluxSystem = new FluxSystem(config.flux);
-    this._status = this._fluxSystem.isOverloaded
-      ? ShipStatusValues.OVERLOADED
-      : ShipStatusValues.NORMAL;
-    this._events = [];
-  }
+		this._id = config.id;
+		this._position = { ...config.initialPosition };
+		this._heading = ((config.initialHeading % 360) + 360) % 360;
+		this._speed = config.speed;
+		this._maneuverability = config.maneuverability;
+		this._armorQuadrants = this._initializeArmorQuadrants(config.armor);
+		this._shield = config.shield ? new Shield(config.shield, false) : null;
+		this._fluxSystem = new FluxSystem(config.flux);
+		this._status = this._fluxSystem.isOverloaded
+			? ShipStatusValues.OVERLOADED
+			: ShipStatusValues.NORMAL;
+		this._events = [];
+	}
 
-  get id(): string {
-    return this._id;
-  }
+	// ====== 简化 Getter 方法 ======
+	get id(): string {
+		return this._id;
+	}
 
-  get position(): Point {
-    return { ...this._position };
-  }
+	get position(): Point {
+		return { ...this._position };
+	}
 
-  get heading(): number {
-    return this._heading;
-  }
+	get heading(): number {
+		return this._heading;
+	}
 
-  get speed(): number {
-    return this._speed;
-  }
+	get speed(): number {
+		return this._speed;
+	}
 
-  get maneuverability(): number {
-    return this._maneuverability;
-  }
+	get maneuverability(): number {
+		return this._maneuverability;
+	}
 
-  get status(): ShipStatus {
-    return this._status;
-  }
+	get status(): ShipStatus {
+		return this._status;
+	}
 
-  get flux(): FluxSystem {
-    return this._fluxSystem;
-  }
+	get flux(): FluxSystem {
+		return this._fluxSystem;
+	}
 
-  get shield(): Shield | null {
-    return this._shield;
-  }
+	get shield(): Shield | null {
+		return this._shield;
+	}
 
-  get armorQuadrants(): Map<ArmorQuadrantType, ArmorQuadrant> {
-    return new Map(this._armorQuadrants);
-  }
+	get armorQuadrants(): Map<ShipArmorQuadrantType, ArmorQuadrant<ShipArmorQuadrantType>> {
+		return new Map(this._armorQuadrants);
+	}
 
-  get events(): ShipEvent[] {
-    return [...this._events];
-  }
+	get events(): ShipEvent[] {
+		return [...this._events];
+	}
 
-  getHull(): number {
-    let total = 0;
-    for (const quadrant of this._armorQuadrants.values()) {
-      total += quadrant.value;
-    }
-    return total;
-  }
+	// ====== 装甲相关方法 ======
+	getHull(): number {
+		return Array.from(this._armorQuadrants.values()).reduce(
+			(sum, q) => sum + q.value,
+			0
+		);
+	}
 
-  getArmorQuadrant(type: ArmorQuadrantType): ArmorQuadrant | undefined {
-    return this._armorQuadrants.get(type);
-  }
+	getArmorQuadrant(type: ShipArmorQuadrantType): ArmorQuadrant<ShipArmorQuadrantType> | undefined {
+		return this._armorQuadrants.get(type);
+	}
 
-  enableShield(): void {
-    if (!this._shield) {
-      return;
-    }
-    this._shield.activate();
-    this._events.push({
-      type: 'SHIELD_TOGGLED',
-      timestamp: Date.now(),
-      shipId: this._id,
-      isActive: true,
-    });
-  }
+	// ====== 护盾相关方法 ======
+	enableShield(): void {
+		if (!this._shield) return;
+		this._shield.activate();
+		this._pushShieldEvent(true);
+	}
 
-  disableShield(): void {
-    if (!this._shield) {
-      return;
-    }
-    this._shield.deactivate();
-    this._events.push({
-      type: 'SHIELD_TOGGLED',
-      timestamp: Date.now(),
-      shipId: this._id,
-      isActive: false,
-    });
-  }
+	disableShield(): void {
+		if (!this._shield) return;
+		this._shield.deactivate();
+		this._pushShieldEvent(false);
+	}
 
-  toggleShield(): void {
-    if (!this._shield) {
-      return;
-    }
-    this._shield.toggle();
-    this._events.push({
-      type: 'SHIELD_TOGGLED',
-      timestamp: Date.now(),
-      shipId: this._id,
-      isActive: this._shield.isActive,
-    });
-  }
+	toggleShield(): void {
+		if (!this._shield) return;
+		this._shield.toggle();
+		this._pushShieldEvent(this._shield.isActive);
+	}
 
-  payShieldMaintenance(): void {
-    if (!this._shield?.isActive) {
-      return;
-    }
-    const cost = this._shield.maintenanceCost;
-    this._fluxSystem.addSoftFlux(cost);
-    this._events.push({
-      type: 'SHIELD_MAINTENANCE',
-      timestamp: Date.now(),
-      shipId: this._id,
-      fluxCost: cost,
-    });
-  }
+	private _pushShieldEvent(isActive: boolean): void {
+		this._events.push({
+			type: "SHIELD_TOGGLED",
+			timestamp: Date.now(),
+			shipId: this._id,
+			isActive,
+		});
+	}
 
-  validateMovement(
-    displacement: Point,
-    rotation: number,
-    phase: ShipMovementPhase
-  ): MovementValidationResult {
-    if (this._status === ShipStatusValues.OVERLOADED || this._status === ShipStatusValues.DISABLED) {
-      return {
-        isValid: false,
-        reason: 'Ship is overloaded or disabled',
-      };
-    }
+	payShieldMaintenance(): void {
+		if (!this._shield?.isActive) return;
 
-    if (this._fluxSystem.state === 'VENTING') {
-      return {
-        isValid: false,
-        reason: 'Ship is venting and cannot move',
-      };
-    }
+		const cost = this._shield.maintenanceCost;
+		this._fluxSystem.addSoftFlux(cost);
+		this._events.push({
+			type: "SHIELD_MAINTENANCE",
+			timestamp: Date.now(),
+			shipId: this._id,
+			fluxCost: cost,
+		});
+	}
 
-    const distance = Math.sqrt(displacement.x ** 2 + displacement.y ** 2);
-    const angleRad = (this._heading * Math.PI) / 180;
-    const headingVec = { x: Math.cos(angleRad), y: Math.sin(angleRad) };
-    const perpVec = { x: -Math.sin(angleRad), y: Math.cos(angleRad) };
+	// ====== 移动验证和执行 ======
+	validateMovement(
+		displacement: Point,
+		rotation: number,
+		phase: ShipMovementPhase
+	): MovementValidationResult {
+		if (this._isShipDisabled()) {
+			return {
+				isValid: false,
+				reason: "Ship is overloaded or disabled",
+			};
+		}
 
-    const forwardComponent = displacement.x * headingVec.x + displacement.y * headingVec.y;
-    const strafeComponent = displacement.x * perpVec.x + displacement.y * perpVec.y;
+		if (this._fluxSystem.state === "VENTING") {
+			return {
+				isValid: false,
+				reason: "Ship is venting and cannot move",
+			};
+		}
 
-    if (phase === 1 || phase === 3) {
-      const absForward = Math.abs(forwardComponent);
-      const absStrafe = Math.abs(strafeComponent);
+		if (phase === 2) {
+			return this._validateRotation(rotation);
+		}
 
-      if (absStrafe > 0.001 && absForward > 0.001) {
-        return {
-          isValid: false,
-          reason: 'Cannot combine forward and strafe movement in phase 1/3',
-        };
-      }
+		return this._validateTranslation(displacement, phase);
+	}
 
-      if (absForward > 0.001 && absForward > this._speed * 2) {
-        return {
-          isValid: false,
-          reason: `Forward movement exceeds maximum distance of ${this._speed * 2}`,
-        };
-      }
+	private _isShipDisabled(): boolean {
+		return this._status === ShipStatusValues.OVERLOADED || this._status === ShipStatusValues.DISABLED;
+	}
 
-      if (absStrafe > 0.001 && absStrafe > this._speed) {
-        return {
-          isValid: false,
-          reason: `Strafe movement exceeds maximum distance of ${this._speed}`,
-        };
-      }
-    }
+	private _validateRotation(rotation: number): MovementValidationResult {
+		const absRotation = Math.abs(rotation);
+		if (absRotation > this._maneuverability) {
+			return {
+				isValid: false,
+				reason: `Rotation exceeds maximum angle of ${this._maneuverability} degrees`,
+			};
+		}
 
-    if (phase === 2) {
-      if (distance > 0.001) {
-        return {
-          isValid: false,
-          reason: 'Cannot move during rotation phase (phase 2)',
-        };
-      }
-      const absRotation = Math.abs(rotation);
-      if (absRotation > this._maneuverability) {
-        return {
-          isValid: false,
-          reason: `Rotation exceeds maximum angle of ${this._maneuverability} degrees`,
-        };
-      }
-    }
+		return { isValid: true };
+	}
 
-    return {
-      isValid: true,
-    };
-  }
+	private _validateTranslation(
+		displacement: Point,
+		phase: ShipMovementPhase
+	): MovementValidationResult {
+		const distance = Math.sqrt(displacement.x ** 2 + displacement.y ** 2);
+		const angleRad = (this._heading * Math.PI) / 180;
+		const headingVec = { x: Math.cos(angleRad), y: Math.sin(angleRad) };
+		const perpVec = { x: -Math.sin(angleRad), y: Math.cos(angleRad) };
 
-  move(displacement: Point, rotation: number, phase: ShipMovementPhase): boolean {
-    const validation = this.validateMovement(displacement, rotation, phase);
-    if (!validation.isValid) {
-      return false;
-    }
+		const forwardComponent = displacement.x * headingVec.x + displacement.y * headingVec.y;
+		const strafeComponent = displacement.x * perpVec.x + displacement.y * perpVec.y;
 
-    const oldPosition = { ...this._position };
-    const oldHeading = this._heading;
+		const absForward = Math.abs(forwardComponent);
+		const absStrafe = Math.abs(strafeComponent);
 
-    if (phase === 1 || phase === 3) {
-      this._position.x += displacement.x;
-      this._position.y += displacement.y;
-    }
+		// 检查是否混合了前进和横移
+		if (absStrafe > EPSILON && absForward > EPSILON) {
+			return {
+				isValid: false,
+				reason: "Cannot combine forward and strafe movement in phase 1/3",
+			};
+		}
 
-    if (phase === 2) {
-      this._heading = ((this._heading + rotation) % 360 + 360) % 360;
-    }
+		// 前进验证
+		if (absForward > EPSILON && absForward > this._speed * 2) {
+			return {
+				isValid: false,
+				reason: `Forward movement exceeds maximum distance of ${this._speed * 2}`,
+			};
+		}
 
-    this._events.push({
-      type: 'SHIP_MOVED',
-      timestamp: Date.now(),
-      shipId: this._id,
-      previousPosition: oldPosition,
-      newPosition: { ...this._position },
-      previousHeading: oldHeading,
-      newHeading: this._heading,
-      phase,
-    });
+		// 横移验证
+		if (absStrafe > EPSILON && absStrafe > this._speed) {
+			return {
+				isValid: false,
+				reason: `Strafe movement exceeds maximum distance of ${this._speed}`,
+			};
+		}
 
-    return true;
-  }
+		return { isValid: true };
+	}
 
-  beginVent(): boolean {
-    if (this._fluxSystem.state === 'OVERLOADED') {
-      return false;
-    }
-    this._fluxSystem.vent();
-    this._status = ShipStatusValues.VENTING;
-    return true;
-  }
+	move(displacement: Point, rotation: number, phase: ShipMovementPhase): boolean {
+		const validation = this.validateMovement(displacement, rotation, phase);
+		if (!validation.isValid) {
+			return false;
+		}
 
-  endVent(): void {
-    if (this._fluxSystem.state === 'VENTING') {
-      this._fluxSystem.endVent();
-      this._status = ShipStatusValues.NORMAL;
-    }
-  }
+		const oldPosition = { ...this._position };
+		const oldHeading = this._heading;
 
-  startOverload(): void {
-    this._fluxSystem.triggerOverload();
-    this._status = ShipStatusValues.OVERLOADED;
-    this._events.push({
-      type: 'FLUX_OVERLOADED',
-      timestamp: Date.now(),
-      shipId: this._id,
-      fluxLevel: this._fluxSystem.current,
-      capacity: this._fluxSystem.capacity,
-    });
-  }
+		if (phase === 1 || phase === 3) {
+			this._position.x += displacement.x;
+			this._position.y += displacement.y;
+		}
 
-  endOverload(): void {
-    if (this._fluxSystem.state === 'OVERLOADED') {
-      this._fluxSystem.endOverload();
-      this._status = ShipStatusValues.NORMAL;
-    }
-  }
+		if (phase === 2) {
+			this._heading = ((this._heading + rotation) % 360 + 360) % 360;
+		}
 
-  startTurn(): void {
-    this._fluxSystem.dissipate();
-  }
+		this._events.push({
+			type: "SHIP_MOVED",
+			timestamp: Date.now(),
+			shipId: this._id,
+			previousPosition: oldPosition,
+			newPosition: { ...this._position },
+			previousHeading: oldHeading,
+			newHeading: this._heading,
+			phase,
+		});
 
-  endTurn(): void {
-    if (this._fluxSystem.current >= this._fluxSystem.capacity) {
-      this.startOverload();
-    }
-  }
+		return true;
+	}
 
-  clearEvents(): void {
-    this._events.length = 0;
-  }
+	// ====== Flux 系统管理 ======
+	beginVent(): boolean {
+		if (this._fluxSystem.state === "OVERLOADED") {
+			return false;
+		}
+		this._fluxSystem.vent();
+		this._status = ShipStatusValues.VENTING;
+		return true;
+	}
 
-  copy(): Ship {
-    const config: ShipConfig = {
-      id: this._id,
-      initialPosition: this._position,
-      initialHeading: this._heading,
-      speed: this._speed,
-      maneuverability: this._maneuverability,
-      armor: {},
-      flux: {
-        capacity: this._fluxSystem.capacity,
-        dissipation: this._fluxSystem.dissipation,
-        initialSoftFlux: this._fluxSystem.softFlux,
-        initialHardFlux: this._fluxSystem.hardFlux,
-      },
-    };
+	endVent(): void {
+		if (this._fluxSystem.state === "VENTING") {
+			this._fluxSystem.endVent();
+			this._status = ShipStatusValues.NORMAL;
+		}
+	}
 
-    for (const [type, quadrant] of this._armorQuadrants) {
-      config.armor[type] = {
-        maxValue: quadrant.maxValue,
-        initialValue: quadrant.value,
-      };
-    }
+	startOverload(): void {
+		this._fluxSystem.triggerOverload();
+		this._status = ShipStatusValues.OVERLOADED;
+		this._events.push({
+			type: "FLUX_OVERLOADED",
+			timestamp: Date.now(),
+			shipId: this._id,
+			fluxLevel: this._fluxSystem.current,
+			capacity: this._fluxSystem.capacity,
+		});
+	}
 
-    if (this._shield) {
-      config.shield = {
-        type: this._shield.type,
-        radius: this._shield.radius,
-        centerOffset: this._shield.centerOffset,
-        coverageAngle: this._shield.coverageAngle,
-        efficiency: this._shield.efficiency,
-        maintenanceCost: this._shield.maintenanceCost,
-      };
-    }
+	endOverload(): void {
+		if (this._fluxSystem.state === "OVERLOADED") {
+			this._fluxSystem.endOverload();
+			this._status = ShipStatusValues.NORMAL;
+		}
+	}
 
-    return new Ship(config);
-  }
+	startTurn(): void {
+		this._fluxSystem.dissipate();
+	}
 
-  private _initializeArmorQuadrants(
-    armor: Partial<Record<ArmorQuadrantType, { maxValue: number; initialValue?: number }>>
-  ): Map<ArmorQuadrantType, ArmorQuadrant> {
-    const quadrants = new Map<ArmorQuadrantType, ArmorQuadrant>();
-    const types: ArmorQuadrantType[] = [
-      'FRONT_TOP',
-      'FRONT_BOTTOM',
-      'LEFT_TOP',
-      'LEFT_BOTTOM',
-      'RIGHT_TOP',
-      'RIGHT_BOTTOM',
-    ];
+	endTurn(): void {
+		if (this._fluxSystem.current >= this._fluxSystem.capacity) {
+			this.startOverload();
+		}
+	}
 
-    for (const type of types) {
-      const config = armor[type];
-      if (!config) {
-        throw new Error(`Missing armor configuration for quadrant ${type}`);
-      }
-      quadrants.set(type, new ArmorQuadrant(type, config.maxValue, config.initialValue));
-    }
+	// ====== 事件管理 ======
+	clearEvents(): void {
+		this._events.length = 0;
+	}
 
-    return quadrants;
-  }
+	// ====== 复制/克隆 ======
+	copy(): Ship {
+		const config: ShipConfig = {
+			id: this._id,
+			initialPosition: this._position,
+			initialHeading: this._heading,
+			speed: this._speed,
+			maneuverability: this._maneuverability,
+			armor: {},
+			flux: {
+				capacity: this._fluxSystem.capacity,
+				dissipation: this._fluxSystem.dissipation,
+				initialSoftFlux: this._fluxSystem.softFlux,
+				initialHardFlux: this._fluxSystem.hardFlux,
+			},
+		};
+
+		for (const [type, quadrant] of this._armorQuadrants) {
+			config.armor[type] = {
+				maxValue: quadrant.maxValue,
+				initialValue: quadrant.value,
+			};
+		}
+
+		if (this._shield) {
+			config.shield = {
+				type: this._shield.type,
+				radius: this._shield.radius,
+				centerOffset: this._shield.centerOffset,
+				coverageAngle: this._shield.coverageAngle,
+				efficiency: this._shield.efficiency,
+				maintenanceCost: this._shield.maintenanceCost,
+			};
+		}
+
+		return new Ship(config);
+	}
+
+	private _initializeArmorQuadrants(
+		armor: Partial<Record<ShipArmorQuadrantType, { maxValue: number; initialValue?: number }>>
+	): Map<ShipArmorQuadrantType, ArmorQuadrant<ShipArmorQuadrantType>> {
+		const quadrants = new Map<ShipArmorQuadrantType, ArmorQuadrant<ShipArmorQuadrantType>>();
+
+		for (const type of SHIP_ARMOR_TYPES) {
+			const config = armor[type];
+			if (!config) {
+				throw new Error(`Missing armor configuration for quadrant ${type}`);
+			}
+			quadrants.set(type, new ArmorQuadrant(type, config.maxValue, config.initialValue));
+		}
+
+		return quadrants;
+	}
 }

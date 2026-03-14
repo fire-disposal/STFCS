@@ -22,6 +22,16 @@ export interface IMap {
   getAllTokens(): TokenEntity[];
 }
 
+/** 玩家相机状态（用于多玩家同步） */
+export interface PlayerCameraState {
+  playerId: string;
+  playerName: string;
+  x: number;
+  y: number;
+  zoom: number;
+  timestamp: number;
+}
+
 export class GameMap implements IMap {
   private readonly _id: string;
   private readonly _width: number;
@@ -30,6 +40,8 @@ export class GameMap implements IMap {
   private readonly _tokens: Map<string, TokenEntity>;
   private _camera: Camera;
   private readonly _events: MapEvent[];
+  /** 存储所有玩家的相机状态 */
+  private _playerCameras: Map<string, PlayerCameraState>;
 
   constructor(config: MapConfig) {
     if (config.width <= 0 || config.height <= 0) {
@@ -45,6 +57,7 @@ export class GameMap implements IMap {
       ? new Camera(config.initialCamera)
       : new Camera({ centerX: config.width / 2, centerY: config.height / 2, zoom: 1, rotation: 0 });
     this._events = [];
+    this._playerCameras = new Map();
 
     this._events.push({
       type: 'MAP_INITIALIZED',
@@ -73,6 +86,31 @@ export class GameMap implements IMap {
 
   get camera(): Camera {
     return this._camera;
+  }
+
+  /** 获取所有玩家的相机状态 */
+  getPlayerCameras(): PlayerCameraState[] {
+    return Array.from(this._playerCameras.values());
+  }
+
+  /** 获取指定玩家的相机状态 */
+  getPlayerCamera(playerId: string): PlayerCameraState | undefined {
+    return this._playerCameras.get(playerId);
+  }
+
+  /** 更新玩家相机状态 */
+  updatePlayerCamera(camera: PlayerCameraState): void {
+    this._playerCameras.set(camera.playerId, camera);
+  }
+
+  /** 移除玩家相机状态（玩家离开时） */
+  removePlayerCamera(playerId: string): void {
+    this._playerCameras.delete(playerId);
+  }
+
+  /** 清空所有玩家相机状态 */
+  clearPlayerCameras(): void {
+    this._playerCameras.clear();
   }
 
   get events(): MapEvent[] {

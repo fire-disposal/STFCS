@@ -1,137 +1,173 @@
-import type { WSMessage } from '@vt/shared/ws';
-import type { IWSServer } from '@vt/shared/ws';
-import type { PlayerInfo } from '@vt/shared/types';
+import type { WSMessage } from "@vt/shared/ws";
+import type { IWSServer } from "@vt/shared/ws";
+import type { PlayerInfo, PlayerCamera } from "@vt/shared/types";
 
 export interface Room {
-  id: string;
-  players: Map<string, PlayerInfo>;
-  createdAt: number;
-  maxPlayers: number;
+	id: string;
+	players: Map<string, PlayerInfo>;
+	createdAt: number;
+	maxPlayers: number;
+	/** 存储房间内玩家的相机状态 */
+	playerCameras: Map<string, PlayerCamera>;
 }
 
 export interface IRoomManager {
-  createRoom(roomId: string): Room;
-  joinRoom(roomId: string, player: PlayerInfo): boolean;
-  leaveRoom(roomId: string, playerId: string): boolean;
-  getRoom(roomId: string): Room | undefined;
-  getPlayerRoom(playerId: string): Room | undefined;
-  broadcastToRoom(roomId: string, message: WSMessage, excludePlayerId?: string): void;
-  deleteRoom(roomId: string): void;
-  listRooms(): Room[];
+	createRoom(roomId: string): Room;
+	joinRoom(roomId: string, player: PlayerInfo): boolean;
+	leaveRoom(roomId: string, playerId: string): boolean;
+	getRoom(roomId: string): Room | undefined;
+	getPlayerRoom(playerId: string): Room | undefined;
+	broadcastToRoom(roomId: string, message: WSMessage, excludePlayerId?: string): void;
+	deleteRoom(roomId: string): void;
+	listRooms(): Room[];
 }
 
 export class RoomManager implements IRoomManager {
-  private _rooms: Map<string, Room>;
-  private _playerRooms: Map<string, string>;
-  private _maxPlayersPerRoom: number;
-  private _wsServer?: IWSServer;
+	private _rooms: Map<string, Room>;
+	private _playerRooms: Map<string, string>;
+	private _maxPlayersPerRoom: number;
+	private _wsServer: IWSServer | undefined;
 
-  constructor(maxPlayersPerRoom: number = 8) {
-    this._rooms = new Map();
-    this._playerRooms = new Map();
-    this._maxPlayersPerRoom = maxPlayersPerRoom;
-  }
+	constructor(maxPlayersPerRoom: number = 8) {
+		this._rooms = new Map();
+		this._playerRooms = new Map();
+		this._maxPlayersPerRoom = maxPlayersPerRoom;
+	}
 
-  setWSServer(wsServer: IWSServer): void {
-    this._wsServer = wsServer;
-  }
+	setWSServer(wsServer: IWSServer): void {
+		this._wsServer = wsServer;
+	}
 
-  createRoom(roomId: string): Room {
-    if (this._rooms.has(roomId)) {
-      return this._rooms.get(roomId)!;
-    }
+	createRoom(roomId: string): Room {
+		const existingRoom = this._rooms.get(roomId);
+		if (existingRoom) {
+			return existingRoom;
+		}
 
-    const room: Room = {
-      id: roomId,
-      players: new Map(),
-      createdAt: Date.now(),
-      maxPlayers: this._maxPlayersPerRoom,
-    };
+		const room: Room = {
+			id: roomId,
+			players: new Map(),
+			createdAt: Date.now(),
+			maxPlayers: this._maxPlayersPerRoom,
+			playerCameras: new Map(),
+		};
 
-    this._rooms.set(roomId, room);
-    return room;
-  }
+		this._rooms.set(roomId, room);
+		return room;
+	}
 
-  joinRoom(roomId: string, player: PlayerInfo): boolean {
-    let room = this._rooms.get(roomId);
-    if (!room) {
-      room = this.createRoom(roomId);
-    }
+	joinRoom(roomId: string, player: PlayerInfo): boolean {
+		let room = this._rooms.get(roomId);
+		if (!room) {
+			room = this.createRoom(roomId);
+		}
 
-    if (room.players.size >= room.maxPlayers) {
-      return false;
-    }
+		if (room.players.size >= room.maxPlayers) {
+			return false;
+		}
 
-    if (room.players.has(player.id)) {
-      return true;
-    }
+		if (room.players.has(player.id)) {
+			return true;
+		}
 
-    room.players.set(player.id, player);
-    this._playerRooms.set(player.id, roomId);
-    return true;
-  }
+		room.players.set(player.id, player);
+		this._playerRooms.set(player.id, roomId);
+		return true;
+	}
 
-  leaveRoom(roomId: string, playerId: string): boolean {
-    const room = this._rooms.get(roomId);
-    if (!room) {
-      return false;
-    }
+	leaveRoom(roomId: string, playerId: string): boolean {
+		const room = this._rooms.get(roomId);
+		if (!room) {
+			return false;
+		}
 
-    const removed = room.players.delete(playerId);
-    this._playerRooms.delete(playerId);
+		const removed = room.players.delete(playerId);
+		this._playerRooms.delete(playerId);
+		// 同时移除玩家的相机状态
+		room.playerCameras.delete(playerId);
 
-    if (room.players.size === 0) {
-      this._rooms.delete(roomId);
-    }
+		if (room.players.size === 0) {
+			this._rooms.delete(roomId);
+		}
 
-    return removed;
-  }
+		return removed;
+	}
 
-  getRoom(roomId: string): Room | undefined {
-    return this._rooms.get(roomId);
-  }
+	getRoom(roomId: string): Room | undefined {
+		return this._rooms.get(roomId);
+	}
 
-  getPlayerRoom(playerId: string): Room | undefined {
-    const roomId = this._playerRooms.get(playerId);
-    if (!roomId) {
-      return undefined;
-    }
-    return this._rooms.get(roomId);
-  }
+	getPlayerRoom(playerId: string): Room | undefined {
+		const roomId = this._playerRooms.get(playerId);
+		if (roomId === undefined) {
+			return undefined;
+		}
+		return this._rooms.get(roomId);
+	}
 
-  broadcastToRoom(roomId: string, message: WSMessage, excludePlayerId?: string): void {
-    const room = this._rooms.get(roomId);
-    if (!room || !this._wsServer) {
-      return;
-    }
+	broadcastToRoom(roomId: string, message: WSMessage, excludePlayerId?: string): void {
+		const room = this._rooms.get(roomId);
+		if (!room || !this._wsServer) {
+			return;
+		}
 
-    for (const [playerId] of room.players.entries()) {
-      if (playerId !== excludePlayerId) {
-        this._wsServer.sendTo(playerId, message);
-      }
-    }
-  }
+		for (const [playerId] of room.players.entries()) {
+			if (playerId !== excludePlayerId) {
+				this._wsServer.sendTo(playerId, message);
+			}
+		}
+	}
 
-  deleteRoom(roomId: string): void {
-    const room = this._rooms.get(roomId);
-    if (!room) {
-      return;
-    }
+	deleteRoom(roomId: string): void {
+		const room = this._rooms.get(roomId);
+		if (!room) {
+			return;
+		}
 
-    for (const [playerId] of room.players.entries()) {
-      this._playerRooms.delete(playerId);
-    }
+		for (const [playerId] of room.players.entries()) {
+			this._playerRooms.delete(playerId);
+		}
 
-    this._rooms.delete(roomId);
-  }
+		this._rooms.delete(roomId);
+	}
 
-  listRooms(): Room[] {
-    return Array.from(this._rooms.values());
-  }
+	listRooms(): Room[] {
+		return Array.from(this._rooms.values());
+	}
 
-  getRoomCount(): number {
-    return this._rooms.size;
-  }
+	getRoomCount(): number {
+		return this._rooms.size;
+	}
+
+	// ===== 玩家相机管理方法 =====
+
+	/** 更新玩家相机状态 */
+	updatePlayerCamera(roomId: string, playerId: string, camera: PlayerCamera): void {
+		const room = this._rooms.get(roomId);
+		if (!room) return;
+		room.playerCameras.set(playerId, camera);
+	}
+
+	/** 获取房间内所有玩家的相机状态 */
+	getRoomPlayerCameras(roomId: string): PlayerCamera[] {
+		const room = this._rooms.get(roomId);
+		if (!room) return [];
+		return Array.from(room.playerCameras.values());
+	}
+
+	/** 获取指定玩家的相机状态 */
+	getPlayerCamera(roomId: string, playerId: string): PlayerCamera | undefined {
+		const room = this._rooms.get(roomId);
+		if (!room) return undefined;
+		return room.playerCameras.get(playerId);
+	}
+
+	/** 移除玩家相机状态 */
+	removePlayerCamera(roomId: string, playerId: string): void {
+		const room = this._rooms.get(roomId);
+		if (!room) return;
+		room.playerCameras.delete(playerId);
+	}
 }
 
 export default RoomManager;
