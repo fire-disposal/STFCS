@@ -70,6 +70,7 @@ export class MessageHandler {
 			"ship.vent": this._handleShipVent.bind(this),
 			"ship.getStatus": this._handleShipGetStatus.bind(this),
 			"dm.toggle": this._handleDMToggle.bind(this),
+			"dm.getStatus": this._handleDMGetStatus.bind(this),
 		};
 	}
 
@@ -347,6 +348,37 @@ export class MessageHandler {
 		const updatedPlayer = this._playerService.getPlayer(clientId);
 		if (!updatedPlayer) throw new Error("Player not found after DM toggle");
 		return updatedPlayer;
+	}
+
+	private async _handleDMGetStatus(clientId: string, _data: unknown) {
+		const player = this._playerService.getPlayer(clientId);
+		if (!player) throw new Error("Player not found");
+
+		// 获取玩家所在的房间
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+
+		// 获取所有玩家的 DM 状态
+		let allPlayers: { id: string; name: string; isDMMode: boolean }[] = [];
+		if (playerRoom) {
+			const roomPlayers = this._playerService.listPlayers(playerRoom.id);
+			allPlayers = roomPlayers.map((p) => ({
+				id: p.id,
+				name: p.name,
+				isDMMode: p.isDMMode ?? false,
+			}));
+		} else {
+			// 如果玩家不在房间中，只返回当前玩家
+			allPlayers = [{
+				id: player.id,
+				name: player.name,
+				isDMMode: player.isDMMode ?? false,
+			}];
+		}
+
+		return {
+			isDMMode: player.isDMMode ?? false,
+			players: allPlayers,
+		};
 	}
 
 	private async _handleObjectSelected(
