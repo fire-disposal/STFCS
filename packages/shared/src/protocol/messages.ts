@@ -1,56 +1,26 @@
 /**
  * 统一消息协议层
  * 
- * 目标：
- * 1. 使用 Zod schema 定义消息结构，实现运行时验证
- * 2. 从 schema 自动推导 TypeScript 类型
- * 3. 统一领域事件和 WS 消息的转换
+ * 原则：
+ * 1. 从 core-types.ts 导入基础 schema
+ * 2. 只定义消息级别的 schema
+ * 3. 避免重复定义
  */
 
 import { z } from 'zod';
-
-// ==================== 基础 Schema ====================
-
-/** 点坐标 */
-export const PointSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-});
-
-export type Point = z.infer<typeof PointSchema>;
-
-/** 玩家信息 */
-export const PlayerInfoSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  joinedAt: z.number(),
-  isActive: z.boolean(),
-  isDMMode: z.boolean(),
-});
-
-export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
-
-/** Token 信息 */
-export const TokenInfoSchema = z.object({
-  id: z.string(),
-  ownerId: z.string(),
-  position: PointSchema,
-  heading: z.number(),
-  type: z.enum(['ship', 'station', 'asteroid']),
-  size: z.number(),
-  scale: z.number(),
-  assetUrl: z.string().optional(),
-  turnState: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-  maxMovement: z.number(),
-  remainingMovement: z.number(),
-  actionsPerTurn: z.number(),
-  remainingActions: z.number(),
-  layer: z.number(),
-  collisionRadius: z.number(),
-  metadata: z.record(z.string(), z.unknown()),
-});
-
-export type TokenInfo = z.infer<typeof TokenInfoSchema>;
+import {
+  PointSchema,
+  PlayerInfoSchema,
+  TokenInfoSchema,
+  CameraStateSchema,
+  ShipMovementSchema,
+  ShipStatusSchema,
+  ExplosionDataSchema,
+  CombatResultSchema,
+  MapConfigSchema,
+  TokenTypeSchema,
+  UnitTurnStateSchema,
+} from '../core-types';
 
 // ==================== 消息定义工具 ====================
 
