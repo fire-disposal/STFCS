@@ -133,9 +133,15 @@
     "dmMode": {
       "active": "DM 激活",
       "enable": "启用 DM",
-      "toggle": "DM 模式切换",
+      "disable": "禁用 DM",
+      "toggle": "DM 模式",
       "enabled": "🎮 DM 模式已启用",
-      "disabled": "👤 DM 模式已禁用"
+      "disabled": "👤 DM 模式已禁用",
+      "warning": "警告",
+      "inactive": "DM 未激活",
+      "holdToToggle": "长按 3 秒切换",
+      "clickToEnable": "长按启用 DM 模式",
+      "clickToDisable": "长按禁用 DM 模式"
     }
   },
   "combat": {
@@ -143,12 +149,33 @@
     "firedMissiles": "{{player}} 向 {{target}} 发射了导弹",
     "shieldTookDamage": "{{ship}} 护盾受到 {{damage}} 点伤害",
     "returnedFire": "{{ship}} 用{{weapon}}还击",
-    "time": "时间"
+    "time": "时间",
+    "turnStart": "{{unit}} 回合开始",
+    "moved": "移动了 {{distance}}",
+    "fired": "使用 {{weapon}} 开火",
+    "shieldDamage": "护盾受到 {{damage}} 点伤害",
+    "shieldActive": "{{ship}} 护盾已激活",
+    "roundStart": "第 {{round}} 回合开始",
+    "attack": "攻击",
+    "damage": "伤害",
+    "shield": "护盾",
+    "move": "移动",
+    "turn": "回合",
+    "system": "系统"
   },
   "chat": {
     "title": "聊天",
     "system": "系统",
-    "send": "发送"
+    "send": "发送",
+    "joined": "加入游戏",
+    "left": "离开游戏",
+    "typeMessage": "输入消息...",
+    "welcome": "欢迎来到游戏！"
+  },
+  "panel": {
+    "chat": "聊天",
+    "combat": "战斗",
+    "all": "全部"
   },
   "status": {
     "room": "房间",
@@ -227,5 +254,41 @@
     "enterName": "输入您的名称",
     "noTokenSelected": "未选择 Token",
     "clickToSelectHint": "点击舰船、空间站或小行星进行选择"
+  },
+  "tactical": {
+    "noSelection": "未选择单位",
+    "current": "当前回合",
+    "globalView": "全局视图",
+    "currentTurn": "当前回合",
+    "move": "移动",
+    "weapons": "武器",
+    "systems": "系统",
+    "headingControl": "航向角控制",
+    "distanceControl": "距离控制",
+    "weaponMounts": "武器挂载",
+    "systemManagement": "系统管理",
+    "noShipSelected": "未选择舰船",
+    "shield": "护盾",
+    "on": "开",
+    "off": "关",
+    "vent": "散热",
+    "actionPoints": "行动点",
+    "endTurn": "结束回合",
+    "evasion": "紧急规避",
+    "detailedView": "详细视图",
+    "detailedViewDescription": "展开显示详细操作界面",
+    "flux": "通量",
+    "armor": "装甲",
+    "structure": "结构",
+    "energy": "能量",
+    "heat": "热量",
+    "speed": "速度",
+    "heading": "航向",
+    "distance": "距离",
+    "target": "目标",
+    "fire": "开火",
+    "aim": "瞄准",
+    "cancel": "取消",
+    "confirm": "确认"
   }
 }

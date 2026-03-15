@@ -120,8 +120,8 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				{/* 单位信息 */}
 				<div className="tactical-unit-info">
 					<div className="tactical-unit-name">
-						{selectedToken.metadata?.name || selectedToken.id}
-						{isCurrentTurn && <span className="tactical-turn-badge">{t("tactical.current")}</span>}
+						{(selectedToken.metadata?.name as string) || selectedToken.id}
+						{isCurrentTurn ? <span className="tactical-turn-badge">{t("tactical.current")}</span> : null}
 					</div>
 					<div className="tactical-unit-type">
 						{t(`token.type.${selectedToken.type}`)} · {selectedToken.ownerId}

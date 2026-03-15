@@ -108,6 +108,7 @@ export const RequestOperationSchema = z.enum([
   'ship.vent',
   'ship.getStatus',
   'dm.toggle',
+  'dm.getStatus',
   'camera.update',
 ]);
 
@@ -158,7 +159,10 @@ export const ShipGetStatusRequestSchema = z.object({
 
 export const DMToggleRequestSchema = z.object({
   enable: z.boolean(),
+  playerId: z.string(),
 });
+
+export const DMGetStatusRequestSchema = z.object({});
 
 export const CameraUpdateRequestSchema = z.object({
   x: z.number(),
@@ -178,6 +182,7 @@ export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('ship.vent'), data: ShipVentRequestSchema }),
   z.object({ operation: z.literal('ship.getStatus'), data: ShipGetStatusRequestSchema }),
   z.object({ operation: z.literal('dm.toggle'), data: DMToggleRequestSchema }),
+  z.object({ operation: z.literal('dm.getStatus'), data: DMGetStatusRequestSchema }),
   z.object({ operation: z.literal('camera.update'), data: CameraUpdateRequestSchema }),
 ]);
 
@@ -234,6 +239,7 @@ export type ShipToggleShieldRequestPayload = z.infer<typeof ShipToggleShieldRequ
 export type ShipVentRequestPayload = z.infer<typeof ShipVentRequestSchema>;
 export type ShipGetStatusRequestPayload = z.infer<typeof ShipGetStatusRequestSchema>;
 export type DMToggleRequestPayload = z.infer<typeof DMToggleRequestSchema>;
+export type DMGetStatusRequestPayload = z.infer<typeof DMGetStatusRequestSchema>;
 export type CameraUpdateRequestPayload = z.infer<typeof CameraUpdateRequestSchema>;
 
 // 响应负载类型
@@ -249,6 +255,7 @@ export type ShipToggleShieldResponsePayload = ShipStatus | null;
 export type ShipVentResponsePayload = ShipStatus | null;
 export type ShipGetStatusResponsePayload = ShipStatus | null;
 export type DMToggleResponsePayload = PlayerInfo;
+export type DMGetStatusResponsePayload = { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
 export type CameraUpdateResponsePayload = void;
 
 // 响应数据联合类型
@@ -263,6 +270,7 @@ export type ResponseData =
   | { operation: 'ship.vent'; data: ShipVentResponsePayload }
   | { operation: 'ship.getStatus'; data: ShipGetStatusResponsePayload }
   | { operation: 'dm.toggle'; data: DMToggleResponsePayload }
+  | { operation: 'dm.getStatus'; data: DMGetStatusResponsePayload }
   | { operation: 'camera.update'; data: CameraUpdateResponsePayload };
 
 export type ResponsePayload<T extends RequestOperation = RequestOperation> =

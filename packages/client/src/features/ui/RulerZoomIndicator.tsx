@@ -1,6 +1,6 @@
 /**
  * 表尺风格缩放指示器组件
- * 位于顶栏中央，提供精确的缩放控制和视觉反馈
+ * 使用设计系统变量，支持高分辨率屏幕
  */
 
 import React, { useMemo } from "react";
@@ -32,7 +32,7 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 	const { t } = useTranslation();
 
 	// 计算当前位置百分比
-	const positionPercent = Math.max(0, Math.min(100, 
+	const positionPercent = Math.max(0, Math.min(100,
 		((zoom - minZoom) / (maxZoom - minZoom)) * 100
 	));
 
@@ -95,30 +95,30 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 			{/* 控制按钮 */}
 			<div className="ruler-zoom-controls">
 				<button
-					className="ruler-zoom-btn"
+					className="btn btn-secondary btn-icon ruler-zoom-btn"
 					onClick={onZoomOut}
 					disabled={isZoomOutDisabled}
 					title={t("zoom.out")}
 					type="button"
 				>
-					<ZoomOut size={16} />
+					<ZoomOut style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
 				</button>
 				<button
-					className="ruler-zoom-btn ruler-zoom-btn--reset"
+					className="btn btn-secondary btn-icon ruler-zoom-btn ruler-zoom-btn--reset"
 					onClick={onReset}
 					title={t("zoom.reset")}
 					type="button"
 				>
-					<RefreshCw size={14} />
+					<RefreshCw style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
 				</button>
 				<button
-					className="ruler-zoom-btn"
+					className="btn btn-secondary btn-icon ruler-zoom-btn"
 					onClick={onZoomIn}
 					disabled={isZoomInDisabled}
 					title={t("zoom.in")}
 					type="button"
 				>
-					<ZoomIn size={16} />
+					<ZoomIn style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
 				</button>
 			</div>
 
@@ -126,40 +126,40 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 				.ruler-zoom-indicator {
 					display: flex;
 					align-items: center;
-					gap: 12px;
-					padding: 4px 12px;
-					background: rgba(15, 18, 28, 0.9);
-					border: 1px solid rgba(74, 158, 255, 0.3);
-					border-radius: 2px;
+					gap: var(--space-3);
+					padding: var(--space-2) var(--space-3);
+					background: var(--bg-panel);
+					border: 1px solid var(--border-color);
+					border-radius: var(--radius-sm);
 				}
 
 				.ruler-zoom-values {
 					display: flex;
 					flex-direction: column;
 					align-items: flex-end;
-					min-width: 50px;
+					min-width: var(--width-xs);
 				}
 
 				.ruler-zoom-percentage {
-					font-family: 'Share Tech Mono', monospace;
-					font-size: 15px;
-					font-weight: 600;
-					color: #4a9eff;
-					line-height: 1;
-					text-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+					font-family: var(--font-mono);
+					font-size: var(--text-md);
+					font-weight: var(--font-semibold);
+					color: var(--color-primary);
+					line-height: var(--leading-tight);
+					text-shadow: 0 0 8px var(--color-primary-glow);
 				}
 
 				.ruler-zoom-scale {
-					font-family: 'Share Tech Mono', monospace;
-					font-size: 9px;
-					color: #6a7a9f;
-					margin-top: 1px;
+					font-family: var(--font-mono);
+					font-size: var(--text-xs);
+					color: var(--text-tertiary);
+					margin-top: var(--space-1);
 				}
 
 				.ruler-scale-container {
 					position: relative;
-					width: 180px;
-					height: 28px;
+					width: clamp(160px, 20vw, 200px);
+					height: var(--height-md);
 					display: flex;
 					align-items: center;
 				}
@@ -177,21 +177,21 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 					transform: translateY(-50%);
 					width: 1px;
 					background: rgba(74, 158, 255, 0.4);
-					transition: all 0.2s ease;
+					transition: var(--transition-fast);
 				}
 
 				.ruler-tick--major {
-					height: 12px;
+					height: clamp(10px, 1.5vw, 12px);
 					background: rgba(74, 158, 255, 0.6);
 				}
 
 				.ruler-tick--medium {
-					height: 8px;
+					height: clamp(6px, 1vw, 8px);
 					background: rgba(74, 158, 255, 0.5);
 				}
 
 				.ruler-tick--minor {
-					height: 5px;
+					height: clamp(4px, 0.6vw, 5px);
 					background: rgba(74, 158, 255, 0.3);
 				}
 
@@ -203,14 +203,14 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 					background: linear-gradient(
 						180deg,
 						transparent 0%,
-						#4a9eff 15%,
-						#4a9eff 85%,
+						var(--color-primary) 15%,
+						var(--color-primary) 85%,
 						transparent 100%
 					);
 					box-shadow:
-						0 0 6px rgba(74, 158, 255, 0.6),
-						0 0 12px rgba(74, 158, 255, 0.3);
-					transition: left 0.15s ease-out;
+						0 0 6px var(--color-primary-glow),
+						0 0 12px var(--color-primary-glow);
+					transition: left var(--transition-fast);
 					pointer-events: none;
 					transform: translateX(-50%);
 				}
@@ -225,7 +225,7 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 					height: 0;
 					border-left: 3px solid transparent;
 					border-right: 3px solid transparent;
-					border-bottom: 4px solid #4a9eff;
+					border-bottom: 4px solid var(--color-primary);
 				}
 
 				.ruler-value-label {
@@ -233,49 +233,29 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 					bottom: -20px;
 					left: 50%;
 					transform: translateX(-50%);
-					font-family: 'Share Tech Mono', monospace;
-					font-size: 9px;
-					color: #4a9eff;
-					background: rgba(10, 12, 20, 0.95);
-					padding: 1px 4px;
+					font-family: var(--font-mono);
+					font-size: var(--text-xs);
+					color: var(--color-primary);
+					background: var(--bg-primary);
+					padding: var(--space-1) var(--space-2);
 					border: 1px solid rgba(74, 158, 255, 0.4);
 					white-space: nowrap;
-					border-radius: 0;
+					border-radius: var(--radius-none);
 				}
 
 				.ruler-zoom-controls {
 					display: flex;
-					gap: 3px;
+					gap: var(--space-1);
 				}
 
 				.ruler-zoom-btn {
-					width: 26px;
-					height: 26px;
-					background: rgba(40, 50, 70, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.3);
-					color: #4a9eff;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
-					padding: 0;
-				}
-
-				.ruler-zoom-btn:hover:not(:disabled) {
-					background: rgba(74, 158, 255, 0.2);
-					border-color: rgba(74, 158, 255, 0.6);
-					box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
-				}
-
-				.ruler-zoom-btn:disabled {
-					opacity: 0.3;
-					cursor: not-allowed;
+					width: var(--height-sm) !important;
+					height: var(--height-sm) !important;
+					padding: 0 !important;
 				}
 
 				.ruler-zoom-btn--reset {
-					width: 30px;
+					width: calc(var(--height-sm) + 4px) !important;
 				}
 
 				.ruler-zoom-btn--reset:hover svg {
@@ -294,6 +274,21 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 
 				.ruler-scale-container:hover .ruler-tick--major {
 					background: rgba(74, 158, 255, 0.8);
+				}
+
+				/* 高分辨率屏幕适配 */
+				@media (min-width: 2560px) {
+					.ruler-scale-container {
+						width: 240px;
+					}
+					
+					.ruler-tick--major {
+						height: 14px;
+					}
+					
+					.ruler-tick--medium {
+						height: 10px;
+					}
 				}
 			`}</style>
 		</div>

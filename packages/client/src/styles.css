@@ -1,6 +1,9 @@
 /* STFCS - 基础样式文件 */
 /* 太空舰队战斗系统的核心样式 */
 
+/* 设计系统 - 必须在最前面导入 */
+@import './styles/design-system.css';
+@import './styles/components.css';
 @import './styles/fonts.css';
 
 /* ====== 重置和基础样式 ====== */

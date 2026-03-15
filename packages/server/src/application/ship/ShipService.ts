@@ -238,12 +238,16 @@ export class ShipService extends BaseService implements IShipService {
 				efficiency: ship.shield?.efficiency ?? 0,
 				maintenanceCost: ship.shield?.maintenanceCost ?? 0,
 				active: ship.shield?.isActive ?? false,
+				current: 0,
+				max: 0,
 			},
 			position: ship.position,
 			heading: ship.heading,
 			speed: ship.speed,
 			maneuverability: ship.maneuverability,
 			disabled: ship.status === "OVERLOADED" || ship.status === "DISABLED",
+			actionsPerTurn: 3,
+			remainingActions: 3,
 		};
 	}
 

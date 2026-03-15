@@ -31,7 +31,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 	const token = selectedToken;
 
 	// 获取元数据
-	const metadata = token.metadata || {};
+	const metadata = token.metadata || ({} as Record<string, unknown>);
 	const faction = (metadata.faction as string) || "neutral";
 	const tokenClass = (metadata.class as string) || (metadata.type as string) || "unknown";
 	const composition = (metadata.composition as string) || "unknown";

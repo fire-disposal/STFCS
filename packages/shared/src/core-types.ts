@@ -70,6 +70,8 @@ export const ShieldSpecSchema = z.object({
   efficiency: z.number().min(0).max(1),
   maintenanceCost: z.number().min(0),
   active: z.boolean(),
+  current: z.number().min(0),
+  max: z.number().min(0),
 });
 
 export const ShipStatusSchema = z.object({
@@ -88,6 +90,8 @@ export const ShipStatusSchema = z.object({
   maneuverability: z.number().min(0),
   disabled: z.boolean(),
   owner: z.string().optional(),
+  actionsPerTurn: z.number().min(0),
+  remainingActions: z.number().min(0),
 });
 
 export const ShipMovementPhaseSchema = z.union([

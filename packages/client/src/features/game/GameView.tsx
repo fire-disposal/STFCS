@@ -51,6 +51,8 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	const { tokens } = useAppSelector((state) => state.map);
 	const { selectedTool } = useAppSelector((state) => state.ui);
 	const { roomId, currentPlayerId, players } = useAppSelector((state) => state.player);
+	const currentPlayer = currentPlayerId ? players[currentPlayerId] : null;
+	const currentPlayerName = currentPlayer?.name || 'Player';
 	const currentUnit = useAppSelector(selectCurrentUnit);
 
 	// 处理工具选择
@@ -111,7 +113,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 			{/* 顶部菜单栏 */}
 			<TopBarMenu
 				onDisconnect={onDisconnect}
-				playerName={currentPlayerId || 'Player'}
+				playerName={currentPlayerName}
 				zoom={camera.zoom}
 				minZoom={camera.minZoom}
 				maxZoom={camera.maxZoom}

@@ -149,20 +149,14 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 									<div className="menu-item">
 										<Globe size={16} />
 										<span>{t("game.language") || "Language"}</span>
-										<div className="menu-language">
+										<div className="lang-toggle-wrapper">
+											<span className="lang-label">{isChinese ? "中文" : "EN"}</span>
 											<button
-												className={`mini-lang ${isChinese ? "active" : ""}`}
-												onClick={() => changeLanguage("zh-CN")}
+												className="toggle-switch"
+												onClick={() => changeLanguage(isChinese ? "en-US" : "zh-CN")}
 												type="button"
 											>
-												中文
-											</button>
-											<button
-												className={`mini-lang ${!isChinese ? "active" : ""}`}
-												onClick={() => changeLanguage("en-US")}
-												type="button"
-											>
-												English
+												<div className={`toggle-inner ${isChinese ? "on" : "off"}`} />
 											</button>
 										</div>
 									</div>
@@ -212,20 +206,20 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 					top: 0;
 					left: 0;
 					right: 0;
-					height: 48px;
-					background: rgba(20, 20, 40, 0.98);
-					border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+					height: var(--header-height);
+					background: var(--bg-hud);
+					border-bottom: 1px solid var(--border-color);
 					display: flex;
 					align-items: center;
 					justify-content: space-between;
-					padding: 0 16px;
-					z-index: 1000;
+					padding: 0 var(--space-4);
+					z-index: var(--z-fixed);
 				}
 
 				.top-bar-left {
 					display: flex;
 					align-items: center;
-					gap: 12px;
+					gap: var(--space-3);
 					flex-shrink: 0;
 				}
 
@@ -235,89 +229,89 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 					align-items: center;
 					justify-content: center;
 					min-width: 0;
-					padding: 0 16px;
+					padding: 0 var(--space-4);
 				}
 
 				.top-bar-right {
 					display: flex;
 					align-items: center;
-					gap: 12px;
+					gap: var(--space-3);
 					flex-shrink: 0;
 				}
 
 				.menu-toggle {
 					background: transparent;
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #aaccff;
-					padding: 6px 8px;
-					border-radius: 2px;
+					border: 1px solid var(--border-color);
+					color: var(--text-primary);
+					padding: var(--space-2);
+					border-radius: var(--radius-sm);
 					cursor: pointer;
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					transition: all 0.2s ease;
+					transition: var(--transition-fast);
 				}
 
 				.menu-toggle:hover {
-					background: rgba(74, 158, 255, 0.1);
-					border-color: rgba(74, 158, 255, 0.5);
+					background: var(--bg-hover);
+					border-color: var(--border-color-hover);
 				}
 
 				.game-title {
-					font-size: 14px;
-					font-weight: 700;
-					color: #aaccff;
-					letter-spacing: 1px;
-					font-family: 'Orbitron', sans-serif;
+					font-size: var(--text-lg);
+					font-weight: var(--font-bold);
+					color: var(--text-primary);
+					letter-spacing: var(--tracking-wide);
+					font-family: var(--font-display);
 				}
 
 				.top-bar-btn {
 					background: transparent;
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #aaccff;
-					padding: 6px;
-					border-radius: 2px;
+					border: 1px solid var(--border-color);
+					color: var(--text-primary);
+					padding: var(--space-2);
+					border-radius: var(--radius-sm);
 					cursor: pointer;
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					transition: all 0.2s ease;
+					transition: var(--transition-fast);
 				}
 
 				.top-bar-btn:hover {
-					background: rgba(74, 158, 255, 0.1);
-					border-color: rgba(74, 158, 255, 0.5);
+					background: var(--bg-hover);
+					border-color: var(--border-color-hover);
 				}
 
 				.player-info {
 					display: flex;
 					align-items: center;
-					gap: 6px;
+					gap: var(--space-2);
 					background: rgba(40, 40, 80, 0.5);
-					padding: 6px 12px;
-					border-radius: 2px;
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #aaccff;
+					padding: var(--space-2) var(--space-3);
+					border-radius: var(--radius-sm);
+					border: 1px solid var(--border-color);
+					color: var(--text-primary);
 				}
 
 				.player-name {
-					font-size: 12px;
-					font-weight: 500;
+					font-size: var(--text-sm);
+					font-weight: var(--font-medium);
 				}
 
 				.disconnect-button {
 					background: rgba(239, 68, 68, 0.1);
 					border: 1px solid rgba(239, 68, 68, 0.3);
-					color: #ef4444;
-					padding: 6px 12px;
-					border-radius: 2px;
+					color: var(--color-danger);
+					padding: var(--space-2) var(--space-3);
+					border-radius: var(--radius-sm);
 					cursor: pointer;
 					display: flex;
 					align-items: center;
-					gap: 6px;
-					font-size: 12px;
-					font-weight: 500;
-					transition: all 0.2s ease;
+					gap: var(--space-2);
+					font-size: var(--text-sm);
+					font-weight: var(--font-medium);
+					transition: var(--transition-fast);
 				}
 
 				.disconnect-button:hover {
@@ -328,96 +322,96 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 				/* 菜单样式 */
 				.menu-overlay {
 					position: fixed;
-					top: 48px;
+					top: var(--header-height);
 					left: 0;
 					right: 0;
 					bottom: 0;
 					background: rgba(0, 0, 0, 0.6);
-					z-index: 1001;
+					z-index: calc(var(--z-fixed) + 1);
 					backdrop-filter: blur(4px);
 					display: flex;
 					align-items: flex-start;
 					justify-content: center;
-					padding-top: 40px;
+					padding-top: var(--space-10);
 				}
 
 				.menu-panel {
-					width: 360px;
-					max-height: calc(100vh - 48px - 80px);
-					background: rgba(20, 20, 40, 0.98);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					border-radius: 4px;
+					width: clamp(320px, 30vw, 360px);
+					max-height: calc(100vh - var(--header-height) - var(--space-20));
+					background: var(--bg-hud);
+					border: 1px solid var(--border-color);
+					border-radius: var(--radius-md);
 					overflow-y: auto;
-					box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+					box-shadow: var(--shadow-lg);
 				}
 
 				.menu-header {
 					display: flex;
 					align-items: center;
 					justify-content: space-between;
-					padding: 16px;
-					border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+					padding: var(--space-4);
+					border-bottom: 1px solid var(--border-color);
 				}
 
 				.menu-header h3 {
 					margin: 0;
-					font-size: 14px;
-					font-weight: 600;
-					color: #aaccff;
+					font-size: var(--text-base);
+					font-weight: var(--font-semibold);
+					color: var(--text-primary);
 				}
 
 				.close-menu {
 					background: transparent;
 					border: none;
-					color: #8a8aa8;
-					font-size: 24px;
+					color: var(--text-tertiary);
+					font-size: var(--text-xl);
 					cursor: pointer;
 					padding: 0;
-					width: 32px;
-					height: 32px;
+					width: var(--height-md);
+					height: var(--height-md);
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					border-radius: 2px;
-					transition: all 0.2s ease;
+					border-radius: var(--radius-sm);
+					transition: var(--transition-fast);
 				}
 
 				.close-menu:hover {
-					background: rgba(100, 100, 150, 0.1);
-					color: #aaccff;
+					background: var(--bg-hover);
+					color: var(--text-primary);
 				}
 
 				.menu-content {
-					padding: 16px;
+					padding: var(--space-4);
 				}
 
 				.menu-section {
-					margin-bottom: 24px;
+					margin-bottom: var(--space-6);
 				}
 
 				.section-title {
 					display: flex;
 					align-items: center;
-					gap: 8px;
-					font-size: 11px;
-					font-weight: 600;
-					color: #8a8aa8;
+					gap: var(--space-2);
+					font-size: var(--text-xs);
+					font-weight: var(--font-semibold);
+					color: var(--text-tertiary);
 					text-transform: uppercase;
-					letter-spacing: 0.5px;
-					margin-bottom: 12px;
+					letter-spacing: var(--tracking-wide);
+					margin-bottom: var(--space-3);
 				}
 
 				.menu-item {
 					display: flex;
 					align-items: center;
-					gap: 12px;
-					padding: 10px 12px;
+					gap: var(--space-3);
+					padding: var(--space-3);
 					background: rgba(40, 40, 80, 0.3);
-					border-radius: 2px;
-					margin-bottom: 8px;
+					border-radius: var(--radius-sm);
+					margin-bottom: var(--space-2);
 					cursor: pointer;
-					transition: all 0.2s ease;
-					color: #aaccff;
+					transition: var(--transition-fast);
+					color: var(--text-primary);
 				}
 
 				.menu-item:hover {
@@ -427,7 +421,7 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 				.menu-item.danger {
 					background: rgba(239, 68, 68, 0.1);
 					border: 1px solid rgba(239, 68, 68, 0.2);
-					color: #ff8a8a;
+					color: var(--color-danger);
 				}
 
 				.menu-item.danger:hover {
@@ -437,36 +431,28 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 
 				.menu-item span {
 					flex: 1;
-					font-size: 13px;
+					font-size: var(--text-sm);
 				}
 
-				.menu-language {
+				.lang-toggle-wrapper {
 					display: flex;
-					gap: 4px;
+					align-items: center;
+					gap: var(--space-2);
 				}
 
-				.mini-lang {
-					background: rgba(40, 40, 80, 0.5);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #8a8aa8;
-					padding: 4px 8px;
-					font-size: 11px;
-					border-radius: 2px;
-					cursor: pointer;
-					transition: all 0.2s ease;
-				}
-
-				.mini-lang.active {
-					background: rgba(74, 158, 255, 0.2);
-					border-color: rgba(74, 158, 255, 0.4);
-					color: #aaccff;
+				.lang-label {
+					font-size: var(--text-xs);
+					color: var(--text-secondary);
+					font-weight: var(--font-medium);
+					min-width: 28px;
+					text-align: center;
 				}
 
 				.toggle-switch {
 					width: 40px;
 					height: 20px;
 					background: rgba(100, 100, 150, 0.3);
-					border-radius: 10px;
+					border-radius: var(--radius-full);
 					border: none;
 					cursor: pointer;
 					position: relative;
@@ -479,19 +465,19 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 					left: 2px;
 					width: 16px;
 					height: 16px;
-					background: #8a8aa8;
-					border-radius: 50%;
-					transition: all 0.2s ease;
+					background: var(--text-tertiary);
+					border-radius: var(--radius-full);
+					transition: var(--transition-fast);
 				}
 
 				.toggle-inner.on {
 					left: calc(100% - 18px);
-					background: #4ade80;
+					background: var(--color-success);
 				}
 
 				.toggle-inner.off {
 					left: 2px;
-					background: #8a8aa8;
+					background: var(--text-tertiary);
 				}
 
 				/* 响应式 */

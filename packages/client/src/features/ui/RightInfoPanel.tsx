@@ -77,7 +77,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 		const newMessage: ChatMessage = {
 			id: Date.now().toString(),
 			type: "chat",
-			senderId: currentPlayerId,
+			senderId: currentPlayerId || undefined,
 			senderName: currentPlayer.name,
 			content: inputMessage.trim(),
 			timestamp: Date.now(),
@@ -131,7 +131,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				<div key={msg.id} className="rip-message rip-message--event">
 					<span className="rip-message-time">{formatTime(msg.timestamp)}</span>
 					<span className="rip-message-content rip-message-content--event">
-						{msg.type === "join" ? <LogIn size={12} /> : <LogOut size={12} />}
+						{msg.type === "join" ? <LogIn style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} /> : <LogOut style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} />}
 						{msg.senderName} {msg.type === "join" ? t("chat.joined") : t("chat.left")}
 					</span>
 				</div>
@@ -151,7 +151,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 	const renderCombatEvent = (event: CombatEvent) => {
 		const getEventIcon = () => {
 			switch (event.type) {
-				case "attack": return <Swords size={12} />;
+				case "attack": return <Swords style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} />;
 				case "damage": return <span className="rip-event-icon rip-event-icon--damage">⚡</span>;
 				case "shield": return <span className="rip-event-icon rip-event-icon--shield">🛡️</span>;
 				case "move": return <span className="rip-event-icon">➤</span>;
@@ -187,9 +187,9 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 		<div className={`right-info-panel ${className}`}>
 			{/* 标签页头部 */}
 			<div className="rip-tabs">
-				{renderTabButton("chat", <MessageSquare size={14} />, t("panel.chat"))}
-				{renderTabButton("combat", <Swords size={14} />, t("panel.combat"))}
-				{renderTabButton("all", <Layers size={14} />, t("panel.all"))}
+				{renderTabButton("chat", <MessageSquare style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />, t("panel.chat"))}
+				{renderTabButton("combat", <Swords style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />, t("panel.combat"))}
+				{renderTabButton("all", <Layers style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />, t("panel.all"))}
 			</div>
 
 			{/* 内容区域 */}
@@ -211,7 +211,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 								onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
 							/>
 							<button onClick={handleSendMessage} type="button">
-								<Send size={14} />
+								<Send style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
 							</button>
 						</div>
 					</div>
@@ -244,7 +244,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 								onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
 							/>
 							<button onClick={handleSendMessage} type="button">
-								<Send size={14} />
+								<Send style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
 							</button>
 						</div>
 					</div>
@@ -275,28 +275,28 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					gap: 6px;
-					padding: 10px 8px;
+					gap: var(--space-2);
+					padding: var(--space-3) var(--space-2);
 					background: transparent;
 					border: none;
 					border-bottom: 2px solid transparent;
-					color: #6a7a9f;
-					font-size: 12px;
-					font-weight: 500;
+					color: var(--text-tertiary);
+					font-size: var(--text-sm);
+					font-weight: var(--font-medium);
 					cursor: pointer;
-					transition: all 0.15s ease;
+					transition: var(--transition-fast);
 					text-transform: uppercase;
-					letter-spacing: 0.5px;
+					letter-spacing: var(--tracking-wide);
 				}
 
 				.rip-tab-btn:hover {
-					color: #8a9ebf;
+					color: var(--text-secondary);
 					background: rgba(74, 158, 255, 0.05);
 				}
 
 				.rip-tab-btn.active {
-					color: #4a9eff;
-					border-bottom-color: #4a9eff;
+					color: var(--color-primary);
+					border-bottom-color: var(--color-primary);
 					background: rgba(74, 158, 255, 0.1);
 				}
 
@@ -321,21 +321,21 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				.rip-mixed-log {
 					flex: 1;
 					overflow-y: auto;
-					padding: 8px;
+					padding: var(--space-3);
 					display: flex;
 					flex-direction: column;
-					gap: 4px;
+					gap: var(--space-2);
 				}
 
 				/* 聊天消息样式 */
 				.rip-message {
 					display: flex;
 					align-items: flex-start;
-					gap: 6px;
-					padding: 4px 6px;
-					font-size: 12px;
-					line-height: 1.4;
-					border-radius: 0;
+					gap: var(--space-2);
+					padding: var(--space-2) var(--space-3);
+					font-size: var(--text-sm);
+					line-height: var(--leading-normal);
+					border-radius: var(--radius-none);
 				}
 
 				.rip-message--system {
@@ -346,7 +346,7 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				.rip-message--event {
 					background: rgba(100, 100, 150, 0.1);
 					border-left: 2px solid rgba(100, 100, 150, 0.3);
-					color: #8a94a8;
+					color: var(--text-tertiary);
 				}
 
 				.rip-message--chat {
@@ -359,45 +359,45 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				}
 
 				.rip-message-time {
-					font-family: 'Share Tech Mono', monospace;
-					font-size: 10px;
-					color: #5a6478;
+					font-family: var(--font-mono);
+					font-size: var(--text-xs);
+					color: var(--text-tertiary);
 					min-width: 60px;
 					flex-shrink: 0;
 				}
 
 				.rip-message-sender {
-					font-weight: 600;
-					color: #4a9eff;
-					margin-right: 4px;
+					font-weight: var(--font-semibold);
+					color: var(--color-primary);
+					margin-right: var(--space-1);
 				}
 
 				.rip-message-content {
-					color: #c0c0d0;
+					color: var(--text-secondary);
 					flex: 1;
 				}
 
 				.rip-message-content--system {
-					color: #8a94a8;
+					color: var(--text-tertiary);
 					font-style: italic;
 				}
 
 				.rip-message-content--event {
 					display: flex;
 					align-items: center;
-					gap: 4px;
+					gap: var(--space-1);
 				}
 
 				/* 战斗日志样式 - 复用原有风格 */
 				.rip-log-entry {
 					display: flex;
 					align-items: center;
-					gap: 6px;
-					padding: 6px 8px;
+					gap: var(--space-2);
+					padding: var(--space-2) var(--space-3);
 					background: rgba(30, 30, 60, 0.3);
 					border-left: 2px solid transparent;
-					font-size: 12px;
-					line-height: 1.4;
+					font-size: var(--text-sm);
+					line-height: var(--leading-normal);
 					border-radius: 0;
 				}
 
@@ -427,9 +427,9 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				}
 
 				.rip-log-time {
-					font-family: 'Share Tech Mono', monospace;
-					font-size: 10px;
-					color: #5a6478;
+					font-family: var(--font-mono);
+					font-size: var(--text-xs);
+					color: var(--text-tertiary);
 					min-width: 60px;
 					flex-shrink: 0;
 				}
@@ -438,42 +438,42 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					width: 16px;
-					color: #6a7a9f;
+					width: var(--icon-md);
+					color: var(--text-tertiary);
 				}
 
 				.rip-event-icon--damage {
-					color: #ffaa00;
+					color: var(--color-warning);
 				}
 
 				.rip-event-icon--shield {
-					color: #4a9eff;
+					color: var(--color-primary);
 				}
 
 				.rip-log-text {
-					color: #c0c0d0;
+					color: var(--text-secondary);
 					flex: 1;
 				}
 
 				/* 聊天输入 */
 				.rip-chat-input {
 					display: flex;
-					gap: 6px;
-					padding: 8px;
+					gap: var(--space-2);
+					padding: var(--space-3);
 					border-top: 1px solid rgba(74, 158, 255, 0.2);
 					background: rgba(10, 12, 20, 0.8);
 				}
 
 				.rip-chat-input input {
 					flex: 1;
-					padding: 6px 10px;
+					padding: var(--space-2) var(--space-3);
 					background: rgba(0, 0, 0, 0.5);
 					border: 1px solid rgba(74, 158, 255, 0.3);
-					color: #c0c0d0;
-					font-size: 12px;
-					border-radius: 0;
+					color: var(--text-secondary);
+					font-size: var(--text-sm);
+					border-radius: var(--radius-none);
 					outline: none;
-					transition: all 0.15s ease;
+					transition: var(--transition-fast);
 				}
 
 				.rip-chat-input input:focus {
@@ -482,17 +482,17 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 				}
 
 				.rip-chat-input button {
-					width: 32px;
-					height: 32px;
+					width: var(--height-md);
+					height: var(--height-md);
 					background: rgba(74, 158, 255, 0.15);
 					border: 1px solid rgba(74, 158, 255, 0.4);
-					color: #4a9eff;
+					color: var(--color-primary);
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
+					transition: var(--transition-fast);
+					border-radius: var(--radius-none);
 					padding: 0;
 				}
 

@@ -1,4 +1,14 @@
-import React, { useState, useEffect } from "react";
+/**
+ * DM模式切换按钮 - 简约风格
+ * 
+ * 设计要点：
+ * 1. 边缘触发器 - 右侧细线
+ * 2. 小抽屉面板 - 与竖线长度相当
+ * 3. 简约按钮 - 标准按钮组件
+ * 4. 后端集成 - 实际DM切换逻辑
+ */
+
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,37 +22,37 @@ interface DMToggleButtonProps {
 	className?: string;
 }
 
-/**
- * DM 模式切换按钮组件
- *
- * 功能特性：
- * - 折叠状态：角落中的小图标按钮
- * - 展开状态：方形红色物理按钮效果
- * - 点击触发后端 DM 模式切换逻辑
- * - 模拟按下/弹出的类物理按钮效果
- * - 与周围科幻风格一致的 UI 设计
- */
-const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
+const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 	const dispatch = useAppDispatch();
 	const { t } = useTranslation();
 	const { isDMMode, players } = useAppSelector((state) => state.ui.dmMode);
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
+	const currentPlayerName = useAppSelector((state) => state.ui.connection.playerName);
+
+	// 面板展开状态
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [isPressed, setIsPressed] = useState(false);
-	const [isAnimating, setIsAnimating] = useState(false);
+	// 加载状态
+	const [isLoading, setIsLoading] = useState(false);
 
 	// 监听后端的 DM 状态更新
 	useEffect(() => {
 		const handleDMStatusUpdate = (payload: any) => {
+			console.log("[DM] Status update received:", payload);
 			if (payload.players) {
 				dispatch(updateDMPlayers(payload.players));
+			}
+			if (payload.isDMMode !== undefined) {
+				dispatch(setDMMode(payload.isDMMode));
 			}
 		};
 
 		const handleDMToggle = (payload: any) => {
-			// 当其他玩家切换 DM 状态时，更新列表
+			console.log("[DM] Toggle event received:", payload);
 			if (payload.players) {
 				dispatch(updateDMPlayers(payload.players));
+			}
+			if (payload.playerId === currentPlayerId && payload.isDMMode !== undefined) {
+				dispatch(setDMMode(payload.isDMMode));
 			}
 		};
 
@@ -53,560 +63,420 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
 			websocketService.off("DM_STATUS_UPDATE", handleDMStatusUpdate);
 			websocketService.off("DM_TOGGLE", handleDMToggle);
 		};
-	}, [dispatch]);
+	}, [dispatch, currentPlayerId]);
 
 	// 初始化时请求当前 DM 状态
 	useEffect(() => {
-		if (players.length === 0 && websocketService.isConnected()) {
-			// 如果有玩家列表，尝试获取 DM 状态
-			const playerList = store.getState().player.players;
-			if (Object.keys(playerList).length > 0) {
-				const dmPlayers = Object.values(playerList).map((p) => ({
-					id: p.id,
-					name: p.name,
-					isDMMode: p.isDMMode || false,
-				}));
-				dispatch(updateDMPlayers(dmPlayers));
+		const initDMStatus = async () => {
+			if (!websocketService.isConnected()) return;
+
+			try {
+				// 请求当前DM状态
+				const response = await websocketService.sendRequest("dm.getStatus", {}) as { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
+				console.log("[DM] Initial status:", response);
+
+				if (response && response.isDMMode !== undefined) {
+					dispatch(setDMMode(response.isDMMode));
+				}
+				if (response && response.players) {
+					dispatch(updateDMPlayers(response.players));
+				}
+			} catch (error) {
+				console.warn("[DM] Failed to get initial status:", error);
+				// 使用本地状态作为回退
+				const playerList = store.getState().player.players;
+				if (Object.keys(playerList).length > 0) {
+					const dmPlayers = Object.values(playerList).map((p: any) => ({
+						id: p.id,
+						name: p.name,
+						isDMMode: p.isDMMode || false,
+					}));
+					dispatch(updateDMPlayers(dmPlayers));
+				}
 			}
-		}
-	}, [dispatch, players.length]);
+		};
 
-	// 处理按钮点击 - 切换 DM 模式
+		initDMStatus();
+	}, [dispatch]);
+
+	// 切换 DM 模式 - 连接后端
 	const handleDMToggle = async () => {
-		if (isAnimating) return;
+		if (!currentPlayerId || isLoading) return;
 
-		setIsAnimating(true);
-		setIsPressed(true);
-
-		// 模拟物理按钮按下延迟
-		await new Promise((resolve) => setTimeout(resolve, 150));
+		setIsLoading(true);
+		const newDMState = !isDMMode;
 
 		try {
-			const newDMState = !isDMMode;
+			console.log("[DM] Toggling to:", newDMState);
 
-			// 发送请求到后端切换 DM 模式
-			await websocketService.sendRequest("dm.toggle", {
+			// 发送请求到后端
+			const response = await websocketService.sendRequest("dm.toggle", {
 				enable: newDMState,
-			});
+				playerId: currentPlayerId,
+			}) as { id: string; name: string; joinedAt: number; isActive: boolean; isDMMode: boolean };
+
+			console.log("[DM] Toggle response:", response);
 
 			// 更新本地状态
 			dispatch(setDMMode(newDMState));
 
-			// 添加系统消息提示
+			// 发送系统消息
 			websocketService.send({
 				type: WS_MESSAGE_TYPES.CHAT_MESSAGE,
 				payload: {
-					senderId: currentPlayerId || "",
-					senderName: store.getState().ui.connection.playerName,
+					senderId: "system",
+					senderName: "System",
 					content: newDMState
-						? t("player.dmMode.enabled")
-						: t("player.dmMode.disabled"),
+						? `🎮 ${currentPlayerName || currentPlayerId} 已启用 DM 模式`
+						: `👤 ${currentPlayerName || currentPlayerId} 已禁用 DM 模式`,
 					timestamp: Date.now(),
 				},
 			});
+
+			// 关闭面板
+			setIsExpanded(false);
 		} catch (error) {
-			console.error("Failed to toggle DM mode:", error);
+			console.error("[DM] Failed to toggle DM mode:", error);
+			// 显示错误（可以添加toast通知）
 		} finally {
-			// 模拟物理按钮弹起延迟
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			setIsPressed(false);
-			setIsAnimating(false);
+			setIsLoading(false);
 		}
 	};
 
-	// 处理展开/折叠切换
-	const handleExpandToggle = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (!isExpanded) {
-			setIsExpanded(true);
-		}
-	};
-
-	// 点击外部区域时折叠
+	// 点击外部关闭面板
 	useEffect(() => {
-		const handleClickOutside = () => {
-			if (isExpanded) {
+		const handleClickOutside = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			if (isExpanded && !target.closest('.dm-toggle-container')) {
 				setIsExpanded(false);
 			}
 		};
 
 		if (isExpanded) {
-			document.addEventListener("click", handleClickOutside);
-			return () => {
-				document.removeEventListener("click", handleClickOutside);
-			};
+			document.addEventListener('click', handleClickOutside);
 		}
+
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
 	}, [isExpanded]);
 
+	// 获取当前玩家的DM状态
 	const currentPlayerDMState = players.find((p) => p.id === currentPlayerId);
 	const displayDMState = currentPlayerDMState?.isDMMode ?? isDMMode;
 
 	return (
-		<div className={`dm-toggle-container ${className || ""}`}>
-			<AnimatePresence>
-				{isExpanded ? (
-					// 展开状态 - 方形红色物理按钮
-					<motion.div
-						key="expanded"
-						initial={{ scale: 0.5, opacity: 0, rotate: -15 }}
-						animate={{
-							scale: 1,
-							opacity: 1,
-							rotate: 0,
-							y: isPressed ? 4 : 0,
-						}}
-						exit={{ scale: 0.5, opacity: 0, rotate: 15 }}
-						transition={{
-							type: "spring",
-							stiffness: 400,
-							damping: 25,
-							mass: 0.8,
-						}}
-						className="dm-button-wrapper"
-						onClick={(e) => {
-							e.stopPropagation();
-							handleDMToggle();
-						}}
-						style={{ cursor: "pointer" }}
-					>
-						{/* 按钮外框 - 发光效果 */}
-						<div
-							className={`dm-button-glow ${displayDMState ? "active" : ""}`}
-						/>
-
-						{/* 按钮主体 */}
-						<div
-							className={`dm-button ${displayDMState ? "active" : ""} ${
-								isPressed ? "pressed" : ""
-							}`}
-						>
-							{/* 按钮表面装饰 */}
-							<div className="dm-button-surface">
-								{/* 中心图标 */}
-								<div className="dm-button-icon">
-									<Crown size={28} strokeWidth={2.5} />
-								</div>
-
-								{/* 状态指示灯 */}
-								<div className={`dm-status-light ${displayDMState ? "on" : "off"}`} />
-
-								{/* 装饰性扫描线 */}
-								<div className="dm-scanline" />
-							</div>
-
-							{/* 按钮侧面（3D 效果） */}
-							<div className="dm-button-side" />
-						</div>
-
-						{/* 按钮标签 */}
-						<div className="dm-button-label">
-							<span className="label-text">
-								{displayDMState ? t("player.dmMode.active") : t("player.dmMode.enable")}
-							</span>
-						</div>
-
-						{/* 底座阴影 */}
-						<div
-							className={`dm-button-shadow ${isPressed ? "pressed" : ""}`}
-						/>
-					</motion.div>
-				) : (
-					// 折叠状态 - 小图标按钮
+		<div className={`dm-toggle-container ${className}`}>
+			<AnimatePresence mode="wait">
+				{!isExpanded ? (
+					// 折叠状态 - 边缘触发器
 					<motion.div
 						key="collapsed"
-						initial={{ scale: 0, opacity: 0 }}
-						animate={{ scale: 1, opacity: 1 }}
-						exit={{ scale: 0, opacity: 0 }}
-						transition={{
-							type: "spring",
-							stiffness: 500,
-							damping: 30,
+						className="dm-edge-trigger"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.15 }}
+						onClick={(e) => {
+							e.stopPropagation();
+							setIsExpanded(true);
 						}}
-						className="dm-toggle-collapsed"
-						onClick={handleExpandToggle}
 						title={t("player.dmMode.toggle")}
-						style={{ cursor: "pointer" }}
 					>
-						{/* 图标容器 */}
-						<div className={`toggle-icon-container ${displayDMState ? "active" : ""}`}>
-							<ShieldAlert size={20} strokeWidth={2.5} />
-							{/* 激活状态指示灯 */}
+						{/* 触发器线条 */}
+						<div className={`dm-trigger-line ${displayDMState ? 'active' : ''}`}>
 							{displayDMState && (
-								<motion.div
-									className="active-indicator-dot"
-									animate={{
-										scale: [1, 1.2, 1],
-										opacity: [0.7, 1, 0.7],
-									}}
-									transition={{
-										duration: 1.5,
-										repeat: Infinity,
-										ease: "easeInOut",
-									}}
-								/>
+								<div className="dm-trigger-pulse" />
 							)}
 						</div>
 
-						{/* 装饰性光晕 */}
-						<div
-							className={`toggle-glow ${displayDMState ? "active" : ""}`}
-						/>
+						{/* 悬停提示 */}
+						<div className="dm-trigger-tooltip">
+							<ShieldAlert size={12} />
+							<span>DM</span>
+						</div>
+					</motion.div>
+				) : (
+					// 展开状态 - 小抽屉面板
+					<motion.div
+						key="expanded"
+						className="dm-drawer"
+						initial={{ x: 20, opacity: 0 }}
+						animate={{ x: 0, opacity: 1 }}
+						exit={{ x: 20, opacity: 0 }}
+						transition={{ type: "spring", stiffness: 400, damping: 30 }}
+						onClick={(e) => e.stopPropagation()}
+					>
+						{/* 简约按钮 */}
+						<button
+							className={`dm-toggle-btn ${displayDMState ? 'active' : ''} ${isLoading ? 'loading' : ''}`}
+							onClick={handleDMToggle}
+							disabled={isLoading}
+							type="button"
+						>
+							{isLoading ? (
+								<div className="dm-loading-spinner" />
+							) : (
+								<>
+									<Crown size={16} />
+									<span className="dm-btn-text">
+										{displayDMState ? t("player.dmMode.disable") : t("player.dmMode.enable")}
+									</span>
+									<div className={`dm-status-dot ${displayDMState ? 'on' : 'off'}`} />
+								</>
+							)}
+						</button>
+
+						{/* 关闭按钮 */}
+						<button 
+							className="dm-close-btn"
+							onClick={() => setIsExpanded(false)}
+							type="button"
+						>
+							×
+						</button>
 					</motion.div>
 				)}
 			</AnimatePresence>
 
 			<style>{`
 				.dm-toggle-container {
+					position: fixed;
+					top: 50%;
+					right: 0;
+					transform: translateY(-50%);
+					z-index: var(--z-fixed);
+					pointer-events: none;
+				}
+
+				/* ========== 边缘触发器 ========== */
+				.dm-edge-trigger {
 					position: absolute;
-					top: 20px;
-					right: 20px;
-					z-index: 1500;
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					font-family: 'Segoe UI', 'Roboto', monospace;
-				}
-
-				/* ========== 折叠状态样式 ========== */
-				.dm-toggle-collapsed {
-					position: relative;
-					width: 48px;
-					height: 48px;
-					border-radius: 12px;
-					background: linear-gradient(
-						135deg,
-						rgba(20, 30, 60, 0.95) 0%,
-						rgba(10, 15, 30, 0.98) 100%
-					);
-					border: 1px solid rgba(74, 158, 255, 0.25);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					box-shadow:
-						0 4px 15px rgba(0, 0, 0, 0.4),
-						inset 0 0 20px rgba(74, 158, 255, 0.05);
-					transition: all 0.2s ease;
-					overflow: hidden;
-				}
-
-				.dm-toggle-collapsed:hover {
-					border-color: rgba(74, 158, 255, 0.5);
-					box-shadow:
-						0 6px 20px rgba(0, 0, 0, 0.5),
-						inset 0 0 30px rgba(74, 158, 255, 0.1),
-						0 0 20px rgba(74, 158, 255, 0.2);
-					transform: translateY(-2px);
-				}
-
-				.toggle-icon-container {
-					position: relative;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					color: #6a7a9f;
-					transition: all 0.3s ease;
-				}
-
-				.toggle-icon-container.active {
-					color: #ff4444;
-					text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
-				}
-
-				.toggle-icon-container.active svg {
-					filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
-				}
-
-				.active-indicator-dot {
-					position: absolute;
-					bottom: -2px;
-					right: -2px;
+					right: 0;
+					top: 50%;
+					transform: translateY(-50%);
 					width: 8px;
-					height: 8px;
-					border-radius: 50%;
-					background: #ff4444;
-					box-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
-				}
-
-				.toggle-glow {
-					position: absolute;
-					inset: -2px;
-					border-radius: 12px;
-					background: radial-gradient(
-						circle at center,
-						rgba(74, 158, 255, 0.15) 0%,
-						transparent 70%
-					);
-					opacity: 0;
-					transition: opacity 0.3s ease;
-					pointer-events: none;
-				}
-
-				.toggle-glow.active {
-					opacity: 1;
-					background: radial-gradient(
-						circle at center,
-						rgba(255, 68, 68, 0.2) 0%,
-						transparent 70%
-					);
-				}
-
-				/* ========== 展开状态样式 ========== */
-				.dm-button-wrapper {
-					position: relative;
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					gap: 8px;
-				}
-
-				.dm-button-glow {
-					position: absolute;
-					inset: -15px;
-					border-radius: 20px;
-					background: radial-gradient(
-						circle at center,
-						rgba(255, 68, 68, 0.3) 0%,
-						transparent 60%
-					);
-					opacity: 0;
-					transition: opacity 0.3s ease;
-					pointer-events: none;
-					animation: pulse-glow 2s ease-in-out infinite;
-				}
-
-				.dm-button-glow.active {
-					opacity: 1;
-				}
-
-				@keyframes pulse-glow {
-					0%, 100% {
-						opacity: 0.6;
-						transform: scale(1);
-					}
-					50% {
-						opacity: 1;
-						transform: scale(1.05);
-					}
-				}
-
-				.dm-button {
-					position: relative;
-					width: 80px;
 					height: 80px;
-					border-radius: 16px;
-					background: linear-gradient(
-						145deg,
-						#2a1a1a 0%,
-						#1a0a0a 100%
-					);
-					border: 2px solid rgba(255, 68, 68, 0.3);
+					cursor: pointer;
+					pointer-events: auto;
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					box-shadow:
-						0 8px 25px rgba(0, 0, 0, 0.5),
-						inset 0 2px 10px rgba(255, 255, 255, 0.05),
-						inset 0 -2px 10px rgba(0, 0, 0, 0.3);
-					transition: all 0.15s ease;
-					transform-style: preserve-3d;
 				}
 
-				.dm-button.active {
-					border-color: rgba(255, 68, 68, 0.8);
-					background: linear-gradient(
-						145deg,
-						#3a1a1a 0%,
-						#2a0a0a 100%
-					);
-					box-shadow:
-						0 8px 25px rgba(0, 0, 0, 0.5),
-						inset 0 2px 10px rgba(255, 68, 68, 0.1),
-						inset 0 -2px 10px rgba(0, 0, 0, 0.3),
-						0 0 30px rgba(255, 68, 68, 0.3);
-				}
-
-				.dm-button.pressed {
-					transform: translateY(4px) scale(0.98);
-					box-shadow:
-						0 2px 10px rgba(0, 0, 0, 0.5),
-						inset 0 2px 15px rgba(255, 68, 68, 0.2),
-						inset 0 -1px 5px rgba(0, 0, 0, 0.4);
-				}
-
-				.dm-button-surface {
-					position: relative;
-					width: 100%;
+				.dm-trigger-line {
+					width: 3px;
 					height: 100%;
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					justify-content: center;
-					border-radius: 14px;
-					background: linear-gradient(
-						135deg,
-						rgba(30, 15, 15, 0.9) 0%,
-						rgba(20, 10, 10, 0.95) 100%
-					);
-					overflow: hidden;
-				}
-
-				.dm-button-icon {
-					color: #ff4444;
-					filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.5));
-					animation: icon-pulse 2s ease-in-out infinite;
-				}
-
-				@keyframes icon-pulse {
-					0%, 100% {
-						transform: scale(1);
-						opacity: 0.9;
-					}
-					50% {
-						transform: scale(1.05);
-						opacity: 1;
-					}
-				}
-
-				.dm-status-light {
-					position: absolute;
-					top: 8px;
-					right: 8px;
-					width: 6px;
-					height: 6px;
-					border-radius: 50%;
-					transition: all 0.3s ease;
-				}
-
-				.dm-status-light.on {
-					background: #ff4444;
-					box-shadow:
-						0 0 8px rgba(255, 68, 68, 0.8),
-						0 0 15px rgba(255, 68, 68, 0.4);
-					animation: blink-light 1.5s ease-in-out infinite;
-				}
-
-				.dm-status-light.off {
-					background: #4a4a4a;
-					box-shadow: 0 0 3px rgba(74, 74, 74, 0.5);
-				}
-
-				@keyframes blink-light {
-					0%, 100% {
-						opacity: 1;
-					}
-					50% {
-						opacity: 0.5;
-					}
-				}
-
-				.dm-scanline {
-					position: absolute;
-					inset: 0;
 					background: linear-gradient(
 						180deg,
 						transparent 0%,
-						rgba(255, 68, 68, 0.1) 50%,
+						rgba(100, 100, 150, 0.3) 20%,
+						rgba(100, 100, 150, 0.3) 80%,
 						transparent 100%
 					);
-					animation: scanline-move 3s linear infinite;
-					pointer-events: none;
+					position: relative;
+					transition: var(--transition-fast);
+					border-radius: 2px;
 				}
 
-				@keyframes scanline-move {
-					0% {
-						transform: translateY(-100%);
-					}
-					100% {
-						transform: translateY(100%);
-					}
-				}
-
-				.dm-button-side {
-					position: absolute;
-					inset: 0;
-					border-radius: 16px;
+				.dm-trigger-line.active {
 					background: linear-gradient(
 						180deg,
-						rgba(255, 68, 68, 0.1) 0%,
-						transparent 50%,
-						rgba(0, 0, 0, 0.2) 100%
+						transparent 0%,
+						rgba(255, 68, 68, 0.5) 20%,
+						rgba(255, 68, 68, 0.5) 80%,
+						transparent 100%
 					);
-					pointer-events: none;
 				}
 
-				.dm-button-label {
+				.dm-trigger-pulse {
+					position: absolute;
+					inset: -2px;
+					background: rgba(255, 68, 68, 0.3);
+					border-radius: 4px;
+					animation: pulse 1.5s ease-in-out infinite;
+				}
+
+				@keyframes pulse {
+					0%, 100% { opacity: 0.3; transform: scale(1); }
+					50% { opacity: 0.6; transform: scale(1.1); }
+				}
+
+				.dm-trigger-tooltip {
+					position: absolute;
+					right: 12px;
+					top: 50%;
+					transform: translateY(-50%);
+					display: flex;
+					align-items: center;
+					gap: 4px;
+					padding: 4px 8px;
+					background: var(--bg-panel);
+					border: 1px solid var(--border-color);
+					color: var(--text-tertiary);
+					font-size: var(--text-xs);
+					font-weight: var(--font-semibold);
+					letter-spacing: var(--tracking-wider);
+					opacity: 0;
+					pointer-events: none;
+					transition: var(--transition-fast);
+					white-space: nowrap;
+					border-radius: var(--radius-sm);
+				}
+
+				.dm-edge-trigger:hover .dm-trigger-tooltip {
+					opacity: 1;
+					right: 16px;
+				}
+
+				.dm-edge-trigger:hover .dm-trigger-line {
+					width: 4px;
+					background: linear-gradient(
+						180deg,
+						transparent 0%,
+						rgba(74, 158, 255, 0.5) 20%,
+						rgba(74, 158, 255, 0.5) 80%,
+						transparent 100%
+					);
+				}
+
+				/* ========== 抽屉面板 ========== */
+				.dm-drawer {
+					position: absolute;
+					right: 8px;
+					top: 50%;
+					transform: translateY(-50%);
+					display: flex;
+					align-items: center;
+					gap: var(--space-2);
+					padding: var(--space-3);
+					background: var(--bg-panel);
+					border: 1px solid var(--border-color);
+					border-right: none;
+					border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+					box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+					pointer-events: auto;
+				}
+
+				/* ========== 切换按钮 ========== */
+				.dm-toggle-btn {
+					display: flex;
+					align-items: center;
+					gap: var(--space-2);
+					padding: var(--space-2) var(--space-3);
+					background: rgba(40, 50, 70, 0.6);
+					border: 1px solid var(--border-color);
+					border-radius: var(--radius-sm);
+					color: var(--text-secondary);
+					font-family: var(--font-body);
+					font-size: var(--text-xs);
+					font-weight: var(--font-medium);
+					letter-spacing: var(--tracking-wide);
+					text-transform: uppercase;
+					cursor: pointer;
+					transition: var(--transition-fast);
+					white-space: nowrap;
+				}
+
+				.dm-toggle-btn:hover:not(:disabled) {
+					background: rgba(74, 158, 255, 0.15);
+					border-color: rgba(74, 158, 255, 0.4);
+					color: var(--color-primary);
+				}
+
+				.dm-toggle-btn.active {
+					background: rgba(255, 68, 68, 0.15);
+					border-color: rgba(255, 68, 68, 0.4);
+					color: var(--color-danger);
+				}
+
+				.dm-toggle-btn.active:hover:not(:disabled) {
+					background: rgba(255, 68, 68, 0.25);
+					border-color: rgba(255, 68, 68, 0.6);
+				}
+
+				.dm-toggle-btn:disabled {
+					opacity: 0.6;
+					cursor: not-allowed;
+				}
+
+				.dm-btn-text {
+					min-width: 60px;
 					text-align: center;
 				}
 
-				.label-text {
-					font-size: 10px;
-					font-weight: 700;
-					letter-spacing: 2px;
-					color: #ff4444;
-					text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
-					background: linear-gradient(
-						90deg,
-						#ff4444 0%,
-						#ff6666 50%,
-						#ff4444 100%
-					);
-					-webkit-background-clip: text;
-					-webkit-text-fill-color: transparent;
-					background-clip: text;
-					animation: label-shimmer 2s linear infinite;
-					background-size: 200% auto;
-				}
-
-				@keyframes label-shimmer {
-					0% {
-						background-position: 0% center;
-					}
-					100% {
-						background-position: 200% center;
-					}
-				}
-
-				.dm-button-shadow {
-					position: absolute;
-					bottom: -10px;
-					left: 50%;
-					transform: translateX(-50%);
-					width: 60px;
-					height: 10px;
-					border-radius: 50%;
-					background: radial-gradient(
-						ellipse at center,
-						rgba(0, 0, 0, 0.5) 0%,
-						transparent 70%
-					);
-					transition: all 0.15s ease;
-				}
-
-				.dm-button-shadow.pressed {
-					width: 70px;
+				.dm-status-dot {
+					width: 6px;
 					height: 6px;
-					opacity: 0.8;
+					border-radius: var(--radius-full);
+					transition: var(--transition-fast);
 				}
 
-				/* ========== 响应式设计 ========== */
-				@media (max-width: 768px) {
-					.dm-toggle-container {
-						top: 10px;
-						right: 10px;
+				.dm-status-dot.on {
+					background: var(--color-danger);
+					box-shadow: 0 0 6px var(--color-danger-glow);
+					animation: blink 1.5s ease-in-out infinite;
+				}
+
+				.dm-status-dot.off {
+					background: var(--text-tertiary);
+				}
+
+				@keyframes blink {
+					0%, 100% { opacity: 1; }
+					50% { opacity: 0.4; }
+				}
+
+				.dm-loading-spinner {
+					width: 14px;
+					height: 14px;
+					border: 2px solid rgba(74, 158, 255, 0.2);
+					border-top-color: var(--color-primary);
+					border-radius: var(--radius-full);
+					animation: spin 0.8s linear infinite;
+				}
+
+				@keyframes spin {
+					to { transform: rotate(360deg); }
+				}
+
+				/* ========== 关闭按钮 ========== */
+				.dm-close-btn {
+					width: 20px;
+					height: 20px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					background: transparent;
+					border: 1px solid var(--border-color);
+					border-radius: var(--radius-sm);
+					color: var(--text-tertiary);
+					font-size: 14px;
+					cursor: pointer;
+					transition: var(--transition-fast);
+					padding: 0;
+					line-height: 1;
+				}
+
+				.dm-close-btn:hover {
+					background: rgba(255, 68, 68, 0.1);
+					border-color: rgba(255, 68, 68, 0.3);
+					color: var(--color-danger);
+				}
+
+				/* 响应式 */
+				@media (min-width: 2560px) {
+					.dm-edge-trigger {
+						height: 100px;
 					}
 
-					.dm-toggle-collapsed {
-						width: 42px;
-						height: 42px;
+					.dm-toggle-btn {
+						padding: var(--space-3) var(--space-4);
+						font-size: var(--text-sm);
 					}
 
-					.dm-button {
-						width: 70px;
-						height: 70px;
-					}
-
-					.label-text {
-						font-size: 9px;
+					.dm-btn-text {
+						min-width: 80px;
 					}
 				}
 			`}</style>

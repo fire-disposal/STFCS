@@ -132,10 +132,16 @@
     "actionPoints": "Action Points: {{current}}/{{total}}",
     "dmMode": {
       "active": "DM ACTIVE",
-      "enable": "ENABLE DM",
-      "toggle": "DM Mode Toggle",
+      "enable": "ENABLE",
+      "disable": "DISABLE",
+      "toggle": "DM Mode",
       "enabled": "🎮 DM mode enabled",
-      "disabled": "👤 DM mode disabled"
+      "disabled": "👤 DM mode disabled",
+      "warning": "WARNING",
+      "inactive": "DM INACTIVE",
+      "holdToToggle": "HOLD 3s TO TOGGLE",
+      "clickToEnable": "Hold to enable DM mode",
+      "clickToDisable": "Hold to disable DM mode"
     }
   },
   "combat": {
@@ -143,12 +149,33 @@
     "firedMissiles": "{{player}} fired missiles at {{target}}",
     "shieldTookDamage": "{{ship}} shield took {{damage}} damage",
     "returnedFire": "{{ship}} returned fire with {{weapon}}",
-    "time": "Time"
+    "time": "Time",
+    "turnStart": "{{unit}} turn started",
+    "moved": "moved {{distance}}",
+    "fired": "fired {{weapon}}",
+    "shieldDamage": "shield took {{damage}} damage",
+    "shieldActive": "{{ship}} shield activated",
+    "roundStart": "Round {{round}} started",
+    "attack": "Attack",
+    "damage": "Damage",
+    "shield": "Shield",
+    "move": "Move",
+    "turn": "Turn",
+    "system": "System"
   },
   "chat": {
     "title": "Chat",
     "system": "System",
-    "send": "Send"
+    "send": "Send",
+    "joined": "joined",
+    "left": "left",
+    "typeMessage": "Type message...",
+    "welcome": "Welcome to the game!"
+  },
+  "panel": {
+    "chat": "Chat",
+    "combat": "Combat",
+    "all": "All"
   },
   "status": {
     "room": "Room",
@@ -227,5 +254,41 @@
     "enterName": "Enter your name",
     "noTokenSelected": "No token selected",
     "clickToSelectHint": "Click on a ship, station, or asteroid to select it"
+  },
+  "tactical": {
+    "noSelection": "No unit selected",
+    "current": "CURRENT",
+    "globalView": "Global View",
+    "currentTurn": "Current Turn",
+    "move": "Move",
+    "weapons": "Weapons",
+    "systems": "Systems",
+    "headingControl": "Heading Control",
+    "distanceControl": "Distance Control",
+    "weaponMounts": "Weapon Mounts",
+    "systemManagement": "System Management",
+    "noShipSelected": "No ship selected",
+    "shield": "Shield",
+    "on": "ON",
+    "off": "OFF",
+    "vent": "Vent",
+    "actionPoints": "Action Points",
+    "endTurn": "End Turn",
+    "evasion": "Evasion",
+    "detailedView": "Detailed View",
+    "detailedViewDescription": "Expand to show detailed controls",
+    "flux": "Flux",
+    "armor": "Armor",
+    "structure": "Structure",
+    "energy": "Energy",
+    "heat": "Heat",
+    "speed": "Speed",
+    "heading": "Heading",
+    "distance": "Distance",
+    "target": "Target",
+    "fire": "Fire",
+    "aim": "Aim",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }

@@ -13,6 +13,7 @@ import {
 	setPlayerName,
 	setRoomId,
 } from "@/store/slices/uiSlice";
+import { addPlayer, setCurrentPlayer } from "@/store/slices/playerSlice";
 
 // 简化的连接视图 - 只输入玩家名称
 const PlayerNameView: React.FC<{
@@ -205,6 +206,29 @@ const App: React.FC = () => {
 			dispatch(setPlayerName(name));
 			dispatch(setPlayerId(tempPlayerId));
 			dispatch(setRoomId(defaultRoomId));
+
+			// 设置当前玩家ID到playerSlice
+			dispatch(setCurrentPlayer(tempPlayerId));
+
+			// 将当前玩家添加到 players 状态
+			dispatch(addPlayer({
+				id: tempPlayerId,
+				name,
+				joinedAt: Date.now(),
+				isActive: true,
+				isDMMode: false,
+				isConnected: true,
+				isReady: false,
+				currentShipId: null,
+				selectedTargets: [],
+				usedActions: 0,
+				pendingActions: 0,
+				roomId: defaultRoomId,
+				slotIndex: 0,
+				hasActed: false,
+				fluxVentingActive: false,
+				gamePhase: "lobby",
+			}));
 
 			console.log(`Player ${name} joined the game in room ${defaultRoomId}`);
 		} catch (error) {
