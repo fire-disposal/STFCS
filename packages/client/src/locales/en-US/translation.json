@@ -44,7 +44,13 @@
     "close": "Close",
     "back": "Back",
     "next": "Next",
-    "previous": "Previous"
+    "previous": "Previous",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "send": "Send",
+    "typeMessage": "Type a message...",
+    "welcome": "Welcome to the game!",
+    "letsBegin": "Let's begin the battle!"
   },
   "token": {
     "info": "Token Info",
@@ -66,7 +72,24 @@
     "rotateRight": "Rotate Right (+15°)",
     "markMoved": "Mark as Moved",
     "markActed": "Mark Action Used",
-    "endTurn": "End Turn for This Token"
+    "endTurn": "End Turn for This Token",
+    "type": {
+      "ship": "Ship",
+      "station": "Station",
+      "asteroid": "Asteroid"
+    },
+    "status": {
+      "active": "Active",
+      "moved": "Moved",
+      "acted": "Acted",
+      "ended": "Ended",
+      "waiting": "Waiting"
+    },
+    "faction": "Faction",
+    "class": "Class",
+    "composition": "Composition",
+    "id": "ID",
+    "notInitialized": "Turn order not initialized"
   },
   "ship": {
     "hull": "Hull",
@@ -81,5 +104,128 @@
       "chinese": "简体中文",
       "english": "English"
     }
+  },
+  "turn": {
+    "round": "Round",
+    "phase": {
+      "label": "Phase",
+      "planning": "PLANNING",
+      "action": "ACTION",
+      "end": "END"
+    },
+    "currentTurn": "Current Turn:",
+    "previousUnit": "Previous Unit",
+    "nextUnit": "Next Unit",
+    "unitsCounter": "{{current}} / {{total}}"
+  },
+  "room": {
+    "title": "Room Panel",
+    "roomId": "Room ID",
+    "notJoined": "Not joined",
+    "players": "Players",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "player": {
+    "controls": "Player Controls",
+    "endTurn": "End Turn",
+    "actionPoints": "Action Points: {{current}}/{{total}}",
+    "dmMode": {
+      "active": "DM ACTIVE",
+      "enable": "ENABLE DM",
+      "toggle": "DM Mode Toggle",
+      "enabled": "🎮 DM mode enabled",
+      "disabled": "👤 DM mode disabled"
+    }
+  },
+  "combat": {
+    "log": "Combat Log",
+    "firedMissiles": "{{player}} fired missiles at {{target}}",
+    "shieldTookDamage": "{{ship}} shield took {{damage}} damage",
+    "returnedFire": "{{ship}} returned fire with {{weapon}}",
+    "time": "Time"
+  },
+  "chat": {
+    "title": "Chat",
+    "system": "System",
+    "send": "Send"
+  },
+  "status": {
+    "room": "Room",
+    "players": "Players",
+    "tool": "Tool",
+    "turn": "Turn",
+    "waiting": "Waiting..."
+  },
+  "layer": {
+    "title": "Layer Control",
+    "viewMode": "View Mode",
+    "hideAll": "Hide All",
+    "showAll": "Show All",
+    "hide": "Hide",
+    "show": "Show",
+    "groups": {
+      "background": "Background",
+      "tokens": "Tokens",
+      "effects": "Effects",
+      "ui": "UI"
+    },
+    "layers": {
+      "backgroundStars": "Stars",
+      "backgroundNebula": "Nebula",
+      "backgroundGrid": "Grid",
+      "tokensShips": "Ships",
+      "tokensStations": "Stations",
+      "tokensAsteroids": "Asteroids",
+      "effectsWeapons": "Weapon Ranges",
+      "effectsSelection": "Selection",
+      "otherPlayersCameras": "Other Players"
+    },
+    "viewModes": {
+      "tactical": "Tactical",
+      "navigation": "Navigation",
+      "decorative": "Decorative"
+    }
+  },
+  "zoom": {
+    "in": "Zoom In",
+    "out": "Zoom Out",
+    "reset": "Reset Zoom (100%)",
+    "percentage": "{{percent}}%",
+    "scale": "Scale",
+    "resolution": "Resolution:",
+    "unitsPerPixel": "{{units}} u/px",
+    "direction": "Zoom Direction",
+    "normal": "Normal",
+    "inverted": "Inverted"
+  },
+  "tools": {
+    "select": "Select",
+    "pan": "Pan",
+    "edit": "Edit",
+    "measure": "Measure",
+    "place": "Place"
+  },
+  "menu": {
+    "title": "Menu",
+    "settings": "Settings",
+    "language": "Language",
+    "mute": "Mute",
+    "unmute": "Unmute"
+  },
+  "scale": {
+    "ratio": {
+      "1:100": "1:100",
+      "1:250": "1:250",
+      "1:500": "1:500",
+      "1:1000": "1:1000",
+      "1:2500": "1:2500",
+      "1:5000": "1:5000"
+    }
+  },
+  "placeholder": {
+    "enterName": "Enter your name",
+    "noTokenSelected": "No token selected",
+    "clickToSelectHint": "Click on a ship, station, or asteroid to select it"
   }
 }

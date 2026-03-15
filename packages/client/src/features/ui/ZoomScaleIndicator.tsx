@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ZoomIn, ZoomOut } from "lucide-react";
 
 interface ZoomScaleIndicatorProps {
@@ -24,6 +25,7 @@ const ZoomScaleIndicator: React.FC<ZoomScaleIndicatorProps> = ({
 	onReset,
 	className,
 }) => {
+	const { t } = useTranslation();
 	// 计算缩放百分比
 	const zoomPercent = ((zoom - minZoom) / (maxZoom - minZoom)) * 100;
 
@@ -78,8 +80,8 @@ const ZoomScaleIndicator: React.FC<ZoomScaleIndicatorProps> = ({
 
 				{/* 底部：世界单位信息 */}
 				<div className="world-units-display">
-					<span className="units-label">Resolution:</span>
-					<span className="units-value">{getWorldUnitsPerPixel(zoom)} u/px</span>
+					<span className="units-label">{t("zoom.resolution")}</span>
+					<span className="units-value">{t("zoom.unitsPerPixel", { units: getWorldUnitsPerPixel(zoom) })}</span>
 				</div>
 
 				{/* 缩放控制按钮 */}
@@ -88,14 +90,14 @@ const ZoomScaleIndicator: React.FC<ZoomScaleIndicatorProps> = ({
 						className="zoom-button"
 						onClick={onZoomOut}
 						disabled={zoom <= minZoom}
-						title="Zoom Out"
+						title={t("zoom.out")}
 					>
 						<ZoomOut size={14} />
 					</button>
 					<button
 						className="zoom-button reset"
 						onClick={onReset}
-						title="Reset Zoom (100%)"
+						title={t("zoom.reset")}
 					>
 						<span className="reset-label">1:1</span>
 					</button>
@@ -103,7 +105,7 @@ const ZoomScaleIndicator: React.FC<ZoomScaleIndicatorProps> = ({
 						className="zoom-button"
 						onClick={onZoomIn}
 						disabled={zoom >= maxZoom}
-						title="Zoom In"
+						title={t("zoom.in")}
 					>
 						<ZoomIn size={14} />
 					</button>

@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 
 interface ZoomControlProps {
@@ -23,6 +24,7 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
 	onZoomOut,
 	onReset,
 }) => {
+	const { t } = useTranslation();
 	const zoomPercent = Math.round(zoom * 100);
 
 	return (
@@ -34,7 +36,7 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
 					className="zoom-control__button"
 					onClick={onZoomOut}
 					disabled={zoom <= minZoom}
-					title="Zoom Out"
+					title={t("zoom.out")}
 				>
 					<ZoomOut size={14} />
 				</button>
@@ -42,7 +44,7 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
 				<button
 					className="zoom-control__button zoom-control__button--reset"
 					onClick={onReset}
-					title="Reset Zoom"
+					title={t("zoom.reset")}
 				>
 					<RefreshCw size={12} />
 				</button>
@@ -51,7 +53,7 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
 					className="zoom-control__button"
 					onClick={onZoomIn}
 					disabled={zoom >= maxZoom}
-					title="Zoom In"
+					title={t("zoom.in")}
 				>
 					<ZoomIn size={14} />
 				</button>

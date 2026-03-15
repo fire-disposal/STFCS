@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, ShieldAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setDMMode, updateDMPlayers } from "@/store/slices/uiSlice";
 import { websocketService } from "@/services/websocket";
@@ -23,6 +24,7 @@ interface DMToggleButtonProps {
  */
 const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
 	const dispatch = useAppDispatch();
+	const { t } = useTranslation();
 	const { isDMMode, players } = useAppSelector((state) => state.ui.dmMode);
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
 	const [isExpanded, setIsExpanded] = useState(false);
@@ -97,8 +99,8 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
 					senderId: currentPlayerId || "",
 					senderName: store.getState().ui.connection.playerName,
 					content: newDMState
-						? "🎮 DM mode enabled"
-						: "👤 DM mode disabled",
+						? t("player.dmMode.enabled")
+						: t("player.dmMode.disabled"),
 					timestamp: Date.now(),
 				},
 			});
@@ -199,7 +201,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
 						{/* 按钮标签 */}
 						<div className="dm-button-label">
 							<span className="label-text">
-								{displayDMState ? "DM ACTIVE" : "ENABLE DM"}
+								{displayDMState ? t("player.dmMode.active") : t("player.dmMode.enable")}
 							</span>
 						</div>
 
@@ -222,7 +224,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className }) => {
 						}}
 						className="dm-toggle-collapsed"
 						onClick={handleExpandToggle}
-						title="DM Mode Toggle"
+						title={t("player.dmMode.toggle")}
 						style={{ cursor: "pointer" }}
 					>
 						{/* 图标容器 */}

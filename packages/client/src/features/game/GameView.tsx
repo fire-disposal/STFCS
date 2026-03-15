@@ -159,9 +159,9 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 							<LayerControlPanel />
 
 							<div className="room-panel-placeholder">
-								<h3>Room Panel</h3>
-								<p>Room ID: {roomId || "Not joined"}</p>
-								<p>Players: {Object.keys(players).length}</p>
+								<h3>{t("room.title")}</h3>
+								<p>{t("room.roomId")}: {roomId || t("room.notJoined")}</p>
+								<p>{t("room.players")}: {Object.keys(players).length}</p>
 								<div className="player-list">
 									{Object.values(players).map((player) => (
 										<div key={player.id} className="player-item">
@@ -183,12 +183,12 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 							</div>
 
 							<div className="player-controls-placeholder">
-								<h3>Player Controls</h3>
+								<h3>{t("player.controls")}</h3>
 								<button onClick={handleEndTurn} className="end-turn-button">
-									End Turn
+									{t("player.endTurn")}
 								</button>
 								<div className="action-points">
-									<span>Action Points: 3/5</span>
+									<span>{t("player.actionPoints", { current: 3, total: 5 })}</span>
 								</div>
 							</div>
 						</div>
@@ -217,19 +217,19 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					{!rightPanelCollapsed && (
 						<div className="panel-content">
 							<div className="combat-log-placeholder">
-								<h3>Combat Log</h3>
+								<h3>{t("combat.log")}</h3>
 								<div className="log-entries">
 									<div className="log-entry">
 										<span className="log-time">12:30:45</span>
-										<span className="log-text">Player1 fired missiles at EnemyShip</span>
+										<span className="log-text">{t("combat.firedMissiles", { player: "Player1", target: "EnemyShip" })}</span>
 									</div>
 									<div className="log-entry">
 										<span className="log-time">12:31:10</span>
-										<span className="log-text">EnemyShip shield took 150 damage</span>
+										<span className="log-text">{t("combat.shieldTookDamage", { ship: "EnemyShip", damage: 150 })}</span>
 									</div>
 									<div className="log-entry">
 										<span className="log-time">12:31:25</span>
-										<span className="log-text">EnemyShip returned fire with laser cannons</span>
+										<span className="log-text">{t("combat.returnedFire", { ship: "EnemyShip", weapon: t("ship.weapons") })}</span>
 									</div>
 								</div>
 							</div>
@@ -242,26 +242,26 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 			<div className="game-chat">
 				<div className="chat-panel-placeholder">
 					<div className="chat-header">
-						<h3>Chat {chatExpanded ? "▼" : "▲"}</h3>
+						<h3>{t("chat.title")} {chatExpanded ? "▼" : "▲"}</h3>
 						<button onClick={() => setChatExpanded(!chatExpanded)}>
-							{chatExpanded ? "Collapse" : "Expand"}
+							{chatExpanded ? t("ui.collapse") : t("ui.expand")}
 						</button>
 					</div>
 					{chatExpanded && (
 						<div className="chat-content">
 							<div className="chat-messages">
 								<div className="chat-message">
-									<span className="sender">System:</span>
-									<span className="message">Welcome to the game!</span>
+									<span className="sender">{t("chat.system")}:</span>
+									<span className="message">{t("ui.welcome")}</span>
 								</div>
 								<div className="chat-message">
 									<span className="sender">Player1:</span>
-									<span className="message">Let's begin the battle!</span>
+									<span className="message">{t("ui.letsBegin")}</span>
 								</div>
 							</div>
 							<div className="chat-input">
-								<input type="text" placeholder="Type a message..." />
-								<button onClick={() => handleChatSend("Test message")}>Send</button>
+								<input type="text" placeholder={t("ui.typeMessage")} />
+								<button onClick={() => handleChatSend("Test message")}>{t("ui.send")}</button>
 							</div>
 						</div>
 					)}
@@ -271,21 +271,21 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 			{/* 游戏状态指示器 */}
 			<div className="game-status">
 				<div className="status-item">
-					<span className="status-label">Room:</span>
-					<span className="status-value">{roomId || "Not joined"}</span>
+					<span className="status-label">{t("status.room")}:</span>
+					<span className="status-value">{roomId || t("room.notJoined")}</span>
 				</div>
 				<div className="status-item">
-					<span className="status-label">Players:</span>
+					<span className="status-label">{t("status.players")}:</span>
 					<span className="status-value">{Object.keys(players).length}</span>
 				</div>
 				<div className="status-item">
-					<span className="status-label">Tool:</span>
+					<span className="status-label">{t("status.tool")}:</span>
 					<span className="status-value">{selectedTool}</span>
 				</div>
 				<div className="status-item">
-					<span className="status-label">Turn:</span>
+					<span className="status-label">{t("status.turn")}:</span>
 					<span className="status-value">
-						{currentUnit ? `${currentUnit.name}'s Turn` : "Waiting..."}
+						{currentUnit ? `${currentUnit.name}'s Turn` : t("status.waiting")}
 					</span>
 				</div>
 			</div>

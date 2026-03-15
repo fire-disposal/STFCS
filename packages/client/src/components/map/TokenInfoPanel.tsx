@@ -2,6 +2,7 @@ import { useAppSelector } from "@/store";
 import { updateToken } from "@/store/slices/mapSlice";
 import type { TokenInfo } from "@vt/shared/types";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Rocket, Satellite, MapPin, RotateCcw, RotateCw, Check, Zap, SkipForward } from "lucide-react";
 import { useDispatch } from "react-redux";
 
@@ -11,6 +12,7 @@ interface TokenInfoPanelProps {
 
 const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 	const dispatch = useDispatch();
+	const { t } = useTranslation();
 	const { tokens, selectedTokenId } = useAppSelector((state) => state.map);
 	const selectedToken = selectedTokenId ? tokens[selectedTokenId] : null;
 
@@ -18,9 +20,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 		return (
 			<div className={`token-info-panel ${className || ""}`}>
 				<div className="token-info-placeholder">
-					<h3>Token Info</h3>
-					<p className="placeholder-text">No token selected</p>
-					<p className="placeholder-hint">Click on a ship, station, or asteroid to select it</p>
+					<h3>{t("token.info")}</h3>
+					<p className="placeholder-text">{t("token.noSelection")}</p>
+					<p className="placeholder-hint">{t("token.clickToSelect")}</p>
 				</div>
 			</div>
 		);
@@ -137,8 +139,8 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 					<div className="token-title">
 						<h3>{tokenClass.toUpperCase()}</h3>
 						<div className="token-subtitle">
-							<span className="token-id">ID: {token.id.slice(0, 8)}</span>
-							<span className="token-type">Type: {token.type}</span>
+							<span className="token-id">{t("token.id")}: {token.id.slice(0, 8)}</span>
+							<span className="token-type">{t("token.type.ship")}: {token.type}</span>
 						</div>
 					</div>
 				</div>
@@ -154,32 +156,32 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 			<div className="token-info-content">
 				{/* 基本信息 */}
 				<div className="info-section">
-					<h4>Basic Information</h4>
+					<h4>{t("token.basicInfo")}</h4>
 					<div className="info-grid">
 						<div className="info-item">
-							<span className="info-label">Position</span>
+							<span className="info-label">{t("token.position")}</span>
 							<span className="info-value">
 								{Math.round(token.position.x)}, {Math.round(token.position.y)}
 							</span>
 						</div>
 						<div className="info-item">
-							<span className="info-label">Heading</span>
+							<span className="info-label">{t("token.heading")}</span>
 							<span className="info-value">{Math.round(token.heading)}°</span>
 						</div>
 						<div className="info-item">
-							<span className="info-label">Size</span>
+							<span className="info-label">{t("token.size")}</span>
 							<span className="info-value">{token.size} units</span>
 						</div>
 						<div className="info-item">
-							<span className="info-label">Scale</span>
+							<span className="info-label">{t("token.scale")}</span>
 							<span className="info-value">{token.scale}x</span>
 						</div>
 						<div className="info-item">
-							<span className="info-label">Layer</span>
+							<span className="info-label">{t("token.layer")}</span>
 							<span className="info-value">{token.layer}</span>
 						</div>
 						<div className="info-item">
-							<span className="info-label">Collision</span>
+							<span className="info-label">{t("token.collision")}</span>
 							<span className="info-value">{token.collisionRadius} units</span>
 						</div>
 					</div>
@@ -187,12 +189,12 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 
 				{/* 回合状态 */}
 				<div className="info-section">
-					<h4>Turn Status</h4>
+					<h4>{t("token.turnStatus")}</h4>
 					<div className="resource-bars">
 						{token.maxMovement > 0 && (
 							<div className="resource-bar">
 								<div className="bar-header">
-									<span className="bar-label">Movement Points</span>
+									<span className="bar-label">{t("token.movementPoints")}</span>
 									<span className="bar-value">
 										{token.remainingMovement} / {token.maxMovement}
 									</span>
@@ -208,7 +210,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 						{token.actionsPerTurn > 0 && (
 							<div className="resource-bar">
 								<div className="bar-header">
-									<span className="bar-label">Action Points</span>
+									<span className="bar-label">{t("token.actionPoints")}</span>
 									<span className="bar-value">
 										{token.remainingActions} / {token.actionsPerTurn}
 									</span>
@@ -224,23 +226,23 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 				{/* 元数据 */}
 				{Object.keys(metadata).length > 0 && (
 					<div className="info-section">
-						<h4>Metadata</h4>
+						<h4>{t("token.metadata")}</h4>
 						<div className="metadata-grid">
 							{faction && typeof faction === "string" && (
 								<div className="metadata-item">
-									<span className="metadata-label">Faction</span>
+									<span className="metadata-label">{t("token.faction")}</span>
 									<span className="metadata-value">{faction}</span>
 								</div>
 							)}
 							{tokenClass && typeof tokenClass === "string" && (
 								<div className="metadata-item">
-									<span className="metadata-label">Class</span>
+									<span className="metadata-label">{t("token.class")}</span>
 									<span className="metadata-value">{tokenClass}</span>
 								</div>
 							)}
 							{composition && typeof composition === "string" && (
 								<div className="metadata-item">
-									<span className="metadata-label">Composition</span>
+									<span className="metadata-label">{t("token.composition")}</span>
 									<span className="metadata-value">{composition}</span>
 								</div>
 							)}
@@ -258,7 +260,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 
 				{/* 操作按钮 */}
 				<div className="info-section">
-					<h4>Actions</h4>
+					<h4>{t("token.actions")}</h4>
 					<div className="action-buttons">
 						<div className="button-row">
 							<button
@@ -267,7 +269,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								disabled={token.turnState === "acted"}
 							>
 								<span className="button-icon"><RotateCcw size={16} /></span>
-								<span className="button-text">Rotate Left (-15°)</span>
+								<span className="button-text">{t("token.rotateLeft")}</span>
 							</button>
 							<button
 								className="action-button rotate-right"
@@ -275,7 +277,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								disabled={token.turnState === "acted"}
 							>
 								<span className="button-icon"><RotateCw size={16} /></span>
-								<span className="button-text">Rotate Right (+15°)</span>
+								<span className="button-text">{t("token.rotateRight")}</span>
 							</button>
 						</div>
 						<div className="button-row">
@@ -285,7 +287,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								disabled={token.turnState === "acted" || token.remainingMovement === 0}
 							>
 								<span className="button-icon"><Check size={16} /></span>
-								<span className="button-text">Mark as Moved</span>
+								<span className="button-text">{t("token.markMoved")}</span>
 							</button>
 							<button
 								className="action-button mark-acted"
@@ -293,7 +295,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								disabled={token.turnState === "acted" || token.remainingActions === 0}
 							>
 								<span className="button-icon"><Zap size={16} /></span>
-								<span className="button-text">Mark Action Used</span>
+								<span className="button-text">{t("token.markActed")}</span>
 							</button>
 						</div>
 						<div className="button-row">
@@ -303,7 +305,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								disabled={token.turnState === "waiting" || token.turnState === "ended"}
 							>
 								<span className="button-icon"><SkipForward size={16} /></span>
-								<span className="button-text">End Turn for This Token</span>
+								<span className="button-text">{t("token.endTurn")}</span>
 							</button>
 						</div>
 					</div>

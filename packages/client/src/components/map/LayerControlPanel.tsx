@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLayerManager } from "@/hooks/useLayerManager";
 import { LayerGroupId, ViewMode } from "@/features/game/layers/types";
 import { Eye, EyeOff, Layers, ChevronDown, ChevronRight } from "lucide-react";
@@ -15,6 +16,7 @@ interface LayerControlPanelProps {
 export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 	className,
 }) => {
+	const { t } = useTranslation();
 	const layerManager = useLayerManager();
 	const [expandedGroups, setExpandedGroups] = useState<Set<LayerGroupId>>(
 		new Set([LayerGroupId.BACKGROUND])
@@ -32,7 +34,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 		setExpandedGroups(newExpanded);
 	};
 
-	const renderViewModeButton = (mode: ViewMode, label: string) => (
+	const renderViewModeButton = (mode: ViewMode, labelKey: string) => (
 		<button
 			className={`view-mode-button ${
 				layerManager.currentViewMode === mode ? "active" : ""
@@ -40,7 +42,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 			onClick={() => layerManager.switchViewMode(mode)}
 			title={layerManager.getCurrentViewModeConfig()?.description}
 		>
-			{label}
+			{t(labelKey)}
 		</button>
 	);
 
@@ -49,16 +51,16 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 			<div className="layer-panel-header">
 				<h3>
 					<Layers size={16} />
-					图层控制
+					{t("layer.title")}
 				</h3>
 			</div>
 
 			{/* 视图模式快速切换 */}
 			<div className="view-mode-section">
 				<div className="view-mode-buttons">
-					{renderViewModeButton(ViewMode.TACTICAL, "战术")}
-					{renderViewModeButton(ViewMode.NAVIGATION, "航海")}
-					{renderViewModeButton(ViewMode.DECORATIVE, "装饰")}
+					{renderViewModeButton(ViewMode.TACTICAL, "layer.viewModes.tactical")}
+					{renderViewModeButton(ViewMode.NAVIGATION, "layer.viewModes.navigation")}
+					{renderViewModeButton(ViewMode.DECORATIVE, "layer.viewModes.decorative")}
 				</div>
 			</div>
 
@@ -87,7 +89,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 										!group.allVisible
 									);
 								}}
-								title={group.allVisible ? "隐藏全部" : "显示全部"}
+								title={group.allVisible ? t("layer.hideAll") : t("layer.showAll")}
 							>
 								{group.allVisible ? (
 									<Eye size={14} />
@@ -114,7 +116,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 														!layer.visible
 													)
 												}
-												title={layer.visible ? "隐藏" : "显示"}
+												title={layer.visible ? t("layer.hide") : t("layer.show")}
 											>
 												{layer.visible ? (
 													<Eye size={14} />

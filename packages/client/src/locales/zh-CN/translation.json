@@ -44,7 +44,13 @@
     "close": "关闭",
     "back": "返回",
     "next": "下一步",
-    "previous": "上一步"
+    "previous": "上一步",
+    "expand": "展开",
+    "collapse": "折叠",
+    "send": "发送",
+    "typeMessage": "输入消息...",
+    "welcome": "欢迎来到游戏！",
+    "letsBegin": "让我们开始战斗吧！"
   },
   "token": {
     "info": "Token 信息",
@@ -66,7 +72,24 @@
     "rotateRight": "向右旋转 (+15°)",
     "markMoved": "标记为已移动",
     "markActed": "标记行动已使用",
-    "endTurn": "结束此 Token 回合"
+    "endTurn": "结束此 Token 回合",
+    "type": {
+      "ship": "舰船",
+      "station": "空间站",
+      "asteroid": "小行星"
+    },
+    "status": {
+      "active": "激活",
+      "moved": "已移动",
+      "acted": "已行动",
+      "ended": "已结束",
+      "waiting": "等待中"
+    },
+    "faction": "阵营",
+    "class": "类型",
+    "composition": "组成",
+    "id": "ID",
+    "notInitialized": "未初始化回合顺序"
   },
   "ship": {
     "hull": "船体",
@@ -81,5 +104,128 @@
       "chinese": "简体中文",
       "english": "English"
     }
+  },
+  "turn": {
+    "round": "回合",
+    "phase": {
+      "label": "阶段",
+      "planning": "计划",
+      "action": "行动",
+      "end": "结束"
+    },
+    "currentTurn": "当前回合：",
+    "previousUnit": "上一单位",
+    "nextUnit": "下一单位",
+    "unitsCounter": "{{current}} / {{total}}"
+  },
+  "room": {
+    "title": "房间面板",
+    "roomId": "房间 ID",
+    "notJoined": "未加入",
+    "players": "玩家",
+    "connected": "已连接",
+    "disconnected": "已断开"
+  },
+  "player": {
+    "controls": "玩家控制",
+    "endTurn": "结束回合",
+    "actionPoints": "行动点数：{{current}}/{{total}}",
+    "dmMode": {
+      "active": "DM 激活",
+      "enable": "启用 DM",
+      "toggle": "DM 模式切换",
+      "enabled": "🎮 DM 模式已启用",
+      "disabled": "👤 DM 模式已禁用"
+    }
+  },
+  "combat": {
+    "log": "战斗日志",
+    "firedMissiles": "{{player}} 向 {{target}} 发射了导弹",
+    "shieldTookDamage": "{{ship}} 护盾受到 {{damage}} 点伤害",
+    "returnedFire": "{{ship}} 用{{weapon}}还击",
+    "time": "时间"
+  },
+  "chat": {
+    "title": "聊天",
+    "system": "系统",
+    "send": "发送"
+  },
+  "status": {
+    "room": "房间",
+    "players": "玩家",
+    "tool": "工具",
+    "turn": "回合",
+    "waiting": "等待中..."
+  },
+  "layer": {
+    "title": "图层控制",
+    "viewMode": "视图模式",
+    "hideAll": "隐藏全部",
+    "showAll": "显示全部",
+    "hide": "隐藏",
+    "show": "显示",
+    "groups": {
+      "background": "背景",
+      "tokens": "Token",
+      "effects": "效果",
+      "ui": "UI"
+    },
+    "layers": {
+      "backgroundStars": "星空",
+      "backgroundNebula": "星云",
+      "backgroundGrid": "网格",
+      "tokensShips": "舰船",
+      "tokensStations": "空间站",
+      "tokensAsteroids": "小行星",
+      "effectsWeapons": "武器范围",
+      "effectsSelection": "选中",
+      "otherPlayersCameras": "其他玩家"
+    },
+    "viewModes": {
+      "tactical": "战术",
+      "navigation": "航海",
+      "decorative": "装饰"
+    }
+  },
+  "zoom": {
+    "in": "放大",
+    "out": "缩小",
+    "reset": "重置缩放 (100%)",
+    "percentage": "{{percent}}%",
+    "scale": "比例尺",
+    "resolution": "分辨率：",
+    "unitsPerPixel": "{{units}} 单位/像素",
+    "direction": "缩放方向",
+    "normal": "正常",
+    "inverted": "翻转"
+  },
+  "tools": {
+    "select": "选择",
+    "pan": "平移",
+    "edit": "编辑",
+    "measure": "测量",
+    "place": "放置"
+  },
+  "menu": {
+    "title": "菜单",
+    "settings": "设置",
+    "language": "语言",
+    "mute": "静音",
+    "unmute": "取消静音"
+  },
+  "scale": {
+    "ratio": {
+      "1:100": "1:100",
+      "1:250": "1:250",
+      "1:500": "1:500",
+      "1:1000": "1:1000",
+      "1:2500": "1:2500",
+      "1:5000": "1:5000"
+    }
+  },
+  "placeholder": {
+    "enterName": "输入您的名称",
+    "noTokenSelected": "未选择 Token",
+    "clickToSelectHint": "点击舰船、空间站或小行星进行选择"
   }
 }

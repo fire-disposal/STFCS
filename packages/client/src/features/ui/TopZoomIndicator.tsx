@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 
 interface TopZoomIndicatorProps {
@@ -23,6 +24,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 	onZoomOut,
 	onReset,
 }) => {
+	const { t } = useTranslation();
 	// 计算缩放百分比
 	const zoomPercent = ((zoom - minZoom) / (maxZoom - minZoom)) * 100;
 
@@ -80,7 +82,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 					className="zoom-control-button"
 					onClick={onZoomOut}
 					disabled={zoom <= minZoom}
-					title="Zoom Out"
+					title={t("zoom.out")}
 				>
 					<ZoomOut size={16} />
 				</button>
@@ -88,7 +90,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 				<button
 					className="zoom-control-button zoom-control-button--reset"
 					onClick={onReset}
-					title="Reset Zoom (100%)"
+					title={t("zoom.reset")}
 				>
 					<RefreshCw size={14} />
 				</button>
@@ -97,7 +99,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 					className="zoom-control-button"
 					onClick={onZoomIn}
 					disabled={zoom >= maxZoom}
-					title="Zoom In"
+					title={t("zoom.in")}
 				>
 					<ZoomIn size={16} />
 				</button>

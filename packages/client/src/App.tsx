@@ -80,7 +80,7 @@ const PlayerNameView: React.FC<{
 								type="text"
 								value={name}
 								onChange={(e) => setName(e.target.value)}
-								placeholder="Enter your name"
+								placeholder={t("placeholder.enterName")}
 								disabled={isConnecting}
 								className="form-input"
 								maxLength={32}

@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Crown, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
 	useAppDispatch,
 	useAppSelector,
@@ -43,6 +44,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 	className = "",
 }) => {
 	const dispatch = useAppDispatch();
+	const { t } = useTranslation();
 	const turnOrder = useAppSelector(selectTurnOrder);
 	const currentUnit = useAppSelector(selectCurrentUnit);
 	const currentIndex = useAppSelector(selectCurrentIndex);
@@ -212,7 +214,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 	if (!turnOrder || units.length === 0) {
 		return (
 			<div className={`turn-indicator turn-indicator--empty ${className}`}>
-				<span className="turn-indicator__placeholder">未初始化回合顺序</span>
+				<span className="turn-indicator__placeholder">{t("token.notInitialized")}</span>
 			</div>
 		);
 	}
@@ -224,7 +226,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 			{/* 回合信息头部 */}
 			<div className="turn-indicator__header">
 				<div className="turn-indicator__round-info">
-					<span className="turn-indicator__round-label">Round</span>
+					<span className="turn-indicator__round-label">{t("turn.round")}</span>
 					<span className="turn-indicator__round-number">{turnOrder.roundNumber}</span>
 				</div>
 				<div className="turn-indicator__phase">
@@ -233,7 +235,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 					</span>
 				</div>
 				<div className="turn-indicator__counter">
-					<span>{currentIndex + 1} / {units.length}</span>
+					<span>{t("turn.unitsCounter", { current: currentIndex + 1, total: units.length })}</span>
 				</div>
 			</div>
 
@@ -268,7 +270,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 			{currentUnit && (
 				<div className="turn-indicator__current-unit">
 					<div className="turn-indicator__current-unit-info">
-						<span className="turn-indicator__current-label">Current Turn:</span>
+						<span className="turn-indicator__current-label">{t("turn.currentTurn")}</span>
 						<span className="turn-indicator__current-name">{currentUnit.name}</span>
 						<span className="turn-indicator__current-owner">({currentUnit.ownerName})</span>
 					</div>
@@ -276,17 +278,17 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({
 						<button
 							className="turn-indicator__nav-btn"
 							onClick={handlePreviousTurn}
-							title="Previous Unit"
+							title={t("turn.previousUnit")}
 						>
 							<ChevronLeft size={16} />
-							<span>Prev</span>
+							<span>{t("ui.previous")}</span>
 						</button>
 						<button
 							className="turn-indicator__nav-btn turn-indicator__nav-btn--next"
 							onClick={handleNextTurnClick}
-							title="Next Unit"
+							title={t("turn.nextUnit")}
 						>
-							<span>Next</span>
+							<span>{t("ui.next")}</span>
 							<ChevronRight size={16} />
 						</button>
 					</div>
