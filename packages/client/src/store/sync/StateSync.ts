@@ -180,10 +180,11 @@ export class StateSync implements MessageHandler {
 
       case WS_MESSAGE_TYPES.SELECTION_UPDATE: {
         const { selections } = message.payload;
-        const selectionRecords: Record<string, { selectedBy: { id: string; name: string; isDMMode: boolean } | null; timestamp: number }> = {};
+        const selectionRecords: Record<string, { tokenId: string; selectedBy: { id: string; name: string; isDMMode: boolean } | null; timestamp: number }> = {};
         
         selections.forEach(s => {
           selectionRecords[s.tokenId] = {
+            tokenId: s.tokenId,
             selectedBy: s.selectedBy,
             timestamp: s.timestamp,
           };
