@@ -1,12 +1,10 @@
 /**
  * 状态同步模块导出
+ *
+ * 基于领域事件的状态同步 v2
  */
 
-// v1 - 基于 WS 消息的状态同步（保持向后兼容）
-export { StateSync, createStateSync } from './StateSync';
-export type { StateSyncOptions, MessageHandler } from './StateSync';
-
-// v2 - 基于领域事件的状态同步
+// 状态同步器 v2
 export { StateSyncV2, createStateSyncV2 } from './StateSyncV2';
 export type { StateSyncV2Options, DomainEventHandler } from './StateSyncV2';
 

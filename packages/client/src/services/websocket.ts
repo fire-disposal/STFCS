@@ -35,7 +35,8 @@ import {
 	updateTokenDrag,
 	endTokenDrag,
 } from "@/store/slices/selectionSlice";
-import { createStateSync } from "@/store/sync";
+import { createStateSyncV2, createWSEventBusIntegration } from "@/store/sync";
+import { DEFAULT_WS_URL } from "@/config";
 
 // 使用共享的 WSMessagePayloadMap，无需重复定义
 export type { WSMessage, WSMessageType, WSMessagePayloadMap };
@@ -64,13 +65,21 @@ export class WebSocketService {
 	private messageHandlers = new Map<WSMessageType, Set<(...args: unknown[]) => void>>();
 	private pendingRequests = new Map<string, PendingRequest>();
 	private requestTimeout = 10000;
+	
+	// 新架构：状态同步器和事件总线集成
+	private stateSync = createStateSyncV2({ enableLogging: false });
+	private eventBusIntegration = createWSEventBusIntegration(this, {
+		roomId: 'default', // 初始房间，连接后更新
+		enableLogging: false,
+	});
 
 	constructor() {
 		this.setupMessageHandlers();
 	}
 
 	private setupMessageHandlers(): void {
-		// 事件处理器
+		// 使用新架构的事件总线集成处理领域事件
+		// 手动处理器保留用于特定业务逻辑
 		this.on(WS_MESSAGE_TYPES.PLAYER_JOINED, (payload) => {
 			console.log("Player joined:", payload);
 		});
