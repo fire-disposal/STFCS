@@ -57,6 +57,12 @@ export type {
 // 导出结果类型工具函数
 export { ok, fail } from "./types";
 
+// 导出统一消息协议（新）
+export * from "./protocol";
+
+// 导出领域事件总线（新）
+export * from "./events";
+
 // 导出 WebSocket 类型（权威定义）
 export {
 	WS_MESSAGE_TYPES,

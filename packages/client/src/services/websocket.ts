@@ -33,6 +33,7 @@ import {
 	updateTokenDrag,
 	endTokenDrag,
 } from "@/store/slices/selectionSlice";
+import { StateSync, createStateSync } from "@/store/sync";
 
 export type { WSMessage, WSMessageType };
 
