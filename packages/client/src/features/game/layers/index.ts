@@ -49,3 +49,18 @@ export {
 	type WeaponRangeConfig,
 	type WeaponMountData,
 } from "./WeaponRangeRenderer";
+
+// 其他玩家相机渲染器
+export {
+	renderCameraIndicator,
+	renderAllOtherPlayersCameras,
+	updateCameraIndicator,
+	type CameraIndicatorConfig,
+} from "./OtherPlayersCameraRenderer";
+
+// 选中状态图层渲染器
+export {
+	renderSelectionLayer,
+	updateSelectionLayer,
+	type SelectionLayerConfig,
+} from "./SelectionLayerRenderer";

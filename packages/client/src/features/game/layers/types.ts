@@ -12,23 +12,26 @@ export enum LayerId {
 	BACKGROUND_STARS = "background.stars",
 	BACKGROUND_NEBULA = "background.nebula",
 	BACKGROUND_GRID = "background.grid",
-	
+
 	// 游戏对象层
 	OBJECTS_TOKENS = "objects.tokens",
 	OBJECTS_SHIELDS = "objects.shields",
 	OBJECTS_WEAPON_RANGES = "objects.weaponRanges",
-	
+
 	// UI 层
 	UI_STATUS_BARS = "ui.statusBars",
 	UI_LABELS = "ui.labels",
 	UI_SELECTION = "ui.selection",
-	
+
 	// 效果层
 	EFFECTS_EXPLOSIONS = "effects.explosions",
 	EFFECTS_DAMAGE_NUMBERS = "effects.damageNumbers",
-	
+
 	// 其他玩家层
 	OTHER_PLAYERS_CAMERAS = "otherPlayers.cameras",
+
+	// 选中状态层
+	SELECTIONS = "selections",
 }
 
 /**
@@ -236,6 +239,15 @@ export const DEFAULT_LAYER_CONFIGS: LayerConfig[] = [
 		defaultVisible: true,
 		autoManaged: true,
 	},
+
+	// 选中状态层
+	{
+		id: LayerId.SELECTIONS,
+		name: "选中状态",
+		groupId: LayerGroupId.UI,
+		defaultVisible: true,
+		autoManaged: true,
+	},
 ];
 
 // 默认图层组配置
@@ -303,6 +315,7 @@ export const VIEW_MODE_CONFIGS: ViewModeConfig[] = [
 			[LayerId.EFFECTS_EXPLOSIONS]: true,
 			[LayerId.EFFECTS_DAMAGE_NUMBERS]: true,
 			[LayerId.OTHER_PLAYERS_CAMERAS]: true,
+			[LayerId.SELECTIONS]: true,
 		},
 	},
 	{
@@ -322,6 +335,7 @@ export const VIEW_MODE_CONFIGS: ViewModeConfig[] = [
 			[LayerId.EFFECTS_EXPLOSIONS]: false,
 			[LayerId.EFFECTS_DAMAGE_NUMBERS]: false,
 			[LayerId.OTHER_PLAYERS_CAMERAS]: true,
+			[LayerId.SELECTIONS]: true,
 		},
 	},
 	{
@@ -341,6 +355,7 @@ export const VIEW_MODE_CONFIGS: ViewModeConfig[] = [
 			[LayerId.EFFECTS_EXPLOSIONS]: false,
 			[LayerId.EFFECTS_DAMAGE_NUMBERS]: false,
 			[LayerId.OTHER_PLAYERS_CAMERAS]: false,
+			[LayerId.SELECTIONS]: false,
 		},
 	},
 ];

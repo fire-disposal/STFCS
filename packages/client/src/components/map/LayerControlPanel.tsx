@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { useLayerManager } from "@/hooks/useLayerManager";
-import { LayerId, LayerGroupId, ViewMode } from "@/features/game/layers/types";
+import { LayerGroupId, ViewMode } from "@/features/game/layers/types";
 import { Eye, EyeOff, Layers, ChevronDown, ChevronRight } from "lucide-react";
 
 interface LayerControlPanelProps {

@@ -14,6 +14,7 @@ export interface LayerRegistry {
 	overlay: Container;
 	effects: Container;
 	otherPlayersCameras: Container;
+	selections: Container; // 选中状态图层
 }
 
 /**
@@ -31,6 +32,7 @@ export function createLayers(): LayerRegistry {
 		overlay: new Container(),
 		effects: new Container(),
 		otherPlayersCameras: new Container(),
+		selections: new Container(), // 选中状态图层
 	};
 }
 
@@ -47,6 +49,7 @@ export const LAYER_CONFIG = {
 	overlay: { zIndex: 6, name: "Overlay" },
 	effects: { zIndex: 7, name: "Effects" },
 	otherPlayersCameras: { zIndex: 8, name: "Other Players Cameras" },
+	selections: { zIndex: 9, name: "Selections" }, // 选中状态在最上层
 } as const;
 
 /**

@@ -3,7 +3,7 @@
  * 提供可扩展的组件化附加组件架构
  */
 
-import { Container, Graphics, Text, TextStyle } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import type { TokenInfo } from "@vt/shared/types";
 import { ScalableText } from "@/features/game/utils/TextRenderer";
 
@@ -16,7 +16,9 @@ export type AddonType =
 	| "armorQuadrants"
 	| "shieldIndicator"
 	| "weaponArcs"
-	| "selectionGlow";
+	| "selectionGlow"
+	| "selectionLock"
+	| "controlLock"; // 控制权限锁定标识
 
 /**
  * 附加组件配置
@@ -76,7 +78,7 @@ export interface ArmorQuadrantsConfig {
 export function createHeadingIndicator(
 	token: TokenInfo,
 	config: HeadingIndicatorConfig = {},
-	zoom: number
+	_zoom: number // 保留参数用于接口一致性
 ): Container {
 	const container = new Container();
 	const {
@@ -373,9 +375,9 @@ export function createArmorQuadrantsIndicator(
 }
 
 /**
- * 创建选中光晕效果
+ * 创建选中光晕效果（保留用于向后兼容）
  */
-export function createSelectionGlow(token: TokenInfo, zoom: number): Graphics {
+export function createSelectionGlow(token: TokenInfo, _zoom: number): Graphics {
 	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
 	const glow = new Graphics();
 
@@ -395,6 +397,322 @@ export function createSelectionGlow(token: TokenInfo, zoom: number): Graphics {
 	glow.addChild(innerGlow);
 
 	return glow;
+}
+
+/**
+ * 四角锁定样式选中效果配置
+ */
+export interface SelectionLockConfig {
+	/** 锁定框颜色 */
+	color?: number;
+	/** 锁定框线宽 */
+	lineWidth?: number;
+	/** 锁定框透明度 */
+	alpha?: number;
+	/** 角框大小（像素） */
+	cornerSize?: number;
+	/** 角框突出部分长度 */
+	cornerExtension?: number;
+	/** 是否显示连接线 */
+	showConnectLines?: boolean;
+	/** 连接虚线透明度 */
+	connectLineAlpha?: number;
+	/** 自适应边距 */
+	padding?: number;
+}
+
+/**
+ * 创建四角锁定样式的选中效果
+ * 特点：
+ * - 四角角框锁定
+ * - 自适应内容大小
+ * - 可选连接虚线
+ */
+export function createSelectionLock(
+	token: TokenInfo,
+	config: SelectionLockConfig = {},
+	_zoom: number // 保留参数用于接口一致性
+): Graphics {
+	const {
+		color = 0x00ff88,
+		lineWidth = 2,
+		alpha = 0.9,
+		cornerSize = 20,
+		cornerExtension = 8,
+		showConnectLines = true,
+		connectLineAlpha = 0.4,
+		padding = 8,
+	} = config;
+
+	const graphics = new Graphics();
+	
+	// 根据 token 类型计算大小
+	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const halfSize = tokenSize + padding;
+
+	// 计算边界框
+	const left = -halfSize;
+	const right = halfSize;
+	const top = -halfSize;
+	const bottom = halfSize;
+
+	// 绘制四个角框（加粗实线）
+	graphics.setStrokeStyle({ width: lineWidth, color, alpha });
+
+	// 左上角
+	graphics.moveTo(left, top + cornerExtension);
+	graphics.lineTo(left, top);
+	graphics.lineTo(left + cornerExtension, top);
+	
+	// 右上角
+	graphics.moveTo(right - cornerExtension, top);
+	graphics.lineTo(right, top);
+	graphics.lineTo(right, top + cornerExtension);
+	
+	// 左下角
+	graphics.moveTo(left, bottom - cornerExtension);
+	graphics.lineTo(left, bottom);
+	graphics.lineTo(left + cornerExtension, bottom);
+	
+	// 右下角
+	graphics.moveTo(right - cornerExtension, bottom);
+	graphics.lineTo(right, bottom);
+	graphics.lineTo(right, bottom - cornerExtension);
+	
+	graphics.stroke();
+
+	// 绘制连接虚线（可选）
+	if (showConnectLines) {
+		graphics.setStrokeStyle({ 
+			width: 1, 
+			color, 
+			alpha: connectLineAlpha,
+			alignment: 0.5,
+		});
+
+		// 上边虚线
+		graphics.moveTo(left + cornerSize, top);
+		graphics.lineTo(right - cornerSize, top);
+		
+		// 下边虚线
+		graphics.moveTo(left + cornerSize, bottom);
+		graphics.lineTo(right - cornerSize, bottom);
+		
+		// 左边虚线
+		graphics.moveTo(left, top + cornerSize);
+		graphics.lineTo(left, bottom - cornerSize);
+		
+		// 右边虚线
+		graphics.moveTo(right, top + cornerSize);
+		graphics.lineTo(right, bottom - cornerSize);
+		
+		graphics.stroke();
+	}
+
+	// 添加中心点标记（可选，增强视觉中心）
+	const centerDot = new Graphics();
+	centerDot.circle(0, 0, 3);
+	centerDot.fill({ color, alpha: 0.6 });
+	graphics.addChild(centerDot);
+
+	return graphics;
+}
+
+/**
+ * 控制权限锁定标识配置
+ * 用于显示当前拥有 Token 控制权限的玩家
+ */
+export interface ControlLockConfig {
+	/** 锁定框颜色 */
+	color?: number;
+	/** 锁定框线宽 */
+	lineWidth?: number;
+	/** 锁定框透明度 */
+	alpha?: number;
+	/** 角框大小（像素） */
+	cornerSize?: number;
+	/** 角框突出部分长度 */
+	cornerExtension?: number;
+	/** 是否显示连接线 */
+	showConnectLines?: boolean;
+	/** 连接虚线透明度 */
+	connectLineAlpha?: number;
+	/** 自适应边距 */
+	padding?: number;
+	/** 是否显示控制者名称 */
+	showPlayerName?: boolean;
+	/** 是否显示 DM 标识 */
+	showDMBadge?: boolean;
+	/** 名称字体大小 */
+	nameFontSize?: number;
+	/** 名称背景透明度 */
+	nameBackgroundAlpha?: number;
+	/** 控制器信息 */
+	controller?: {
+		playerId: string;
+		playerName: string;
+		isDMMode: boolean;
+	} | null;
+}
+
+/**
+ * 创建控制权限锁定标识
+ * 显示当前拥有 Token 实际操作权限的玩家
+ * 特点：
+ * - 四角角框锁定
+ * - 自适应内容大小
+ * - 显示控制者名称（若非本机玩家）
+ * - DM 模式标识
+ */
+export function createControlLock(
+	token: TokenInfo,
+	config: ControlLockConfig = {},
+	_zoom: number // 保留参数用于接口一致性
+): Container {
+	const {
+		color = 0x00ff88,
+		lineWidth = 2,
+		alpha = 0.95,
+		cornerSize = 24,
+		cornerExtension = 10,
+		showConnectLines = true,
+		connectLineAlpha = 0.4,
+		padding = 10,
+		showPlayerName = true,
+		showDMBadge = true,
+		nameFontSize = 11,
+		nameBackgroundAlpha = 0.7,
+		controller,
+	} = config;
+
+	const container = new Container();
+	
+	// 根据 token 类型计算大小
+	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const halfSize = tokenSize + padding;
+
+	// 计算边界框
+	const left = -halfSize;
+	const right = halfSize;
+	const top = -halfSize;
+	const bottom = halfSize;
+
+	// 创建四角锁定图形
+	const lockGraphics = new Graphics();
+	lockGraphics.setStrokeStyle({ width: lineWidth, color, alpha });
+
+	// 左上角
+	lockGraphics.moveTo(left, top + cornerExtension);
+	lockGraphics.lineTo(left, top);
+	lockGraphics.lineTo(left + cornerExtension, top);
+	
+	// 右上角
+	lockGraphics.moveTo(right - cornerExtension, top);
+	lockGraphics.lineTo(right, top);
+	lockGraphics.lineTo(right, top + cornerExtension);
+	
+	// 左下角
+	lockGraphics.moveTo(left, bottom - cornerExtension);
+	lockGraphics.lineTo(left, bottom);
+	lockGraphics.lineTo(left + cornerExtension, bottom);
+	
+	// 右下角
+	lockGraphics.moveTo(right - cornerExtension, bottom);
+	lockGraphics.lineTo(right, bottom);
+	lockGraphics.lineTo(right, bottom - cornerExtension);
+	
+	lockGraphics.stroke();
+
+	// 绘制连接虚线（可选）
+	if (showConnectLines) {
+		lockGraphics.setStrokeStyle({ 
+			width: 1, 
+			color, 
+			alpha: connectLineAlpha,
+			alignment: 0.5,
+		});
+
+		// 上边虚线
+		lockGraphics.moveTo(left + cornerSize, top);
+		lockGraphics.lineTo(right - cornerSize, top);
+		
+		// 下边虚线
+		lockGraphics.moveTo(left + cornerSize, bottom);
+		lockGraphics.lineTo(right - cornerSize, bottom);
+		
+		// 左边虚线
+		lockGraphics.moveTo(left, top + cornerSize);
+		lockGraphics.lineTo(left, bottom - cornerSize);
+		
+		// 右边虚线
+		lockGraphics.moveTo(right, top + cornerSize);
+		lockGraphics.lineTo(right, bottom - cornerSize);
+		
+		lockGraphics.stroke();
+	}
+
+	container.addChild(lockGraphics);
+
+	// 添加控制者名称标签
+	if (showPlayerName && controller) {
+		const nameLabelContainer = new Container();
+		
+		// 名称文本
+		const nameText = new ScalableText(controller.playerName, {
+			baseFontSize: nameFontSize,
+			keepSize: true,
+			styleOptions: {
+				fill: 0xffffff,
+				stroke: { color: 0x000000, width: 2 },
+				fontWeight: "bold",
+			},
+		});
+		
+		// DM 标识
+		let dmBadge: ScalableText | null = null;
+		if (showDMBadge && controller.isDMMode) {
+			dmBadge = new ScalableText("DM", {
+				baseFontSize: nameFontSize - 2,
+				keepSize: true,
+				styleOptions: {
+					fill: 0xffd700,
+					stroke: { color: 0x000000, width: 2 },
+					fontWeight: "bold",
+				},
+			});
+		}
+		
+		// 计算标签尺寸
+		const nameBounds = nameText.getBounds();
+		const dmWidth = dmBadge ? dmBadge.getBounds().width + 4 : 0;
+		const totalWidth = nameBounds.width + dmWidth;
+		const totalHeight = Math.max(nameBounds.height, dmBadge ? dmBadge.getBounds().height : 0) + 8;
+		
+		// 背景框
+		const bg = new Graphics();
+		bg.roundRect(-totalWidth / 2 - 6, -totalHeight / 2 - 4, totalWidth + 12, totalHeight + 8, 4);
+		bg.fill({ color: 0x000000, alpha: nameBackgroundAlpha });
+		bg.setStrokeStyle({ width: 1, color, alpha: 0.5 });
+		bg.stroke();
+		nameLabelContainer.addChild(bg);
+		
+		// 放置文本
+		nameText.anchor.set(0.5, 0.5);
+		nameText.position.set(-dmWidth / 2, 0);
+		nameLabelContainer.addChild(nameText);
+		
+		if (dmBadge) {
+			dmBadge.anchor.set(0.5, 0.5);
+			dmBadge.position.set(totalWidth / 2 - dmWidth / 2 + 2, 0);
+			nameLabelContainer.addChild(dmBadge);
+		}
+		
+		// 放置在顶部
+		nameLabelContainer.position.set(0, -halfSize - totalHeight / 2 - 8);
+		container.addChild(nameLabelContainer);
+	}
+
+	return container;
 }
 
 /**
@@ -424,6 +742,16 @@ export const AddonRegistry: Record<AddonType, AddonRenderer> = {
 	selectionGlow: {
 		type: "selectionGlow",
 		render: (token, _, zoom) => createSelectionGlow(token, zoom),
+	},
+	selectionLock: {
+		type: "selectionLock",
+		render: (token, config, zoom) => createSelectionLock(token, config, zoom),
+	},
+	controlLock: {
+		type: "controlLock",
+		render: (token, config, zoom) => {
+			return createControlLock(token, config, zoom);
+		},
 	},
 };
 

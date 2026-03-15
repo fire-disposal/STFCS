@@ -10,7 +10,7 @@ import {
 	createHeadingIndicator,
 	createAngleDisplay,
 	createArmorQuadrantsIndicator,
-	createSelectionGlow,
+	createSelectionLock,
 	type AddonConfig,
 } from "@/features/game/components/TokenAddons";
 
@@ -172,10 +172,20 @@ export function renderToken(
 	const label = renderTokenLabel(token, tokenSize, config.zoom);
 	rootContainer.addChild(label);
 
-	// 如果是选中的 Token，添加高亮（在根容器中）
+	// 如果是本地选中的 Token，添加四角锁定高亮（在根容器中）
+	// 注意：控制权限锁定在 SelectionLayer 中绘制，这里只绘制本地选中高亮
 	if (token.id === config.selectedTokenId) {
-		const highlight = createSelectionGlow(token, config.zoom);
-		rootContainer.addChild(highlight);
+		const lockHighlight = createSelectionLock(token, {
+			color: 0x00ff88, // 绿色表示本地选中
+			lineWidth: 2,
+			alpha: 0.95,
+			cornerSize: 24,
+			cornerExtension: 10,
+			showConnectLines: true,
+			connectLineAlpha: 0.4,
+			padding: 10,
+		}, config.zoom);
+		rootContainer.addChild(lockHighlight);
 	}
 
 	// 添加交互（在根容器上）
@@ -465,7 +475,10 @@ function renderTokenLabel(
 }
 
 /**
- * 设置 Token 交互
+ * 设置 Token 交互（优化版）
+ * - 精确的拖拽计算
+ * - 视觉反馈（拖拽预览、高亮）
+ * - 与全局交互系统协同
  */
 function setupTokenInteraction(
 	container: Container,
@@ -478,8 +491,64 @@ function setupTokenInteraction(
 	let isDragging = false;
 	let dragStartPos = { x: 0, y: 0 };
 	let tokenStartPos = { x: token.position.x, y: token.position.y };
+	let dragPreview: Graphics | null = null;
+
+	// 创建拖拽预览（半透明虚影）
+	const createDragPreview = () => {
+		if (dragPreview) return;
+		
+		dragPreview = new Graphics();
+		dragPreview.alpha = 0.5;
+		dragPreview.zIndex = 100; // 确保在最上层
+		
+		// 根据 token 类型绘制预览形状
+		const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+		
+		if (token.type === "ship") {
+			dragPreview.circle(0, 0, tokenSize);
+			dragPreview.fill({ color: 0xffffff, alpha: 0.3 });
+			dragPreview.setStrokeStyle({ width: 2, color: 0xffff00, alpha: 0.8 });
+			dragPreview.stroke();
+		} else if (token.type === "station") {
+			dragPreview.circle(0, 0, tokenSize);
+			dragPreview.fill({ color: 0xffffff, alpha: 0.3 });
+			dragPreview.setStrokeStyle({ width: 2, color: 0xffaa00, alpha: 0.8 });
+			dragPreview.stroke();
+		} else {
+			dragPreview.circle(0, 0, tokenSize);
+			dragPreview.fill({ color: 0xffffff, alpha: 0.3 });
+			dragPreview.setStrokeStyle({ width: 2, color: 0x888888, alpha: 0.8 });
+			dragPreview.stroke();
+		}
+		
+		container.parent?.addChild(dragPreview);
+	};
+
+	// 更新拖拽预览位置
+	const updateDragPreview = (screenX: number, screenY: number) => {
+		if (!dragPreview) return;
+		dragPreview.position.set(screenX, screenY);
+	};
+
+	// 移除拖拽预览
+	const removeDragPreview = () => {
+		if (dragPreview && container.parent) {
+			container.parent.removeChild(dragPreview);
+			dragPreview = null;
+		}
+	};
 
 	container.on("pointerdown", (event: FederatedPointerEvent) => {
+		// 如果按下空格或 Ctrl，不处理 Token 交互（让画布处理）
+		if ((event.nativeEvent as any).shiftKey === false) {
+			// 检查是否有空格/Ctrl 按下的标志（由外部设置）
+			const isPanMode = (globalThis as any).__interactionPanMode === true;
+			if (isPanMode) {
+				event.stopPropagation();
+				return;
+			}
+		}
+
 		event.stopPropagation();
 
 		if (config.onTokenClick) {
@@ -487,17 +556,20 @@ function setupTokenInteraction(
 		}
 
 		isDragging = true;
+		// 使用屏幕坐标（像素）而不是世界坐标
 		dragStartPos = { x: event.global.x, y: event.global.y };
 		tokenStartPos = { x: token.position.x, y: token.position.y };
 
 		// 触发拖拽开始回调
 		if (config.onTokenDragStart) {
 			config.onTokenDragStart(token);
+			createDragPreview();
 		}
 	});
 
 	container.on("pointermove", (event: FederatedPointerEvent) => {
 		if (isDragging && config.onTokenDrag) {
+			// 关键修复：使用当前 zoom 计算位移，确保拖动速度与视觉一致
 			const dx = (event.global.x - dragStartPos.x) / config.zoom;
 			const dy = (event.global.y - dragStartPos.y) / config.zoom;
 			const newPosition = {
@@ -505,6 +577,11 @@ function setupTokenInteraction(
 				y: tokenStartPos.y + dy,
 			};
 			config.onTokenDrag(token, newPosition);
+			
+			// 更新预览位置
+			if (dragPreview) {
+				updateDragPreview(event.global.x, event.global.y);
+			}
 		}
 	});
 
@@ -516,6 +593,8 @@ function setupTokenInteraction(
 			const dy = finalPosition.y - tokenStartPos.y;
 			const distance = Math.sqrt(dx * dx + dy * dy);
 			const cancelled = distance < 5; // 小于 5 像素视为取消
+			
+			removeDragPreview();
 			config.onTokenDragEnd(token, finalPosition, cancelled);
 		}
 		isDragging = false;
@@ -523,9 +602,19 @@ function setupTokenInteraction(
 
 	container.on("pointerupoutside", () => {
 		if (isDragging && config.onTokenDragEnd) {
+			removeDragPreview();
 			config.onTokenDragEnd(token, tokenStartPos, true);
 		}
 		isDragging = false;
+	});
+
+	// 悬停效果
+	container.on("pointerenter", () => {
+		// 可以添加悬停高亮
+	});
+
+	container.on("pointerleave", () => {
+		// 移除悬停高亮
 	});
 }
 

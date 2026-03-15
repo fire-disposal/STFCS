@@ -3,6 +3,7 @@ import type { TypedUseSelectorHook } from "react-redux";
 import { useDispatch, useSelector } from "react-redux";
 import cameraReducer from "./slices/cameraSlice";
 import combatReducer from "./slices/combatSlice";
+import interactionReducer from "./slices/interactionSlice";
 import layerReducer from "./slices/layerSlice";
 import mapReducer from "./slices/mapSlice";
 import playerReducer from "./slices/playerSlice";
@@ -22,6 +23,7 @@ export const store = configureStore({
 		turn: turnReducer,
 		ui: uiReducer,
 		selection: selectionReducer,
+		interaction: interactionReducer,
 	},
 	middleware: (getDefaultMiddleware) =>
 		getDefaultMiddleware({

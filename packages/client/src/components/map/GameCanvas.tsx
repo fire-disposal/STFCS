@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from "@/store";
 import { updateToken } from "@/store/slices/mapSlice";
-import { selectToken } from "@/store/slices/selectionSlice";
+import { selectToken as selectTokenAction } from "@/store/slices/selectionSlice";
 import { updateCamera } from "@/store/slices/cameraSlice";
 import type { CameraState } from "@vt/shared/types";
 import { LayerId } from "@/features/game/layers/types";
@@ -21,10 +21,13 @@ import {
 	renderAllTokens,
 	updateWeaponRanges,
 	clearWeaponRanges,
+	renderAllOtherPlayersCameras,
+	renderSelectionLayer,
 	type LayerRegistry,
 	type TokenRendererConfig,
 } from "@/features/game/layers";
 import { updateParallax } from "@/features/game/layers/BackgroundRenderer";
+import { useInteraction } from "@/hooks/useInteraction";
 
 interface GameCanvasProps {
 	width?: number;
@@ -36,12 +39,14 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const {
 		config: mapConfig,
 		tokens,
+		otherPlayersCameras,
 	} = useAppSelector((state) => state.map);
-	const { selectedTokenId } = useAppSelector((state) => state.selection);
+	const { selectedTokenId, selections } = useAppSelector((state) => state.selection);
 	const camera = useAppSelector((state) => state.camera.local);
 	const layerVisibility = useAppSelector((state) => state.layers.visibility);
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
 	const currentPlayerName = useAppSelector((state) => state.ui.connection.playerName);
+	const { cursor, keyboard } = useAppSelector((state) => state.interaction);
 
 	// 相机 ref - 直接镜像 Redux 状态，用于高性能更新
 	const cameraRef = useRef<CameraState>({ ...camera });
@@ -63,19 +68,13 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		duration: number;
 	} | null>(null);
 
-	// 交互状态 ref（避免闭包问题）
-	const interactionRef = useRef({
-		isDragging: false,
-		dragStart: { x: 0, y: 0 },
-		lastCameraPos: { x: 0, y: 0 },
-	});
-
-	// Token 拖拽状态
+	// Token 拖拽状态（本地管理，避免 Redux 频繁更新）
 	const draggingTokenRef = useRef<{
 		tokenId: string;
 		originalPosition: { x: number; y: number };
 		isDragging: boolean;
 		lastDragTime?: number;
+		startScreenPos?: { x: number; y: number };
 	} | null>(null);
 
 	const canvasRef = useRef<HTMLDivElement>(null);
@@ -85,6 +84,95 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const mapConfigRef = useRef(mapConfig);
 	const tokensRef = useRef(tokens);
 	const selectedTokenIdRef = useRef(selectedTokenId);
+
+	// 使用交互 Hook
+	const interaction = useInteraction(camera, {
+		onCanvasPan: () => {
+			// 画布拖动时更新背景视差
+			if (layersRef.current) {
+				updateParallax(layersRef.current.background, cameraRef.current, {
+					width: mapConfigRef.current.width,
+					height: mapConfigRef.current.height,
+					backgroundColor: mapConfigRef.current.backgroundColor,
+				});
+			}
+		},
+		onTokenDragStart: (tokenId) => {
+			const token = tokensRef.current[tokenId];
+			if (!token) return;
+
+			draggingTokenRef.current = {
+				tokenId,
+				originalPosition: { ...token.position },
+				isDragging: true,
+			};
+
+			// 发送拖拽开始消息
+			if (currentPlayerId && currentPlayerName) {
+				websocketService.sendTokenDragStart(
+					tokenId,
+					currentPlayerId,
+					currentPlayerName,
+					token.position,
+					token.heading || 0
+				);
+			}
+		},
+		onTokenDrag: (tokenId, newPosition) => {
+			const token = tokensRef.current[tokenId];
+			if (!token) return;
+
+			// 更新本地 token 位置（视觉反馈）
+			dispatch(updateToken({
+				id: tokenId,
+				updates: { position: newPosition },
+			}));
+
+			// 发送拖拽中消息（限流：每 100ms 一次）
+			if (currentPlayerId && currentPlayerName && draggingTokenRef.current?.isDragging) {
+				const now = Date.now();
+				if (!draggingTokenRef.current.lastDragTime || now - draggingTokenRef.current.lastDragTime > 100) {
+					draggingTokenRef.current.lastDragTime = now;
+					websocketService.sendTokenDragging(
+						tokenId,
+						currentPlayerId,
+						currentPlayerName,
+						newPosition,
+						token.heading || 0
+					);
+				}
+			}
+		},
+		onTokenDragEnd: (tokenId, finalPosition, cancelled) => {
+			if (!draggingTokenRef.current) return;
+
+			const token = tokensRef.current[tokenId];
+			if (!token) return;
+
+			const committed = !cancelled && draggingTokenRef.current.isDragging;
+
+			// 发送拖拽结束消息
+			if (currentPlayerId) {
+				websocketService.sendTokenDragEnd(
+					tokenId,
+					currentPlayerId,
+					finalPosition,
+					token.heading || 0,
+					committed
+				);
+			}
+
+			// 如果取消拖拽，恢复原始位置
+			if (cancelled) {
+				dispatch(updateToken({
+					id: tokenId,
+					updates: { position: draggingTokenRef.current.originalPosition },
+				}));
+			}
+
+			draggingTokenRef.current = null;
+		},
+	});
 
 	// 更新 refs
 	useEffect(() => {
@@ -159,78 +247,54 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 			zoom: cam.zoom,
 			onTokenClick: (token: any, event: FederatedPointerEvent) => {
 				event.stopPropagation();
-				dispatch(selectToken(token.id));
+				dispatch(selectTokenAction(token.id));
 			},
-			onTokenDragStart: (token: any) => {
-				// 开始拖拽时，记录原始位置并通知其他玩家
-				draggingTokenRef.current = {
-					tokenId: token.id,
-					originalPosition: { ...token.position },
-					isDragging: true,
-				};
-
-				// 发送拖拽开始消息
-				if (currentPlayerId && currentPlayerName) {
-					websocketService.sendTokenDragStart(
-						token.id,
-						currentPlayerId,
-						currentPlayerName,
-						token.position,
-						token.heading || 0
-					);
-				}
+			onTokenDragStart: () => {
+				// 由 useInteraction hook 处理
 			},
-			onTokenDrag: (token: any, newPosition: { x: number; y: number }) => {
-				// 更新本地 token 位置（视觉反馈）
-				dispatch(updateToken({
-					id: token.id,
-					updates: { position: newPosition },
-				}));
-
-				// 发送拖拽中消息（限流：每 100ms 一次）
-				if (currentPlayerId && currentPlayerName && draggingTokenRef.current?.isDragging) {
-					const now = Date.now();
-					if (!draggingTokenRef.current.lastDragTime || now - draggingTokenRef.current.lastDragTime > 100) {
-						draggingTokenRef.current.lastDragTime = now;
-						websocketService.sendTokenDragging(
-							token.id,
-							currentPlayerId,
-							currentPlayerName,
-							newPosition,
-							token.heading || 0
-						);
-					}
-				}
+			onTokenDrag: () => {
+				// 由 useInteraction hook 处理
 			},
-			onTokenDragEnd: (token: any, finalPosition: { x: number; y: number }, cancelled: boolean) => {
-				if (!draggingTokenRef.current) return;
-
-				const committed = !cancelled && draggingTokenRef.current.isDragging;
-
-				// 发送拖拽结束消息
-				if (currentPlayerId && currentPlayerName) {
-					websocketService.sendTokenDragEnd(
-						token.id,
-						currentPlayerId,
-						finalPosition,
-						token.heading || 0,
-						committed
-					);
-				}
-
-				// 如果取消拖拽，恢复原始位置
-				if (cancelled) {
-					dispatch(updateToken({
-						id: token.id,
-						updates: { position: draggingTokenRef.current.originalPosition },
-					}));
-				}
-
-				draggingTokenRef.current = null;
+			onTokenDragEnd: () => {
+				// 由 useInteraction hook 处理
 			},
 		};
 
 		renderAllTokens(layers.tokens, tokensRef.current, tokenConfig);
+
+		// 渲染其他玩家相机指示器
+		const showOtherPlayers = layerVisibility[LayerId.OTHER_PLAYERS_CAMERAS] ?? true;
+		if (showOtherPlayers && Object.keys(otherPlayersCameras).length > 0) {
+			const canvasEl = appRef.current?.canvas;
+			if (canvasEl) {
+				renderAllOtherPlayersCameras(
+					layers.otherPlayersCameras,
+					otherPlayersCameras,
+					{ width: canvasEl.clientWidth, height: canvasEl.clientHeight },
+					currentPlayerId
+				);
+				layers.otherPlayersCameras.visible = true;
+			}
+		} else {
+			layers.otherPlayersCameras.visible = false;
+			layers.otherPlayersCameras.removeChildren();
+		}
+
+		// 渲染选中状态图层
+		const showSelections = layerVisibility[LayerId.SELECTIONS] ?? true;
+		if (showSelections) {
+			renderSelectionLayer(layers.selections, {
+				currentPlayerId,
+				selections,
+				selectedTokenId: selectedTokenIdRef.current,
+				tokens: tokensRef.current,
+				zoom: cam.zoom,
+			});
+			layers.selections.visible = true;
+		} else {
+			layers.selections.visible = false;
+			layers.selections.removeChildren();
+		}
 
 		if (selectedTokenIdRef.current && tokensRef.current[selectedTokenIdRef.current]) {
 			const token = tokensRef.current[selectedTokenIdRef.current];
@@ -258,7 +322,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
 				payload: {
 					playerId: currentPlayerId,
-					playerName: "Player",
+					playerName: currentPlayerName,
 					centerX: cam.centerX,
 					centerY: cam.centerY,
 					zoom: cam.zoom,
@@ -294,7 +358,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				resolution: window.devicePixelRatio || 1,
 				autoDensity: true,
 				antialias: true,
-				resizeTo: container, // 自动调整尺寸
+				resizeTo: container,
 			});
 
 			appRef.current = app;
@@ -310,8 +374,6 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 
 			// 监听 resize 事件
 			const resizeObserver = new ResizeObserver(() => {
-				// PixiJS 会自动调整 canvas 尺寸（因为设置了 resizeTo）
-				// 但需要手动更新舞台变换
 				updateStageTransform();
 			});
 			resizeObserver.observe(container);
@@ -368,6 +430,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 			// 交互事件
 			const canvas = app.canvas;
 
+			// 滚轮缩放
 			const handleWheel = (e: WheelEvent) => {
 				e.preventDefault();
 				const cam = cameraRef.current;
@@ -402,54 +465,82 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				};
 			};
 
+			// 鼠标按下 - 开始拖动画布或 Token
 			const handleMouseDown = (e: MouseEvent) => {
-				if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+				// 中键或空格 + 左键：拖动画布
+				if (e.button === 1 || (e.button === 0 && keyboard.isSpacePressed)) {
 					e.preventDefault();
 					const cam = cameraRef.current;
-					interactionRef.current.isDragging = true;
-					interactionRef.current.dragStart = { x: e.clientX, y: e.clientY };
-					interactionRef.current.lastCameraPos = { x: cam.centerX, y: cam.centerY };
-				}
-			};
-
-			const handleMouseMove = (e: MouseEvent) => {
-				if (interactionRef.current.isDragging) {
-					const cam = cameraRef.current;
-					const dx = e.clientX - interactionRef.current.dragStart.x;
-					const dy = e.clientY - interactionRef.current.dragStart.y;
-					const zoom = cameraRef.current.zoom;
-					cam.centerX = interactionRef.current.lastCameraPos.x - dx / zoom;
-					cam.centerY = interactionRef.current.lastCameraPos.y - dy / zoom;
-					updateStageTransform();
-					updateParallax(layers.background, cam, {
-						width: mapConfigRef.current.width,
-						height: mapConfigRef.current.height,
-						backgroundColor: mapConfigRef.current.backgroundColor,
+					interaction.startCanvasPan({
+						startScreen: { x: e.clientX, y: e.clientY },
+						startWorld: {
+							x: (e.clientX - canvas.getBoundingClientRect().left) / cam.zoom + cam.centerX,
+							y: (e.clientY - canvas.getBoundingClientRect().top) / cam.zoom + cam.centerY,
+						},
+						startCamera: {
+							centerX: cam.centerX,
+							centerY: cam.centerY,
+							zoom: cam.zoom,
+						},
 					});
 				}
 			};
 
-			const handleMouseUp = () => {
-				if (interactionRef.current.isDragging) {
-					interactionRef.current.isDragging = false;
-					syncCamera();
+			// 鼠标移动 - 处理拖动
+			const handleMouseMove = (e: MouseEvent) => {
+				if (interaction.drag) {
+					interaction.updateDragPosition(e.clientX, e.clientY);
 				}
 			};
 
+			// 鼠标释放 - 结束拖动
+			const handleMouseUp = () => {
+				if (interaction.drag) {
+					interaction.endCurrentDrag();
+				}
+			};
+
+			// 绑定全局事件
 			canvas.addEventListener("wheel", handleWheel, { passive: false });
 			canvas.addEventListener("mousedown", handleMouseDown);
 			window.addEventListener("mousemove", handleMouseMove);
 			window.addEventListener("mouseup", handleMouseUp);
 
+			// 应用光标样式
+			const canvasContainer = canvasRef.current;
+			if (canvasContainer) {
+				canvasContainer.style.cursor = cursor === "grab" ? "grab" :
+					cursor === "grabbing" ? "grabbing" :
+					cursor === "pointer" ? "pointer" :
+					cursor === "move" ? "move" :
+					cursor === "crosshair" ? "crosshair" : "default";
+			}
+
 			return () => {
 				resizeObserver.disconnect();
 				app.destroy(true);
 				appRef.current = null;
+				canvas.removeEventListener("wheel", handleWheel);
+				canvas.removeEventListener("mousedown", handleMouseDown);
+				window.removeEventListener("mousemove", handleMouseMove);
+				window.removeEventListener("mouseup", handleMouseUp);
 			};
 		};
 
 		initPixi();
-	}, []);
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+	// 光标变化时更新
+	useEffect(() => {
+		const canvasContainer = canvasRef.current;
+		if (canvasContainer) {
+			canvasContainer.style.cursor = cursor === "grab" ? "grab" :
+				cursor === "grabbing" ? "grabbing" :
+				cursor === "pointer" ? "pointer" :
+				cursor === "move" ? "move" :
+				cursor === "crosshair" ? "crosshair" : "default";
+		}
+	}, [cursor]);
 
 	// 背景重绘
 	useEffect(() => {
@@ -464,9 +555,25 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	// 图层可见性变化时更新
 	useEffect(() => {
 		renderAllLayers(false);
-	}, [layerVisibility[LayerId.BACKGROUND_STARS], layerVisibility[LayerId.BACKGROUND_NEBULA], layerVisibility[LayerId.BACKGROUND_GRID]]);
+	}, [
+		layerVisibility[LayerId.BACKGROUND_STARS],
+		layerVisibility[LayerId.BACKGROUND_NEBULA],
+		layerVisibility[LayerId.BACKGROUND_GRID],
+		layerVisibility[LayerId.OTHER_PLAYERS_CAMERAS],
+		layerVisibility[LayerId.SELECTIONS]
+	]);
 
-	// 缩放按钮处理 - 通过自定义事件触发
+	// 其他玩家相机更新时重绘
+	useEffect(() => {
+		renderAllLayers(false);
+	}, [otherPlayersCameras]);
+
+	// 选中状态更新时重绘
+	useEffect(() => {
+		renderAllLayers(false);
+	}, [selections]);
+
+	// 缩放按钮处理
 	useEffect(() => {
 		const handleZoomEvent = (e: Event) => {
 			const detail = (e as CustomEvent).detail as { action: "in" | "out" | "reset" };

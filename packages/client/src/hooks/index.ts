@@ -17,3 +17,6 @@ export type { UsePixiAppOptions, UsePixiAppReturn } from "./usePixiApp";
 
 export { useCanvasInteraction } from "./useCanvasInteraction";
 export type { UseCanvasInteractionOptions } from "./useCanvasInteraction";
+
+export { useInteraction } from "./useInteraction";
+export type { UseInteractionReturn } from "./useInteraction";
