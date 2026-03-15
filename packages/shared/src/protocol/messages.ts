@@ -22,6 +22,16 @@ import {
   UnitTurnStateSchema,
 } from '../core-types';
 
+// 注意：这些 schema 已导入但未全部使用，用于未来扩展和类型推导
+void CameraStateSchema;
+void ShipMovementSchema;
+void ShipStatusSchema;
+void ExplosionDataSchema;
+void CombatResultSchema;
+void MapConfigSchema;
+void TokenTypeSchema;
+void UnitTurnStateSchema;
+
 // ==================== 消息定义工具 ====================
 
 /** 消息配置 */
@@ -604,8 +614,7 @@ export function validateMessage<T extends WSMessageType>(
   try {
     const validated = schema.parse(payload);
     return { success: true, message: { type, payload: validated } as WSMessageOf<T> };
-  } catch (err) {
-    const error = err as any;
+  } catch {
     return { success: false, error: 'Validation failed' };
   }
 }

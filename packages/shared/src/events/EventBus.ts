@@ -421,16 +421,4 @@ export function createDomainEvent<T extends DomainEventType>(
 
 // ==================== 导出 ====================
 
-export type {
-  ShipMovedEvent,
-  ShieldToggledEvent,
-  FluxStateUpdatedEvent,
-  PlayerJoinedEvent,
-  PlayerLeftEvent,
-  PlayerDMModeChangedEvent,
-  ObjectSelectedEvent,
-  ObjectDeselectedEvent,
-  TokenMovedEvent,
-  WeaponFiredEvent,
-  DamageDealtEvent,
-};
+// 类型已在文件顶部定义并导出，这里不需要重复导出
