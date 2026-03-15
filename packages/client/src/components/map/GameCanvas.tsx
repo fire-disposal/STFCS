@@ -104,6 +104,17 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		drag: DragState | null;
 	} | null>(null);
 
+	// 本地画布拖动状态（本地优先，不经过 Redux）
+	const canvasDragRef = useRef<{
+		isDragging: boolean;
+		startScreen: { x: number; y: number };
+		startCamera: { centerX: number; centerY: number; zoom: number };
+	} | null>(null);
+
+	// 相机同步节流定时器
+	const syncThrottleRef = useRef<NodeJS.Timeout | null>(null);
+	const lastSyncTimeRef = useRef<number>(0);
+
 	// 使用交互 Hook
 	const interaction = useInteraction(camera, { width: mapConfig.width, height: mapConfig.height }, {
 		onCanvasPan: () => {
@@ -344,26 +355,53 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		}
 	};
 
-	// 发送相机更新到 Redux 和 WebSocket
-	const syncCamera = () => {
-		const cam = cameraRef.current;
-		dispatch(updateCamera({ centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom }));
+	// 发送相机更新到 Redux 和 WebSocket（节流，不阻塞本地操作）
+	const syncCamera = (immediate = false) => {
+		const now = Date.now();
+		const timeSinceLastSync = now - lastSyncTimeRef.current;
+		const minSyncInterval = 100; // 最小同步间隔 100ms
 
-		if (websocketService.isConnected() && currentPlayerId) {
-			websocketService.send({
-				type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
-				payload: {
-					playerId: currentPlayerId,
-					playerName: currentPlayerName,
-					centerX: cam.centerX,
-					centerY: cam.centerY,
-					zoom: cam.zoom,
-					rotation: cam.rotation,
-					minZoom: cam.minZoom,
-					maxZoom: cam.maxZoom,
-					timestamp: Date.now(),
-				},
+		// 清除待定的同步定时器
+		if (syncThrottleRef.current) {
+			clearTimeout(syncThrottleRef.current);
+			syncThrottleRef.current = null;
+		}
+
+		const doSync = () => {
+			const cam = cameraRef.current;
+			lastSyncTimeRef.current = Date.now();
+
+			// 异步更新 Redux，不阻塞本地渲染
+			requestAnimationFrame(() => {
+				dispatch(updateCamera({ centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom }));
 			});
+
+			// 异步发送到服务器
+			if (websocketService.isConnected() && currentPlayerId) {
+				requestAnimationFrame(() => {
+					websocketService.send({
+						type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
+						payload: {
+							playerId: currentPlayerId,
+							playerName: currentPlayerName,
+							centerX: cam.centerX,
+							centerY: cam.centerY,
+							zoom: cam.zoom,
+							rotation: cam.rotation,
+							minZoom: cam.minZoom,
+							maxZoom: cam.maxZoom,
+							timestamp: Date.now(),
+						},
+					});
+				});
+			}
+		};
+
+		if (immediate || timeSinceLastSync >= minSyncInterval) {
+			doSync();
+		} else {
+			// 延迟同步，避免频繁更新
+			syncThrottleRef.current = setTimeout(doSync, minSyncInterval - timeSinceLastSync);
 		}
 	};
 
@@ -526,14 +564,26 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				};
 			};
 
-			// 鼠标按下 - 仅中键拖拽画布
+			// 鼠标按下 - 仅中键拖拽画布（本地优先，直接更新）
 			const handleMouseDown = (e: MouseEvent) => {
 				// 仅中键拖拽画布
 				if (e.button === 1) {
 					e.preventDefault();
 					const cam = cameraRef.current;
-					const rect = canvas.getBoundingClientRect();
 
+					// 本地记录拖动起始状态，不经过 Redux
+					canvasDragRef.current = {
+						isDragging: true,
+						startScreen: { x: e.clientX, y: e.clientY },
+						startCamera: {
+							centerX: cam.centerX,
+							centerY: cam.centerY,
+							zoom: cam.zoom,
+						},
+					};
+
+					// 同时更新到 useInteraction 以保持兼容性
+					const rect = canvas.getBoundingClientRect();
 					interactionRef.current?.startCanvasPan({
 						startScreen: { x: e.clientX, y: e.clientY },
 						startWorld: {
@@ -549,8 +599,39 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				}
 			};
 
-			// 鼠标移动 - 处理拖动
+			// 鼠标移动 - 处理拖动（本地优先，实时更新）
 			const handleMouseMove = (e: MouseEvent) => {
+				// 本地画布拖动处理（中键）
+				if (canvasDragRef.current?.isDragging) {
+					const drag = canvasDragRef.current;
+					const dx = (e.clientX - drag.startScreen.x) / drag.startCamera.zoom;
+					const dy = (e.clientY - drag.startScreen.y) / drag.startCamera.zoom;
+
+					// 直接更新 cameraRef，不经过 Redux，零延迟
+					cameraRef.current = {
+						...cameraRef.current,
+						centerX: drag.startCamera.centerX - dx,
+						centerY: drag.startCamera.centerY - dy,
+					};
+
+					// 立即更新渲染
+					updateStageTransform();
+
+					// 更新背景视差
+					if (layersRef.current) {
+						updateParallax(layersRef.current.background, cameraRef.current, {
+							width: mapConfigRef.current.width,
+							height: mapConfigRef.current.height,
+							backgroundColor: mapConfigRef.current.backgroundColor,
+						});
+					}
+
+					// 节流同步到 Redux 和服务器（不阻塞本地渲染）
+					syncCamera();
+					return;
+				}
+
+				// Token 拖动处理（保持原有逻辑）
 				if (interactionRef.current?.drag) {
 					interactionRef.current.updateDragPosition(e.clientX, e.clientY);
 				}
@@ -558,6 +639,14 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 
 			// 鼠标释放 - 结束拖动
 			const handleMouseUp = () => {
+				// 结束本地画布拖动
+				if (canvasDragRef.current?.isDragging) {
+					canvasDragRef.current = null;
+					// 立即同步最终状态
+					syncCamera(true);
+				}
+
+				// 结束 Token 拖动
 				if (interactionRef.current?.drag) {
 					interactionRef.current.endCurrentDrag();
 				}
@@ -695,6 +784,12 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		return () => {
 			window.removeEventListener("game-zoom", handleZoomEvent as EventListener);
 			window.removeEventListener("game-zoom-direction", handleZoomDirectionEvent as EventListener);
+
+			// 清理相机同步定时器
+			if (syncThrottleRef.current) {
+				clearTimeout(syncThrottleRef.current);
+				syncThrottleRef.current = null;
+			}
 		};
 	}, []);
 
