@@ -1,25 +1,24 @@
 /**
- * 统一类型来源 (Single Source of Truth)
- * 
+ * 统一 Zod Schema 和类型定义 (Single Source of Truth)
+ *
  * 原则：
  * 1. 所有类型从 Zod schema 推导
- * 2. 避免手写重复类型
+ * 2. 避免重复定义
  * 3. 保持类型名称一致性
  */
 
 import { z } from 'zod';
 
-// ==================== 基础类型 Schema ====================
+// ==================== 协议版本 ====================
+export const PROTOCOL_VERSION = '1.0.0' as const;
 
-/** 点坐标 */
+// ==================== 基础类型 Schema ====================
 export const PointSchema = z.object({
   x: z.number(),
   y: z.number(),
 });
 
-// ==================== 核心实体 Schema ====================
-
-/** 玩家信息 */
+// ==================== 玩家相关 Schema ====================
 export const PlayerInfoSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(32),
@@ -28,7 +27,14 @@ export const PlayerInfoSchema = z.object({
   isDMMode: z.boolean(),
 });
 
-/** 舰船装甲象限 */
+export const PlayerGameStateSchema = z.object({
+  currentShipId: z.string().nullable(),
+  hasActivatedFluxVenting: z.boolean(),
+  readyForNextPhase: z.boolean(),
+  selectedWeapons: z.array(z.string()),
+});
+
+// ==================== 舰船相关 Schema ====================
 export const ArmorQuadrantSchema = z.enum([
   'FRONT_TOP',
   'FRONT_BOTTOM',
@@ -38,17 +44,14 @@ export const ArmorQuadrantSchema = z.enum([
   'RIGHT_BOTTOM',
 ]);
 
-/** 舰船装甲状态 */
 export const ArmorStateSchema = z.object({
   quadrants: z.record(ArmorQuadrantSchema, z.number().min(0)),
   maxArmor: z.number().min(0),
   maxQuadArmor: z.number().min(0),
 });
 
-/** 辐能类型 */
 export const FluxTypeSchema = z.enum(['soft', 'hard']);
 
-/** 辐能状态 */
 export const FluxStateSchema = z.object({
   current: z.number().min(0),
   capacity: z.number().min(0),
@@ -57,10 +60,8 @@ export const FluxStateSchema = z.object({
   hardFlux: z.number().min(0),
 });
 
-/** 辐能过载状态 */
 export const FluxOverloadStateSchema = z.enum(['normal', 'venting', 'overloaded']);
 
-/** 护盾规格 */
 export const ShieldSpecSchema = z.object({
   type: z.enum(['front', 'full']),
   radius: z.number().min(0),
@@ -71,7 +72,6 @@ export const ShieldSpecSchema = z.object({
   active: z.boolean(),
 });
 
-/** 舰船状态 */
 export const ShipStatusSchema = z.object({
   id: z.string(),
   hull: z.object({
@@ -90,17 +90,14 @@ export const ShipStatusSchema = z.object({
   owner: z.string().optional(),
 });
 
-/** 舰船移动阶段 */
 export const ShipMovementPhaseSchema = z.union([
   z.literal(1),
   z.literal(2),
   z.literal(3),
 ]);
 
-/** 舰船移动类型 */
 export const ShipMovementTypeSchema = z.enum(['straight', 'strafe', 'rotate']);
 
-/** 舰船移动 */
 export const ShipMovementSchema = z.object({
   shipId: z.string(),
   phase: ShipMovementPhaseSchema,
@@ -113,21 +110,10 @@ export const ShipMovementSchema = z.object({
   timestamp: z.number(),
 });
 
-/** 玩家游戏状态 */
-export const PlayerGameStateSchema = z.object({
-  currentShipId: z.string().nullable(),
-  hasActivatedFluxVenting: z.boolean(),
-  readyForNextPhase: z.boolean(),
-  selectedWeapons: z.array(z.string()),
-});
-
-/** 武器类型 */
+// ==================== 武器相关 Schema ====================
 export const WeaponTypeSchema = z.enum(['ballistic', 'energy', 'missile']);
-
-/** 武器挂载类型 */
 export const WeaponMountTypeSchema = z.enum(['fixed', 'turret']);
 
-/** 武器规格 */
 export const WeaponSpecSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -139,7 +125,6 @@ export const WeaponSpecSchema = z.object({
   fluxCost: z.number().min(0),
 });
 
-/** 武器挂载 */
 export const WeaponMountSchema = z.object({
   id: z.string(),
   weaponId: z.string(),
@@ -150,7 +135,6 @@ export const WeaponMountSchema = z.object({
   arcMax: z.number(),
 });
 
-/** 攻击命令 */
 export const AttackCommandSchema = z.object({
   sourceShipId: z.string(),
   targetShipId: z.string(),
@@ -158,7 +142,7 @@ export const AttackCommandSchema = z.object({
   timestamp: z.number(),
 });
 
-/** 爆炸数据 */
+// ==================== 战斗相关 Schema ====================
 export const ExplosionDataSchema = z.object({
   id: z.string(),
   position: PointSchema,
@@ -170,7 +154,6 @@ export const ExplosionDataSchema = z.object({
   timestamp: z.number(),
 });
 
-/** 战斗结果 */
 export const CombatResultSchema = z.object({
   hit: z.boolean(),
   damage: z.number().min(0).optional(),
@@ -185,7 +168,7 @@ export const CombatResultSchema = z.object({
   timestamp: z.number(),
 });
 
-/** 地图配置 */
+// ==================== 地图与 Token Schema ====================
 export const MapConfigSchema = z.object({
   id: z.string(),
   width: z.number().min(1),
@@ -193,10 +176,8 @@ export const MapConfigSchema = z.object({
   name: z.string().min(1),
 });
 
-/** Token 类型 */
 export const TokenTypeSchema = z.enum(['ship', 'station', 'asteroid']);
 
-/** 单位回合状态 */
 export const UnitTurnStateSchema = z.enum([
   'waiting',
   'active',
@@ -205,7 +186,6 @@ export const UnitTurnStateSchema = z.enum([
   'ended',
 ]);
 
-/** Token 信息 */
 export const TokenInfoSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
@@ -225,7 +205,7 @@ export const TokenInfoSchema = z.object({
   metadata: z.record(z.string(), z.unknown()),
 });
 
-/** 相机状态 */
+// ==================== 相机相关 Schema ====================
 export const CameraStateSchema = z.object({
   centerX: z.number(),
   centerY: z.number(),
@@ -235,14 +215,12 @@ export const CameraStateSchema = z.object({
   maxZoom: z.number().optional(),
 });
 
-/** 玩家相机 */
 export const PlayerCameraSchema = CameraStateSchema.extend({
   playerId: z.string(),
   playerName: z.string(),
   timestamp: z.number(),
 });
 
-/** 相机更新命令 */
 export const CameraUpdateCommandSchema = z.object({
   centerX: z.number().optional(),
   centerY: z.number().optional(),
@@ -250,7 +228,6 @@ export const CameraUpdateCommandSchema = z.object({
   rotation: z.number().optional(),
 });
 
-/** 相机配置 */
 export const CameraConfigSchema = z.object({
   centerX: z.number(),
   centerY: z.number(),
@@ -261,11 +238,8 @@ export const CameraConfigSchema = z.object({
 });
 
 // ==================== 回合系统 Schema ====================
-
-/** 回合阶段 */
 export const TurnPhaseSchema = z.enum(['planning', 'movement', 'action', 'resolution']);
 
-/** 回合单位 */
 export const TurnUnitSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -278,7 +252,6 @@ export const TurnUnitSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-/** 回合顺序 */
 export const TurnOrderSchema = z.object({
   currentIndex: z.number(),
   units: z.array(TurnUnitSchema),
@@ -287,7 +260,6 @@ export const TurnOrderSchema = z.object({
   isComplete: z.boolean(),
 });
 
-/** 回合状态 */
 export const TurnStateSchema = z.object({
   order: TurnOrderSchema.nullable(),
   isInitialized: z.boolean(),
@@ -295,63 +267,33 @@ export const TurnStateSchema = z.object({
 });
 
 // ==================== 类型推导 (从 Schema 推导) ====================
-
 export type Point = z.infer<typeof PointSchema>;
-
 export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
-
-export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
-
-export type ArmorState = z.infer<typeof ArmorStateSchema>;
-
-export type FluxType = z.infer<typeof FluxTypeSchema>;
-
-export type FluxState = z.infer<typeof FluxStateSchema>;
-
-export type FluxOverloadState = z.infer<typeof FluxOverloadStateSchema>;
-
-export type ShieldSpec = z.infer<typeof ShieldSpecSchema>;
-
-export type ShipStatus = z.infer<typeof ShipStatusSchema>;
-
-export type ShipMovement = z.infer<typeof ShipMovementSchema>;
-
 export type PlayerGameState = z.infer<typeof PlayerGameStateSchema>;
-
+export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
+export type ArmorState = z.infer<typeof ArmorStateSchema>;
+export type FluxType = z.infer<typeof FluxTypeSchema>;
+export type FluxState = z.infer<typeof FluxStateSchema>;
+export type FluxOverloadState = z.infer<typeof FluxOverloadStateSchema>;
+export type ShieldSpec = z.infer<typeof ShieldSpecSchema>;
+export type ShipStatus = z.infer<typeof ShipStatusSchema>;
+export type ShipMovement = z.infer<typeof ShipMovementSchema>;
 export type WeaponType = z.infer<typeof WeaponTypeSchema>;
-
 export type WeaponMountType = z.infer<typeof WeaponMountTypeSchema>;
-
 export type WeaponSpec = z.infer<typeof WeaponSpecSchema>;
-
 export type WeaponMount = z.infer<typeof WeaponMountSchema>;
-
 export type AttackCommand = z.infer<typeof AttackCommandSchema>;
-
 export type ExplosionData = z.infer<typeof ExplosionDataSchema>;
-
 export type CombatResult = z.infer<typeof CombatResultSchema>;
-
 export type MapConfig = z.infer<typeof MapConfigSchema>;
-
 export type TokenType = z.infer<typeof TokenTypeSchema>;
-
 export type UnitTurnState = z.infer<typeof UnitTurnStateSchema>;
-
 export type TokenInfo = z.infer<typeof TokenInfoSchema>;
-
 export type CameraState = z.infer<typeof CameraStateSchema>;
-
 export type PlayerCamera = z.infer<typeof PlayerCameraSchema>;
-
 export type CameraUpdateCommand = z.infer<typeof CameraUpdateCommandSchema>;
-
 export type CameraConfig = z.infer<typeof CameraConfigSchema>;
-
 export type TurnPhase = z.infer<typeof TurnPhaseSchema>;
-
 export type TurnUnit = z.infer<typeof TurnUnitSchema>;
-
 export type TurnOrder = z.infer<typeof TurnOrderSchema>;
-
 export type TurnState = z.infer<typeof TurnStateSchema>;

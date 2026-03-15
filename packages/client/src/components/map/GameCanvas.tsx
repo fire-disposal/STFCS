@@ -434,8 +434,10 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 			const handleWheel = (e: WheelEvent) => {
 				e.preventDefault();
 				const cam = cameraRef.current;
+				const minZoom = cam.minZoom ?? 0.5;
+				const maxZoom = cam.maxZoom ?? 4;
 				const factor = e.deltaY > 0 ? 0.9 : 1.1;
-				const targetZoom = Math.max(cam.minZoom, Math.min(cam.maxZoom, cam.zoom * factor));
+				const targetZoom = Math.max(minZoom, Math.min(maxZoom, cam.zoom * factor));
 
 				const rect = canvas.getBoundingClientRect();
 				const mx = (e.clientX - rect.left) / rect.width;
@@ -578,10 +580,12 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		const handleZoomEvent = (e: Event) => {
 			const detail = (e as CustomEvent).detail as { action: "in" | "out" | "reset" };
 			const cam = cameraRef.current;
+			const minZoom = cam.minZoom ?? 0.5;
+			const maxZoom = cam.maxZoom ?? 4;
 
 			if (detail.action === "in") {
 				zoomAnimationRef.current = {
-					targetZoom: Math.min(cam.maxZoom, cam.zoom * 1.2),
+					targetZoom: Math.min(maxZoom, cam.zoom * 1.2),
 					targetCenterX: cam.centerX,
 					targetCenterY: cam.centerY,
 					startZoom: cam.zoom,
@@ -592,7 +596,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				};
 			} else if (detail.action === "out") {
 				zoomAnimationRef.current = {
-					targetZoom: Math.max(cam.minZoom, cam.zoom / 1.2),
+					targetZoom: Math.max(minZoom, cam.zoom / 1.2),
 					targetCenterX: cam.centerX,
 					targetCenterY: cam.centerY,
 					startZoom: cam.zoom,

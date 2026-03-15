@@ -15,8 +15,15 @@ import type {
 	ShipMovedMessage,
 	SuccessResponse,
 	WSMessage,
+	ErrorResponse,
+	TokenDragStartMessage,
+	TokenDraggingMessage,
+	TokenDragEndMessage,
+	ObjectSelectedMessage,
+	ObjectDeselectedMessage,
+	PlayerJoinedMessage,
 } from "@vt/shared/ws";
-import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { WS_MESSAGE_TYPES, isRequestMessage, isShipMovedMessage } from "@vt/shared/ws";
 import type { PlayerService } from "../../application/player/PlayerService";
 import type { SelectionService } from "../../application/selection/SelectionService";
 import type { ShipService } from "../../application/ship/ShipService";
@@ -71,63 +78,51 @@ export class MessageHandler {
 
 	async handleMessage(clientId: string, message: WSMessage): Promise<void> {
 		try {
-			switch (message.type) {
-				case WS_MESSAGE_TYPES.REQUEST:
-					await this._handleRequestMessage(clientId, message);
-					break;
+			if (isRequestMessage(message)) {
+				await this._handleRequestMessage(clientId, message);
+				return;
+			}
 
+			switch (message.type) {
 				case WS_MESSAGE_TYPES.PLAYER_JOINED:
 					await this._handlePlayerJoined(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.SHIP_MOVED:
 					await this._handleShipMoved(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.SHIELD_UPDATE:
 					await this._handleShieldUpdate(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.FLUX_STATE:
 					await this._handleFluxState(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.COMBAT_EVENT:
 					await this._handleCombatEvent(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.DRAWING_ADD:
 					await this._handleDrawingAdd(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.DRAWING_CLEAR:
 					await this._handleDrawingClear(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.CHAT_MESSAGE:
 					await this._handleChatMessage(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.OBJECT_SELECTED:
 					await this._handleObjectSelected(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.OBJECT_DESELECTED:
 					await this._handleObjectDeselected(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.TOKEN_DRAG_START:
 					await this._handleTokenDragStart(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.TOKEN_DRAGGING:
 					await this._handleTokenDragging(clientId, message);
 					break;
-
 				case WS_MESSAGE_TYPES.TOKEN_DRAG_END:
 					await this._handleTokenDragEnd(clientId, message);
 					break;
-
 				default:
 					console.warn(`Unhandled WS message type: ${message.type}`);
 			}
@@ -143,7 +138,7 @@ export class MessageHandler {
 
 	private async _handleRequestMessage(clientId: string, request: RequestMessage): Promise<void> {
 		const { requestId, operation } = request.payload;
-		const data = request.payload.data;
+		const data = (request.payload as RequestPayload).data;
 
 		const handler = this._requestHandlers[operation];
 		if (!handler) {
@@ -161,13 +156,12 @@ export class MessageHandler {
 
 		try {
 			const result = await (handler as (clientId: string, data: unknown) => Promise<unknown>)(clientId, data);
-			const successResponse: SuccessResponse<typeof operation> = {
+			this._sendResponse(clientId, requestId, {
 				success: true,
 				operation,
-				data: result as Extract<ResponseData, { operation: typeof operation }>["data"],
+				data: result,
 				timestamp: Date.now(),
-			};
-			this._sendResponse(clientId, requestId, successResponse);
+			});
 		} catch (error) {
 			this._sendResponse(clientId, requestId, {
 				success: false,
@@ -193,15 +187,10 @@ export class MessageHandler {
 			isDMMode: false,
 		};
 
-		// 安全地获取 roomId
 		const roomId = "roomId" in data ? (data.roomId as string | undefined) : undefined;
 		const result = await this._playerService.join(playerInfo, roomId);
-		if (!result.success) {
-			throw new Error(result.error ?? "Failed to join");
-		}
-		if (!result.data) {
-			throw new Error("No player data returned");
-		}
+		if (!result.success) throw new Error(result.error ?? "Failed to join");
+		if (!result.data) throw new Error("No player data returned");
 
 		return result.data;
 	}
@@ -211,14 +200,10 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "player.leave" }>["data"]
 	) {
 		const result = await this._playerService.leave(data.playerId, data.roomId);
-		if (!result.success) {
-			throw new Error(result.error ?? "Failed to leave");
-		}
+		if (!result.success) throw new Error(result.error ?? "Failed to leave");
 
-		// 清理玩家相机状态
 		this._roomManager.removePlayerCamera(data.roomId, data.playerId);
 
-		// 广播玩家离开消息（包含相机已清理）
 		if (this._wsServer) {
 			this._wsServer.sendTo(data.roomId, {
 				type: WS_MESSAGE_TYPES.PLAYER_LEFT,
@@ -244,9 +229,7 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "ship.move" }>["data"]
 	) {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
-		if (!playerRoom) {
-			throw new Error("Player is not in a room");
-		}
+		if (!playerRoom) throw new Error("Player is not in a room");
 
 		const result = await this._shipService.moveShip(data.shipId, {
 			shipId: data.shipId,
@@ -256,9 +239,7 @@ export class MessageHandler {
 			angle: data.angle,
 		});
 
-		if (!result.success) {
-			throw new Error(result.error ?? "Movement failed");
-		}
+		if (!result.success) throw new Error(result.error ?? "Movement failed");
 
 		const status = this._shipService.getShipStatus(data.shipId);
 
@@ -289,14 +270,10 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "ship.toggleShield" }>["data"]
 	) {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
-		if (!playerRoom) {
-			throw new Error("Player is not in a room");
-		}
+		if (!playerRoom) throw new Error("Player is not in a room");
 
 		const success = await this._shipService.toggleShield(data.shipId);
-		if (!success) {
-			throw new Error("Failed to toggle shield");
-		}
+		if (!success) throw new Error("Failed to toggle shield");
 
 		const status = this._shipService.getShipStatus(data.shipId);
 
@@ -322,14 +299,10 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "ship.vent" }>["data"]
 	) {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
-		if (!playerRoom) {
-			throw new Error("Player is not in a room");
-		}
+		if (!playerRoom) throw new Error("Player is not in a room");
 
 		const success = await this._shipService.ventShip(data.shipId);
-		if (!success) {
-			throw new Error("Failed to vent");
-		}
+		if (!success) throw new Error("Failed to vent");
 
 		const status = this._shipService.getShipStatus(data.shipId);
 
@@ -363,27 +336,17 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "dm.toggle" }>["data"]
 	) {
 		const player = this._playerService.getPlayer(clientId);
-		if (!player) {
-			throw new Error("Player not found");
-		}
+		if (!player) throw new Error("Player not found");
 
 		const success = await this._playerService.toggleDMMode(clientId, data.enable);
-		if (!success) {
-			throw new Error("Failed to toggle DM mode");
-		}
+		if (!success) throw new Error("Failed to toggle DM mode");
 
 		const updatedPlayer = this._playerService.getPlayer(clientId);
-		if (!updatedPlayer) {
-			throw new Error("Player not found after DM toggle");
-		}
+		if (!updatedPlayer) throw new Error("Player not found after DM toggle");
 		return updatedPlayer;
 	}
 
-	private async _handleObjectSelected(
-		clientId: string,
-		message: object
-	): Promise<void> {
-		const payload = (message as ObjectSelectedMessage).payload;
+	private async _handleObjectSelected(clientId: string, message: ObjectSelectedMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -391,23 +354,18 @@ export class MessageHandler {
 		}
 
 		const result = await this._selectionService.selectObject({
-			tokenId: payload.tokenId,
+			tokenId: message.payload.tokenId,
 			playerId: clientId,
-			forceOverride: payload.forceOverride ?? false,
+			forceOverride: message.payload.forceOverride ?? false,
 			roomId: playerRoom.id,
 		});
 
 		if (!result.success) {
 			this._sendError(clientId, "SELECTION_ERROR", typeof result.error === "string" ? result.error : "Failed to select object");
-			return;
 		}
 	}
 
-	private async _handleObjectDeselected(
-		clientId: string,
-		message: object
-	): Promise<void> {
-		const payload = (message as ObjectDeselectedMessage).payload;
+	private async _handleObjectDeselected(clientId: string, message: ObjectDeselectedMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -415,71 +373,59 @@ export class MessageHandler {
 		}
 
 		const result = await this._selectionService.deselectObject(
-			payload.tokenId,
+			message.payload.tokenId,
 			clientId,
 			playerRoom.id
 		);
 
 		if (!result.success) {
 			this._sendError(clientId, "DESELECTION_ERROR", result.error ?? "Failed to deselect object");
-			return;
 		}
 	}
 
-	private async _handlePlayerJoined(clientId: string, message: object): Promise<void> {
-		const payload = (message as PlayerJoinedMessage).payload;
-		const playerInfo = {
-			...payload,
-			isActive: true,
-			isDMMode: false,
-		};
+	private async _handlePlayerJoined(clientId: string, message: PlayerJoinedMessage): Promise<void> {
+		const { payload } = message;
+		const playerInfo = { ...payload, isActive: true, isDMMode: false };
 		await this._playerService.join(playerInfo);
 
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (playerRoom) {
-			// 发送现有绘图
 			const drawings = this._roomDrawings.get(playerRoom.id) ?? [];
 			if (drawings.length > 0) {
 				this._sendDrawingsToPlayer(clientId, drawings);
 			}
 
-			// 发送现有玩家的相机状态
 			const existingCameras = this._roomManager.getRoomPlayerCameras(playerRoom.id);
-			if (existingCameras.length > 0) {
-				// 逐个发送每个玩家的相机状态
-				for (const camera of existingCameras) {
-					if (this._wsServer) {
-						this._wsServer.sendTo(clientId, {
-							type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
-							payload: camera,
-						});
-					}
+			for (const camera of existingCameras) {
+				if (this._wsServer) {
+					this._wsServer.sendTo(clientId, {
+						type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
+						payload: camera,
+					});
 				}
 			}
 		}
 	}
 
 	private _sendDrawingsToPlayer(clientId: string, drawings: DrawingElement[]): void {
-		if (drawings.length === 0) return;
+		if (drawings.length === 0 || !this._wsServer) return;
 
-		if (this._wsServer) {
-			this._wsServer.sendTo(clientId, {
-				type: WS_MESSAGE_TYPES.DRAWING_SYNC,
-				payload: {
-					elements: drawings,
-				},
-			});
-		}
+		this._wsServer.sendTo(clientId, {
+			type: WS_MESSAGE_TYPES.DRAWING_SYNC,
+			payload: { elements: drawings },
+		});
 	}
 
-	private async _handleShipMoved(clientId: string, message: object): Promise<void> {
-		const payload = (message as ShipMovedPayload).payload;
+	private async _handleShipMoved(clientId: string, message: WSMessage): Promise<void> {
+		if (!isShipMovedMessage(message)) return;
+		
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
 			return;
 		}
 
+		const payload = message.payload;
 		const result = await this._shipService.moveShip(payload.shipId, {
 			shipId: payload.shipId,
 			phase: payload.phase,
@@ -488,42 +434,43 @@ export class MessageHandler {
 			angle: payload.angle,
 		});
 
-		if (result.success && result.data) {
-			const shipStatus = result.data as import("@vt/shared/types").ShipStatus;
-			this._roomManager.broadcastToRoom(playerRoom.id, {
-				type: WS_MESSAGE_TYPES.SHIP_MOVED,
-				payload: {
-					shipId: payload.shipId,
-					phase: payload.phase,
-					type: payload.type,
-					distance: payload.distance,
-					angle: payload.angle,
-					newX: shipStatus.position.x,
-					newY: shipStatus.position.y,
-					newHeading: shipStatus.heading,
-					timestamp: Date.now(),
-				},
-			});
+		if (result.success) {
+			const shipStatus = this._shipService.getShipStatus(payload.shipId);
+			if (shipStatus) {
+				this._roomManager.broadcastToRoom(playerRoom.id, {
+					type: WS_MESSAGE_TYPES.SHIP_MOVED,
+					payload: {
+						shipId: payload.shipId,
+						phase: payload.phase,
+						type: payload.type,
+						distance: payload.distance,
+						angle: payload.angle,
+						newX: shipStatus.position.x,
+						newY: shipStatus.position.y,
+						newHeading: shipStatus.heading,
+						timestamp: Date.now(),
+					},
+				});
+			}
 		}
 	}
 
-	private async _handleShieldUpdate(clientId: string, message: object): Promise<void> {
-		const payload = (message as ShieldUpdateMessage).payload;
+	private async _handleShieldUpdate(clientId: string, message: ShieldUpdateMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
 			return;
 		}
 
+		const { payload } = message;
 		if (payload.active) {
 			await this._shipService.enableShield(payload.shipId);
 		} else {
 			await this._shipService.disableShield(payload.shipId);
 		}
 
-		// 获取舰船状态以广播完整信息
 		const shipStatus = await this._shipService.getShipStatus(payload.shipId);
-		
+
 		this._roomManager.broadcastToRoom(playerRoom.id, {
 			type: WS_MESSAGE_TYPES.SHIELD_UPDATE,
 			payload: {
@@ -535,20 +482,17 @@ export class MessageHandler {
 		});
 	}
 
-	private async _handleFluxState(clientId: string, message: object): Promise<void> {
-		const payload = (message as FluxStateMessage).payload;
+	private async _handleFluxState(clientId: string, message: FluxStateMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
-		if (!playerRoom) {
-			return;
-		}
+		if (!playerRoom) return;
 
+		const { payload } = message;
 		if (payload.fluxState === "venting") {
 			await this._shipService.ventShip(payload.shipId);
 		}
 
-		// 获取舰船通量状态以广播完整信息
 		const shipStatus = await this._shipService.getShipStatus(payload.shipId);
-		
+
 		this._roomManager.broadcastToRoom(playerRoom.id, {
 			type: WS_MESSAGE_TYPES.FLUX_STATE,
 			payload: {
@@ -561,14 +505,14 @@ export class MessageHandler {
 		});
 	}
 
-	private async _handleCombatEvent(clientId: string, message: object): Promise<void> {
-		const payload = (message as CombatEventMessage).payload;
+	private async _handleCombatEvent(clientId: string, message: CombatEventMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
 			return;
 		}
 
+		const { payload } = message;
 		this._roomManager.broadcastToRoom(playerRoom.id, {
 			type: WS_MESSAGE_TYPES.COMBAT_EVENT,
 			payload: {
@@ -583,8 +527,7 @@ export class MessageHandler {
 		});
 	}
 
-	private async _handleDrawingAdd(clientId: string, message: object): Promise<void> {
-		const payload = (message as DrawingAddMessage).payload;
+	private async _handleDrawingAdd(clientId: string, message: DrawingAddMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -596,7 +539,7 @@ export class MessageHandler {
 			drawings = [];
 			this._roomDrawings.set(playerRoom.id, drawings);
 		}
-		drawings.push(payload.element);
+		drawings.push(message.payload.element);
 
 		this._roomManager.broadcastToRoom(
 			playerRoom.id,
@@ -604,35 +547,31 @@ export class MessageHandler {
 				type: WS_MESSAGE_TYPES.DRAWING_ADD,
 				payload: {
 					playerId: clientId,
-					element: payload.element,
+					element: message.payload.element,
 				},
 			},
 			clientId
 		);
 	}
 
-	private async _handleDrawingClear(clientId: string, message: object): Promise<void> {
-		const payload = (message as DrawingClearMessage).payload;
+	private async _handleDrawingClear(clientId: string, message: DrawingClearMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
 			return;
 		}
 
-		if (payload.playerId === clientId) {
+		if (message.payload.playerId === clientId) {
 			this._roomDrawings.set(playerRoom.id, []);
 		}
 
 		this._roomManager.broadcastToRoom(playerRoom.id, {
 			type: WS_MESSAGE_TYPES.DRAWING_CLEAR,
-			payload: {
-				playerId: clientId,
-			},
+			payload: { playerId: clientId },
 		});
 	}
 
-	private async _handleChatMessage(clientId: string, message: object): Promise<void> {
-		const payload = (message as ChatMessagePayload).payload;
+	private async _handleChatMessage(clientId: string, message: ChatMessagePayload): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -646,18 +585,13 @@ export class MessageHandler {
 			payload: {
 				senderId: clientId,
 				senderName: player?.name ?? "Unknown",
-				content: payload.content,
+				content: message.payload.content,
 				timestamp: Date.now(),
 			},
 		});
 	}
 
-	private _sendError(
-		clientId: string,
-		code: string,
-		message: string,
-		details?: Record<string, unknown>
-	): void {
+	private _sendError(clientId: string, code: string, message: string, details?: Record<string, unknown>): void {
 		if (this._wsServer) {
 			this._wsServer.sendTo(clientId, {
 				type: WS_MESSAGE_TYPES.ERROR,
@@ -666,26 +600,16 @@ export class MessageHandler {
 		}
 	}
 
-	private _sendResponse(
-		clientId: string,
-		requestId: string,
-		response: SuccessResponse<RequestOperation> | ErrorResponse
-	): void {
+	private _sendResponse(clientId: string, requestId: string, response: SuccessResponse<RequestOperation> | ErrorResponse): void {
 		if (!this._wsServer) return;
 
 		this._wsServer.sendTo(clientId, {
 			type: WS_MESSAGE_TYPES.RESPONSE,
-			payload: {
-				requestId,
-				...response,
-			},
+			payload: { requestId, ...response },
 		});
 	}
 
-	private async _handleRoomList(
-		_clientId: string,
-		_data: Extract<RequestPayload, { operation: "room.list" }>["data"]
-	) {
+	private async _handleRoomList(_clientId: string, _data: unknown) {
 		const rooms = this._roomManager.listRooms().map((r) => ({
 			roomId: r.id,
 			playerCount: r.players.size,
@@ -695,15 +619,11 @@ export class MessageHandler {
 		return { rooms };
 	}
 
-	private async _handleRoomCreate(
-		_clientId: string,
-		data: Extract<RequestPayload, { operation: "room.create" }>["data"]
-	) {
-		if (!data || !("roomId" in data) || !data.roomId) {
-			throw new Error("Invalid roomId");
-		}
+	private async _handleRoomCreate(_clientId: string, data: unknown) {
+		const roomData = data as { roomId: string; maxPlayers?: number };
+		if (!roomData?.roomId) throw new Error("Invalid roomId");
 
-		const room = this._roomManager.createRoom(data.roomId);
+		const room = this._roomManager.createRoom(roomData.roomId);
 		return { roomId: room.id };
 	}
 
@@ -712,17 +632,12 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "camera.update" }>["data"]
 	): Promise<void> {
 		const player = this._playerService.getPlayer(clientId);
-		if (!player) {
-			throw new Error("Player not found");
-		}
+		if (!player) throw new Error("Player not found");
 
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
-		if (!playerRoom) {
-			throw new Error("Player is not in a room");
-		}
+		if (!playerRoom) throw new Error("Player is not in a room");
 
-		// 存储玩家相机状态
-		const cameraState: import("@vt/shared/types").PlayerCamera = {
+		const cameraState = {
 			playerId: clientId,
 			playerName: player.name,
 			centerX: data.x,
@@ -735,7 +650,6 @@ export class MessageHandler {
 		};
 		this._roomManager.updatePlayerCamera(playerRoom.id, clientId, cameraState);
 
-		// 广播给房间内其他玩家
 		this._roomManager.broadcastToRoom(playerRoom.id, {
 			type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
 			payload: cameraState,
@@ -750,66 +664,60 @@ export class MessageHandler {
 		this._wsServer = wsServer;
 	}
 
-	// ===== Token 拖拽消息处理 =====
-
-	private async _handleTokenDragStart(clientId: string, message: object): Promise<void> {
-		const payload = (message as TokenDragStartMessage).payload;
+	// Token 拖拽消息处理
+	private async _handleTokenDragStart(clientId: string, message: TokenDragStartMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
-			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			this._sendError(clientId, "DRAG_START_ERROR", "Player is not in a room");
 			return;
 		}
 
 		const result = await this._selectionService.startTokenDrag({
-			tokenId: payload.tokenId,
+			tokenId: message.payload.tokenId,
 			playerId: clientId,
-			position: payload.position,
-			heading: payload.heading,
+			position: message.payload.position,
+			heading: message.payload.heading,
 			roomId: playerRoom.id,
 		});
 
 		if (!result.success) {
 			this._sendError(clientId, "DRAG_START_ERROR", result.error ?? "Failed to start drag");
-			return;
 		}
 	}
 
-	private async _handleTokenDragging(clientId: string, message: object): Promise<void> {
-		const payload = (message as TokenDraggingMessage).payload;
+	private async _handleTokenDragging(clientId: string, message: TokenDraggingMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
-			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			this._sendError(clientId, "DRAG_ERROR", "Player is not in a room");
 			return;
 		}
 
 		const result = await this._selectionService.updateTokenDrag({
-			tokenId: payload.tokenId,
+			tokenId: message.payload.tokenId,
 			playerId: clientId,
-			position: payload.position,
-			heading: payload.heading,
+			position: message.payload.position,
+			heading: message.payload.heading,
 			roomId: playerRoom.id,
 		});
 
 		if (!result.success) {
-			// 拖拽更新失败不报错，只是忽略（可能是延迟消息）
-			console.warn(`Failed to update drag for token ${payload.tokenId}:`, result.error);
+			console.warn(`Failed to update drag for token ${message.payload.tokenId}:`, result.error);
 		}
 	}
 
-	private async _handleTokenDragEnd(clientId: string, message: object): Promise<void> {
-		const payload = (message as TokenDragEndMessage).payload;
+	private async _handleTokenDragEnd(clientId: string, message: TokenDragEndMessage): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
-			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			this._sendError(clientId, "DRAG_END_ERROR", "Player is not in a room");
 			return;
 		}
 
 		const result = await this._selectionService.endTokenDrag({
-			tokenId: payload.tokenId,
+			tokenId: message.payload.tokenId,
 			playerId: clientId,
-			finalPosition: payload.finalPosition,
-			finalHeading: payload.finalHeading,
-			committed: payload.committed,
+			finalPosition: message.payload.finalPosition,
+			finalHeading: message.payload.finalHeading,
+			committed: message.payload.committed,
 			roomId: playerRoom.id,
 		});
 
@@ -818,18 +726,15 @@ export class MessageHandler {
 			return;
 		}
 
-		// 如果确认移动，更新 token 位置
-		if (payload.committed) {
-			// 这里可以调用 MapService 更新 token 位置
-			// 由于 MapService 可能在应用层，这里只广播消息
+		if (message.payload.committed) {
 			this._roomManager.broadcastToRoom(playerRoom.id, {
 				type: WS_MESSAGE_TYPES.TOKEN_MOVED,
 				payload: {
-					tokenId: payload.tokenId,
-					previousPosition: { x: 0, y: 0 }, // TODO: 从服务获取
-					newPosition: payload.finalPosition,
-					previousHeading: 0, // TODO: 从服务获取
-					newHeading: payload.finalHeading,
+					tokenId: message.payload.tokenId,
+					previousPosition: { x: 0, y: 0 },
+					newPosition: message.payload.finalPosition,
+					previousHeading: 0,
+					newHeading: message.payload.finalHeading,
 					timestamp: Date.now(),
 				},
 			});
@@ -838,61 +743,3 @@ export class MessageHandler {
 }
 
 export default MessageHandler;
-
-// 本地消息类型接口（用于类型断言）
-interface PlayerJoinedMessage {
-	type: string;
-	payload: { id: string; name: string; joinedAt: number; isActive: boolean; isDMMode: boolean };
-}
-
-interface ObjectSelectedMessage {
-	type: string;
-	payload: { tokenId: string; forceOverride?: boolean };
-}
-
-interface ObjectDeselectedMessage {
-	type: string;
-	payload: { tokenId: string };
-}
-
-interface TokenDragStartMessage {
-	type: string;
-	payload: { tokenId: string; position: { x: number; y: number }; heading: number };
-}
-
-interface TokenDraggingMessage {
-	type: string;
-	payload: { tokenId: string; position: { x: number; y: number }; heading: number };
-}
-
-interface TokenDragEndMessage {
-	type: string;
-	payload: {
-		tokenId: string;
-		finalPosition: { x: number; y: number };
-		finalHeading: number;
-		committed: boolean;
-	};
-}
-
-interface ShipMovedPayload {
-	type: string;
-	payload: {
-		shipId: string;
-		phase: 1 | 2 | 3;
-		type: "straight" | "strafe" | "rotate";
-		distance?: number;
-		angle?: number;
-	};
-}
-
-interface ErrorResponse {
-	success: false;
-	operation: RequestOperation;
-	error: {
-		code: string;
-		message: string;
-		details?: Record<string, unknown>;
-	};
-	timestamp: number;
-}

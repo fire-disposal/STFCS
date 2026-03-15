@@ -394,15 +394,28 @@ export class StateSync implements MessageHandler {
       case WS_MESSAGE_TYPES.RESPONSE:
       case WS_MESSAGE_TYPES.WEAPON_FIRED:
       case WS_MESSAGE_TYPES.MAP_INITIALIZED:
+      case WS_MESSAGE_TYPES.SHIP_STATUS_UPDATE:
+      case WS_MESSAGE_TYPES.TOKEN_PLACED:
+      case WS_MESSAGE_TYPES.TOKEN_MOVED:
+      case WS_MESSAGE_TYPES.OBJECT_SELECTED:
+      case WS_MESSAGE_TYPES.OBJECT_DESELECTED:
+      case WS_MESSAGE_TYPES.SELECTION_UPDATE:
+      case WS_MESSAGE_TYPES.TOKEN_DRAG_START:
+      case WS_MESSAGE_TYPES.TOKEN_DRAGGING:
+      case WS_MESSAGE_TYPES.TOKEN_DRAG_END:
+      case WS_MESSAGE_TYPES.DM_TOGGLE:
+      case WS_MESSAGE_TYPES.DM_STATUS_UPDATE:
+      case WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED:
+      case WS_MESSAGE_TYPES.TURN_ORDER_UPDATED:
+      case WS_MESSAGE_TYPES.TURN_INDEX_CHANGED:
+      case WS_MESSAGE_TYPES.UNIT_STATE_CHANGED:
+      case WS_MESSAGE_TYPES.ROUND_INCREMENTED:
         // 这些消息不需要状态同步
         break;
 
       default:
-        // 未知消息类型
-        const _exhaustiveCheck: never = message;
-        if (this.enableLogging) {
-          console.warn('[StateSync] Unknown message type:', _exhaustiveCheck);
-        }
+        // 未知消息类型，忽略
+        break;
     }
   }
 }

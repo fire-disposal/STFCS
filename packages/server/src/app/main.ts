@@ -9,6 +9,7 @@ import { ShipService } from "../application/ship/ShipService";
 import { config } from "../config";
 import { RoomEventBusManager } from "../infrastructure/events/EventBusIntegration";
 import { WSEventHandler } from "../infrastructure/events/WSEventHandler";
+import { EventBus } from "../infrastructure/events/EventBus";
 import { MessageHandler } from "../infrastructure/ws/MessageHandler";
 import { RoomManager } from "../infrastructure/ws/RoomManager";
 import { WSServer } from "../infrastructure/ws/WSServer";
@@ -27,7 +28,8 @@ export class Application {
 	private _playerService: PlayerService;
 	private _selectionService: SelectionService;
 	private _shipService: ShipService;
-	private _eventBusManager: RoomEventBusManager;
+	private _eventBusManager?: RoomEventBusManager;
+	private _eventBus?: EventBus;
 	private _wsEventHandler?: WSEventHandler;
 
 	constructor(options: ServerOptions = {}) {
@@ -37,11 +39,11 @@ export class Application {
 			},
 		});
 
-		this._eventBusManager = new RoomEventBusManager();
 		this._roomManager = new RoomManager(config.maxPlayersPerRoom);
 		this._playerService = new PlayerService();
 		this._selectionService = new SelectionService();
 		this._shipService = new ShipService();
+		// _eventBusManager 将在 _initializeWS 中初始化（需要 wsServer）
 	}
 
 	async initialize(): Promise<void> {
@@ -163,6 +165,9 @@ export class Application {
 			},
 		});
 
+		// 初始化事件总线管理器（需要 wsServer）
+		this._eventBusManager = new RoomEventBusManager(this._wsServer);
+
 		this._roomManager.setWSServer(this._wsServer);
 		this._playerService.setWSServer(this._wsServer);
 		this._selectionService.setWSServer(this._wsServer);
@@ -180,6 +185,9 @@ export class Application {
 	}
 
 	private _initializeEventBus(): void {
+		// 创建全局事件总线
+		this._eventBus = new EventBus();
+		
 		// 创建 WS 事件处理器，订阅领域事件并广播到 WS
 		if (this._wsServer) {
 			this._wsEventHandler = new WSEventHandler(this._wsServer, this._roomManager, this._eventBus);

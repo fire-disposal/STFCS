@@ -10,6 +10,7 @@ import { removeOtherPlayerCamera } from "@/store/slices/mapSlice";
 import type {
 	WSMessage,
 	WSMessageType,
+	WSMessagePayloadMap,
 	RoomUpdateMessage,
 	PingMessage,
 	PlayerJoinedMessage,
@@ -25,7 +26,8 @@ import type {
 	TokenDraggingMessage,
 	TokenDragEndMessage,
 } from "@vt/shared/ws";
-import type { ShipMovement } from "@vt/shared/types";
+import type { ShipMovement, PlayerCamera } from "@vt/shared/types";
+import type { DrawingElement } from "@vt/shared/ws";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
 import {
@@ -33,24 +35,25 @@ import {
 	updateTokenDrag,
 	endTokenDrag,
 } from "@/store/slices/selectionSlice";
-import { StateSync, createStateSync } from "@/store/sync";
+import { createStateSync } from "@/store/sync";
 
-export type { WSMessage, WSMessageType };
+// 使用共享的 WSMessagePayloadMap，无需重复定义
+export type { WSMessage, WSMessageType, WSMessagePayloadMap };
 
-// 使用共享类型定义
-export type PlayerJoinedPayload = PlayerJoinedMessage["payload"];
-export type ShipMovedPayload = ShipMovedMessage["payload"];
-export type ChatMessagePayloadType = ChatMessagePayload["payload"];
-export type DrawingElementPayload = DrawingAddMessage["payload"]["element"];
-
-export type RoomUpdatePayload = RoomUpdateMessage["payload"];
+// 便捷类型别名
+export type PlayerJoinedPayload = WSMessagePayloadMap[typeof WS_MESSAGE_TYPES.PLAYER_JOINED];
+export type ShipMovedPayload = WSMessagePayloadMap[typeof WS_MESSAGE_TYPES.SHIP_MOVED];
+export type ChatMessagePayloadType = WSMessagePayloadMap[typeof WS_MESSAGE_TYPES.CHAT_MESSAGE];
+export type RoomUpdatePayload = WSMessagePayloadMap[typeof WS_MESSAGE_TYPES.ROOM_UPDATE];
 
 interface PendingRequest {
-	resolve: (data: any) => void;
+	resolve: (data: unknown) => void;
 	reject: (error: Error) => void;
 	timeout: NodeJS.Timeout;
 	operation: RequestOperation;
 }
+
+type MessageHandler<T extends WSMessageType> = (payload: WSMessagePayloadMap[T]) => void;
 
 export class WebSocketService {
 	private ws: WebSocket | null = null;
@@ -58,10 +61,9 @@ export class WebSocketService {
 	private maxReconnectAttempts = 5;
 	private reconnectDelay = 1000;
 	private pingInterval: NodeJS.Timeout | null = null;
-	private messageHandlers: Map<WSMessageType, Array<(payload: unknown) => void>> =
-		new Map();
-	private pendingRequests: Map<string, PendingRequest> = new Map();
-	private requestTimeout = 10000; // 10秒超时
+	private messageHandlers = new Map<WSMessageType, Set<(...args: unknown[]) => void>>();
+	private pendingRequests = new Map<string, PendingRequest>();
+	private requestTimeout = 10000;
 
 	constructor() {
 		this.setupMessageHandlers();
@@ -70,26 +72,20 @@ export class WebSocketService {
 	private setupMessageHandlers(): void {
 		// 事件处理器
 		this.on(WS_MESSAGE_TYPES.PLAYER_JOINED, (payload) => {
-			const data = payload as PlayerJoinedPayload;
-			console.log("Player joined:", data);
-			// 这里可以分发到Redux store
+			console.log("Player joined:", payload);
 		});
 
 		this.on(WS_MESSAGE_TYPES.PLAYER_LEFT, (payload) => {
-			const playerId = (payload as { playerId: string; reason?: string }).playerId;
-			console.log("Player left:", playerId);
-			// 清除离开玩家的相机状态
-			store.dispatch(removeOtherPlayerCamera(playerId));
+			console.log("Player left:", payload.playerId);
+			store.dispatch(removeOtherPlayerCamera(payload.playerId));
 		});
 
 		this.on(WS_MESSAGE_TYPES.SHIP_MOVED, (payload) => {
-			const data = payload as ShipMovedPayload;
-			console.log("Ship moved:", data);
+			console.log("Ship moved:", payload);
 		});
 
 		this.on(WS_MESSAGE_TYPES.CHAT_MESSAGE, (payload) => {
-			const data = payload as ChatMessagePayloadType;
-			console.log("Chat message:", data);
+			console.log("Chat message:", payload);
 		});
 
 		this.on(WS_MESSAGE_TYPES.PONG, () => {
@@ -97,56 +93,50 @@ export class WebSocketService {
 		});
 
 		this.on(WS_MESSAGE_TYPES.ROOM_UPDATE, (payload) => {
-			const data = payload as RoomUpdatePayload;
-			console.log("Room updated:", data);
+			console.log("Room updated:", payload);
 		});
 
-		this.on(WS_MESSAGE_TYPES.CAMERA_UPDATED, (payload) => {
-			// payload expected to be PlayerCamera
-			const cam = payload as unknown as import("@vt/shared/types").PlayerCamera;
-			store.dispatch(updateOtherPlayerCamera(cam));
+		this.on(WS_MESSAGE_TYPES.CAMERA_UPDATED, (payload: PlayerCamera) => {
+			store.dispatch(updateOtherPlayerCamera(payload));
 		});
 
 		// Token 拖拽处理器
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_START, (payload) => {
-			const data = (payload as TokenDragStartMessage["payload"]);
 			store.dispatch(beginTokenDrag({
-				tokenId: data.tokenId,
-				playerId: data.playerId,
-				playerName: data.playerName,
-				position: data.position,
-				heading: data.heading,
-				timestamp: data.timestamp,
+				tokenId: payload.tokenId,
+				playerId: payload.playerId,
+				playerName: payload.playerName,
+				position: payload.position,
+				heading: payload.heading,
+				timestamp: payload.timestamp,
 			}));
 		});
 
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAGGING, (payload) => {
-			const data = (payload as TokenDraggingMessage["payload"]);
 			store.dispatch(updateTokenDrag({
-				tokenId: data.tokenId,
-				playerId: data.playerId,
-				playerName: data.playerName,
-				position: data.position,
-				heading: data.heading,
-				timestamp: data.timestamp,
+				tokenId: payload.tokenId,
+				playerId: payload.playerId,
+				playerName: payload.playerName,
+				position: payload.position,
+				heading: payload.heading,
+				timestamp: payload.timestamp,
 			}));
 		});
 
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_END, (payload) => {
-			const data = (payload as TokenDragEndMessage["payload"]);
 			store.dispatch(endTokenDrag({
-				tokenId: data.tokenId,
-				playerId: data.playerId,
-				finalPosition: data.finalPosition,
-				finalHeading: data.finalHeading,
-				committed: data.committed,
-				timestamp: data.timestamp,
+				tokenId: payload.tokenId,
+				playerId: payload.playerId,
+				finalPosition: payload.finalPosition,
+				finalHeading: payload.finalHeading,
+				committed: payload.committed,
+				timestamp: payload.timestamp,
 			}));
 		});
 
 		// 响应处理器
 		this.on(WS_MESSAGE_TYPES.RESPONSE, (payload) => {
-			this.handleResponse(payload as ResponseMessage["payload"]);
+			this.handleResponse(payload);
 		});
 	}
 
@@ -159,7 +149,6 @@ export class WebSocketService {
 			return;
 		}
 
-		// 清除超时定时器
 		clearTimeout(pending.timeout);
 		this.pendingRequests.delete(requestId);
 
@@ -201,7 +190,7 @@ export class WebSocketService {
 			}, this.requestTimeout);
 
 			this.pendingRequests.set(requestId, {
-				resolve: (data: any) => resolve(data),
+				resolve: (data: unknown) => resolve(data as any),
 				reject,
 				timeout,
 				operation,
@@ -217,11 +206,7 @@ export class WebSocketService {
 		playerName: string,
 		roomId?: string
 	): Promise<ResponseForOperation<"player.join">> {
-		return this.sendRequest("player.join", {
-			id: playerId,
-			name: playerName,
-			roomId,
-		});
+		return this.sendRequest("player.join", { id: playerId, name: playerName, roomId });
 	}
 
 	public async leavePlayer(playerId: string, roomId: string): Promise<void> {
@@ -239,13 +224,7 @@ export class WebSocketService {
 		distance?: number,
 		angle?: number
 	): Promise<ResponseForOperation<"ship.move">> {
-		return this.sendRequest("ship.move", {
-			shipId,
-			phase,
-			type,
-			distance,
-			angle,
-		});
+		return this.sendRequest("ship.move", { shipId, phase, type, distance, angle });
 	}
 
 	public async toggleShield(shipId: string): Promise<ResponseForOperation<"ship.toggleShield">> {
@@ -264,7 +243,7 @@ export class WebSocketService {
 		return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 	}
 
-	// 现有的连接管理方法
+	// 连接管理
 	public connect(url: string): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if (this.ws?.readyState === WebSocket.OPEN) {
@@ -336,7 +315,6 @@ export class WebSocketService {
 		store.dispatch(setRoomId(null));
 	}
 
-	// 向后兼容的发送方法
 	public send(message: WSMessage): void {
 		if (this.ws?.readyState === WebSocket.OPEN) {
 			this.ws.send(JSON.stringify(message));
@@ -345,11 +323,7 @@ export class WebSocketService {
 		}
 	}
 
-	public sendPlayerJoined(
-		playerId: string,
-		playerName: string,
-		roomId: string
-	): void {
+	public sendPlayerJoined(playerId: string, playerName: string, roomId: string): void {
 		void roomId;
 		const message: PlayerJoinedMessage = {
 			type: WS_MESSAGE_TYPES.PLAYER_JOINED,
@@ -375,11 +349,9 @@ export class WebSocketService {
 	public sendChatMessage(
 		content: string,
 		senderId: string,
-		senderName: string,
-		_type: "player" | "system" | "combat" = "player",
+		senderName: string
 	): void {
-		void _type;
-		const message: WSMessage = {
+		this.send({
 			type: WS_MESSAGE_TYPES.CHAT_MESSAGE,
 			payload: {
 				content,
@@ -387,31 +359,24 @@ export class WebSocketService {
 				senderName,
 				timestamp: Date.now(),
 			},
-		};
-		this.send(message);
+		});
 	}
 
-	public sendDrawingElement(playerId: string, element: DrawingElementPayload): void {
-		const message: WSMessage = {
+	public sendDrawingElement(playerId: string, element: DrawingElement): void {
+		this.send({
 			type: WS_MESSAGE_TYPES.DRAWING_ADD,
-			payload: {
-				playerId,
-				element,
-			},
-		};
-		this.send(message);
+			payload: { playerId, element },
+		});
 	}
 
 	public sendDrawingClear(playerId: string): void {
-		const message: WSMessage = {
+		this.send({
 			type: WS_MESSAGE_TYPES.DRAWING_CLEAR,
 			payload: { playerId },
-		};
-		this.send(message);
+		});
 	}
 
-	// ===== Token 拖拽相关方法 =====
-
+	// Token 拖拽相关方法
 	public sendTokenDragStart(
 		tokenId: string,
 		playerId: string,
@@ -419,7 +384,7 @@ export class WebSocketService {
 		position: { x: number; y: number },
 		heading: number
 	): void {
-		const message: WSMessage = {
+		this.send({
 			type: WS_MESSAGE_TYPES.TOKEN_DRAG_START,
 			payload: {
 				tokenId,
@@ -429,8 +394,7 @@ export class WebSocketService {
 				heading,
 				timestamp: Date.now(),
 			},
-		};
-		this.send(message);
+		});
 	}
 
 	public sendTokenDragging(
@@ -440,7 +404,7 @@ export class WebSocketService {
 		position: { x: number; y: number },
 		heading: number
 	): void {
-		const message: WSMessage = {
+		this.send({
 			type: WS_MESSAGE_TYPES.TOKEN_DRAGGING,
 			payload: {
 				tokenId,
@@ -451,8 +415,7 @@ export class WebSocketService {
 				timestamp: Date.now(),
 				isDragging: true,
 			},
-		};
-		this.send(message);
+		});
 	}
 
 	public sendTokenDragEnd(
@@ -462,7 +425,7 @@ export class WebSocketService {
 		finalHeading: number,
 		committed: boolean
 	): void {
-		const message: WSMessage = {
+		this.send({
 			type: WS_MESSAGE_TYPES.TOKEN_DRAG_END,
 			payload: {
 				tokenId,
@@ -472,19 +435,24 @@ export class WebSocketService {
 				timestamp: Date.now(),
 				committed,
 			},
-		};
-		this.send(message);
+		});
 	}
 
-	// 事件处理器管理
-	public on(type: WSMessageType, handler: (payload: unknown) => void): void {
+	// 事件处理器管理 - 使用类型安全的泛型
+	public on<T extends WSMessageType>(
+		type: T,
+		handler: MessageHandler<T>
+	): void {
 		if (!this.messageHandlers.has(type)) {
-			this.messageHandlers.set(type, []);
+			this.messageHandlers.set(type, new Set());
 		}
-		this.messageHandlers.get(type)!.push(handler);
+		this.messageHandlers.get(type)!.add(handler as (...args: unknown[]) => void);
 	}
 
-	public off(type: WSMessageType, handler?: (payload: unknown) => void): void {
+	public off<T extends WSMessageType>(
+		type: T,
+		handler?: MessageHandler<T>
+	): void {
 		const handlers = this.messageHandlers.get(type);
 		if (!handlers) return;
 
@@ -493,10 +461,7 @@ export class WebSocketService {
 			return;
 		}
 
-		const index = handlers.indexOf(handler);
-		if (index > -1) {
-			handlers.splice(index, 1);
-		}
+		handlers.delete(handler as (...args: unknown[]) => void);
 	}
 
 	private handleMessage(message: WSMessage): void {
@@ -509,13 +474,12 @@ export class WebSocketService {
 	private startPingInterval(): void {
 		this.pingInterval = setInterval(() => {
 			if (this.ws?.readyState === WebSocket.OPEN) {
-				const message: PingMessage = {
+				this.send({
 					type: WS_MESSAGE_TYPES.PING,
 					payload: { timestamp: Date.now() },
-				};
-				this.send(message);
+				});
 			}
-		}, 30000); // 每30秒发送一次ping
+		}, 30000);
 	}
 
 	private stopPingInterval(): void {
@@ -529,9 +493,7 @@ export class WebSocketService {
 		if (this.reconnectAttempts < this.maxReconnectAttempts) {
 			this.reconnectAttempts++;
 			const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-			console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
+			console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 			setTimeout(() => {
 				this.connect(url).catch((error) => {
 					console.error("Reconnection failed:", error);

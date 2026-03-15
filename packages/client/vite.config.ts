@@ -10,6 +10,7 @@ export default defineConfig({
 			"@vt/shared": resolve(__dirname, "../shared/src"),
 			"@vt/shared/ws": resolve(__dirname, "../shared/src/ws/index.ts"),
 			"@vt/shared/types": resolve(__dirname, "../shared/src/types/index.ts"),
+			"@vt/shared/constants": resolve(__dirname, "../shared/src/constants/index.ts"),
 		},
 	},
 	server: {
@@ -22,7 +23,7 @@ export default defineConfig({
 				secure: false,
 			},
 			"/ws": {
-				target: "ws://localhost:3000",
+				target: "ws://localhost:3001",
 				ws: true,
 				changeOrigin: true,
 				secure: false,

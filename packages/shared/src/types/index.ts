@@ -1,13 +1,9 @@
 /**
  * 核心类型导出
- * 
- * 原则：
- * 1. 所有类型从 core-types.ts 统一导出
- * 2. 避免重复定义
- * 3. 保持向后兼容
+ *
+ * 所有类型从 core-types.ts 统一导出，此处仅重新导出
  */
 
-// 从统一来源导出所有核心类型
 export type {
   // 基础类型
   Point,
@@ -15,13 +11,13 @@ export type {
   PlayerInfo,
   PlayerGameState,
   // 舰船相关
-  ShipStatus,
   ArmorQuadrant,
   ArmorState,
-  FluxState,
   FluxType,
+  FluxState,
   FluxOverloadState,
   ShieldSpec,
+  ShipStatus,
   ShipMovement,
   // 武器相关
   WeaponType,
@@ -29,14 +25,14 @@ export type {
   WeaponSpec,
   WeaponMount,
   // 战斗相关
-  ExplosionData,
   AttackCommand,
+  ExplosionData,
   CombatResult,
   // 地图与 Token
   MapConfig,
-  TokenInfo,
   TokenType,
   UnitTurnState,
+  TokenInfo,
   // 相机
   CameraState,
   PlayerCamera,

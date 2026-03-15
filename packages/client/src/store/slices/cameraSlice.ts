@@ -45,10 +45,9 @@ const cameraSlice = createSlice({
 				state.local.centerY = action.payload.centerY;
 			}
 			if (action.payload.zoom !== undefined) {
-				state.local.zoom = Math.max(
-					state.local.minZoom,
-					Math.min(state.local.maxZoom, action.payload.zoom)
-				);
+				const minZoom = state.local.minZoom ?? 0.5;
+				const maxZoom = state.local.maxZoom ?? 4;
+				state.local.zoom = Math.max(minZoom, Math.min(maxZoom, action.payload.zoom));
 			}
 			if (action.payload.rotation !== undefined) {
 				state.local.rotation = action.payload.rotation;

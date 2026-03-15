@@ -5,6 +5,7 @@
 
 import { useEffect, useCallback, useRef, useState } from "react";
 import { websocketService } from "@/services/websocket";
+import { DEFAULT_WS_URL } from "@vt/shared/constants";
 import type { WSMessageType } from "@vt/shared/ws";
 
 interface UseWebSocketOptions {
@@ -69,7 +70,7 @@ export function useWebSocket(
 	// 连接
 	const connect = useCallback(async () => {
 		if (!websocketService.isConnected()) {
-			await websocketService.connect("ws://localhost:3001");
+			await websocketService.connect(DEFAULT_WS_URL);
 		}
 	}, []);
 

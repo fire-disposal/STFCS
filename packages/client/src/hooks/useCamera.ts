@@ -64,7 +64,9 @@ export function useCamera(): UseCameraReturn {
 	// 缩放
 	const zoomTo = useCallback(
 		(zoom: number) => {
-			const clamped = Math.max(camera.minZoom, Math.min(camera.maxZoom, zoom));
+			const minZoom = camera.minZoom ?? 0.5;
+			const maxZoom = camera.maxZoom ?? 4;
+			const clamped = Math.max(minZoom, Math.min(maxZoom, zoom));
 			dispatch(updateCamera({ zoom: clamped }));
 		},
 		[dispatch, camera.minZoom, camera.maxZoom]

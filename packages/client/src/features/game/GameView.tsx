@@ -71,7 +71,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		if (currentPlayerId && content.trim()) {
 			const player = players[currentPlayerId];
 			if (player) {
-				websocketService.sendChatMessage(content, currentPlayerId, player.name, "player");
+				websocketService.sendChatMessage(content, currentPlayerId, player.name);
 			}
 		}
 	};

@@ -13,7 +13,19 @@ export const WEAPON_FIXED_ARC = 10;
 export const WS_HEARTBEAT_INTERVAL = 30000;
 export const WS_RECONNECT_DELAY = 1000;
 export const MAX_RECONNECT_ATTEMPTS = 5;
-export const DEFAULT_WS_URL =
-	typeof window !== "undefined" && typeof location !== "undefined"
-		? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
-		: "ws://localhost:3001";
+
+/**
+ * 获取默认 WebSocket URL
+ * - 浏览器环境：使用当前 host 的 /ws 路径（通过 Vite 代理）
+ * - Node.js 环境：使用 localhost:3001
+ */
+export function getDefaultWsUrl(): string {
+	if (typeof window !== "undefined" && typeof location !== "undefined") {
+		// 浏览器环境：使用代理路径
+		return `ws://${location.host}/ws`;
+	}
+	// Node.js 环境：直接连接 WebSocket 服务器
+	return "ws://localhost:3001";
+}
+
+export const DEFAULT_WS_URL = getDefaultWsUrl();
