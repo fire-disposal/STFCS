@@ -5,10 +5,10 @@
  */
 
 // 导出常量和配置
-export * from './constants';
+export * from './constants/index.js';
 
 // 导出 Zod schemas
-export * from './schemas';
+export * from './schemas/index.js';
 
 // 导出核心类型定义
 export type {
@@ -50,16 +50,16 @@ export type {
   TurnUnit,
   TurnOrder,
   TurnState,
-} from './types';
+} from './types/index.js';
 
 // 导出结果类型工具函数
-export { ok, fail } from './types';
+export { ok, fail } from './types/index.js';
 
 // 导出协议层（统一消息协议 DSL 和领域事件）
-export * from './protocol';
+export * from './protocol/index.js';
 
 // 导出协议版本
-export { PROTOCOL_VERSION } from './core-types';
+export { PROTOCOL_VERSION } from './core-types.js';
 
 // 导出 WebSocket 消息类型和工具
 export {
@@ -156,7 +156,7 @@ export {
   isPlayerJoinedMessage,
   isShipMovedMessage,
   isCameraUpdatedMessage,
-} from './ws';
+} from './ws/index.js';
 
 // 导出领域事件总线（重新导出，保持向后兼容）
 export {
@@ -164,7 +164,7 @@ export {
   DefaultEventTranslator,
   createDomainEvent,
   publishEvent,
-} from './events';
+} from './events/index.js';
 
 export type {
   EventHandler,
@@ -172,4 +172,4 @@ export type {
   EventTranslator,
   IEventBus,
   EventContext,
-} from './events';
+} from './events/index.js';

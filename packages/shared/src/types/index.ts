@@ -43,7 +43,7 @@ export type {
   TurnUnit,
   TurnOrder,
   TurnState,
-} from '../core-types';
+} from '../core-types.js';
 
 // 导出结果类型
 export type { Result, Success, Failure, OptionalResult } from './result';

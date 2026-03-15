@@ -46,4 +46,4 @@ export {
   TurnUnitSchema,
   TurnOrderSchema,
   TurnStateSchema,
-} from '../core-types';
+} from '../core-types.js';

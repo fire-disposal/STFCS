@@ -10,7 +10,7 @@ export {
   defineRequest,
   MessageValidator,
   MessageDispatcher,
-} from './MessageDSL';
+} from './MessageDSL.js';
 
 export type {
   MessageConfig,
@@ -22,13 +22,13 @@ export type {
   InferMessageMap,
   WSMessageFromDirectory,
   WSMessagePayloadMap,
-} from './MessageDSL';
+} from './MessageDSL.js';
 
 // 领域事件
 export {
   DOMAIN_EVENTS,
   createDomainEvent,
-} from './DomainEvents';
+} from './DomainEvents.js';
 
 export type {
   DomainEventDirectory,
@@ -36,7 +36,7 @@ export type {
   DomainEventType,
   DomainEventPayloadMap,
   EventContext,
-} from './DomainEvents';
+} from './DomainEvents.js';
 
 // 事件 Schema（用于扩展和验证）
 export {
@@ -60,10 +60,10 @@ export {
   TurnIndexChangedEventSchema,
   UnitStateChangedEventSchema,
   RoundIncrementedEventSchema,
-} from './DomainEvents';
+} from './DomainEvents.js';
 
 // 协议版本
-export { PROTOCOL_VERSION } from '../core-types';
+export { PROTOCOL_VERSION } from '../core-types.js';
 
 // 重新导出 Zod 用于扩展
 export { z } from 'zod';

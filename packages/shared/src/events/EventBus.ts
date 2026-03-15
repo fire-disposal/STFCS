@@ -12,10 +12,10 @@ import type {
   DomainEventType,
   DomainEventPayloadMap,
   EventContext,
-} from '../protocol/DomainEvents';
-import { createDomainEvent } from '../protocol/DomainEvents';
-import type { WSMessage } from '../ws';
-import { WS_MESSAGE_TYPES } from '../ws';
+} from '../protocol/DomainEvents.js';
+import { createDomainEvent } from '../protocol/DomainEvents.js';
+import type { WSMessage } from '../ws/index.js';
+import { WS_MESSAGE_TYPES } from '../ws/index.js';
 
 // ==================== 事件处理器类型 ====================
 

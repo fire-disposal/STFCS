@@ -20,7 +20,7 @@ import type {
   TokenInfo,
   MapConfig,
   ArmorQuadrant,
-} from '../types';
+} from '../types/index.js';
 // @ts-ignore - 类型在 schema 中使用
 import type {
   PlayerInfoSchema,
@@ -31,7 +31,7 @@ import type {
   PlayerCameraSchema,
   ArmorQuadrantSchema,
   PointSchema,
-} from '../core-types';
+} from '../core-types.js';
 
 // ==================== 消息类型常量 ====================
 export const WS_MESSAGE_TYPES = {

@@ -5,8 +5,8 @@
  */
 
 import { z } from 'zod';
-import { defineMessage } from './MessageDSL';
-import { PointSchema, ArmorQuadrantSchema } from '../core-types';
+import { defineMessage } from './MessageDSL.js';
+import { PointSchema, ArmorQuadrantSchema } from '../core-types.js';
 
 // ==================== 事件 Payload Schema ====================
 
@@ -352,7 +352,7 @@ export const DOMAIN_EVENTS = {
 
 // ==================== 类型推导 ====================
 
-import type { InferMessageMap as InferEventsMap } from './MessageDSL';
+import type { InferMessageMap as InferEventsMap } from './MessageDSL.js';
 
 /** 事件目录类型 */
 export type DomainEventDirectory = typeof DOMAIN_EVENTS;
@@ -394,5 +394,5 @@ export interface EventContext {
 
 // ==================== 导出 ====================
 
-export { defineMessage } from './MessageDSL';
-export type { MessageConfig } from './MessageDSL';
+export { defineMessage } from './MessageDSL.js';
+export type { MessageConfig } from './MessageDSL.js';
