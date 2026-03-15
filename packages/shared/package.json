@@ -2,56 +2,23 @@
   "name": "@vt/shared",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "type": "module",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./*": {
-      "import": "./dist/*.js",
-      "require": "./dist/*.js",
-      "default": "./dist/*.js",
-      "types": "./dist/*.d.ts"
-    },
-    "./ws": {
-      "import": "./dist/ws/index.js",
-      "require": "./dist/ws/index.js",
-      "default": "./dist/ws/index.js",
-      "types": "./dist/ws/index.d.ts"
-    },
-    "./types": {
-      "import": "./dist/types/index.js",
-      "require": "./dist/types/index.js",
-      "default": "./dist/types/index.js",
-      "types": "./dist/types/index.d.ts"
-    },
-    "./schemas": {
-      "import": "./dist/schemas/index.js",
-      "require": "./dist/schemas/index.js",
-      "default": "./dist/schemas/index.js",
-      "types": "./dist/schemas/index.d.ts"
-    },
-    "./constants": {
-      "import": "./dist/constants/index.js",
-      "require": "./dist/constants/index.js",
-      "default": "./dist/constants/index.js",
-      "types": "./dist/constants/index.d.ts"
-    },
-    "./events": {
-      "import": "./dist/events/index.js",
-      "require": "./dist/events/index.js",
-      "default": "./dist/events/index.js",
-      "types": "./dist/events/index.d.ts"
-    }
+    ".": "./dist/index.js",
+    "./*": "./dist/*.js",
+    "./ws": "./dist/ws/index.js",
+    "./types": "./dist/types/index.js",
+    "./schemas": "./dist/schemas/index.js",
+    "./constants": "./dist/constants/index.js",
+    "./events": "./dist/events/index.js",
+    "./protocol": "./dist/protocol/index.js",
+    "./core-types": "./dist/core-types.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsc -p tsconfig.json --watch",
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap --treeshake",
+    "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome lint src --diagnostic-level=error",
     "lint:fix": "biome lint --write src --diagnostic-level=error",
@@ -59,7 +26,11 @@
     "format:check": "biome format src"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^1.9.4",
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

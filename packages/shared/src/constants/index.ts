@@ -20,9 +20,11 @@ export const MAX_RECONNECT_ATTEMPTS = 5;
  * - Node.js 环境：使用 localhost:3001
  */
 export function getDefaultWsUrl(): string {
-	if (typeof window !== "undefined" && typeof location !== "undefined") {
+	// 使用类型断言避免 DOM 依赖
+	const globalObj = globalThis as typeof globalThis & { window?: { location?: { host: string } } };
+	if (globalObj.window?.location?.host) {
 		// 浏览器环境：使用代理路径
-		return `ws://${location.host}/ws`;
+		return `ws://${globalObj.window.location.host}/ws`;
 	}
 	// Node.js 环境：直接连接 WebSocket 服务器
 	return "ws://localhost:3001";

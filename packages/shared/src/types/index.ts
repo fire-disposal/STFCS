@@ -46,5 +46,5 @@ export type {
 } from '../core-types.js';
 
 // 导出结果类型
-export type { Result, Success, Failure, OptionalResult } from './result';
-export { ok, fail } from './result';
+export type { Result, Success, Failure, OptionalResult } from './result.js';
+export { ok, fail } from './result.js';
