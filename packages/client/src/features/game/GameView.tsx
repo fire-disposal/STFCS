@@ -13,16 +13,10 @@ import {
 } from "@/store/slices/turnSlice";
 import TurnIndicator from "@/features/ui/TurnIndicator";
 import DMToggleButton from "@/features/ui/DMToggleButton";
-import { TopZoomIndicator } from "@/features/ui/TopZoomIndicator";
+import { TacticalCommandPanel } from "@/features/ui/TacticalCommandPanel";
+import { RightInfoPanel } from "@/features/ui/RightInfoPanel";
 import React, { useState, useEffect, useRef } from "react";
 import {
-	MousePointer,
-	Hand,
-	Edit3,
-	Ruler,
-	MapPin,
-	SkipForward,
-	LogOut,
 	Circle,
 } from "lucide-react";
 
@@ -35,14 +29,12 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	const { t } = useTranslation();
 	const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
 	const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
-	const [chatExpanded, setChatExpanded] = useState(false);
 
 	// 获取相机状态用于显示
 	const camera = useAppSelector((state) => state.camera.local);
 
 	// 缩放控制处理
 	const handleZoomIn = () => {
-		// 通过自定义事件通知 GameCanvas
 		window.dispatchEvent(new CustomEvent("game-zoom", { detail: { action: "in" } }));
 	};
 
@@ -66,20 +58,9 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 		dispatch(setSelectedTool(tool as any));
 	};
 
-	// 处理聊天消息发送
-	const handleChatSend = (content: string) => {
-		if (currentPlayerId && content.trim()) {
-			const player = players[currentPlayerId];
-			if (player) {
-				websocketService.sendChatMessage(content, currentPlayerId, player.name);
-			}
-		}
-	};
-
 	// 处理结束回合
 	const handleEndTurn = () => {
 		if (currentPlayerId) {
-			// 发送结束回合消息
 			websocketService.send({
 				type: "PLAYER_ACTION",
 				payload: {
@@ -111,19 +92,15 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 
 	// 初始化 WebSocket 消息处理器
 	useEffect(() => {
-		// 设置舰船移动处理器
 		websocketService.on("SHIP_MOVED", (payload) => {
 			console.log("Ship moved received:", payload);
-			// 这里可以更新本地状态或触发重新获取
 		});
 
-		// 设置战斗结果处理器
 		websocketService.on("COMBAT_EVENT", (payload) => {
 			console.log("Combat result:", payload);
 		});
 
 		return () => {
-			// 清理处理器
 			websocketService.off("SHIP_MOVED", () => {});
 			websocketService.off("COMBAT_EVENT", () => {});
 		};
@@ -132,10 +109,9 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 	return (
 		<div className="game-view">
 			{/* 顶部菜单栏 */}
-			<TopBarMenu 
-				onDisconnect={onDisconnect} 
+			<TopBarMenu
+				onDisconnect={onDisconnect}
 				playerName={currentPlayerId || 'Player'}
-				// 缩放控制
 				zoom={camera.zoom}
 				minZoom={camera.minZoom}
 				maxZoom={camera.maxZoom}
@@ -150,6 +126,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					<button
 						className="panel-toggle"
 						onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+						type="button"
 					>
 						{leftPanelCollapsed ? "›" : "‹"}
 					</button>
@@ -206,94 +183,41 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					/>
 				</main>
 
-				{/* 右侧面板 - 战斗日志和系统信息 */}
+				{/* 右侧面板 - 新的多功能信息面板（聊天/战斗/全部） */}
 				<aside className={`game-sidebar right ${rightPanelCollapsed ? "collapsed" : ""}`}>
 					<button
 						className="panel-toggle"
 						onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+						type="button"
 					>
 						{rightPanelCollapsed ? "‹" : "›"}
 					</button>
 					{!rightPanelCollapsed && (
-						<div className="panel-content">
-							<div className="combat-log-placeholder">
-								<h3>{t("combat.log")}</h3>
-								<div className="log-entries">
-									<div className="log-entry">
-										<span className="log-time">12:30:45</span>
-										<span className="log-text">{t("combat.firedMissiles", { player: "Player1", target: "EnemyShip" })}</span>
-									</div>
-									<div className="log-entry">
-										<span className="log-time">12:31:10</span>
-										<span className="log-text">{t("combat.shieldTookDamage", { ship: "EnemyShip", damage: 150 })}</span>
-									</div>
-									<div className="log-entry">
-										<span className="log-time">12:31:25</span>
-										<span className="log-text">{t("combat.returnedFire", { ship: "EnemyShip", weapon: t("ship.weapons") })}</span>
-									</div>
-								</div>
-							</div>
+						<div className="panel-content" style={{ padding: 0, height: '100%' }}>
+							<RightInfoPanel />
 						</div>
 					)}
 				</aside>
 			</div>
 
-			{/* 底部聊天面板 */}
-			<div className="game-chat">
-				<div className="chat-panel-placeholder">
-					<div className="chat-header">
-						<h3>{t("chat.title")} {chatExpanded ? "▼" : "▲"}</h3>
-						<button onClick={() => setChatExpanded(!chatExpanded)}>
-							{chatExpanded ? t("ui.collapse") : t("ui.expand")}
-						</button>
-					</div>
-					{chatExpanded && (
-						<div className="chat-content">
-							<div className="chat-messages">
-								<div className="chat-message">
-									<span className="sender">{t("chat.system")}:</span>
-									<span className="message">{t("ui.welcome")}</span>
-								</div>
-								<div className="chat-message">
-									<span className="sender">Player1:</span>
-									<span className="message">{t("ui.letsBegin")}</span>
-								</div>
-							</div>
-							<div className="chat-input">
-								<input type="text" placeholder={t("ui.typeMessage")} />
-								<button onClick={() => handleChatSend("Test message")}>{t("ui.send")}</button>
-							</div>
-						</div>
-					)}
-				</div>
-			</div>
-
-			{/* 游戏状态指示器 */}
-			<div className="game-status">
-				<div className="status-item">
-					<span className="status-label">{t("status.room")}:</span>
-					<span className="status-value">{roomId || t("room.notJoined")}</span>
-				</div>
-				<div className="status-item">
-					<span className="status-label">{t("status.players")}:</span>
-					<span className="status-value">{Object.keys(players).length}</span>
-				</div>
-				<div className="status-item">
-					<span className="status-label">{t("status.tool")}:</span>
-					<span className="status-value">{selectedTool}</span>
-				</div>
-				<div className="status-item">
-					<span className="status-label">{t("status.turn")}:</span>
-					<span className="status-value">
-						{currentUnit ? `${currentUnit.name}'s Turn` : t("status.waiting")}
-					</span>
-				</div>
-			</div>
-
 			{/* DM 模式切换按钮 */}
 			<DMToggleButton />
 
+			{/* 底部战术指挥面板 - 纯游戏相关 */}
+			<TacticalCommandPanel />
+
 			<style>{`
+				/* 游戏视图容器 - 为顶栏和底部面板留出空间 */
+				.game-view {
+					width: 100%;
+					height: 100%;
+					display: flex;
+					flex-direction: column;
+					overflow: hidden;
+					padding-top: 48px; /* 顶栏高度 */
+					padding-bottom: 64px; /* 底部面板高度 */
+				}
+
 				.toolbar {
 					display: flex;
 					gap: 24px;
@@ -307,9 +231,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 				}
 
 				.room-panel-placeholder,
-				.player-controls-placeholder,
-				.combat-log-placeholder,
-				.chat-panel-placeholder {
+				.player-controls-placeholder {
 					padding: 12px;
 					background: rgba(20, 20, 40, 0.7);
 					border-radius: 4px;
@@ -317,9 +239,7 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 				}
 
 				.room-panel-placeholder h3,
-				.player-controls-placeholder h3,
-				.combat-log-placeholder h3,
-				.chat-panel-placeholder h3 {
+				.player-controls-placeholder h3 {
 					color: #aaccff;
 					margin-bottom: 8px;
 					font-size: 14px;
@@ -384,84 +304,22 @@ const GameView: React.FC<GameViewProps> = ({ onDisconnect }) => {
 					min-width: 0;
 				}
 
-				.log-entries {
-					max-height: 300px;
-					overflow-y: auto;
+				/* 右侧面板样式调整 */
+				.game-sidebar.right {
+					position: relative;
+					z-index: 100;
 				}
 
-				.log-entry {
-					padding: 6px 8px;
-					background: rgba(30, 30, 60, 0.3);
-					margin-bottom: 4px;
-					border-radius: 3px;
-					display: flex;
-					gap: 8px;
-					font-size: 12px;
+				.game-sidebar.right .panel-content {
+					height: 100%;
+					overflow: hidden;
+					padding: 0;
 				}
 
-				.log-time {
-					color: #8a8aa8;
-					min-width: 60px;
-				}
-
-				.log-text {
-					color: #c0c0d0;
-				}
-
-				.chat-header {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
-				}
-
-				.chat-header button {
-					background: rgba(40, 40, 80, 0.5);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					color: #aaccff;
-					padding: 4px 8px;
-					border-radius: 3px;
-					font-size: 12px;
-					cursor: pointer;
-				}
-
-				.chat-messages {
-					max-height: 120px;
-					overflow-y: auto;
-					margin: 12px 0;
-				}
-
-				.chat-message {
-					margin-bottom: 6px;
-					font-size: 13px;
-				}
-
-				.sender {
-					color: #4a9eff;
-					font-weight: 500;
-					margin-right: 6px;
-				}
-
-				.chat-input {
-					display: flex;
-					gap: 8px;
-				}
-
-				.chat-input input {
-					flex: 1;
-					background: rgba(10, 10, 30, 0.8);
-					border: 1px solid rgba(100, 100, 150, 0.3);
-					border-radius: 4px;
-					padding: 6px 10px;
-					color: #c0c0d0;
-				}
-
-				.chat-input button {
-					background: rgba(74, 158, 255, 0.2);
-					border: 1px solid #4a9eff;
-					color: #aaccff;
-					padding: 6px 12px;
-					border-radius: 4px;
-					cursor: pointer;
+				/* 覆盖全局样式 */
+				:global(.game-view) {
+					padding-top: 48px !important;
+					padding-bottom: 64px !important;
 				}
 			`}</style>
 		</div>

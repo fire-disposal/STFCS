@@ -372,6 +372,8 @@ code, pre {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    padding-top: 48px; /* 为fixed顶栏留出空间 */
+    padding-bottom: 64px; /* 为fixed底部面板留出空间 */
 }
 
 .game-content {

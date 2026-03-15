@@ -218,19 +218,19 @@ export const RulerZoomIndicator: React.FC<RulerZoomIndicatorProps> = ({
 				.ruler-value-indicator::before {
 					content: '';
 					position: absolute;
-					top: -3px;
+					bottom: -3px;
 					left: 50%;
 					transform: translateX(-50%);
 					width: 0;
 					height: 0;
 					border-left: 3px solid transparent;
 					border-right: 3px solid transparent;
-					border-top: 4px solid #4a9eff;
+					border-bottom: 4px solid #4a9eff;
 				}
 
 				.ruler-value-label {
 					position: absolute;
-					top: -16px;
+					bottom: -20px;
 					left: 50%;
 					transform: translateX(-50%);
 					font-family: 'Share Tech Mono', monospace;
