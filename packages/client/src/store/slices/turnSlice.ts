@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction, createSelector } from "@reduxjs/toolkit";
 import type { TurnUnit, TurnOrder, UnitTurnState, TurnPhase } from "@vt/shared/types";
 
 interface TurnState {
@@ -268,14 +268,14 @@ export const {
 	setMaxVisibleUnits,
 } = turnSlice.actions;
 
-// 选择器
+// 基础选择器
+const selectTurnState = (state: { turn: TurnState }) => state.turn;
+const selectTurnOrderFromState = (state: { turn: TurnState }) => state.turn.order;
+
+// 简单的原始值选择器（不需要 memoization）
 export const selectTurnOrder = (state: { turn: TurnState }) => state.turn.order;
-export const selectCurrentUnit = (state: { turn: TurnState }) =>
-	state.turn.order?.units[state.turn.order.currentIndex] || null;
 export const selectCurrentIndex = (state: { turn: TurnState }) =>
 	state.turn.order?.currentIndex ?? -1;
-export const selectTurnUnits = (state: { turn: TurnState }) =>
-	state.turn.order?.units ?? [];
 export const selectHoveredUnitId = (state: { turn: TurnState }) =>
 	state.turn.hoveredUnitId;
 export const selectVisibleStartIndex = (state: { turn: TurnState }) =>
@@ -284,5 +284,18 @@ export const selectMaxVisibleUnits = (state: { turn: TurnState }) =>
 	state.turn.maxVisibleUnits;
 export const selectIsTurnInitialized = (state: { turn: TurnState }) =>
 	state.turn.isInitialized;
+
+// Memoized 选择器（返回数组或对象，需要 memoization 避免不必要的重渲染）
+const EMPTY_UNITS_ARRAY: TurnUnit[] = [];
+
+export const selectTurnUnits = createSelector(
+	[selectTurnOrderFromState],
+	(order) => order?.units ?? EMPTY_UNITS_ARRAY
+);
+
+export const selectCurrentUnit = createSelector(
+	[selectTurnOrderFromState],
+	(order) => order?.units[order.currentIndex] ?? null
+);
 
 export default turnSlice.reducer;
