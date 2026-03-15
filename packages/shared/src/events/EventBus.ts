@@ -7,8 +7,6 @@
  * 3. 支持事件转换（领域事件 → WS 消息）
  */
 
-import { z } from 'zod';
-
 // ==================== 基础事件类型 ====================
 
 /** 基础事件接口 */
@@ -16,6 +14,13 @@ export interface IDomainEvent {
   readonly type: string;
   readonly timestamp: number;
   readonly roomId?: string;
+}
+
+/** 事件上下文 */
+export interface EventContext {
+  roomId: string;
+  playerId?: string;
+  correlationId?: string;
 }
 
 // ==================== 领域事件定义 ====================
@@ -159,7 +164,7 @@ export interface EventTranslator {
  * 默认事件转换器
  */
 export class DefaultEventTranslator implements EventTranslator {
-  translate(event: DomainEvent, context: EventContext): unknown | null {
+  translate(event: DomainEvent, _context: EventContext): unknown | null {
     switch (event.type) {
       case 'SHIP_MOVED':
         return {
@@ -416,7 +421,7 @@ export function createDomainEvent<T extends DomainEventType>(
 
 // ==================== 导出 ====================
 
-export {
+export type {
   ShipMovedEvent,
   ShieldToggledEvent,
   FluxStateUpdatedEvent,

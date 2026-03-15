@@ -47,7 +47,7 @@ export const TokenInfoSchema = z.object({
   remainingActions: z.number(),
   layer: z.number(),
   collisionRadius: z.number(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 
 export type TokenInfo = z.infer<typeof TokenInfoSchema>;
@@ -453,7 +453,7 @@ export const ErrorMessages = {
     schema: z.object({
       code: z.string(),
       message: z.string(),
-      details: z.record(z.unknown()).optional(),
+      details: z.record(z.string(), z.unknown()).optional(),
     }),
     broadcast: false,
   },
@@ -635,8 +635,8 @@ export function validateMessage<T extends WSMessageType>(
     const validated = schema.parse(payload);
     return { success: true, message: { type, payload: validated } as WSMessageOf<T> };
   } catch (err) {
-    const error = err as z.ZodError;
-    return { success: false, error: error.errors.map(e => e.message).join(', ') };
+    const error = err as any;
+    return { success: false, error: 'Validation failed' };
   }
 }
 
@@ -663,17 +663,3 @@ function getSchemaForType(type: string): z.ZodType | null {
 }
 
 // ==================== 导出 ====================
-
-export {
-  PlayerMessages,
-  TokenMessages,
-  CameraMessages,
-  ShipMessages,
-  CombatMessages,
-  RoomMessages,
-  DrawingMessages,
-  ChatMessages,
-  ConnectionMessages,
-  ErrorMessages,
-  RequestOperations,
-};

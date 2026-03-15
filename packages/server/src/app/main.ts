@@ -7,7 +7,7 @@ import { PlayerService } from "../application/player/PlayerService";
 import { SelectionService } from "../application/selection/SelectionService";
 import { ShipService } from "../application/ship/ShipService";
 import { config } from "../config";
-import { EventBus } from "../infrastructure/events/EventBus";
+import { RoomEventBusManager } from "../infrastructure/events/EventBusIntegration";
 import { WSEventHandler } from "../infrastructure/events/WSEventHandler";
 import { MessageHandler } from "../infrastructure/ws/MessageHandler";
 import { RoomManager } from "../infrastructure/ws/RoomManager";
@@ -27,7 +27,7 @@ export class Application {
 	private _playerService: PlayerService;
 	private _selectionService: SelectionService;
 	private _shipService: ShipService;
-	private _eventBus: EventBus;
+	private _eventBusManager: RoomEventBusManager;
 	private _wsEventHandler?: WSEventHandler;
 
 	constructor(options: ServerOptions = {}) {
@@ -37,7 +37,7 @@ export class Application {
 			},
 		});
 
-		this._eventBus = new EventBus();
+		this._eventBusManager = new RoomEventBusManager();
 		this._roomManager = new RoomManager(config.maxPlayersPerRoom);
 		this._playerService = new PlayerService();
 		this._selectionService = new SelectionService();
