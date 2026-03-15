@@ -4,24 +4,21 @@ import type {
 	DrawingAddMessage,
 	DrawingClearMessage,
 	DrawingElement,
+	ErrorResponse,
 	FluxStateMessage,
-	OperationHandler,
+	ObjectDeselectedMessage,
+	ObjectSelectedMessage,
+	PlayerJoinedMessage,
 	RequestHandlers,
 	RequestMessage,
 	RequestOperation,
 	RequestPayload,
-	ResponseData,
 	ShieldUpdateMessage,
-	ShipMovedMessage,
 	SuccessResponse,
-	WSMessage,
-	ErrorResponse,
+	TokenDragEndMessage,
 	TokenDragStartMessage,
 	TokenDraggingMessage,
-	TokenDragEndMessage,
-	ObjectSelectedMessage,
-	ObjectDeselectedMessage,
-	PlayerJoinedMessage,
+	WSMessage,
 } from "@vt/shared/ws";
 import { WS_MESSAGE_TYPES, isRequestMessage, isShipMovedMessage } from "@vt/shared/ws";
 import type { PlayerService } from "../../application/player/PlayerService";
@@ -123,6 +120,9 @@ export class MessageHandler {
 				case WS_MESSAGE_TYPES.TOKEN_DRAG_END:
 					await this._handleTokenDragEnd(clientId, message);
 					break;
+				case WS_MESSAGE_TYPES.PING:
+					await this._handlePing(clientId, message);
+					break;
 				default:
 					console.warn(`Unhandled WS message type: ${message.type}`);
 			}
@@ -155,7 +155,10 @@ export class MessageHandler {
 		}
 
 		try {
-			const result = await (handler as (clientId: string, data: unknown) => Promise<unknown>)(clientId, data);
+			const result = await (handler as (clientId: string, data: unknown) => Promise<unknown>)(
+				clientId,
+				data
+			);
 			this._sendResponse(clientId, requestId, {
 				success: true,
 				operation,
@@ -346,7 +349,10 @@ export class MessageHandler {
 		return updatedPlayer;
 	}
 
-	private async _handleObjectSelected(clientId: string, message: ObjectSelectedMessage): Promise<void> {
+	private async _handleObjectSelected(
+		clientId: string,
+		message: ObjectSelectedMessage
+	): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -361,11 +367,18 @@ export class MessageHandler {
 		});
 
 		if (!result.success) {
-			this._sendError(clientId, "SELECTION_ERROR", typeof result.error === "string" ? result.error : "Failed to select object");
+			this._sendError(
+				clientId,
+				"SELECTION_ERROR",
+				typeof result.error === "string" ? result.error : "Failed to select object"
+			);
 		}
 	}
 
-	private async _handleObjectDeselected(clientId: string, message: ObjectDeselectedMessage): Promise<void> {
+	private async _handleObjectDeselected(
+		clientId: string,
+		message: ObjectDeselectedMessage
+	): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -418,7 +431,7 @@ export class MessageHandler {
 
 	private async _handleShipMoved(clientId: string, message: WSMessage): Promise<void> {
 		if (!isShipMovedMessage(message)) return;
-		
+
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
@@ -591,7 +604,12 @@ export class MessageHandler {
 		});
 	}
 
-	private _sendError(clientId: string, code: string, message: string, details?: Record<string, unknown>): void {
+	private _sendError(
+		clientId: string,
+		code: string,
+		message: string,
+		details?: Record<string, unknown>
+	): void {
 		if (this._wsServer) {
 			this._wsServer.sendTo(clientId, {
 				type: WS_MESSAGE_TYPES.ERROR,
@@ -600,7 +618,11 @@ export class MessageHandler {
 		}
 	}
 
-	private _sendResponse(clientId: string, requestId: string, response: SuccessResponse<RequestOperation> | ErrorResponse): void {
+	private _sendResponse(
+		clientId: string,
+		requestId: string,
+		response: SuccessResponse<RequestOperation> | ErrorResponse
+	): void {
 		if (!this._wsServer) return;
 
 		this._wsServer.sendTo(clientId, {
@@ -665,7 +687,10 @@ export class MessageHandler {
 	}
 
 	// Token 拖拽消息处理
-	private async _handleTokenDragStart(clientId: string, message: TokenDragStartMessage): Promise<void> {
+	private async _handleTokenDragStart(
+		clientId: string,
+		message: TokenDragStartMessage
+	): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "DRAG_START_ERROR", "Player is not in a room");
@@ -685,7 +710,10 @@ export class MessageHandler {
 		}
 	}
 
-	private async _handleTokenDragging(clientId: string, message: TokenDraggingMessage): Promise<void> {
+	private async _handleTokenDragging(
+		clientId: string,
+		message: TokenDraggingMessage
+	): Promise<void> {
 		const playerRoom = this._roomManager.getPlayerRoom(clientId);
 		if (!playerRoom) {
 			this._sendError(clientId, "DRAG_ERROR", "Player is not in a room");
@@ -737,6 +765,15 @@ export class MessageHandler {
 					newHeading: message.payload.finalHeading,
 					timestamp: Date.now(),
 				},
+			});
+		}
+	}
+
+	private async _handlePing(clientId: string, message: WSMessage): Promise<void> {
+		if (this._wsServer) {
+			this._wsServer.sendTo(clientId, {
+				type: WS_MESSAGE_TYPES.PONG,
+				payload: { timestamp: (message as { payload: { timestamp: number } }).payload.timestamp },
 			});
 		}
 	}
