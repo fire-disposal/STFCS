@@ -7,9 +7,8 @@ import { PlayerService } from "../application/player/PlayerService";
 import { SelectionService } from "../application/selection/SelectionService";
 import { ShipService } from "../application/ship/ShipService";
 import { config } from "../config";
-import { RoomEventBusManager } from "../infrastructure/events/EventBusIntegration";
-import { WSEventHandler } from "../infrastructure/events/WSEventHandler";
-import { EventBus } from "../infrastructure/events/EventBus";
+import { DomainEventAggregator } from "../infrastructure/events";
+import { EventBus } from "@vt/shared/events";
 import { MessageHandler } from "../infrastructure/ws/MessageHandler";
 import { RoomManager } from "../infrastructure/ws/RoomManager";
 import { WSServer } from "../infrastructure/ws/WSServer";
@@ -28,9 +27,8 @@ export class Application {
 	private _playerService: PlayerService;
 	private _selectionService: SelectionService;
 	private _shipService: ShipService;
-	private _eventBusManager?: RoomEventBusManager;
+	private _domainEventAggregator?: DomainEventAggregator;
 	private _eventBus?: EventBus;
-	private _wsEventHandler?: WSEventHandler;
 
 	constructor(options: ServerOptions = {}) {
 		this._fastify = Fastify({
@@ -80,8 +78,8 @@ export class Application {
 	}
 
 	async stop(): Promise<void> {
-		if (this._wsEventHandler) {
-			this._wsEventHandler.dispose();
+		if (this._domainEventAggregator) {
+			this._domainEventAggregator.stop();
 		}
 		if (this._wsServer) {
 			this._wsServer.close();
@@ -165,9 +163,6 @@ export class Application {
 			},
 		});
 
-		// 初始化事件总线管理器（需要 wsServer）
-		this._eventBusManager = new RoomEventBusManager(this._wsServer);
-
 		this._roomManager.setWSServer(this._wsServer);
 		this._playerService.setWSServer(this._wsServer);
 		this._selectionService.setWSServer(this._wsServer);
@@ -187,11 +182,20 @@ export class Application {
 	private _initializeEventBus(): void {
 		// 创建全局事件总线
 		this._eventBus = new EventBus();
-		
-		// 创建 WS 事件处理器，订阅领域事件并广播到 WS
+
+		// 创建领域事件聚合器，订阅领域事件并广播到 WS
 		if (this._wsServer) {
-			this._wsEventHandler = new WSEventHandler(this._wsServer, this._roomManager, this._eventBus);
-			this._fastify.log.info("Event bus initialized with WS event handler");
+			this._domainEventAggregator = new DomainEventAggregator(
+				this._eventBus,
+				this._wsServer,
+				this._roomManager as any, // 类型兼容性问题，暂时使用 as any
+				{
+					roomId: 'global', // 全局房间
+					enableLogging: process.env.NODE_ENV === 'development',
+				}
+			);
+			this._domainEventAggregator.start();
+			this._fastify.log.info("Event bus initialized with DomainEventAggregator");
 		}
 	}
 
