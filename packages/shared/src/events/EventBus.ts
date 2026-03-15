@@ -1,151 +1,34 @@
 /**
- * 领域事件总线
- * 
- * 目标：
- * 1. 统一领域事件的发布和订阅
- * 2. 提供类型安全的事件处理
- * 3. 支持事件转换（领域事件 → WS 消息）
+ * 领域事件总线 v2
+ *
+ * 基于统一协议层的事件总线，提供：
+ * 1. 类型安全的事件发布和订阅
+ * 2. 领域事件 → WS 消息自动转换
+ * 3. 事件上下文追踪
  */
 
-// ==================== 基础事件类型 ====================
+import type {
+  DomainEvent,
+  DomainEventType,
+  DomainEventPayloadMap,
+  EventContext,
+} from '../protocol/DomainEvents';
+import { createDomainEvent } from '../protocol/DomainEvents';
+import type { WSMessage } from '../ws';
+import { WS_MESSAGE_TYPES } from '../ws';
 
-/** 基础事件接口 */
-export interface IDomainEvent {
-  readonly type: string;
-  readonly timestamp: number;
-  readonly roomId?: string;
-}
+// ==================== 事件处理器类型 ====================
 
-/** 事件上下文 */
-export interface EventContext {
-  roomId: string;
-  playerId?: string;
-  correlationId?: string;
-}
+/** 事件处理器 */
+export type EventHandler<T extends DomainEvent = DomainEvent> = (
+  event: T,
+  context: EventContext
+) => void | Promise<void>;
 
-// ==================== 领域事件定义 ====================
+/** 取消订阅函数 */
+export type Unsubscribe = () => void;
 
-/**
- * 舰船事件
- */
-export interface ShipMovedEvent extends IDomainEvent {
-  type: 'SHIP_MOVED';
-  shipId: string;
-  previousPosition: { x: number; y: number };
-  newPosition: { x: number; y: number };
-  previousHeading: number;
-  newHeading: number;
-  phase: 1 | 2 | 3;
-}
-
-export interface ShieldToggledEvent extends IDomainEvent {
-  type: 'SHIELD_TOGGLED';
-  shipId: string;
-  isActive: boolean;
-}
-
-export interface FluxStateUpdatedEvent extends IDomainEvent {
-  type: 'FLUX_STATE_UPDATED';
-  shipId: string;
-  fluxState: 'normal' | 'venting' | 'overloaded';
-  currentFlux: number;
-  softFlux: number;
-  hardFlux: number;
-}
-
-/**
- * 玩家事件
- */
-export interface PlayerJoinedEvent extends IDomainEvent {
-  type: 'PLAYER_JOINED';
-  playerId: string;
-  playerName: string;
-}
-
-export interface PlayerLeftEvent extends IDomainEvent {
-  type: 'PLAYER_LEFT';
-  playerId: string;
-  reason?: string;
-}
-
-export interface PlayerDMModeChangedEvent extends IDomainEvent {
-  type: 'PLAYER_DM_MODE_CHANGED';
-  playerId: string;
-  playerName: string;
-  isDMMode: boolean;
-}
-
-/**
- * Token/选中事件
- */
-export interface ObjectSelectedEvent extends IDomainEvent {
-  type: 'OBJECT_SELECTED';
-  tokenId: string;
-  playerId: string;
-  playerName: string;
-  isDMMode: boolean;
-}
-
-export interface ObjectDeselectedEvent extends IDomainEvent {
-  type: 'OBJECT_DESELECTED';
-  tokenId: string;
-  playerId: string;
-  reason: 'manual' | 'override' | 'released';
-}
-
-export interface TokenMovedEvent extends IDomainEvent {
-  type: 'TOKEN_MOVED';
-  tokenId: string;
-  ownerId: string;
-  previousPosition: { x: number; y: number };
-  newPosition: { x: number; y: number };
-  previousHeading: number;
-  newHeading: number;
-}
-
-/**
- * 战斗事件
- */
-export interface WeaponFiredEvent extends IDomainEvent {
-  type: 'WEAPON_FIRED';
-  sourceShipId: string;
-  targetShipId: string;
-  weaponId: string;
-  mountId: string;
-}
-
-export interface DamageDealtEvent extends IDomainEvent {
-  type: 'DAMAGE_DEALT';
-  sourceShipId: string;
-  targetShipId: string;
-  hit: boolean;
-  damage?: number;
-  shieldAbsorbed: number;
-  armorReduced: number;
-  hullDamage: number;
-  softFluxGenerated: number;
-  hardFluxGenerated: number;
-}
-
-/**
- * 联合类型
- */
-export type DomainEvent =
-  | ShipMovedEvent
-  | ShieldToggledEvent
-  | FluxStateUpdatedEvent
-  | PlayerJoinedEvent
-  | PlayerLeftEvent
-  | PlayerDMModeChangedEvent
-  | ObjectSelectedEvent
-  | ObjectDeselectedEvent
-  | TokenMovedEvent
-  | WeaponFiredEvent
-  | DamageDealtEvent;
-
-export type DomainEventType = DomainEvent['type'];
-
-// ==================== 事件到 WS 消息的转换 ====================
+// ==================== 事件到 WS 消息转换器 ====================
 
 /**
  * 事件转换器接口
@@ -153,95 +36,260 @@ export type DomainEventType = DomainEvent['type'];
 export interface EventTranslator {
   /**
    * 将领域事件转换为 WS 消息
-   * @param event 领域事件
-   * @param context 事件上下文
-   * @returns WS 消息，如果返回 null 则表示不广播
    */
-  translate(event: DomainEvent, context: EventContext): unknown | null;
+  translate(event: DomainEvent, context: EventContext): WSMessage | null;
 }
 
 /**
  * 默认事件转换器
+ * 将领域事件转换为对应的 WS 消息格式
  */
 export class DefaultEventTranslator implements EventTranslator {
-  translate(event: DomainEvent, _context: EventContext): unknown | null {
-    switch (event.type) {
+  translate(event: DomainEvent, _context: EventContext): WSMessage | null {
+    const { type, payload } = event;
+
+    switch (type) {
+      // 舰船事件
       case 'SHIP_MOVED':
         return {
-          type: 'SHIP_MOVED' as const,
+          type: WS_MESSAGE_TYPES.SHIP_MOVED,
           payload: {
-            shipId: event.shipId,
-            phase: event.phase,
+            shipId: payload.shipId,
+            phase: payload.phase,
             type: 'straight' as const,
-            newX: event.newPosition.x,
-            newY: event.newPosition.y,
-            newHeading: event.newHeading,
-            timestamp: event.timestamp,
+            newX: payload.newPosition.x,
+            newY: payload.newPosition.y,
+            newHeading: payload.newHeading,
+            timestamp: payload.timestamp,
           },
         };
 
+      case 'SHIELD_TOGGLED':
+        return {
+          type: WS_MESSAGE_TYPES.SHIELD_UPDATE,
+          payload: {
+            shipId: payload.shipId,
+            active: payload.isActive,
+            type: 'front' as const,
+            coverageAngle: 180,
+          },
+        };
+
+      case 'FLUX_STATE_UPDATED':
+        return {
+          type: WS_MESSAGE_TYPES.FLUX_STATE,
+          payload: {
+            shipId: payload.shipId,
+            fluxState: payload.fluxState,
+            currentFlux: payload.currentFlux,
+            softFlux: payload.softFlux,
+            hardFlux: payload.hardFlux,
+          },
+        };
+
+      // 玩家事件
+      case 'PLAYER_JOINED':
+        return {
+          type: WS_MESSAGE_TYPES.PLAYER_JOINED,
+          payload: {
+            id: payload.playerId,
+            name: payload.playerName,
+            joinedAt: payload.timestamp,
+            isActive: true,
+            isDMMode: false,
+          },
+        };
+
+      case 'PLAYER_LEFT':
+        return {
+          type: WS_MESSAGE_TYPES.PLAYER_LEFT,
+          payload: {
+            playerId: payload.playerId,
+            reason: payload.reason,
+          },
+        };
+
+      case 'PLAYER_DM_MODE_CHANGED':
+        return {
+          type: WS_MESSAGE_TYPES.DM_STATUS_UPDATE,
+          payload: {
+            players: [{
+              id: payload.playerId,
+              name: payload.playerName,
+              isDMMode: payload.isDMMode,
+            }],
+          },
+        };
+
+      // 选中事件
       case 'OBJECT_SELECTED':
         return {
-          type: 'OBJECT_SELECTED' as const,
+          type: WS_MESSAGE_TYPES.OBJECT_SELECTED,
           payload: {
-            playerId: event.playerId,
-            playerName: event.playerName,
-            tokenId: event.tokenId,
-            timestamp: event.timestamp,
-            forceOverride: false,
+            playerId: payload.playerId,
+            playerName: payload.playerName,
+            tokenId: payload.tokenId,
+            timestamp: payload.timestamp,
+            forceOverride: payload.forceOverride ?? false,
           },
         };
 
       case 'OBJECT_DESELECTED':
         return {
-          type: 'OBJECT_DESELECTED' as const,
+          type: WS_MESSAGE_TYPES.OBJECT_DESELECTED,
           payload: {
-            playerId: event.playerId,
-            tokenId: event.tokenId,
-            timestamp: event.timestamp,
-            reason: event.reason,
+            playerId: payload.playerId,
+            tokenId: payload.tokenId,
+            timestamp: payload.timestamp,
+            reason: payload.reason,
           },
         };
 
+      // Token 事件
       case 'TOKEN_MOVED':
         return {
-          type: 'TOKEN_MOVED' as const,
+          type: WS_MESSAGE_TYPES.TOKEN_MOVED,
           payload: {
-            tokenId: event.tokenId,
-            previousPosition: event.previousPosition,
-            newPosition: event.newPosition,
-            previousHeading: event.previousHeading,
-            newHeading: event.newHeading,
-            timestamp: event.timestamp,
+            tokenId: payload.tokenId,
+            previousPosition: payload.previousPosition,
+            newPosition: payload.newPosition,
+            previousHeading: payload.previousHeading,
+            newHeading: payload.newHeading,
+            timestamp: payload.timestamp,
           },
         };
 
+      case 'TOKEN_DRAG_START':
+        return {
+          type: WS_MESSAGE_TYPES.TOKEN_DRAG_START,
+          payload: {
+            tokenId: payload.tokenId,
+            playerId: payload.playerId,
+            playerName: payload.playerName,
+            position: payload.position,
+            heading: payload.heading,
+            timestamp: payload.timestamp,
+          },
+        };
+
+      case 'TOKEN_DRAGGING':
+        return {
+          type: WS_MESSAGE_TYPES.TOKEN_DRAGGING,
+          payload: {
+            tokenId: payload.tokenId,
+            playerId: payload.playerId,
+            playerName: payload.playerName,
+            position: payload.position,
+            heading: payload.heading,
+            isDragging: payload.isDragging,
+            timestamp: payload.timestamp,
+          },
+        };
+
+      case 'TOKEN_DRAG_END':
+        return {
+          type: WS_MESSAGE_TYPES.TOKEN_DRAG_END,
+          payload: {
+            tokenId: payload.tokenId,
+            playerId: payload.playerId,
+            finalPosition: payload.finalPosition,
+            finalHeading: payload.finalHeading,
+            committed: payload.committed,
+            timestamp: payload.timestamp,
+          },
+        };
+
+      // 战斗事件
       case 'WEAPON_FIRED':
         return {
-          type: 'WEAPON_FIRED' as const,
+          type: WS_MESSAGE_TYPES.WEAPON_FIRED,
           payload: {
-            sourceShipId: event.sourceShipId,
-            targetShipId: event.targetShipId,
-            weaponId: event.weaponId,
-            mountId: event.mountId,
-            timestamp: event.timestamp,
+            sourceShipId: payload.sourceShipId,
+            targetShipId: payload.targetShipId,
+            weaponId: payload.weaponId,
+            mountId: payload.mountId,
+            timestamp: payload.timestamp,
           },
         };
 
       case 'DAMAGE_DEALT':
         return {
-          type: 'DAMAGE_DEALT' as const,
+          type: WS_MESSAGE_TYPES.DAMAGE_DEALT,
           payload: {
-            sourceShipId: event.sourceShipId,
-            targetShipId: event.targetShipId,
-            hit: event.hit,
-            damage: event.damage,
-            shieldAbsorbed: event.shieldAbsorbed,
-            armorReduced: event.armorReduced,
-            hullDamage: event.hullDamage,
-            softFluxGenerated: event.softFluxGenerated,
-            hardFluxGenerated: event.hardFluxGenerated,
-            timestamp: event.timestamp,
+            sourceShipId: payload.sourceShipId,
+            targetShipId: payload.targetShipId,
+            hit: payload.hit,
+            damage: payload.damage,
+            shieldAbsorbed: payload.shieldAbsorbed,
+            armorReduced: payload.armorReduced,
+            hullDamage: payload.hullDamage,
+            hitQuadrant: payload.hitQuadrant,
+            softFluxGenerated: payload.softFluxGenerated,
+            hardFluxGenerated: payload.hardFluxGenerated,
+            timestamp: payload.timestamp,
+          },
+        };
+
+      // 相机事件
+      case 'CAMERA_UPDATED':
+        return {
+          type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
+          payload: {
+            playerId: payload.playerId,
+            playerName: payload.playerName,
+            centerX: payload.centerX,
+            centerY: payload.centerY,
+            zoom: payload.zoom,
+            rotation: payload.rotation,
+            timestamp: payload.timestamp,
+          },
+        };
+
+      // 回合事件
+      case 'TURN_ORDER_INITIALIZED':
+        return {
+          type: WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED,
+          payload: {
+            units: payload.units,
+            roundNumber: payload.roundNumber,
+            phase: payload.phase,
+          },
+        };
+
+      case 'TURN_ORDER_UPDATED':
+        return {
+          type: WS_MESSAGE_TYPES.TURN_ORDER_UPDATED,
+          payload: {
+            units: payload.units,
+            roundNumber: payload.roundNumber,
+            phase: payload.phase,
+          },
+        };
+
+      case 'TURN_INDEX_CHANGED':
+        return {
+          type: WS_MESSAGE_TYPES.TURN_INDEX_CHANGED,
+          payload: {
+            currentIndex: payload.currentIndex,
+            previousIndex: payload.previousIndex,
+            roundNumber: payload.roundNumber,
+          },
+        };
+
+      case 'UNIT_STATE_CHANGED':
+        return {
+          type: WS_MESSAGE_TYPES.UNIT_STATE_CHANGED,
+          payload: {
+            unitId: payload.unitId,
+            state: payload.state,
+          },
+        };
+
+      case 'ROUND_INCREMENTED':
+        return {
+          type: WS_MESSAGE_TYPES.ROUND_INCREMENTED,
+          payload: {
+            roundNumber: payload.roundNumber,
           },
         };
 
@@ -254,15 +302,6 @@ export class DefaultEventTranslator implements EventTranslator {
 
 // ==================== 事件总线接口 ====================
 
-/** 事件处理器 */
-export type EventHandler<T extends DomainEvent = DomainEvent> = (
-  event: T,
-  context: EventContext
-) => void | Promise<void>;
-
-/** 取消订阅函数 */
-export type Unsubscribe = () => void;
-
 /**
  * 事件总线接口
  */
@@ -270,7 +309,10 @@ export interface IEventBus {
   /**
    * 发布事件
    */
-  publish<T extends DomainEvent>(event: T, context: EventContext): Promise<void>;
+  publish<T extends DomainEvent>(
+    event: T,
+    context: EventContext
+  ): Promise<void>;
 
   /**
    * 订阅特定类型的事件
@@ -293,8 +335,12 @@ export interface IEventBus {
   /**
    * 设置 WS 广播函数
    */
-  setWSBroadcaster(broadcaster: (message: unknown, excludeClientId?: string) => void): void;
+  setWSBroadcaster(
+    broadcaster: (message: WSMessage, excludeClientId?: string) => void
+  ): void;
 }
+
+// ==================== 事件总线实现 ====================
 
 /**
  * 事件总线实现
@@ -303,21 +349,30 @@ export class EventBus implements IEventBus {
   private handlers: Map<DomainEventType, Set<EventHandler>> = new Map();
   private allHandlers: Set<EventHandler> = new Set();
   private translator: EventTranslator = new DefaultEventTranslator();
-  private wsBroadcaster?: (message: unknown, excludeClientId?: string) => void;
+  private wsBroadcaster?: (message: WSMessage, excludeClientId?: string) => void;
 
   /**
    * 发布事件
    */
-  async publish<T extends DomainEvent>(event: T, context: EventContext): Promise<void> {
+  async publish<T extends DomainEvent>(
+    event: T,
+    context: EventContext
+  ): Promise<void> {
     // 确保事件有时间戳
-    if (!event.timestamp) {
-      (event as any).timestamp = Date.now();
+    if (!('timestamp' in event.payload)) {
+      (event.payload as any).timestamp = Date.now();
     }
 
-    // 添加上下文信息
-    const enrichedEvent = { ...event, roomId: context.roomId };
+    // 添加上下文信息到 payload
+    const enrichedEvent: DomainEvent = {
+      ...event,
+      payload: {
+        ...event.payload,
+        roomId: context.roomId,
+      } as any,
+    };
 
-    // 调用所有事件处理器
+    // 调用所有处理器
     const allPromises: Promise<void>[] = [];
 
     // 调用全局处理器
@@ -384,7 +439,9 @@ export class EventBus implements IEventBus {
   /**
    * 设置 WS 广播函数
    */
-  setWSBroadcaster(broadcaster: (message: unknown, excludeClientId?: string) => void): void {
+  setWSBroadcaster(
+    broadcaster: (message: WSMessage, excludeClientId?: string) => void
+  ): void {
     this.wsBroadcaster = broadcaster;
   }
 
@@ -404,21 +461,18 @@ export class EventBus implements IEventBus {
 // ==================== 事件创建工具 ====================
 
 /**
- * 创建领域事件
+ * 创建并发布领域事件
  */
-export function createDomainEvent<T extends DomainEventType>(
+export async function publishEvent<T extends DomainEventType>(
+  eventBus: IEventBus,
   type: T,
-  data: Omit<Extract<DomainEvent, { type: T }>, 'type' | 'timestamp' | 'roomId'>,
+  payload: DomainEventPayloadMap[T],
   context: EventContext
-): Extract<DomainEvent, { type: T }> {
-  return {
-    ...data,
-    type,
-    timestamp: Date.now(),
-    roomId: context.roomId,
-  } as Extract<DomainEvent, { type: T }>;
+): Promise<void> {
+  const event = createDomainEvent(type, payload) as DomainEvent;
+  await eventBus.publish(event, context);
 }
 
 // ==================== 导出 ====================
 
-// 类型已在文件顶部定义并导出，这里不需要重复导出
+export type { EventContext };

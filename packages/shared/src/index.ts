@@ -55,6 +55,9 @@ export type {
 // 导出结果类型工具函数
 export { ok, fail } from './types';
 
+// 导出协议层（统一消息协议 DSL 和领域事件）
+export * from './protocol';
+
 // 导出协议版本
 export { PROTOCOL_VERSION } from './core-types';
 
@@ -155,5 +158,18 @@ export {
   isCameraUpdatedMessage,
 } from './ws';
 
-// 导出领域事件总线
-export * from './events';
+// 导出领域事件总线（重新导出，保持向后兼容）
+export {
+  EventBus,
+  DefaultEventTranslator,
+  createDomainEvent,
+  publishEvent,
+} from './events';
+
+export type {
+  EventHandler,
+  Unsubscribe,
+  EventTranslator,
+  IEventBus,
+  EventContext,
+} from './events';

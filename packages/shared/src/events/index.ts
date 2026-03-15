@@ -3,3 +3,12 @@
  */
 
 export * from './EventBus';
+
+// 重新导出协议层的领域事件类型
+export type {
+  DomainEvent,
+  DomainEventType,
+  DomainEventPayloadMap,
+} from '../protocol/DomainEvents';
+
+export { createDomainEvent } from '../protocol/DomainEvents';
