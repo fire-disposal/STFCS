@@ -1,21 +1,35 @@
 /**
- * WebSocket 消息协议定义
+ * WebSocket 消息协议定义（简化版）
  *
- * 所有消息类型从 Zod schema 推导，确保类型安全
+ * 保留核心 WS 通信基础设施：
+ * 1. 消息类型常量
+ * 2. 请求 - 响应消息 schema 和类型
+ * 3. 接口定义 (IWSServer, IWSClient)
+ * 4. 类型守卫函数
+ *
+ * 事件消息 schema 已迁移到 protocol/DomainEvents.ts
  */
 
 import { z } from 'zod';
-import type { PlayerInfo, ShipStatus } from '../types';
-import {
+// @ts-ignore - 类型在 WSMessage 联合类型中使用
+import type {
+  PlayerInfo,
+  ShipStatus,
+  ShipMovement,
+  PlayerCamera,
+  TokenInfo,
+  MapConfig,
+  ArmorQuadrant,
+} from '../types';
+// @ts-ignore - 类型在 schema 中使用
+import type {
   PlayerInfoSchema,
   ShipMovementSchema,
   ShipStatusSchema,
-  ExplosionDataSchema,
   MapConfigSchema,
   TokenInfoSchema,
   PlayerCameraSchema,
   ArmorQuadrantSchema,
-  FluxOverloadStateSchema,
   PointSchema,
 } from '../core-types';
 
@@ -75,364 +89,14 @@ export const WS_MESSAGE_TYPES = {
 
 export type WSMessageType = (typeof WS_MESSAGE_TYPES)[keyof typeof WS_MESSAGE_TYPES];
 
-// ==================== 基础消息 Schema ====================
+// ==================== 基础 Schema ====================
 const ErrorPayloadSchema = z.object({
   code: z.string(),
   message: z.string(),
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
-// ==================== 事件消息 Schema ====================
-export const PlayerJoinedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.PLAYER_JOINED),
-  payload: PlayerInfoSchema,
-});
-
-export const PlayerLeftMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.PLAYER_LEFT),
-  payload: z.object({
-    playerId: z.string(),
-    reason: z.string().optional(),
-  }),
-});
-
-export const ShipMovedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.SHIP_MOVED),
-  payload: ShipMovementSchema,
-});
-
-export const ShipStatusUpdateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.SHIP_STATUS_UPDATE),
-  payload: ShipStatusSchema,
-});
-
-export const ExplosionMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.EXPLOSION),
-  payload: ExplosionDataSchema,
-});
-
-export const ShieldUpdateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.SHIELD_UPDATE),
-  payload: z.object({
-    shipId: z.string(),
-    active: z.boolean(),
-    type: z.enum(['front', 'full']),
-    coverageAngle: z.number().min(0).max(360),
-  }),
-});
-
-export const FluxStateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.FLUX_STATE),
-  payload: z.object({
-    shipId: z.string(),
-    fluxState: FluxOverloadStateSchema,
-    currentFlux: z.number().min(0),
-    softFlux: z.number().min(0),
-    hardFlux: z.number().min(0),
-  }),
-});
-
-export const CombatEventMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.COMBAT_EVENT),
-  payload: z.object({
-    sourceShipId: z.string(),
-    targetShipId: z.string(),
-    weaponId: z.string(),
-    hit: z.boolean(),
-    damage: z.number().min(0).optional(),
-    hitQuadrant: ArmorQuadrantSchema.optional(),
-    timestamp: z.number(),
-  }),
-});
-
-export const MapInitializedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.MAP_INITIALIZED),
-  payload: MapConfigSchema.extend({
-    tokens: z.array(TokenInfoSchema),
-  }),
-});
-
-export const TokenPlacedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TOKEN_PLACED),
-  payload: TokenInfoSchema,
-});
-
-export const TokenMovedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TOKEN_MOVED),
-  payload: z.object({
-    tokenId: z.string(),
-    previousPosition: PointSchema,
-    newPosition: PointSchema,
-    previousHeading: z.number(),
-    newHeading: z.number(),
-    timestamp: z.number(),
-  }),
-});
-
-export const CameraUpdatedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.CAMERA_UPDATED),
-  payload: PlayerCameraSchema,
-});
-
-export const WeaponFiredMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.WEAPON_FIRED),
-  payload: z.object({
-    sourceShipId: z.string(),
-    targetShipId: z.string(),
-    weaponId: z.string(),
-    mountId: z.string(),
-    timestamp: z.number(),
-  }),
-});
-
-export const DamageDealtMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DAMAGE_DEALT),
-  payload: z.object({
-    hit: z.boolean(),
-    damage: z.number().min(0).optional(),
-    shieldAbsorbed: z.number().min(0),
-    armorReduced: z.number().min(0),
-    hullDamage: z.number().min(0),
-    hitQuadrant: ArmorQuadrantSchema.optional(),
-    softFluxGenerated: z.number().min(0),
-    hardFluxGenerated: z.number().min(0),
-    sourceShipId: z.string(),
-    targetShipId: z.string(),
-    timestamp: z.number(),
-  }),
-});
-
-const DrawingElementSchema = z.object({
-  type: z.enum(['path', 'line', 'arrow', 'rect', 'circle']),
-  color: z.string(),
-  lineWidth: z.number(),
-  path: z.string().optional(),
-  x1: z.number().optional(),
-  y1: z.number().optional(),
-  x2: z.number().optional(),
-  y2: z.number().optional(),
-  cx: z.number().optional(),
-  cy: z.number().optional(),
-  radius: z.number().optional(),
-});
-
-export const DrawingAddMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DRAWING_ADD),
-  payload: z.object({
-    playerId: z.string(),
-    element: DrawingElementSchema,
-  }),
-});
-
-export const DrawingClearMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DRAWING_CLEAR),
-  payload: z.object({
-    playerId: z.string(),
-  }),
-});
-
-export const DrawingSyncMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DRAWING_SYNC),
-  payload: z.object({
-    elements: z.array(DrawingElementSchema),
-  }),
-});
-
-export const ChatMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.CHAT_MESSAGE),
-  payload: z.object({
-    senderId: z.string(),
-    senderName: z.string(),
-    content: z.string(),
-    timestamp: z.number(),
-  }),
-});
-
-export const ErrorMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.ERROR),
-  payload: ErrorPayloadSchema,
-});
-
-export const PingMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.PING),
-  payload: z.object({
-    timestamp: z.number(),
-  }),
-});
-
-export const PongMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.PONG),
-  payload: z.object({
-    timestamp: z.number(),
-  }),
-});
-
-const RoomPlayerSnapshotSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  isReady: z.boolean(),
-  currentShipId: z.string().nullable(),
-});
-
-export const RoomUpdateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.ROOM_UPDATE),
-  payload: z.object({
-    roomId: z.string(),
-    players: z.array(RoomPlayerSnapshotSchema),
-  }),
-});
-
-// DM 模式消息
-export const DMToggleMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DM_TOGGLE),
-  payload: z.object({
-    playerId: z.string(),
-    playerName: z.string(),
-    enable: z.boolean(),
-    timestamp: z.number(),
-  }),
-});
-
-export const DMStatusUpdateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.DM_STATUS_UPDATE),
-  payload: z.object({
-    players: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      isDMMode: z.boolean(),
-    })),
-  }),
-});
-
-// 选择系统消息
-export const ObjectSelectedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.OBJECT_SELECTED),
-  payload: z.object({
-    playerId: z.string(),
-    playerName: z.string(),
-    tokenId: z.string(),
-    timestamp: z.number(),
-    forceOverride: z.boolean().optional(),
-  }),
-});
-
-export const ObjectDeselectedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.OBJECT_DESELECTED),
-  payload: z.object({
-    playerId: z.string(),
-    tokenId: z.string(),
-    timestamp: z.number(),
-    reason: z.enum(['manual', 'override', 'released']).optional(),
-  }),
-});
-
-export const SelectionUpdateMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.SELECTION_UPDATE),
-  payload: z.object({
-    selections: z.array(z.object({
-      tokenId: z.string(),
-      selectedBy: z.object({
-        id: z.string(),
-        name: z.string(),
-        isDMMode: z.boolean(),
-      }).nullable(),
-      timestamp: z.number(),
-    })),
-  }),
-});
-
-// Token 拖拽消息
-export const TokenDragStartMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TOKEN_DRAG_START),
-  payload: z.object({
-    tokenId: z.string(),
-    playerId: z.string(),
-    playerName: z.string(),
-    position: PointSchema,
-    heading: z.number(),
-    timestamp: z.number(),
-  }),
-});
-
-export const TokenDraggingMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TOKEN_DRAGGING),
-  payload: z.object({
-    tokenId: z.string(),
-    playerId: z.string(),
-    playerName: z.string(),
-    position: PointSchema,
-    heading: z.number(),
-    timestamp: z.number(),
-    isDragging: z.boolean(),
-  }),
-});
-
-export const TokenDragEndMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TOKEN_DRAG_END),
-  payload: z.object({
-    tokenId: z.string(),
-    playerId: z.string(),
-    finalPosition: PointSchema,
-    finalHeading: z.number(),
-    timestamp: z.number(),
-    committed: z.boolean(),
-  }),
-});
-
-// ==================== 回合系统消息 Schema ====================
-const TurnUnitMessageSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  ownerId: z.string(),
-  ownerName: z.string(),
-  unitType: z.enum(['ship', 'station', 'npc']),
-  state: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-  initiative: z.number(),
-});
-
-export const TurnOrderInitializedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED),
-  payload: z.object({
-    units: z.array(TurnUnitMessageSchema),
-    roundNumber: z.number(),
-    phase: z.enum(['planning', 'movement', 'action', 'resolution']),
-  }),
-});
-
-export const TurnOrderUpdatedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TURN_ORDER_UPDATED),
-  payload: z.object({
-    units: z.array(TurnUnitMessageSchema),
-    roundNumber: z.number(),
-    phase: z.enum(['planning', 'movement', 'action', 'resolution']),
-  }),
-});
-
-export const TurnIndexChangedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.TURN_INDEX_CHANGED),
-  payload: z.object({
-    currentIndex: z.number(),
-    previousIndex: z.number(),
-    roundNumber: z.number(),
-  }),
-});
-
-export const UnitStateChangedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.UNIT_STATE_CHANGED),
-  payload: z.object({
-    unitId: z.string(),
-    state: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-  }),
-});
-
-export const RoundIncrementedMessageSchema = z.object({
-  type: z.literal(WS_MESSAGE_TYPES.ROUND_INCREMENTED),
-  payload: z.object({
-    roundNumber: z.number(),
-  }),
-});
-
-// ==================== 请求 - 响应消息 Schema ====================
+// ==================== 请求 - 响应消息 Schema（核心业务） ====================
 export const RequestOperationSchema = z.enum([
   'player.join',
   'player.leave',
@@ -555,48 +219,9 @@ export const ResponseMessageSchema = z.object({
   }).and(ResponsePayloadSchema),
 });
 
-// ==================== 类型推导 ====================
-export type PlayerJoinedMessage = z.infer<typeof PlayerJoinedMessageSchema>;
-export type PlayerLeftMessage = z.infer<typeof PlayerLeftMessageSchema>;
-export type ShipMovedMessage = z.infer<typeof ShipMovedMessageSchema>;
-export type ShipStatusUpdateMessage = z.infer<typeof ShipStatusUpdateMessageSchema>;
-export type ExplosionMessage = z.infer<typeof ExplosionMessageSchema>;
-export type ShieldUpdateMessage = z.infer<typeof ShieldUpdateMessageSchema>;
-export type FluxStateMessage = z.infer<typeof FluxStateMessageSchema>;
-export type CombatEventMessage = z.infer<typeof CombatEventMessageSchema>;
-export type MapInitializedMessage = z.infer<typeof MapInitializedMessageSchema>;
-export type TokenPlacedMessage = z.infer<typeof TokenPlacedMessageSchema>;
-export type TokenMovedMessage = z.infer<typeof TokenMovedMessageSchema>;
-export type CameraUpdatedMessage = z.infer<typeof CameraUpdatedMessageSchema>;
-export type WeaponFiredMessage = z.infer<typeof WeaponFiredMessageSchema>;
-export type DamageDealtMessage = z.infer<typeof DamageDealtMessageSchema>;
-export type DrawingAddMessage = z.infer<typeof DrawingAddMessageSchema>;
-export type DrawingClearMessage = z.infer<typeof DrawingClearMessageSchema>;
-export type DrawingSyncMessage = z.infer<typeof DrawingSyncMessageSchema>;
-export type ChatMessagePayload = z.infer<typeof ChatMessageSchema>;
-export type ErrorMessage = z.infer<typeof ErrorMessageSchema>;
-export type PingMessage = z.infer<typeof PingMessageSchema>;
-export type PongMessage = z.infer<typeof PongMessageSchema>;
-export type RoomUpdateMessage = z.infer<typeof RoomUpdateMessageSchema>;
-export type DMToggleMessage = z.infer<typeof DMToggleMessageSchema>;
-export type DMStatusUpdateMessage = z.infer<typeof DMStatusUpdateMessageSchema>;
-export type ObjectSelectedMessage = z.infer<typeof ObjectSelectedMessageSchema>;
-export type ObjectDeselectedMessage = z.infer<typeof ObjectDeselectedMessageSchema>;
-export type SelectionUpdateMessage = z.infer<typeof SelectionUpdateMessageSchema>;
-export type TokenDragStartMessage = z.infer<typeof TokenDragStartMessageSchema>;
-export type TokenDraggingMessage = z.infer<typeof TokenDraggingMessageSchema>;
-export type TokenDragEndMessage = z.infer<typeof TokenDragEndMessageSchema>;
-export type TurnOrderInitializedMessage = z.infer<typeof TurnOrderInitializedMessageSchema>;
-export type TurnOrderUpdatedMessage = z.infer<typeof TurnOrderUpdatedMessageSchema>;
-export type TurnIndexChangedMessage = z.infer<typeof TurnIndexChangedMessageSchema>;
-export type UnitStateChangedMessage = z.infer<typeof UnitStateChangedMessageSchema>;
-export type RoundIncrementedMessage = z.infer<typeof RoundIncrementedMessageSchema>;
+// ==================== 请求/响应类型 ====================
 export type RequestMessage = z.infer<typeof RequestMessageSchema>;
 export type ResponseMessage = z.infer<typeof ResponseMessageSchema>;
-
-// 响应数据类型
-export type RoomPlayerSnapshot = z.infer<typeof RoomPlayerSnapshotSchema>;
-export type DrawingElement = z.infer<typeof DrawingElementSchema>;
 
 // 请求负载类型别名
 export type PlayerJoinRequestPayload = z.infer<typeof PlayerJoinRequestSchema>;
@@ -666,48 +291,81 @@ export type RequestHandlers = {
   [O in RequestOperation]?: OperationHandler<O>;
 };
 
-// ==================== 消息联合类型 ====================
+// ==================== 事件消息类型（从 DomainEvents 导入） ====================
+// 注意：事件消息的完整 schema 定义在 protocol/DomainEvents.ts
+// 这里只定义 WS 消息包装类型
+
+/** 绘图元素 Schema（本地使用） */
+const DrawingElementSchema = z.object({
+  type: z.enum(['path', 'line', 'arrow', 'rect', 'circle']),
+  color: z.string(),
+  lineWidth: z.number(),
+  path: z.string().optional(),
+  x1: z.number().optional(),
+  y1: z.number().optional(),
+  x2: z.number().optional(),
+  y2: z.number().optional(),
+  cx: z.number().optional(),
+  cy: z.number().optional(),
+  radius: z.number().optional(),
+});
+
+export type DrawingElement = z.infer<typeof DrawingElementSchema>;
+
+// ==================== WS 消息联合类型 ====================
+/**
+ * WS 消息联合类型
+ * 
+ * 包含：
+ * 1. 请求 - 响应消息（完整定义）
+ * 2. 事件消息（简化，使用 payload 类型）
+ */
 export type WSMessage =
-  | PlayerJoinedMessage
-  | PlayerLeftMessage
-  | ShipMovedMessage
-  | ShipStatusUpdateMessage
-  | ExplosionMessage
-  | ShieldUpdateMessage
-  | FluxStateMessage
-  | CombatEventMessage
-  | MapInitializedMessage
-  | TokenPlacedMessage
-  | TokenMovedMessage
-  | CameraUpdatedMessage
-  | WeaponFiredMessage
-  | DamageDealtMessage
-  | DrawingAddMessage
-  | DrawingClearMessage
-  | DrawingSyncMessage
-  | ChatMessagePayload
-  | ErrorMessage
-  | PingMessage
-  | PongMessage
-  | RoomUpdateMessage
-  | DMToggleMessage
-  | DMStatusUpdateMessage
-  | ObjectSelectedMessage
-  | ObjectDeselectedMessage
-  | SelectionUpdateMessage
-  | TokenDragStartMessage
-  | TokenDraggingMessage
-  | TokenDragEndMessage
-  | TurnOrderInitializedMessage
-  | TurnOrderUpdatedMessage
-  | TurnIndexChangedMessage
-  | UnitStateChangedMessage
-  | RoundIncrementedMessage
+  // 请求 - 响应
   | RequestMessage
-  | ResponseMessage;
+  | ResponseMessage
+  // 事件消息（简化定义，完整 schema 在 DomainEvents）
+  | { type: typeof WS_MESSAGE_TYPES.PLAYER_JOINED; payload: PlayerInfo }
+  | { type: typeof WS_MESSAGE_TYPES.PLAYER_LEFT; payload: { playerId: string; reason?: string } }
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_MOVED; payload: ShipMovement }
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_STATUS_UPDATE; payload: ShipStatus }
+  | { type: typeof WS_MESSAGE_TYPES.SHIELD_UPDATE; payload: { shipId: string; active: boolean; type: 'front' | 'full'; coverageAngle: number } }
+  | { type: typeof WS_MESSAGE_TYPES.FLUX_STATE; payload: { shipId: string; fluxState: 'normal' | 'venting' | 'overloaded'; currentFlux: number; softFlux: number; hardFlux: number } }
+  | { type: typeof WS_MESSAGE_TYPES.CAMERA_UPDATED; payload: PlayerCamera }
+  | { type: typeof WS_MESSAGE_TYPES.TOKEN_MOVED; payload: { tokenId: string; previousPosition: { x: number; y: number }; newPosition: { x: number; y: number }; previousHeading: number; newHeading: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.TOKEN_PLACED; payload: TokenInfo }
+  | { type: typeof WS_MESSAGE_TYPES.MAP_INITIALIZED; payload: MapConfig & { tokens: TokenInfo[] } }
+  | { type: typeof WS_MESSAGE_TYPES.OBJECT_SELECTED; payload: { playerId: string; playerName: string; tokenId: string; timestamp: number; forceOverride?: boolean } }
+  | { type: typeof WS_MESSAGE_TYPES.OBJECT_DESELECTED; payload: { playerId: string; tokenId: string; timestamp: number; reason?: 'manual' | 'override' | 'released' } }
+  | { type: typeof WS_MESSAGE_TYPES.SELECTION_UPDATE; payload: { selections: Array<{ tokenId: string; selectedBy: { id: string; name: string; isDMMode: boolean } | null; timestamp: number }> } }
+  | { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_START; payload: { tokenId: string; playerId: string; playerName: string; position: { x: number; y: number }; heading: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAGGING; payload: { tokenId: string; playerId: string; playerName: string; position: { x: number; y: number }; heading: number; timestamp: number; isDragging: boolean } }
+  | { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END; payload: { tokenId: string; playerId: string; finalPosition: { x: number; y: number }; finalHeading: number; timestamp: number; committed: boolean } }
+  | { type: typeof WS_MESSAGE_TYPES.DM_STATUS_UPDATE; payload: { players: Array<{ id: string; name: string; isDMMode: boolean }> } }
+  | { type: typeof WS_MESSAGE_TYPES.DM_TOGGLE; payload: { playerId: string; playerName: string; enable: boolean; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED; payload: { currentIndex: number; previousIndex: number; roundNumber: number } }
+  | { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED; payload: { unitId: string; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended' } }
+  | { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED; payload: { roundNumber: number } }
+  | { type: typeof WS_MESSAGE_TYPES.WEAPON_FIRED; payload: { sourceShipId: string; targetShipId: string; weaponId: string; mountId: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.DAMAGE_DEALT; payload: { sourceShipId: string; targetShipId: string; hit: boolean; damage?: number; shieldAbsorbed: number; armorReduced: number; hullDamage: number; hitQuadrant?: ArmorQuadrant; softFluxGenerated: number; hardFluxGenerated: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.EXPLOSION; payload: { id: string; position: { x: number; y: number }; radius: number; damage: number; sourceShipId?: string; targetShipId?: string; hitQuadrant?: ArmorQuadrant; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.COMBAT_EVENT; payload: { sourceShipId: string; targetShipId: string; weaponId: string; hit: boolean; damage?: number; hitQuadrant?: ArmorQuadrant; timestamp: number } }
+  // 绘图消息
+  | { type: typeof WS_MESSAGE_TYPES.DRAWING_ADD; payload: { playerId: string; element: DrawingElement } }
+  | { type: typeof WS_MESSAGE_TYPES.DRAWING_CLEAR; payload: { playerId: string } }
+  | { type: typeof WS_MESSAGE_TYPES.DRAWING_SYNC; payload: { elements: DrawingElement[] } }
+  // 聊天消息
+  | { type: typeof WS_MESSAGE_TYPES.CHAT_MESSAGE; payload: { senderId: string; senderName: string; content: string; timestamp: number } }
+  // 错误消息
+  | { type: typeof WS_MESSAGE_TYPES.ERROR; payload: { code: string; message: string; details?: Record<string, unknown> } }
+  // 连接控制消息
+  | { type: typeof WS_MESSAGE_TYPES.PING; payload: { timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.PONG; payload: { timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.ROOM_UPDATE; payload: { roomId: string; players: Array<{ id: string; name: string; isReady: boolean; currentShipId: string | null }> } };
 
 // ==================== 工具类型 ====================
-// 使用映射类型从消息类型推导 payload 类型
 type ExtractPayload<T> = T extends { payload: infer P } ? P : never;
 
 export type WSMessagePayloadMap = {
@@ -768,6 +426,46 @@ export function createMessageGuard<T extends WSMessage>(type: T['type']): Messag
 }
 
 // 导出常用类型守卫
-export const isPlayerJoinedMessage = createMessageGuard<PlayerJoinedMessage>(WS_MESSAGE_TYPES.PLAYER_JOINED);
-export const isShipMovedMessage = createMessageGuard<ShipMovedMessage>(WS_MESSAGE_TYPES.SHIP_MOVED);
-export const isCameraUpdatedMessage = createMessageGuard<CameraUpdatedMessage>(WS_MESSAGE_TYPES.CAMERA_UPDATED);
+export const isPlayerJoinedMessage = createMessageGuard<Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PLAYER_JOINED }>>(WS_MESSAGE_TYPES.PLAYER_JOINED);
+export const isShipMovedMessage = createMessageGuard<Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_MOVED }>>(WS_MESSAGE_TYPES.SHIP_MOVED);
+export const isCameraUpdatedMessage = createMessageGuard<Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.CAMERA_UPDATED }>>(WS_MESSAGE_TYPES.CAMERA_UPDATED);
+
+// ==================== 向后兼容的类型别名 ====================
+// 注意：这些类型别名用于向后兼容，新代码应直接使用 WSMessage 联合类型
+
+export type PlayerJoinedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PLAYER_JOINED }>;
+export type PlayerLeftMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PLAYER_LEFT }>;
+export type ShipMovedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_MOVED }>;
+export type ShipStatusUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_STATUS_UPDATE }>;
+export type ExplosionMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.EXPLOSION }>;
+export type ShieldUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIELD_UPDATE }>;
+export type FluxStateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.FLUX_STATE }>;
+export type CombatEventMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.COMBAT_EVENT }>;
+export type MapInitializedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.MAP_INITIALIZED }>;
+export type TokenPlacedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_PLACED }>;
+export type TokenMovedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_MOVED }>;
+export type CameraUpdatedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.CAMERA_UPDATED }>;
+export type WeaponFiredMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.WEAPON_FIRED }>;
+export type DamageDealtMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DAMAGE_DEALT }>;
+export type DrawingAddMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DRAWING_ADD }>;
+export type DrawingClearMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DRAWING_CLEAR }>;
+export type DrawingSyncMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DRAWING_SYNC }>;
+export type ChatMessagePayload = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.CHAT_MESSAGE }>;
+export type ErrorMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ERROR }>;
+export type PingMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PING }>;
+export type PongMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PONG }>;
+export type RoomUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROOM_UPDATE }>;
+export type RoomPlayerSnapshot = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROOM_UPDATE }>['payload']['players'][number];
+export type DMToggleMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DM_TOGGLE }>;
+export type DMStatusUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DM_STATUS_UPDATE }>;
+export type ObjectSelectedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.OBJECT_SELECTED }>;
+export type ObjectDeselectedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.OBJECT_DESELECTED }>;
+export type SelectionUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SELECTION_UPDATE }>;
+export type TokenDragStartMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_START }>;
+export type TokenDraggingMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAGGING }>;
+export type TokenDragEndMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END }>;
+export type TurnOrderInitializedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED }>;
+export type TurnOrderUpdatedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED }>;
+export type TurnIndexChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED }>;
+export type UnitStateChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED }>;
+export type RoundIncrementedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED }>;
