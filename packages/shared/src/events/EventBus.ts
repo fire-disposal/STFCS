@@ -18,13 +18,6 @@ export interface IDomainEvent {
   readonly roomId?: string;
 }
 
-/** 事件上下文 */
-export interface EventContext {
-  roomId: string;
-  playerId?: string;
-  correlationId?: string;
-}
-
 // ==================== 领域事件定义 ====================
 
 /**
