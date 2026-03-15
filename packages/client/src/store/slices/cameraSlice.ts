@@ -1,10 +1,16 @@
 /**
  * 相机 Redux Slice
  * 统一管理本地和远程玩家相机状态
+ * 
+ * 优化内容：
+ * - 改进缩放比率 (1.15x 每档，更平滑)
+ * - 支持部分出界查看 (屏幕中心点不能离开地图)
+ * - RTS 风格的边界软限制
  */
 
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 import type { CameraState, PlayerCamera } from "@vt/shared/types";
+import { clampZoom } from "@/utils/cameraBounds";
 
 interface CameraSliceState {
 	// 本地玩家相机
@@ -13,13 +19,17 @@ interface CameraSliceState {
 	remote: Record<string, PlayerCamera>;
 }
 
+// 优化的相机配置
+// - minZoom: 0.3 允许看到更多地图
+// - maxZoom: 6 允许详细检查
+// - zoomStep: 1.15 每档缩放比率（比 1.1 快，比 1.2 慢，更平滑）
 const defaultCamera: CameraState = {
 	centerX: 2048, // 地图中心（地图大小 4096）
 	centerY: 2048,
 	zoom: 1,
 	rotation: 0,
-	minZoom: 0.5,
-	maxZoom: 4,
+	minZoom: 0.3,
+	maxZoom: 6,
 };
 
 const initialState: CameraSliceState = {
@@ -45,9 +55,9 @@ const cameraSlice = createSlice({
 				state.local.centerY = action.payload.centerY;
 			}
 			if (action.payload.zoom !== undefined) {
-				const minZoom = state.local.minZoom ?? 0.5;
-				const maxZoom = state.local.maxZoom ?? 4;
-				state.local.zoom = Math.max(minZoom, Math.min(maxZoom, action.payload.zoom));
+				const minZoom = state.local.minZoom ?? defaultCamera.minZoom!;
+				const maxZoom = state.local.maxZoom ?? defaultCamera.maxZoom!;
+				state.local.zoom = clampZoom(action.payload.zoom, minZoom, maxZoom);
 			}
 			if (action.payload.rotation !== undefined) {
 				state.local.rotation = action.payload.rotation;

@@ -1,9 +1,15 @@
 /**
  * 交互管理 Hook
  * 统一的交互操作接口，处理画布和 Token 的交互逻辑
+ * 
+ * 优化内容：
+ * - 仅保留中键拖拽画布
+ * - 移除空格键等特殊逻辑
+ * - 改进平移计算
+ * - 添加边界约束
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
 	setCursor,
@@ -21,6 +27,7 @@ import {
 } from "@/store/slices/interactionSlice";
 import { updateCamera } from "@/store/slices/cameraSlice";
 import type { CameraState } from "@vt/shared/types";
+import { clampCameraCenter, calculateCameraBounds } from "@/utils/cameraBounds";
 
 export interface UseInteractionReturn {
 	// 状态
@@ -52,13 +59,12 @@ export interface UseInteractionReturn {
 /**
  * 交互管理 Hook
  * @param camera - 当前相机状态
- * @param onCanvasPan - 画布拖动回调
- * @param onTokenDragStart - Token 拖动开始回调
- * @param onTokenDrag - Token 拖动中回调
- * @param onTokenDragEnd - Token 拖动结束回调
+ * @param mapBounds - 地图边界配置
+ * @param callbacks - 回调函数
  */
 export function useInteraction(
 	camera: CameraState,
+	mapBounds?: { width: number; height: number },
 	callbacks?: {
 		onCanvasPan?: (dx: number, dy: number) => void;
 		onTokenDragStart?: (tokenId: string) => void;
@@ -69,18 +75,22 @@ export function useInteraction(
 	const dispatch = useAppDispatch();
 	const interaction = useAppSelector((state) => state.interaction);
 
-	// 判断是否应该拖动画布
+	// Drag state ref - always has the latest drag state for event handlers
+	const dragRef = useRef<DragState | null>(null);
+
+	// Sync drag state to ref
+	useEffect(() => {
+		dragRef.current = interaction.drag;
+	}, [interaction.drag]);
+
+	// 判断是否应该拖动画布 - 仅检查模式，不检查键盘状态
 	const shouldPanCanvas = useCallback(() => {
-		return (
-			interaction.keyboard.isSpacePressed ||
-			interaction.keyboard.isCtrlPressed ||
-			interaction.mode === "panCanvas"
-		);
-	}, [interaction.keyboard.isSpacePressed, interaction.keyboard.isCtrlPressed, interaction.mode]);
+		return interaction.mode === "panCanvas";
+	}, [interaction.mode]);
 
 	// 判断 Token 是否可拖动
 	const isTokenDraggable = useCallback(() => {
-		// 如果按下空格或 Ctrl，优先拖动画布
+		// 画布拖动模式时不可拖动 Token
 		if (shouldPanCanvas()) {
 			return false;
 		}
@@ -91,26 +101,18 @@ export function useInteraction(
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent) => {
 			dispatch(keyDown({ key: event.key, pressed: true }));
-
-			// 如果按下空格且当前没有拖动，切换到画布拖动准备状态
-			if (event.key === " " && interaction.mode === "idle") {
-				dispatch(setCursor("grab"));
-			}
+			// 移除空格键光标更新逻辑 - 仅中键拖拽
 		},
-		[dispatch, interaction.mode]
+		[dispatch]
 	);
 
 	// 处理键盘释放
 	const handleKeyUp = useCallback(
 		(event: KeyboardEvent) => {
 			dispatch(keyDown({ key: event.key, pressed: false }));
-
-			// 如果释放空格且当前没有拖动，恢复默认光标
-			if (event.key === " " && interaction.mode === "idle") {
-				dispatch(setCursor("default"));
-			}
+			// 移除空格键光标更新逻辑 - 仅中键拖拽
 		},
-		[dispatch, interaction.mode]
+		[dispatch]
 	);
 
 	// 处理 Token 悬停
@@ -164,11 +166,12 @@ export function useInteraction(
 	// 更新拖动位置
 	const updateDragPosition = useCallback(
 		(screenX: number, screenY: number) => {
-			if (!interaction.drag) return;
+			const drag = dragRef.current;
+			if (!drag) return;
 
 			dispatch(updateDrag({ screenX, screenY }));
 
-			const { startScreen, startCamera, type, tokenId, tokenOriginalPosition } = interaction.drag;
+			const { startScreen, startCamera, type, tokenId, tokenOriginalPosition } = drag;
 
 			if (type === "canvas") {
 				// 画布拖动：计算相机移动
@@ -176,8 +179,27 @@ export function useInteraction(
 				const dx = (screenX - startScreen.x) / startCamera.zoom;
 				const dy = (screenY - startScreen.y) / startCamera.zoom;
 
-				const newCenterX = startCamera.centerX - dx;
-				const newCenterY = startCamera.centerY - dy;
+				let newCenterX = startCamera.centerX - dx;
+				let newCenterY = startCamera.centerY - dy;
+
+				// 应用边界约束（允许部分出界，但屏幕中心点不能离开地图）
+				if (mapBounds) {
+					const bounds = calculateCameraBounds(
+						{
+							mapWidth: mapBounds.width,
+							mapHeight: mapBounds.height,
+							minZoom: startCamera.zoom,
+							maxZoom: startCamera.zoom,
+							outOfBoundsMargin: 0.15, // 15% 允许出界查看
+						},
+						// 假设标准视口，实际边界在 GameCanvas 中精确计算
+						800,
+						600
+					);
+					const clamped = clampCameraCenter(newCenterX, newCenterY, bounds);
+					newCenterX = clamped.x;
+					newCenterY = clamped.y;
+				}
 
 				dispatch(updateCamera({ centerX: newCenterX, centerY: newCenterY }));
 
@@ -195,14 +217,15 @@ export function useInteraction(
 				callbacks?.onTokenDrag?.(tokenId, newPosition);
 			}
 		},
-		[dispatch, interaction.drag, camera.zoom, callbacks]
+		[dispatch, camera.zoom, mapBounds, callbacks]
 	);
 
 	// 结束当前拖动
 	const endCurrentDrag = useCallback(() => {
-		if (!interaction.drag) return;
+		const drag = dragRef.current;
+		if (!drag) return;
 
-		const { type, tokenId, tokenOriginalPosition } = interaction.drag;
+		const { type, tokenId, tokenOriginalPosition } = drag;
 
 		dispatch(endDrag());
 
@@ -212,7 +235,7 @@ export function useInteraction(
 			const cancelled = false; // 由调用者判断
 			callbacks.onTokenDragEnd(tokenId, tokenOriginalPosition, cancelled);
 		}
-	}, [dispatch, interaction.drag, callbacks]);
+	}, [dispatch, callbacks]);
 
 	// 全局键盘事件监听
 	useEffect(() => {

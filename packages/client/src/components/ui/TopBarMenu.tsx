@@ -1,6 +1,6 @@
 import { TopZoomIndicator } from "@/features/ui/TopZoomIndicator";
 import { AnimatePresence, motion } from "framer-motion";
-import { Globe, LogOut, Menu, Settings, User, Volume2, VolumeX } from "lucide-react";
+import { Globe, LogOut, Menu, RotateCcw, Settings, User, Volume2, VolumeX } from "lucide-react";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -30,6 +30,11 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 	const { t, i18n } = useTranslation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isMuted, setIsMuted] = useState(false);
+	// 缩放方向状态：true = 正常（向上放大），false = 翻转（向下放大）
+	const [invertZoomDirection, setInvertZoomDirection] = useState(() => {
+		const saved = localStorage.getItem("zoomDirection");
+		return saved === "inverted";
+	});
 
 	const changeLanguage = (lng: string) => {
 		i18n.changeLanguage(lng);
@@ -39,6 +44,18 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 
 	const currentLanguage = i18n.language || "en-US";
 	const isChinese = currentLanguage === "zh-CN";
+
+	// 处理缩放方向切换
+	const toggleZoomDirection = () => {
+		const newValue = !invertZoomDirection;
+		setInvertZoomDirection(newValue);
+		localStorage.setItem("zoomDirection", newValue ? "inverted" : "normal");
+		
+		// 触发自定义事件通知 GameCanvas
+		window.dispatchEvent(new CustomEvent("game-zoom-direction", { 
+			detail: { inverted: newValue } 
+		}));
+	};
 
 	return (
 		<div className="top-bar-menu">
@@ -136,8 +153,20 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 									</div>
 
 									<div className="menu-item">
+										<RotateCcw size={16} />
+										<span>{t("zoom.direction")}</span>
+										<button
+											className="toggle-switch"
+											onClick={toggleZoomDirection}
+											type="button"
+										>
+											<div className={`toggle-inner ${invertZoomDirection ? "on" : "off"}`} />
+										</button>
+									</div>
+
+									<div className="menu-item">
 										{isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-										<span>{isMuted ? "Unmute" : "Mute"}</span>
+										<span>{isMuted ? t("menu.unmute") : t("menu.mute")}</span>
 										<button
 											className="toggle-switch"
 											onClick={() => setIsMuted(!isMuted)}

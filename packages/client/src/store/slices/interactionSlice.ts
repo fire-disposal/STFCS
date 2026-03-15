@@ -128,7 +128,7 @@ const interactionSlice = createSlice({
 		// 处理键盘按下
 		keyDown: (state, action: PayloadAction<{ key: string; pressed: boolean }>) => {
 			const { key, pressed } = action.payload;
-			
+
 			switch (key.toLowerCase()) {
 				case " ":
 				case "space":
@@ -146,17 +146,12 @@ const interactionSlice = createSlice({
 					break;
 			}
 
-			// 根据键盘状态更新光标
-			if (pressed && key.toLowerCase() === " " && state.mode === "idle") {
-				state.cursor = "grab";
-			} else if (!pressed && key.toLowerCase() === " " && state.mode === "idle") {
-				state.cursor = "default";
-			}
+			// 移除空格键光标更新逻辑 - 仅中键拖拽，空格不改变光标
 		},
 
 		// 悬停在 Token 上
 		hoverToken: (state) => {
-			if (state.mode === "idle" && !state.keyboard.isSpacePressed) {
+			if (state.mode === "idle") {
 				state.mode = "hoverToken";
 				state.cursor = "pointer";
 			}
@@ -165,8 +160,8 @@ const interactionSlice = createSlice({
 		// 离开 Token
 		leaveToken: (state) => {
 			if (state.mode === "hoverToken") {
-				state.mode = state.keyboard.isSpacePressed ? "idle" : "hoverCanvas";
-				state.cursor = state.keyboard.isSpacePressed ? "grab" : "default";
+				state.mode = "idle";
+				state.cursor = "default";
 			}
 		},
 

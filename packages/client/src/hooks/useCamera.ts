@@ -1,6 +1,11 @@
 /**
  * 相机控制 Hook
  * 统一的相机操作接口
+ * 
+ * 优化内容：
+ * - 改进缩放比率 (1.15x 每档)
+ * - 支持边界约束
+ * - RTS 风格的平移控制
  */
 
 import { useCallback } from "react";
@@ -12,6 +17,7 @@ import {
 	resetCamera as resetCameraAction,
 } from "@/store/slices/cameraSlice";
 import type { CameraState } from "@vt/shared/types";
+import { clampZoom } from "@/utils/cameraBounds";
 
 export interface UseCameraReturn extends CameraState {
 	// 设置相机（完全替换）
@@ -64,23 +70,23 @@ export function useCamera(): UseCameraReturn {
 	// 缩放
 	const zoomTo = useCallback(
 		(zoom: number) => {
-			const minZoom = camera.minZoom ?? 0.5;
-			const maxZoom = camera.maxZoom ?? 4;
-			const clamped = Math.max(minZoom, Math.min(maxZoom, zoom));
+			const minZoom = camera.minZoom ?? 0.3;
+			const maxZoom = camera.maxZoom ?? 6;
+			const clamped = clampZoom(zoom, minZoom, maxZoom);
 			dispatch(updateCamera({ zoom: clamped }));
 		},
 		[dispatch, camera.minZoom, camera.maxZoom]
 	);
 
 	const zoomIn = useCallback(
-		(factor = 1.2) => {
+		(factor = 1.15) => {
 			zoomTo(camera.zoom * factor);
 		},
 		[zoomTo, camera.zoom]
 	);
 
 	const zoomOut = useCallback(
-		(factor = 1.2) => {
+		(factor = 1.15) => {
 			zoomTo(camera.zoom / factor);
 		},
 		[zoomTo, camera.zoom]

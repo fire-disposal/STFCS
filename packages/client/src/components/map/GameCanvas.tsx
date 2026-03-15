@@ -3,6 +3,7 @@ import { updateToken } from "@/store/slices/mapSlice";
 import { selectToken as selectTokenAction } from "@/store/slices/selectionSlice";
 import { updateCamera } from "@/store/slices/cameraSlice";
 import type { CameraState } from "@vt/shared/types";
+import type { DragState } from "@/store/slices/interactionSlice";
 import { LayerId } from "@/features/game/layers/types";
 import {
 	Application,
@@ -28,6 +29,11 @@ import {
 } from "@/features/game/layers";
 import { updateParallax } from "@/features/game/layers/BackgroundRenderer";
 import { useInteraction } from "@/hooks/useInteraction";
+import {
+	calculateZoomFactor,
+	calculateZoomTowardsMouse,
+	updateCameraWithConstraints,
+} from "@/utils/cameraBounds";
 
 interface GameCanvasProps {
 	width?: number;
@@ -46,7 +52,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const layerVisibility = useAppSelector((state) => state.layers.visibility);
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
 	const currentPlayerName = useAppSelector((state) => state.ui.connection.playerName);
-	const { cursor, keyboard } = useAppSelector((state) => state.interaction);
+	const { cursor } = useAppSelector((state) => state.interaction);
 
 	// 相机 ref - 直接镜像 Redux 状态，用于高性能更新
 	const cameraRef = useRef<CameraState>({ ...camera });
@@ -84,9 +90,22 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const mapConfigRef = useRef(mapConfig);
 	const tokensRef = useRef(tokens);
 	const selectedTokenIdRef = useRef(selectedTokenId);
+	// 缩放方向：true = 正常（向上滚动放大），false = 翻转（向下滚动放大）
+	const zoomDirectionRef = useRef<boolean>((() => {
+		const saved = localStorage.getItem("zoomDirection");
+		return saved !== "inverted";
+	})());
+
+	// 交互方法 ref - 用于事件处理器中访问最新的方法
+	const interactionRef = useRef<{
+		startCanvasPan: (dragState: Omit<DragState, "type">) => void;
+		updateDragPosition: (screenX: number, screenY: number) => void;
+		endCurrentDrag: () => void;
+		drag: DragState | null;
+	} | null>(null);
 
 	// 使用交互 Hook
-	const interaction = useInteraction(camera, {
+	const interaction = useInteraction(camera, { width: mapConfig.width, height: mapConfig.height }, {
 		onCanvasPan: () => {
 			// 画布拖动时更新背景视差
 			if (layersRef.current) {
@@ -174,6 +193,16 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		},
 	});
 
+	// 同步交互方法到 ref（用于事件处理器）
+	useEffect(() => {
+		interactionRef.current = {
+			startCanvasPan: interaction.startCanvasPan,
+			updateDragPosition: interaction.updateDragPosition,
+			endCurrentDrag: interaction.endCurrentDrag,
+			drag: interaction.drag,
+		};
+	}, [interaction]);
+
 	// 更新 refs
 	useEffect(() => {
 		mapConfigRef.current = mapConfig;
@@ -187,12 +216,15 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		selectedTokenIdRef.current = selectedTokenId;
 	}, [selectedTokenId]);
 
-	// 更新舞台变换
+	// 更新舞台变换（优化版）
 	const updateStageTransform = () => {
-		if (!stageRef.current) return;
+		if (!stageRef.current || !appRef.current) return;
 		const { centerX, centerY, zoom, rotation } = cameraRef.current;
-		const { width, height } = appRef.current!.canvas;
-		stageRef.current.position.set(width / 2 - centerX * zoom, height / 2 - centerY * zoom);
+		const { width, height } = appRef.current.canvas;
+		
+		// 优化：使用 pivot 而不是 position 计算，减少浮点误差
+		stageRef.current.pivot.set(centerX, centerY);
+		stageRef.current.position.set(width / 2, height / 2);
 		stageRef.current.scale.set(zoom);
 		stageRef.current.rotation = (rotation * Math.PI) / 180;
 	};
@@ -430,54 +462,83 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 			// 交互事件
 			const canvas = app.canvas;
 
-			// 滚轮缩放
+			// 滚轮缩放 - 优化缩放比率和边界约束（支持方向翻转）
 			const handleWheel = (e: WheelEvent) => {
 				e.preventDefault();
 				const cam = cameraRef.current;
-				const minZoom = cam.minZoom ?? 0.5;
-				const maxZoom = cam.maxZoom ?? 4;
-				const factor = e.deltaY > 0 ? 0.9 : 1.1;
-				const targetZoom = Math.max(minZoom, Math.min(maxZoom, cam.zoom * factor));
-
 				const rect = canvas.getBoundingClientRect();
-				const mx = (e.clientX - rect.left) / rect.width;
-				const my = (e.clientY - rect.top) / rect.height;
+				const viewportWidth = rect.width;
+				const viewportHeight = rect.height;
 
-				const vw = rect.width / cam.zoom;
-				const vh = rect.height / cam.zoom;
-				const left = cam.centerX - vw / 2;
-				const top = cam.centerY - vh / 2;
-				const worldX = left + mx * vw;
-				const worldY = top + my * vh;
+				// 计算缩放因子（优化比率 1.15x）
+				const baseZoomFactor = calculateZoomFactor(e.deltaY, 1.15);
+				// 根据用户设置翻转缩放方向
+				const zoomFactor = zoomDirectionRef.current ? baseZoomFactor : 1 / baseZoomFactor;
+				const targetZoom = cam.zoom * zoomFactor;
 
-				const newVw = rect.width / targetZoom;
-				const newVh = rect.height / targetZoom;
-				const newCenterX = worldX - mx * newVw + newVw / 2;
-				const newCenterY = worldY - my * newVh + newVh / 2;
+				// 使用 RTS 风格的鼠标位置缩放
+				const mouseScreenX = e.clientX - rect.left;
+				const mouseScreenY = e.clientY - rect.top;
 
-				zoomAnimationRef.current = {
+				const zoomResult = calculateZoomTowardsMouse(
+					mouseScreenX,
+					mouseScreenY,
+					cam.zoom,
 					targetZoom,
-					targetCenterX: newCenterX,
-					targetCenterY: newCenterY,
+					cam.centerX,
+					cam.centerY,
+					viewportWidth,
+					viewportHeight
+				);
+
+				// 应用边界约束
+				const mapConfigCurrent = mapConfigRef.current;
+				const updated = updateCameraWithConstraints(
+					{
+						zoom: targetZoom,
+						centerX: zoomResult.centerX,
+						centerY: zoomResult.centerY,
+					},
+					cam,
+					{
+						mapWidth: mapConfigCurrent.width,
+						mapHeight: mapConfigCurrent.height,
+						minZoom: cam.minZoom ?? 0.3,
+						maxZoom: cam.maxZoom ?? 6,
+						outOfBoundsMargin: 0.15, // 允许 15% 出界查看
+						softBoundaryFactor: 0.25, // 25% 软边界阻力
+					},
+					viewportWidth,
+					viewportHeight,
+					{ enableSoftBoundary: true }
+				);
+
+				// 启动平滑动画
+				zoomAnimationRef.current = {
+					targetZoom: updated.zoom,
+					targetCenterX: updated.centerX,
+					targetCenterY: updated.centerY,
 					startZoom: cam.zoom,
 					startCenterX: cam.centerX,
 					startCenterY: cam.centerY,
 					startTime: performance.now(),
-					duration: 250,
+					duration: 200, // 稍微缩短动画时间，响应更快
 				};
 			};
 
-			// 鼠标按下 - 开始拖动画布或 Token
+			// 鼠标按下 - 仅中键拖拽画布
 			const handleMouseDown = (e: MouseEvent) => {
-				// 中键或空格 + 左键：拖动画布
-				if (e.button === 1 || (e.button === 0 && keyboard.isSpacePressed)) {
+				// 仅中键拖拽画布
+				if (e.button === 1) {
 					e.preventDefault();
 					const cam = cameraRef.current;
-					interaction.startCanvasPan({
+					const rect = canvas.getBoundingClientRect();
+
+					interactionRef.current?.startCanvasPan({
 						startScreen: { x: e.clientX, y: e.clientY },
 						startWorld: {
-							x: (e.clientX - canvas.getBoundingClientRect().left) / cam.zoom + cam.centerX,
-							y: (e.clientY - canvas.getBoundingClientRect().top) / cam.zoom + cam.centerY,
+							x: (e.clientX - rect.left) / cam.zoom + cam.centerX,
+							y: (e.clientY - rect.top) / cam.zoom + cam.centerY,
 						},
 						startCamera: {
 							centerX: cam.centerX,
@@ -490,15 +551,15 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 
 			// 鼠标移动 - 处理拖动
 			const handleMouseMove = (e: MouseEvent) => {
-				if (interaction.drag) {
-					interaction.updateDragPosition(e.clientX, e.clientY);
+				if (interactionRef.current?.drag) {
+					interactionRef.current.updateDragPosition(e.clientX, e.clientY);
 				}
 			};
 
 			// 鼠标释放 - 结束拖动
 			const handleMouseUp = () => {
-				if (interaction.drag) {
-					interaction.endCurrentDrag();
+				if (interactionRef.current?.drag) {
+					interactionRef.current.endCurrentDrag();
 				}
 			};
 
@@ -580,30 +641,34 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		const handleZoomEvent = (e: Event) => {
 			const detail = (e as CustomEvent).detail as { action: "in" | "out" | "reset" };
 			const cam = cameraRef.current;
-			const minZoom = cam.minZoom ?? 0.5;
-			const maxZoom = cam.maxZoom ?? 4;
+			const minZoom = cam.minZoom ?? 0.3;
+			const maxZoom = cam.maxZoom ?? 6;
+			const zoomFactor = 1.15; // 优化的缩放比率
+
+			// 根据用户设置翻转缩放方向
+			const effectiveZoomFactor = zoomDirectionRef.current ? zoomFactor : 1 / zoomFactor;
 
 			if (detail.action === "in") {
 				zoomAnimationRef.current = {
-					targetZoom: Math.min(maxZoom, cam.zoom * 1.2),
+					targetZoom: Math.min(maxZoom, cam.zoom * effectiveZoomFactor),
 					targetCenterX: cam.centerX,
 					targetCenterY: cam.centerY,
 					startZoom: cam.zoom,
 					startCenterX: cam.centerX,
 					startCenterY: cam.centerY,
 					startTime: performance.now(),
-					duration: 250,
+					duration: 200,
 				};
 			} else if (detail.action === "out") {
 				zoomAnimationRef.current = {
-					targetZoom: Math.max(minZoom, cam.zoom / 1.2),
+					targetZoom: Math.max(minZoom, cam.zoom / effectiveZoomFactor),
 					targetCenterX: cam.centerX,
 					targetCenterY: cam.centerY,
 					startZoom: cam.zoom,
 					startCenterX: cam.centerX,
 					startCenterY: cam.centerY,
 					startTime: performance.now(),
-					duration: 250,
+					duration: 200,
 				};
 			} else if (detail.action === "reset") {
 				zoomAnimationRef.current = {
@@ -614,14 +679,22 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 					startCenterX: cam.centerX,
 					startCenterY: cam.centerY,
 					startTime: performance.now(),
-					duration: 250,
+					duration: 300,
 				};
 			}
 		};
 
+		// 监听缩放方向翻转事件
+		const handleZoomDirectionEvent = (e: Event) => {
+			const detail = (e as CustomEvent).detail as { inverted: boolean };
+			zoomDirectionRef.current = detail.inverted;
+		};
+
 		window.addEventListener("game-zoom", handleZoomEvent as EventListener);
+		window.addEventListener("game-zoom-direction", handleZoomDirectionEvent as EventListener);
 		return () => {
 			window.removeEventListener("game-zoom", handleZoomEvent as EventListener);
+			window.removeEventListener("game-zoom-direction", handleZoomDirectionEvent as EventListener);
 		};
 	}, []);
 
