@@ -209,6 +209,47 @@ export const TokenInfoSchema = z.object({
   metadata: z.record(z.string(), z.unknown()),
 });
 
+
+export const StarNodeSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  position: PointSchema,
+  spectralType: z.string().min(1).max(8).default('G'),
+  description: z.string().default(''),
+  tags: z.array(z.string()).default([]),
+  updatedAt: z.number(),
+});
+
+export const PlanetNodeSchema = z.object({
+  id: z.string(),
+  starId: z.string(),
+  name: z.string().min(1),
+  orbitIndex: z.number().int().min(1),
+  kind: z.enum(['terrestrial', 'gas_giant', 'ice_giant', 'dwarf', 'station']).default('terrestrial'),
+  description: z.string().default(''),
+  tags: z.array(z.string()).default([]),
+  updatedAt: z.number(),
+});
+
+export const StarSystemSchema = z.object({
+  starId: z.string(),
+  planets: z.record(z.string(), PlanetNodeSchema),
+  updatedAt: z.number(),
+});
+
+export const StarMapSchema = z.object({
+  stars: z.record(z.string(), StarNodeSchema),
+  systems: z.record(z.string(), StarSystemSchema),
+});
+
+export const MapSnapshotSchema = z.object({
+  version: z.string(),
+  savedAt: z.number(),
+  map: MapConfigSchema,
+  tokens: z.array(TokenInfoSchema),
+  starMap: StarMapSchema,
+});
+
 // ==================== 相机相关 Schema ====================
 export const CameraStateSchema = z.object({
   centerX: z.number(),
@@ -293,6 +334,11 @@ export type MapConfig = z.infer<typeof MapConfigSchema>;
 export type TokenType = z.infer<typeof TokenTypeSchema>;
 export type UnitTurnState = z.infer<typeof UnitTurnStateSchema>;
 export type TokenInfo = z.infer<typeof TokenInfoSchema>;
+export type StarNode = z.infer<typeof StarNodeSchema>;
+export type PlanetNode = z.infer<typeof PlanetNodeSchema>;
+export type StarSystem = z.infer<typeof StarSystemSchema>;
+export type StarMap = z.infer<typeof StarMapSchema>;
+export type MapSnapshot = z.infer<typeof MapSnapshotSchema>;
 export type CameraState = z.infer<typeof CameraStateSchema>;
 export type PlayerCamera = z.infer<typeof PlayerCameraSchema>;
 export type CameraUpdateCommand = z.infer<typeof CameraUpdateCommandSchema>;

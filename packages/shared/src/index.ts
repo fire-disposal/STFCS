@@ -40,6 +40,11 @@ export type {
   TokenInfo,
   TokenType,
   UnitTurnState,
+  StarNode,
+  PlanetNode,
+  StarSystem,
+  StarMap,
+  MapSnapshot,
   // 相机
   CameraState,
   PlayerCamera,
@@ -133,6 +138,10 @@ export {
   type ShipGetStatusRequestPayload,
   type DMToggleRequestPayload,
   type CameraUpdateRequestPayload,
+  type MapSnapshotGetRequestPayload,
+  type MapSnapshotSaveRequestPayload,
+  type MapTokenMoveRequestPayload,
+  type RoomStateGetRequestPayload,
   // 响应负载类型
   type PlayerJoinResponsePayload,
   type PlayerLeaveResponsePayload,
@@ -145,6 +154,10 @@ export {
   type ShipGetStatusResponsePayload,
   type DMToggleResponsePayload,
   type CameraUpdateResponsePayload,
+  type MapSnapshotGetResponsePayload,
+  type MapSnapshotSaveResponsePayload,
+  type MapTokenMoveResponsePayload,
+  type RoomStateGetResponsePayload,
   // 接口
   type IWSServer,
   type IWSClient,

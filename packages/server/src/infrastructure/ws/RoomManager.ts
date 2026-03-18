@@ -1,6 +1,6 @@
-import type { WSMessage } from "@vt/shared/ws";
-import type { IWSServer } from "@vt/shared/ws";
-import type { PlayerInfo, PlayerCamera } from "@vt/shared/types";
+import type { MapSnapshot, PlayerCamera, PlayerInfo, Point, TokenInfo } from "@vt/shared/types";
+import { PROTOCOL_VERSION } from "@vt/shared/core-types";
+import type { IWSServer, WSMessage } from "@vt/shared/ws";
 
 export interface Room {
 	id: string;
@@ -9,10 +9,12 @@ export interface Room {
 	maxPlayers: number;
 	/** 存储房间内玩家的相机状态 */
 	playerCameras: Map<string, PlayerCamera>;
+	/** 房间地图快照（MVP 持久化基线） */
+	mapSnapshot: MapSnapshot;
 }
 
 export interface IRoomManager {
-	createRoom(roomId: string): Room;
+	createRoom(roomId: string, maxPlayers?: number): Room;
 	joinRoom(roomId: string, player: PlayerInfo): boolean;
 	leaveRoom(roomId: string, playerId: string): boolean;
 	getRoom(roomId: string): Room | undefined;
@@ -38,7 +40,7 @@ export class RoomManager implements IRoomManager {
 		this._wsServer = wsServer;
 	}
 
-	createRoom(roomId: string): Room {
+	createRoom(roomId: string, maxPlayers?: number): Room {
 		const existingRoom = this._rooms.get(roomId);
 		if (existingRoom) {
 			return existingRoom;
@@ -48,8 +50,9 @@ export class RoomManager implements IRoomManager {
 			id: roomId,
 			players: new Map(),
 			createdAt: Date.now(),
-			maxPlayers: this._maxPlayersPerRoom,
+			maxPlayers: maxPlayers ?? this._maxPlayersPerRoom,
 			playerCameras: new Map(),
+			mapSnapshot: this._createDefaultSnapshot(roomId),
 		};
 
 		this._rooms.set(roomId, room);
@@ -167,6 +170,80 @@ export class RoomManager implements IRoomManager {
 		const room = this._rooms.get(roomId);
 		if (!room) return;
 		room.playerCameras.delete(playerId);
+	}
+
+	getMapSnapshot(roomId: string): MapSnapshot {
+		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
+		return room.mapSnapshot;
+	}
+
+	saveMapSnapshot(roomId: string, snapshot: MapSnapshot): MapSnapshot {
+		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
+		room.mapSnapshot = {
+			...snapshot,
+			savedAt: Date.now(),
+			version: snapshot.version || PROTOCOL_VERSION,
+		};
+		return room.mapSnapshot;
+	}
+
+	upsertTokenPosition(
+		roomId: string,
+		tokenId: string,
+		position: Point,
+		heading: number,
+		ownerId = "mvp",
+		type: TokenInfo["type"] = "ship",
+		size = 50,
+	): TokenInfo {
+		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
+		const snapshot = room.mapSnapshot;
+		const existing = snapshot.tokens.find((token) => token.id === tokenId);
+		const updated: TokenInfo = {
+			id: tokenId,
+			ownerId: existing?.ownerId ?? ownerId,
+			position,
+			heading,
+			type: existing?.type ?? type,
+			size: existing?.size ?? size,
+			scale: existing?.scale ?? 1,
+			turnState: existing?.turnState ?? "waiting",
+			maxMovement: existing?.maxMovement ?? 9999,
+			remainingMovement: existing?.remainingMovement ?? 9999,
+			actionsPerTurn: existing?.actionsPerTurn ?? 0,
+			remainingActions: existing?.remainingActions ?? 0,
+			layer: existing?.layer ?? 1,
+			collisionRadius: existing?.collisionRadius ?? size,
+			metadata: existing?.metadata ?? {},
+		};
+
+		if (existing) {
+			existing.position = position;
+			existing.heading = heading;
+		} else {
+			snapshot.tokens.push(updated);
+		}
+
+		snapshot.savedAt = Date.now();
+		return updated;
+	}
+
+	private _createDefaultSnapshot(roomId: string): MapSnapshot {
+		return {
+			version: PROTOCOL_VERSION,
+			savedAt: Date.now(),
+			map: {
+				id: `${roomId}_map`,
+				width: 4096,
+				height: 4096,
+				name: `Room ${roomId} Star Map`,
+			},
+			tokens: [],
+			starMap: {
+				stars: {},
+				systems: {},
+			},
+		};
 	}
 }
 

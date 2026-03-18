@@ -44,10 +44,18 @@ export class PlayerService extends BaseService implements IPlayerService {
 		}
 
 		if (this._wsServer) {
-			this._wsServer.broadcast({
-				type: WS_MESSAGE_TYPES.PLAYER_JOINED,
-				payload: completePlayer,
-			});
+			const targetRoom = this._roomManager?.getPlayerRoom(player.id);
+			if (targetRoom) {
+				this._roomManager?.broadcastToRoom(targetRoom.id, {
+					type: WS_MESSAGE_TYPES.PLAYER_JOINED,
+					payload: completePlayer,
+				});
+			} else {
+				this._wsServer.broadcast({
+					type: WS_MESSAGE_TYPES.PLAYER_JOINED,
+					payload: completePlayer,
+				});
+			}
 		}
 
 		return { success: true, data: completePlayer };
@@ -66,7 +74,7 @@ export class PlayerService extends BaseService implements IPlayerService {
 		this._players.delete(playerId);
 
 		if (this._wsServer) {
-			this._wsServer.broadcast({
+			this._roomManager?.broadcastToRoom(roomId, {
 				type: WS_MESSAGE_TYPES.PLAYER_LEFT,
 				payload: { playerId, reason: "Player left" },
 			});
@@ -102,34 +110,37 @@ export class PlayerService extends BaseService implements IPlayerService {
 		this._players.set(playerId, player);
 
 		if (this._wsServer) {
-			this._wsServer.broadcast({
-				type: WS_MESSAGE_TYPES.DM_TOGGLE,
-				payload: {
-					playerId,
-					playerName: player.name,
-					enable,
-					timestamp: Date.now(),
-				},
-			});
-
-			this._broadcastDMStatus();
+			const room = this._roomManager?.getPlayerRoom(playerId);
+			if (room) {
+				this._roomManager?.broadcastToRoom(room.id, {
+					type: WS_MESSAGE_TYPES.DM_TOGGLE,
+					payload: {
+						playerId,
+						playerName: player.name,
+						enable,
+						timestamp: Date.now(),
+					},
+				});
+				this._broadcastDMStatus(room.id);
+			}
 		}
 
 		return true;
 	}
 
-	private _broadcastDMStatus(): void {
+	private _broadcastDMStatus(roomId: string): void {
 		if (!this._wsServer || !this._roomManager) {
 			return;
 		}
 
-		const dmStatus = Array.from(this._players.values()).map((player) => ({
+		const roomPlayers = this.listPlayers(roomId);
+		const dmStatus = roomPlayers.map((player) => ({
 			id: player.id,
 			name: player.name,
 			isDMMode: player.isDMMode,
 		}));
 
-		this._wsServer.broadcast({
+		this._roomManager.broadcastToRoom(roomId, {
 			type: WS_MESSAGE_TYPES.DM_STATUS_UPDATE,
 			payload: {
 				players: dmStatus,

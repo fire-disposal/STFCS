@@ -20,6 +20,7 @@ import type {
   TokenInfo,
   MapConfig,
   ArmorQuadrant,
+  MapSnapshot,
 } from '../types/index.js';
 // @ts-ignore - 类型在 schema 中使用
 import type {
@@ -110,6 +111,10 @@ export const RequestOperationSchema = z.enum([
   'dm.toggle',
   'dm.getStatus',
   'camera.update',
+  'map.snapshot.get',
+  'map.snapshot.save',
+  'map.token.move',
+  'room.state.get',
 ]);
 
 export type RequestOperation = z.infer<typeof RequestOperationSchema>;
@@ -170,6 +175,29 @@ export const CameraUpdateRequestSchema = z.object({
   zoom: z.number(),
 });
 
+export const MapSnapshotGetRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
+export const MapSnapshotSaveRequestSchema = z.object({
+  roomId: z.string().optional(),
+  snapshot: z.unknown(),
+});
+
+export const MapTokenMoveRequestSchema = z.object({
+  roomId: z.string().optional(),
+  tokenId: z.string(),
+  position: z.object({ x: z.number(), y: z.number() }),
+  heading: z.number(),
+  ownerId: z.string().optional(),
+  type: z.enum(['ship', 'station', 'asteroid']).optional(),
+  size: z.number().optional(),
+});
+
+export const RoomStateGetRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
 // 请求负载联合 Schema
 export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('player.join'), data: PlayerJoinRequestSchema }),
@@ -184,6 +212,10 @@ export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('dm.toggle'), data: DMToggleRequestSchema }),
   z.object({ operation: z.literal('dm.getStatus'), data: DMGetStatusRequestSchema }),
   z.object({ operation: z.literal('camera.update'), data: CameraUpdateRequestSchema }),
+  z.object({ operation: z.literal('map.snapshot.get'), data: MapSnapshotGetRequestSchema }),
+  z.object({ operation: z.literal('map.snapshot.save'), data: MapSnapshotSaveRequestSchema }),
+  z.object({ operation: z.literal('map.token.move'), data: MapTokenMoveRequestSchema }),
+  z.object({ operation: z.literal('room.state.get'), data: RoomStateGetRequestSchema }),
 ]);
 
 export type RequestPayload = z.infer<typeof RequestPayloadSchema>;
@@ -241,6 +273,10 @@ export type ShipGetStatusRequestPayload = z.infer<typeof ShipGetStatusRequestSch
 export type DMToggleRequestPayload = z.infer<typeof DMToggleRequestSchema>;
 export type DMGetStatusRequestPayload = z.infer<typeof DMGetStatusRequestSchema>;
 export type CameraUpdateRequestPayload = z.infer<typeof CameraUpdateRequestSchema>;
+export type MapSnapshotGetRequestPayload = z.infer<typeof MapSnapshotGetRequestSchema>;
+export type MapSnapshotSaveRequestPayload = z.infer<typeof MapSnapshotSaveRequestSchema>;
+export type MapTokenMoveRequestPayload = z.infer<typeof MapTokenMoveRequestSchema>;
+export type RoomStateGetRequestPayload = z.infer<typeof RoomStateGetRequestSchema>;
 
 // 响应负载类型
 export type PlayerJoinResponsePayload = PlayerInfo;
@@ -257,6 +293,15 @@ export type ShipGetStatusResponsePayload = ShipStatus | null;
 export type DMToggleResponsePayload = PlayerInfo;
 export type DMGetStatusResponsePayload = { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
 export type CameraUpdateResponsePayload = void;
+export type MapSnapshotGetResponsePayload = { roomId: string; snapshot: MapSnapshot };
+export type MapSnapshotSaveResponsePayload = { roomId: string; snapshot: MapSnapshot };
+export type MapTokenMoveResponsePayload = { roomId: string; token: TokenInfo };
+export type RoomStateGetResponsePayload = {
+  roomId: string;
+  players: PlayerInfo[];
+  dm: { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
+  snapshot: MapSnapshot;
+};
 
 // 响应数据联合类型
 export type ResponseData =
@@ -271,7 +316,11 @@ export type ResponseData =
   | { operation: 'ship.getStatus'; data: ShipGetStatusResponsePayload }
   | { operation: 'dm.toggle'; data: DMToggleResponsePayload }
   | { operation: 'dm.getStatus'; data: DMGetStatusResponsePayload }
-  | { operation: 'camera.update'; data: CameraUpdateResponsePayload };
+  | { operation: 'camera.update'; data: CameraUpdateResponsePayload }
+  | { operation: 'map.snapshot.get'; data: MapSnapshotGetResponsePayload }
+  | { operation: 'map.snapshot.save'; data: MapSnapshotSaveResponsePayload }
+  | { operation: 'map.token.move'; data: MapTokenMoveResponsePayload }
+  | { operation: 'room.state.get'; data: RoomStateGetResponsePayload };
 
 export type ResponsePayload<T extends RequestOperation = RequestOperation> =
   | z.infer<typeof SuccessResponseSchema> & { operation: T }
