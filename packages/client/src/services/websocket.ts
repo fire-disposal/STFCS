@@ -1,4 +1,7 @@
 import { store } from "@/store";
+import { removeOtherPlayerCamera } from "@/store/slices/mapSlice";
+import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
+import { beginTokenDrag, endTokenDrag, updateTokenDrag } from "@/store/slices/selectionSlice";
 import {
 	setConnected,
 	setConnecting,
@@ -6,37 +9,22 @@ import {
 	setRoomId,
 	updatePing,
 } from "@/store/slices/uiSlice";
-import { removeOtherPlayerCamera } from "@/store/slices/mapSlice";
+import { createStateSyncV2, createWSEventBusIntegration } from "@/store/sync";
+import type { PlayerCamera, ShipMovement } from "@vt/shared/types";
 import type {
-	WSMessage,
-	WSMessageType,
-	WSMessagePayloadMap,
-	RoomUpdateMessage,
-	PingMessage,
 	PlayerJoinedMessage,
-	ShipMovedMessage,
-	ChatMessagePayload,
-	DrawingAddMessage,
 	RequestMessage,
-	ResponseMessage,
 	RequestOperation,
-	ResponseForOperation,
 	RequestPayload,
-	TokenDragStartMessage,
-	TokenDraggingMessage,
-	TokenDragEndMessage,
+	ResponseForOperation,
+	ResponseMessage,
+	ShipMovedMessage,
+	WSMessage,
+	WSMessagePayloadMap,
+	WSMessageType,
 } from "@vt/shared/ws";
-import type { ShipMovement, PlayerCamera } from "@vt/shared/types";
 import type { DrawingElement } from "@vt/shared/ws";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
-import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
-import {
-	beginTokenDrag,
-	updateTokenDrag,
-	endTokenDrag,
-} from "@/store/slices/selectionSlice";
-import { createStateSyncV2, createWSEventBusIntegration } from "@/store/sync";
-import { DEFAULT_WS_URL } from "@/config";
 
 // 使用共享的 WSMessagePayloadMap，无需重复定义
 export type { WSMessage, WSMessageType, WSMessagePayloadMap };
@@ -65,11 +53,11 @@ export class WebSocketService {
 	private messageHandlers = new Map<WSMessageType, Set<(...args: unknown[]) => void>>();
 	private pendingRequests = new Map<string, PendingRequest>();
 	private requestTimeout = 10000;
-	
+
 	// 新架构：状态同步器和事件总线集成
 	private stateSync = createStateSyncV2({ enableLogging: false });
 	private eventBusIntegration = createWSEventBusIntegration(this, {
-		roomId: 'default', // 初始房间，连接后更新
+		roomId: "default", // 初始房间，连接后更新
 		enableLogging: false,
 	});
 
@@ -111,36 +99,42 @@ export class WebSocketService {
 
 		// Token 拖拽处理器
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_START, (payload) => {
-			store.dispatch(beginTokenDrag({
-				tokenId: payload.tokenId,
-				playerId: payload.playerId,
-				playerName: payload.playerName,
-				position: payload.position,
-				heading: payload.heading,
-				timestamp: payload.timestamp,
-			}));
+			store.dispatch(
+				beginTokenDrag({
+					tokenId: payload.tokenId,
+					playerId: payload.playerId,
+					playerName: payload.playerName,
+					position: payload.position,
+					heading: payload.heading,
+					timestamp: payload.timestamp,
+				})
+			);
 		});
 
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAGGING, (payload) => {
-			store.dispatch(updateTokenDrag({
-				tokenId: payload.tokenId,
-				playerId: payload.playerId,
-				playerName: payload.playerName,
-				position: payload.position,
-				heading: payload.heading,
-				timestamp: payload.timestamp,
-			}));
+			store.dispatch(
+				updateTokenDrag({
+					tokenId: payload.tokenId,
+					playerId: payload.playerId,
+					playerName: payload.playerName,
+					position: payload.position,
+					heading: payload.heading,
+					timestamp: payload.timestamp,
+				})
+			);
 		});
 
 		this.on(WS_MESSAGE_TYPES.TOKEN_DRAG_END, (payload) => {
-			store.dispatch(endTokenDrag({
-				tokenId: payload.tokenId,
-				playerId: payload.playerId,
-				finalPosition: payload.finalPosition,
-				finalHeading: payload.finalHeading,
-				committed: payload.committed,
-				timestamp: payload.timestamp,
-			}));
+			store.dispatch(
+				endTokenDrag({
+					tokenId: payload.tokenId,
+					playerId: payload.playerId,
+					finalPosition: payload.finalPosition,
+					finalHeading: payload.finalHeading,
+					committed: payload.committed,
+					timestamp: payload.timestamp,
+				})
+			);
 		});
 
 		// 响应处理器
@@ -246,6 +240,30 @@ export class WebSocketService {
 
 	public async getShipStatus(shipId: string): Promise<ResponseForOperation<"ship.getStatus">> {
 		return this.sendRequest("ship.getStatus", { shipId });
+	}
+
+	public async getMapSnapshot(roomId?: string): Promise<ResponseForOperation<"map.snapshot.get">> {
+		return this.sendRequest("map.snapshot.get", { roomId });
+	}
+
+	public async saveMapSnapshot(
+		snapshot: unknown,
+		roomId?: string
+	): Promise<ResponseForOperation<"map.snapshot.save">> {
+		return this.sendRequest("map.snapshot.save", { roomId, snapshot });
+	}
+
+	public async moveMapToken(
+		tokenId: string,
+		position: { x: number; y: number },
+		heading: number,
+		roomId?: string
+	): Promise<ResponseForOperation<"map.token.move">> {
+		return this.sendRequest("map.token.move", { roomId, tokenId, position, heading });
+	}
+
+	public async getRoomState(roomId?: string): Promise<ResponseForOperation<"room.state.get">> {
+		return this.sendRequest("room.state.get", { roomId });
 	}
 
 	private generateRequestId(): string {
@@ -355,11 +373,7 @@ export class WebSocketService {
 		this.send(message);
 	}
 
-	public sendChatMessage(
-		content: string,
-		senderId: string,
-		senderName: string
-	): void {
+	public sendChatMessage(content: string, senderId: string, senderName: string): void {
 		this.send({
 			type: WS_MESSAGE_TYPES.CHAT_MESSAGE,
 			payload: {
@@ -448,20 +462,14 @@ export class WebSocketService {
 	}
 
 	// 事件处理器管理 - 使用类型安全的泛型
-	public on<T extends WSMessageType>(
-		type: T,
-		handler: MessageHandler<T>
-	): void {
+	public on<T extends WSMessageType>(type: T, handler: MessageHandler<T>): void {
 		if (!this.messageHandlers.has(type)) {
 			this.messageHandlers.set(type, new Set());
 		}
 		this.messageHandlers.get(type)!.add(handler as (...args: unknown[]) => void);
 	}
 
-	public off<T extends WSMessageType>(
-		type: T,
-		handler?: MessageHandler<T>
-	): void {
+	public off<T extends WSMessageType>(type: T, handler?: MessageHandler<T>): void {
 		const handlers = this.messageHandlers.get(type);
 		if (!handlers) return;
 
@@ -502,7 +510,9 @@ export class WebSocketService {
 		if (this.reconnectAttempts < this.maxReconnectAttempts) {
 			this.reconnectAttempts++;
 			const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-			console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+			console.log(
+				`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+			);
 			setTimeout(() => {
 				this.connect(url).catch((error) => {
 					console.error("Reconnection failed:", error);

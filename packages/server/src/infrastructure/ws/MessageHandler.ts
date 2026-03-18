@@ -20,6 +20,7 @@ import type {
 	TokenDraggingMessage,
 	WSMessage,
 } from "@vt/shared/ws";
+import { MapSnapshotSchema } from "@vt/shared/core-types";
 import { WS_MESSAGE_TYPES, isRequestMessage, isShipMovedMessage } from "@vt/shared/ws";
 import type { PlayerService } from "../../application/player/PlayerService";
 import type { SelectionService } from "../../application/selection/SelectionService";
@@ -71,6 +72,10 @@ export class MessageHandler {
 			"ship.getStatus": this._handleShipGetStatus.bind(this),
 			"dm.toggle": this._handleDMToggle.bind(this),
 			"dm.getStatus": this._handleDMGetStatus.bind(this),
+			"map.snapshot.get": this._handleMapSnapshotGet.bind(this),
+			"map.snapshot.save": this._handleMapSnapshotSave.bind(this),
+			"map.token.move": this._handleMapTokenMove.bind(this),
+			"room.state.get": this._handleRoomStateGet.bind(this),
 		};
 	}
 
@@ -339,6 +344,8 @@ export class MessageHandler {
 		clientId: string,
 		data: Extract<RequestPayload, { operation: "dm.toggle" }>["data"]
 	) {
+		if (data.playerId !== clientId) throw new Error("Cannot toggle DM mode for another player");
+
 		const player = this._playerService.getPlayer(clientId);
 		if (!player) throw new Error("Player not found");
 
@@ -677,8 +684,91 @@ export class MessageHandler {
 		const roomData = data as { roomId: string; maxPlayers?: number };
 		if (!roomData?.roomId) throw new Error("Invalid roomId");
 
-		const room = this._roomManager.createRoom(roomData.roomId);
+		const room = this._roomManager.createRoom(roomData.roomId, roomData.maxPlayers);
 		return { roomId: room.id };
+	}
+
+
+	private async _handleMapSnapshotGet(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "map.snapshot.get" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const snapshot = this._roomManager.getMapSnapshot(roomId);
+		return { roomId, snapshot };
+	}
+
+	private async _handleMapSnapshotSave(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "map.snapshot.save" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const parsed = MapSnapshotSchema.safeParse(data.snapshot);
+		if (!parsed.success) {
+			throw new Error("Invalid map snapshot payload");
+		}
+		const snapshot = this._roomManager.saveMapSnapshot(roomId, parsed.data);
+		return { roomId, snapshot };
+	}
+
+	private async _handleMapTokenMove(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "map.token.move" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const existing = this._roomManager
+			.getMapSnapshot(roomId)
+			.tokens.find((token) => token.id === data.tokenId);
+		const previousPosition = existing?.position ?? data.position;
+		const previousHeading = existing?.heading ?? data.heading;
+
+		const token = this._roomManager.upsertTokenPosition(
+			roomId,
+			data.tokenId,
+			data.position,
+			data.heading,
+			data.ownerId ?? clientId,
+			data.type ?? "ship",
+			data.size ?? 50
+		);
+
+		this._roomManager.broadcastToRoom(roomId, {
+			type: WS_MESSAGE_TYPES.TOKEN_MOVED,
+			payload: {
+				tokenId: token.id,
+				previousPosition,
+				newPosition: data.position,
+				previousHeading,
+				newHeading: data.heading,
+				timestamp: Date.now(),
+			},
+		});
+
+		return { roomId, token };
+	}
+
+	private async _handleRoomStateGet(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "room.state.get" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const players = this._playerService.listPlayers(roomId);
+		const current = this._playerService.getPlayer(clientId);
+		const dmPlayers = players.map((p) => ({
+			id: p.id,
+			name: p.name,
+			isDMMode: p.isDMMode ?? false,
+		}));
+
+		return {
+			roomId,
+			players,
+			dm: {
+				isDMMode: current?.isDMMode ?? false,
+				players: dmPlayers,
+			},
+			snapshot: this._roomManager.getMapSnapshot(roomId),
+		};
 	}
 
 	private async _handleCameraUpdate(
@@ -787,13 +877,25 @@ export class MessageHandler {
 		}
 
 		if (message.payload.committed) {
+			const existing = this._roomManager
+				.getMapSnapshot(playerRoom.id)
+				.tokens.find((t) => t.id === message.payload.tokenId);
+			const previousPosition = existing?.position ?? message.payload.finalPosition;
+			const previousHeading = existing?.heading ?? message.payload.finalHeading;
+			this._roomManager.upsertTokenPosition(
+				playerRoom.id,
+				message.payload.tokenId,
+				message.payload.finalPosition,
+				message.payload.finalHeading,
+				clientId
+			);
 			this._roomManager.broadcastToRoom(playerRoom.id, {
 				type: WS_MESSAGE_TYPES.TOKEN_MOVED,
 				payload: {
 					tokenId: message.payload.tokenId,
-					previousPosition: { x: 0, y: 0 },
+					previousPosition,
 					newPosition: message.payload.finalPosition,
-					previousHeading: 0,
+					previousHeading,
 					newHeading: message.payload.finalHeading,
 					timestamp: Date.now(),
 				},

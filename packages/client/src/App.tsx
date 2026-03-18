@@ -1,19 +1,22 @@
+import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
 
 import { DEFAULT_WS_URL } from "@/config";
 import GameView from "@/features/game/GameView";
 import { websocketService } from "@/services/websocket";
 import { useAppDispatch, useAppSelector } from "@/store";
+import { loadMapSnapshot } from "@/store/slices/mapSlice";
+import { addPlayer, clearPlayers, setCurrentPlayer } from "@/store/slices/playerSlice";
 import {
 	setConnected,
 	setConnecting,
+	setDMMode,
 	setPlayerId,
 	setPlayerName,
 	setRoomId,
+	updateDMPlayers,
 } from "@/store/slices/uiSlice";
-import { addPlayer, setCurrentPlayer } from "@/store/slices/playerSlice";
 
 // 简化的连接视图 - 只输入玩家名称
 const PlayerNameView: React.FC<{
@@ -34,9 +37,11 @@ const PlayerNameView: React.FC<{
 				await onReconnect();
 				return;
 			} catch (err) {
-				setError(t("connection.error.failedToReconnect", {
-					error: err instanceof Error ? err.message : String(err),
-				}));
+				setError(
+					t("connection.error.failedToReconnect", {
+						error: err instanceof Error ? err.message : String(err),
+					})
+				);
 				return;
 			}
 		}
@@ -53,9 +58,11 @@ const PlayerNameView: React.FC<{
 		try {
 			await onJoin(name);
 		} catch (err) {
-			setError(t("connection.error.failedToJoin", {
-				error: err instanceof Error ? err.message : String(err),
-			}));
+			setError(
+				t("connection.error.failedToJoin", {
+					error: err instanceof Error ? err.message : String(err),
+				})
+			);
 		}
 	};
 
@@ -66,9 +73,7 @@ const PlayerNameView: React.FC<{
 					<h2>{t("connection.title")}</h2>
 					<SciFiLanguageSwitcher />
 				</div>
-				<p className="connection-description">
-					{t("connection.description")}
-				</p>
+				<p className="connection-description">{t("connection.description")}</p>
 
 				<form onSubmit={handleSubmit} className="connection-form">
 					<div className="form-group">
@@ -92,9 +97,7 @@ const PlayerNameView: React.FC<{
 								{t("connection.connectionStatusText", { url: DEFAULT_WS_URL })}
 							</div>
 						)}
-						{isConnected ? (
-							<small className="form-help">{t("connection.formHelp")}</small>
-						) : null}
+						{isConnected ? <small className="form-help">{t("connection.formHelp")}</small> : null}
 						{error && <div className="form-error">{error}</div>}
 					</div>
 
@@ -107,7 +110,9 @@ const PlayerNameView: React.FC<{
 							{isConnecting ? (
 								<>
 									<span className="spinner"></span>
-									{isConnected ? t("connection.submit.joining") : t("connection.submit.reconnecting")}
+									{isConnected
+										? t("connection.submit.joining")
+										: t("connection.submit.reconnecting")}
 								</>
 							) : isConnected ? (
 								t("connection.submit.joinGame")
@@ -203,34 +208,43 @@ const App: React.FC = () => {
 				roomId: defaultRoomId,
 			});
 
+			const roomState = await websocketService.getRoomState(defaultRoomId);
+
 			dispatch(setPlayerName(name));
 			dispatch(setPlayerId(tempPlayerId));
 			dispatch(setRoomId(defaultRoomId));
-
-			// 设置当前玩家ID到playerSlice
+			dispatch(clearPlayers());
 			dispatch(setCurrentPlayer(tempPlayerId));
+			dispatch(loadMapSnapshot(roomState.snapshot));
+			dispatch(setDMMode(roomState.dm.isDMMode));
+			dispatch(updateDMPlayers(roomState.dm.players));
 
-			// 将当前玩家添加到 players 状态
-			dispatch(addPlayer({
-				id: tempPlayerId,
-				name,
-				joinedAt: Date.now(),
-				isActive: true,
-				isDMMode: false,
-				isConnected: true,
-				isReady: false,
-				currentShipId: null,
-				selectedTargets: [],
-				usedActions: 0,
-				pendingActions: 0,
-				roomId: defaultRoomId,
-				slotIndex: 0,
-				hasActed: false,
-				fluxVentingActive: false,
-				gamePhase: "lobby",
-			}));
+			roomState.players.forEach((player, index) => {
+				dispatch(
+					addPlayer({
+						id: player.id,
+						name: player.name,
+						joinedAt: player.joinedAt,
+						isActive: player.isActive ?? true,
+						isDMMode: player.isDMMode ?? false,
+						isConnected: true,
+						isReady: false,
+						currentShipId: null,
+						selectedTargets: [],
+						usedActions: 0,
+						pendingActions: 0,
+						roomId: defaultRoomId,
+						slotIndex: index,
+						hasActed: false,
+						fluxVentingActive: false,
+						gamePhase: "lobby",
+					})
+				);
+			});
 
-			console.log(`Player ${name} joined the game in room ${defaultRoomId}`);
+			console.log(
+				`Player ${name} joined the game in room ${defaultRoomId} with MVP room bootstrap`
+			);
 		} catch (error) {
 			console.error("Failed to join game:", error);
 			throw error;
