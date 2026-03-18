@@ -33,6 +33,11 @@ export type {
   TokenType,
   UnitTurnState,
   TokenInfo,
+  StarNode,
+  PlanetNode,
+  StarSystem,
+  StarMap,
+  MapSnapshot,
   // 相机
   CameraState,
   PlayerCamera,

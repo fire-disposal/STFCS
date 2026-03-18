@@ -40,6 +40,11 @@ export type {
   TokenInfo,
   TokenType,
   UnitTurnState,
+  StarNode,
+  PlanetNode,
+  StarSystem,
+  StarMap,
+  MapSnapshot,
   // 相机
   CameraState,
   PlayerCamera,

@@ -1,5 +1,13 @@
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
-import type { MapConfig, PlayerCamera, TokenInfo } from "@vt/shared/types";
+import type {
+	MapConfig,
+	MapSnapshot,
+	PlanetNode,
+	PlayerCamera,
+	StarNode,
+	StarSystem,
+	TokenInfo,
+} from "@vt/shared/types";
 
 export interface MapTile {
 	x: number;
@@ -16,6 +24,15 @@ export interface PlacementPreview {
 	valid: boolean;
 }
 
+export type StarMapLayer = "galaxy" | "system";
+
+export interface StarMapState {
+	stars: Record<string, StarNode>;
+	systems: Record<string, StarSystem>;
+	currentLayer: StarMapLayer;
+	currentStarId: string | null;
+}
+
 interface MapState {
 	config: MapConfig & {
 		tileWidth: number;
@@ -30,6 +47,7 @@ interface MapState {
 	placementPreview: PlacementPreview | null;
 	// 其他玩家的相机状态（用于预览）
 	otherPlayersCameras: Record<string, PlayerCamera>;
+	starMap: StarMapState;
 }
 
 const initialState: MapState = {
@@ -101,6 +119,12 @@ const initialState: MapState = {
 	placementMode: false,
 	placementPreview: null,
 	otherPlayersCameras: {},
+	starMap: {
+		stars: {},
+		systems: {},
+		currentLayer: "galaxy",
+		currentStarId: null,
+	},
 };
 
 const mapSlice = createSlice({
@@ -153,6 +177,101 @@ const mapSlice = createSlice({
 		selectToken: (state, action: PayloadAction<string | null>) => {
 			state.selectedTokenId = action.payload;
 		},
+		addStar: (state, action: PayloadAction<StarNode>) => {
+			state.starMap.stars[action.payload.id] = action.payload;
+			if (!state.starMap.systems[action.payload.id]) {
+				state.starMap.systems[action.payload.id] = {
+					starId: action.payload.id,
+					planets: {},
+					updatedAt: Date.now(),
+				};
+			}
+		},
+		updateStar: (state, action: PayloadAction<{ id: string; updates: Partial<StarNode> }>) => {
+			const current = state.starMap.stars[action.payload.id];
+			if (current) {
+				state.starMap.stars[action.payload.id] = {
+					...current,
+					...action.payload.updates,
+					updatedAt: Date.now(),
+				};
+			}
+		},
+		removeStar: (state, action: PayloadAction<string>) => {
+			delete state.starMap.stars[action.payload];
+			delete state.starMap.systems[action.payload];
+			if (state.starMap.currentStarId === action.payload) {
+				state.starMap.currentLayer = "galaxy";
+				state.starMap.currentStarId = null;
+			}
+		},
+		enterStarSystem: (state, action: PayloadAction<string>) => {
+			if (!state.starMap.stars[action.payload]) {
+				return;
+			}
+			state.starMap.currentLayer = "system";
+			state.starMap.currentStarId = action.payload;
+			if (!state.starMap.systems[action.payload]) {
+				state.starMap.systems[action.payload] = {
+					starId: action.payload,
+					planets: {},
+					updatedAt: Date.now(),
+				};
+			}
+		},
+		exitStarSystem: (state) => {
+			state.starMap.currentLayer = "galaxy";
+			state.starMap.currentStarId = null;
+		},
+		addPlanet: (
+			state,
+			action: PayloadAction<{
+				starId: string;
+				planet: PlanetNode;
+			}>
+		) => {
+			const system = state.starMap.systems[action.payload.starId];
+			if (!system) {
+				return;
+			}
+			system.planets[action.payload.planet.id] = action.payload.planet;
+			system.updatedAt = Date.now();
+		},
+		updatePlanet: (
+			state,
+			action: PayloadAction<{ starId: string; planetId: string; updates: Partial<PlanetNode> }>
+		) => {
+			const system = state.starMap.systems[action.payload.starId];
+			const planet = system?.planets[action.payload.planetId];
+			if (planet && system) {
+				system.planets[action.payload.planetId] = {
+					...planet,
+					...action.payload.updates,
+					updatedAt: Date.now(),
+				};
+				system.updatedAt = Date.now();
+			}
+		},
+		removePlanet: (state, action: PayloadAction<{ starId: string; planetId: string }>) => {
+			const system = state.starMap.systems[action.payload.starId];
+			if (system?.planets[action.payload.planetId]) {
+				delete system.planets[action.payload.planetId];
+				system.updatedAt = Date.now();
+			}
+		},
+		loadMapSnapshot: (state, action: PayloadAction<MapSnapshot>) => {
+			state.config = {
+				...state.config,
+				...action.payload.map,
+			};
+			state.tokens = Object.fromEntries(action.payload.tokens.map((token) => [token.id, token]));
+			state.starMap = {
+				stars: action.payload.starMap.stars,
+				systems: action.payload.starMap.systems,
+				currentLayer: "galaxy",
+				currentStarId: null,
+			};
+		},
 	},
 });
 
@@ -168,6 +287,15 @@ export const {
 	updateOtherPlayerCamera,
 	removeOtherPlayerCamera,
 	clearOtherPlayersCameras,
+	addStar,
+	updateStar,
+	removeStar,
+	enterStarSystem,
+	exitStarSystem,
+	addPlanet,
+	updatePlanet,
+	removePlanet,
+	loadMapSnapshot,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;
