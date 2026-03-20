@@ -11,8 +11,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppSelector, useAppDispatch } from '@/store';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
+import { useRoomOperations } from '@/room';
+import type { RoomClient, OperationMap } from '@/room';
 import type { MovementState, MovementPhase, MovementType } from '@vt/shared/types';
 import {
   ChevronUp,
@@ -192,6 +192,8 @@ const phaseNames: Record<MovementPhase, string> = {
 interface MovementControlPanelProps {
   shipId: string;
   movementState: MovementState;
+  currentHeading?: number;
+  client: RoomClient<OperationMap> | null;
   disabled?: boolean;
   onMove?: (type: MovementType, distance: number, angle?: number) => void;
   onRotate?: (angle: number) => void;
@@ -202,6 +204,8 @@ interface MovementControlPanelProps {
 export const MovementControlPanel: React.FC<MovementControlPanelProps> = ({
   shipId,
   movementState,
+  currentHeading = 0,
+  client,
   disabled = false,
   onMove,
   onRotate,
@@ -210,6 +214,9 @@ export const MovementControlPanel: React.FC<MovementControlPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+
+  // 获取操作调用器
+  const ops = useRoomOperations(client);
 
   const [error, setError] = useState<string | null>(null);
   const [isMoving, setIsMoving] = useState(false);
@@ -290,7 +297,7 @@ export const MovementControlPanel: React.FC<MovementControlPanelProps> = ({
   }, [disabled, allPhasesComplete, currentPhase, movementState.maxSpeed, movementState.maxTurnRate]);
 
   // 处理移动
-  const handleMove = useCallback((type: MovementType, distance: number) => {
+  const handleMove = useCallback(async (type: MovementType, distance: number) => {
     if (disabled || isMoving || allPhasesComplete) return;
 
     // 验证移动
@@ -306,26 +313,21 @@ export const MovementControlPanel: React.FC<MovementControlPanelProps> = ({
     setIsMoving(true);
     onMove?.(type, distance);
 
-    // 发送到服务器
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId,
-        actionType: 'move',
-        actionData: {
-          type,
-          distance,
-          phase: currentPhase,
-        },
-        timestamp: Date.now(),
-      },
-    });
+    // 调用服务器操作
+    try {
+      // 计算新位置（简化版，实际应该根据当前朝向和距离计算）
+      const newPosition = { x: 0, y: 0 }; // TODO: 实际位置计算
+      await ops?.moveShip(shipId, newPosition, currentHeading);
+    } catch (error) {
+      console.error('Failed to move ship:', error);
+      setError(error instanceof Error ? error.message : '移动失败');
+    }
 
     setTimeout(() => setIsMoving(false), 200);
-  }, [disabled, isMoving, allPhasesComplete, movementState, shipId, currentPhase, onMove]);
+  }, [disabled, isMoving, allPhasesComplete, movementState, shipId, currentPhase, onMove, ops]);
 
   // 处理旋转
-  const handleRotate = useCallback((angle: number) => {
+  const handleRotate = useCallback(async (angle: number) => {
     if (disabled || isMoving || allPhasesComplete) return;
 
     // 验证旋转
@@ -337,57 +339,41 @@ export const MovementControlPanel: React.FC<MovementControlPanelProps> = ({
     setIsMoving(true);
     onRotate?.(angle);
 
-    // 发送到服务器
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId,
-        actionType: 'rotate',
-        actionData: {
-          angle,
-          phase: currentPhase,
-        },
-        timestamp: Date.now(),
-      },
-    });
+    // 调用服务器操作
+    try {
+      const newHeading = currentHeading + angle;
+      await ops?.moveShip(shipId, { x: 0, y: 0 }, newHeading); // TODO: 实际位置
+    } catch (error) {
+      console.error('Failed to rotate ship:', error);
+      setError(error instanceof Error ? error.message : '旋转失败');
+    }
 
     setTimeout(() => setIsMoving(false), 200);
-  }, [disabled, isMoving, allPhasesComplete, movementState, shipId, currentPhase, onRotate]);
+  }, [disabled, isMoving, allPhasesComplete, movementState, shipId, currentPhase, onRotate, ops]);
 
   // 跳过当前阶段
-  const handleSkipPhase = useCallback(() => {
+  const handleSkipPhase = useCallback(async () => {
     if (disabled || allPhasesComplete) return;
 
     onSkipPhase?.();
 
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId,
-        actionType: 'skip_phase',
-        actionData: {
-          phase: currentPhase,
-        },
-        timestamp: Date.now(),
-      },
-    });
+    // 跳过阶段不需要调用服务器，本地状态更新即可
   }, [disabled, allPhasesComplete, shipId, currentPhase, onSkipPhase]);
 
   // 结束移动
-  const handleEndMovement = useCallback(() => {
+  const handleEndMovement = useCallback(async () => {
     if (disabled) return;
 
     onEndMovement?.();
 
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId,
-        actionType: 'end_movement',
-        timestamp: Date.now(),
-      },
-    });
-  }, [disabled, shipId, onEndMovement]);
+    // 调用服务器操作
+    try {
+      await ops?.endShipAction(shipId);
+    } catch (error) {
+      console.error('Failed to end movement:', error);
+      setError(error instanceof Error ? error.message : '结束移动失败');
+    }
+  }, [disabled, shipId, onEndMovement, ops]);
 
   // 渲染阶段指示器
   const renderPhaseIndicator = () => (

@@ -9,4 +9,4 @@ export {
 	type DeploymentInfo,
 } from './GameFlowService.js';
 
-export default GameFlowService;
+export { GameFlowService as default } from './GameFlowService.js';

@@ -9,8 +9,8 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/store";
 import { MessageSquare, Swords, Layers, Send, LogIn, LogOut, Zap, Shield, Move, CircleDot } from "lucide-react";
-import { websocketService } from "@/services/websocket";
-import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { useRoomState, useRoomOperations, useRoomEvent } from "@/room";
+import type { RoomClient, OperationMap } from "@/room";
 
 interface ChatMessage {
 	id: string;
@@ -34,13 +34,26 @@ type TabType = "chat" | "combat" | "all";
 
 interface RightInfoPanelProps {
 	className?: string;
+	// 房间客户端
+	client: RoomClient<OperationMap> | null;
+	// GameView 传递的 props
+	players?: Array<{ id: string; name: string; isReady?: boolean }>;
+	ownerId?: string | null;
+	currentPlayerId?: string;
+	isOwner?: boolean;
+	onKickPlayer?: (playerId: string) => Promise<void>;
+	onTransferOwner?: (newOwnerId: string) => Promise<void>;
 }
 
-export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }) => {
+export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "", client }) => {
 	const { t } = useTranslation();
 	const [activeTab, setActiveTab] = useState<TabType>("all");
 	const [inputMessage, setInputMessage] = useState("");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+
+	// 获取房间状态和操作
+	const roomState = useRoomState(client);
+	const ops = useRoomOperations(client);
 
 	// 从Redux获取玩家信息
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
@@ -54,110 +67,79 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 
 	const [combatEvents, setCombatEvents] = useState<CombatEvent[]>([]);
 
-	// 监听WebSocket消息
-	useEffect(() => {
-		// 聊天消息处理
-		const handleChatMessage = (payload: unknown) => {
-			const msg = payload as { playerId?: string; playerName?: string; content: string; timestamp?: number };
-			setMessages(prev => [...prev, {
-				id: `chat-${Date.now()}`,
-				type: "chat",
-				senderId: msg.playerId,
-				senderName: msg.playerName || 'Unknown',
-				content: msg.content,
-				timestamp: msg.timestamp || Date.now(),
-			}]);
-		};
+	// 监听房间事件
+	useRoomEvent(client, 'chat', (payload: { playerId?: string; playerName?: string; content: string; timestamp?: number }) => {
+		setMessages(prev => [...prev, {
+			id: `chat-${Date.now()}`,
+			type: "chat",
+			senderId: payload.playerId,
+			senderName: payload.playerName || 'Unknown',
+			content: payload.content,
+			timestamp: payload.timestamp || Date.now(),
+		}]);
+	});
 
-		// 玩家加入处理
-		const handlePlayerJoined = (payload: unknown) => {
-			const data = payload as { playerName?: string };
-			setMessages(prev => [...prev, {
-				id: `join-${Date.now()}`,
-				type: "join",
-				senderName: data.playerName || 'Player',
-				content: '',
-				timestamp: Date.now(),
-			}]);
-		};
+	useRoomEvent(client, 'player.joined', (payload: { playerName?: string }) => {
+		setMessages(prev => [...prev, {
+			id: `join-${Date.now()}`,
+			type: "join",
+			senderName: payload.playerName || 'Player',
+			content: '',
+			timestamp: Date.now(),
+		}]);
+	});
 
-		// 玩家离开处理
-		const handlePlayerLeft = (payload: unknown) => {
-			const data = payload as { playerName?: string };
-			setMessages(prev => [...prev, {
-				id: `leave-${Date.now()}`,
-				type: "leave",
-				senderName: data.playerName || 'Player',
-				content: '',
-				timestamp: Date.now(),
-			}]);
-		};
+	useRoomEvent(client, 'player.left', (payload: { playerName?: string }) => {
+		setMessages(prev => [...prev, {
+			id: `leave-${Date.now()}`,
+			type: "leave",
+			senderName: payload.playerName || 'Player',
+			content: '',
+			timestamp: Date.now(),
+		}]);
+	});
 
-		// 武器开火处理
-		const handleWeaponFired = (payload: unknown) => {
-			const data = payload as {
-				sourceShipId?: string;
-				targetShipId?: string;
-				hit?: boolean;
-				damage?: number;
-				timestamp?: number;
-			};
-			setCombatEvents(prev => [...prev, {
-				id: `fire-${Date.now()}`,
-				type: "attack",
-				actor: data.sourceShipId,
-				target: data.targetShipId,
-				content: `${data.sourceShipId || 'Unknown'} fired at ${data.targetShipId || 'Unknown'}${data.hit ? ' (Hit!)' : ' (Miss)'}`,
-				timestamp: data.timestamp || Date.now(),
-			}]);
-		};
+	useRoomEvent(client, 'weapon.fired', (payload: {
+		sourceShipId?: string;
+		targetShipId?: string;
+		hit?: boolean;
+		damage?: number;
+		timestamp?: number;
+	}) => {
+		setCombatEvents(prev => [...prev, {
+			id: `fire-${Date.now()}`,
+			type: "attack",
+			actor: payload.sourceShipId,
+			target: payload.targetShipId,
+			content: `${payload.sourceShipId || 'Unknown'} fired at ${payload.targetShipId || 'Unknown'}${payload.hit ? ' (Hit!)' : ' (Miss)'}`,
+			timestamp: payload.timestamp || Date.now(),
+		}]);
+	});
 
-		// 伤害处理
-		const handleDamageDealt = (payload: unknown) => {
-			const data = payload as {
-				targetShipId?: string;
-				damage?: number;
-				shieldAbsorbed?: number;
-				hullDamage?: number;
-				timestamp?: number;
-			};
-			setCombatEvents(prev => [...prev, {
-				id: `dmg-${Date.now()}`,
-				type: "damage",
-				target: data.targetShipId,
-				content: `${data.targetShipId || 'Target'} took ${data.damage || 0} damage (Shield: ${data.shieldAbsorbed || 0}, Hull: ${data.hullDamage || 0})`,
-				timestamp: data.timestamp || Date.now(),
-			}]);
-		};
+	useRoomEvent(client, 'damage.dealt', (payload: {
+		targetShipId?: string;
+		damage?: number;
+		shieldAbsorbed?: number;
+		hullDamage?: number;
+		timestamp?: number;
+	}) => {
+		setCombatEvents(prev => [...prev, {
+			id: `dmg-${Date.now()}`,
+			type: "damage",
+			target: payload.targetShipId,
+			content: `${payload.targetShipId || 'Target'} took ${payload.damage || 0} damage (Shield: ${payload.shieldAbsorbed || 0}, Hull: ${payload.hullDamage || 0})`,
+			timestamp: payload.timestamp || Date.now(),
+		}]);
+	});
 
-		// 回合结算处理
-		const handleTurnResolution = (payload: unknown) => {
-			const data = payload as { roundNumber?: number };
-			setCombatEvents(prev => [...prev, {
-				id: `turn-${Date.now()}`,
-				type: "turn",
-				content: `Round ${data.roundNumber || 1} resolved`,
-				timestamp: Date.now(),
-			}]);
-		};
-
-		// 注册消息处理器
-		websocketService.on('CHAT_MESSAGE', handleChatMessage);
-		websocketService.on('PLAYER_JOINED', handlePlayerJoined);
-		websocketService.on('PLAYER_LEFT', handlePlayerLeft);
-		websocketService.on('WEAPON_FIRED', handleWeaponFired);
-		websocketService.on('DAMAGE_DEALT', handleDamageDealt);
-		websocketService.on('TURN_RESOLUTION', handleTurnResolution);
-
-		return () => {
-			websocketService.off('CHAT_MESSAGE', handleChatMessage);
-			websocketService.off('PLAYER_JOINED', handlePlayerJoined);
-			websocketService.off('PLAYER_LEFT', handlePlayerLeft);
-			websocketService.off('WEAPON_FIRED', handleWeaponFired);
-			websocketService.off('DAMAGE_DEALT', handleDamageDealt);
-			websocketService.off('TURN_RESOLUTION', handleTurnResolution);
-		};
-	}, []);
+	useRoomEvent(client, 'turn.resolution', (payload: { roundNumber?: number }) => {
+		setCombatEvents(prev => [...prev, {
+			id: `turn-${Date.now()}`,
+			type: "turn",
+			content: `Round ${payload.roundNumber || 1} resolved`,
+			timestamp: Date.now(),
+		}]);
+	});
 
 	// 自动滚动到底部
 	const scrollToBottom = () => {
@@ -169,22 +151,24 @@ export const RightInfoPanel: React.FC<RightInfoPanelProps> = ({ className = "" }
 	}, [messages, combatEvents, activeTab]);
 
 	// 发送消息
-	const handleSendMessage = useCallback(() => {
+	const handleSendMessage = useCallback(async () => {
 		if (!inputMessage.trim() || !currentPlayer) return;
 
-		// 发送到服务器
-		websocketService.send({
-			type: WS_MESSAGE_TYPES.CHAT_MESSAGE,
-			payload: {
-				senderId: currentPlayerId || '',
-				senderName: currentPlayer.name,
+		// 通过房间框架发送聊天消息
+		try {
+			// 发送聊天事件到房间
+			client?.emit('chat', {
+				playerId: currentPlayerId || '',
+				playerName: currentPlayer.name,
 				content: inputMessage.trim(),
 				timestamp: Date.now(),
-			},
-		});
+			});
+		} catch (error) {
+			console.error('Failed to send message:', error);
+		}
 
 		setInputMessage("");
-	}, [inputMessage, currentPlayer, currentPlayerId]);
+	}, [inputMessage, currentPlayer, currentPlayerId, client]);
 
 	// 格式化时间
 	const formatTime = (timestamp: number): string => {

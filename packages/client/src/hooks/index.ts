@@ -7,8 +7,8 @@ export type { UseCameraReturn } from "./useCamera";
 
 export { useTokenSelection } from "./useTokenSelection";
 
-export { useWebSocket, useWebSocketStatus } from "./useWebSocket";
-export type { UseWebSocketOptions, UseWebSocketReturn } from "./useWebSocket";
+export { useWebSocketStatus, useRoomClient } from "./useWebSocket";
+export type { UseWebSocketStatusReturn } from "./useWebSocket";
 
 export { useFactionTurn } from "./useFactionTurn";
 export type { UseFactionTurnReturn } from "./useFactionTurn";

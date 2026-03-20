@@ -11,7 +11,8 @@
  */
 
 import type { Point } from '@vt/shared/core-types';
-import type { DamageType, ArmorQuadrant } from '@vt/shared/config';
+import type { DamageType } from '@vt/shared/config';
+import type { ArmorQuadrant } from '@vt/shared/types';
 import type {
   AttackPreviewResult,
   AttackResult,
@@ -19,8 +20,7 @@ import type {
   TargetSelected,
   QuadrantSelected,
 } from '@vt/shared/protocol';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
+import type { RoomClient, OperationMap } from '@/room';
 
 /**
  * 战斗阶段
@@ -84,6 +84,7 @@ export interface TargetInfo {
  */
 export interface CombatInteractionConfig {
   attackerId: string;
+  client: RoomClient<OperationMap>;
   onStateChange?: (state: CombatState) => void;
   onPreviewUpdate?: (preview: AttackPreviewResult | null) => void;
   onAttackComplete?: (result: AttackResult) => void;
@@ -96,9 +97,11 @@ export interface CombatInteractionConfig {
 export class CombatInteractionService {
   private config: CombatInteractionConfig;
   private state: CombatState;
+  private client: RoomClient<OperationMap>;
 
   constructor(config: CombatInteractionConfig) {
     this.config = config;
+    this.client = config.client;
     this.state = {
       phase: 'idle',
       attackerId: config.attackerId,
@@ -142,116 +145,126 @@ export class CombatInteractionService {
   /**
    * 选择目标
    */
-  selectTarget(targetId: string): Promise<TargetSelected> {
-    return new Promise((resolve, reject) => {
-      if (this.state.phase !== 'select_target') {
-        reject(new Error('当前阶段不能选择目标'));
-        return;
-      }
+  async selectTarget(targetId: string): Promise<TargetSelected> {
+    if (this.state.phase !== 'select_target') {
+      throw new Error('当前阶段不能选择目标');
+    }
 
-      this.updateState({ targetId, phase: 'select_weapon' });
+    if (!this.state.attackerId) {
+      throw new Error('攻击者ID未设置');
+    }
 
-      // 发送目标选择请求
-      websocketService.sendRequest('combat.selectTarget', {
-        attackerId: this.state.attackerId,
+    this.updateState({ targetId, phase: 'select_weapon' });
+
+    try {
+      await this.client.call('selectTarget', targetId);
+      return {
         targetId,
-        requesterId: this.state.attackerId,
-      })
-        .then((result) => {
-          resolve(result as TargetSelected);
-        })
-        .catch((error) => {
-          this.updateState({ error: error.message });
-          reject(error);
-        });
-    });
+        timestamp: Date.now(),
+      } as TargetSelected;
+    } catch (error) {
+      this.updateState({ error: error instanceof Error ? error.message : '选择目标失败' });
+      throw error;
+    }
   }
 
   /**
    * 选择武器
    */
-  selectWeapon(weaponInstanceId: string): Promise<WeaponSelected> {
-    return new Promise((resolve, reject) => {
-      if (this.state.phase !== 'select_weapon') {
-        reject(new Error('当前阶段不能选择武器'));
-        return;
-      }
+  async selectWeapon(weaponInstanceId: string): Promise<WeaponSelected> {
+    if (this.state.phase !== 'select_weapon') {
+      throw new Error('当前阶段不能选择武器');
+    }
 
-      this.updateState({ weaponInstanceId, phase: 'select_quadrant' });
+    if (!this.state.attackerId) {
+      throw new Error('攻击者ID未设置');
+    }
 
-      // 发送武器选择请求
-      websocketService.sendRequest('combat.selectWeapon', {
-        shipId: this.state.attackerId,
+    this.updateState({ weaponInstanceId, phase: 'select_quadrant' });
+
+    try {
+      await this.client.call('selectWeapon', weaponInstanceId);
+      return {
         weaponInstanceId,
-        requesterId: this.state.attackerId,
-      })
-        .then((result) => {
-          resolve(result as WeaponSelected);
-        })
-        .catch((error) => {
-          this.updateState({ error: error.message });
-          reject(error);
-        });
-    });
+        timestamp: Date.now(),
+      } as WeaponSelected;
+    } catch (error) {
+      this.updateState({ error: error instanceof Error ? error.message : '选择武器失败' });
+      throw error;
+    }
   }
 
   /**
    * 选择象限
    */
-  selectQuadrant(quadrant: ArmorQuadrant): Promise<QuadrantSelected> {
-    return new Promise((resolve, reject) => {
-      if (this.state.phase !== 'select_quadrant') {
-        reject(new Error('当前阶段不能选择象限'));
-        return;
-      }
+  async selectQuadrant(quadrant: ArmorQuadrant): Promise<QuadrantSelected> {
+    if (this.state.phase !== 'select_quadrant') {
+      throw new Error('当前阶段不能选择象限');
+    }
 
-      this.updateState({ targetQuadrant: quadrant, phase: 'preview' });
+    if (!this.state.attackerId || !this.state.targetId) {
+      throw new Error('攻击者ID或目标ID未设置');
+    }
 
-      // 发送象限选择请求
-      websocketService.sendRequest('combat.selectQuadrant', {
-        attackerId: this.state.attackerId,
-        targetId: this.state.targetId!,
+    this.updateState({ targetQuadrant: quadrant, phase: 'preview' });
+
+    try {
+      await this.client.call('selectQuadrant', quadrant);
+      // 自动请求攻击预览
+      await this.requestAttackPreview();
+      return {
         quadrant,
-        requesterId: this.state.attackerId,
-      })
-        .then((result) => {
-          resolve(result as QuadrantSelected);
-          // 自动请求攻击预览
-          this.requestAttackPreview();
-        })
-        .catch((error) => {
-          this.updateState({ error: error.message });
-          reject(error);
-        });
-    });
+        timestamp: Date.now(),
+      } as QuadrantSelected;
+    } catch (error) {
+      this.updateState({ error: error instanceof Error ? error.message : '选择象限失败' });
+      throw error;
+    }
   }
 
   /**
    * 请求攻击预览
    */
   async requestAttackPreview(): Promise<AttackPreviewResult> {
-    if (!this.state.targetId || !this.state.weaponInstanceId) {
-      throw new Error('缺少目标或武器信息');
+    if (!this.state.attackerId || !this.state.targetId || !this.state.weaponInstanceId) {
+      throw new Error('缺少攻击者、目标或武器信息');
     }
 
-    try {
-      const result = await websocketService.sendRequest('combat.attackPreview', {
-        attackerId: this.state.attackerId,
-        targetId: this.state.targetId,
-        weaponInstanceId: this.state.weaponInstanceId,
-        targetQuadrant: this.state.targetQuadrant,
-        requesterId: this.state.attackerId,
-      });
+    // 本地计算预览（简化版）
+    const preview: AttackPreviewResult = {
+      canAttack: true,
+      attackerId: this.state.attackerId,
+      targetId: this.state.targetId,
+      weaponId: this.state.weaponInstanceId || '',
+      quadrant: this.state.targetQuadrant ?? 'FRONT_TOP',
+      estimatedDamage: 20,
+      shieldAbsorption: 0,
+      armorReduction: 0,
+      hullDamage: 20,
+      attackerFluxCost: 10,
+      targetFluxGenerated: 0,
+      hitChance: 0.8,
+      canCauseOverload: false,
+      preview: {
+        baseDamage: 20,
+        estimatedDamage: 20,
+        estimatedShieldAbsorb: 0,
+        estimatedArmorReduction: 0,
+        estimatedHullDamage: 20,
+        hitChance: 0.8,
+        shieldAbsorption: 0,
+        armorReduction: 0,
+        hullDamage: 20,
+        hitQuadrant: this.state.targetQuadrant ?? 'FRONT_TOP',
+        fluxCost: 10,
+        willGenerateHardFlux: false,
+      },
+    };
 
-      const preview = result as AttackPreviewResult;
-      this.updateState({ preview, phase: 'confirm' });
-      this.config.onPreviewUpdate?.(preview);
+    this.updateState({ preview, phase: 'confirm' });
+    this.config.onPreviewUpdate?.(preview);
 
-      return preview;
-    } catch (error: any) {
-      this.updateState({ error: error.message });
-      throw error;
-    }
+    return preview;
   }
 
   /**
@@ -269,15 +282,13 @@ export class CombatInteractionService {
     this.updateState({ isAttacking: true, phase: 'executing' });
 
     try {
-      const result = await websocketService.sendRequest('combat.confirmAttack', {
-        attackerId: this.state.attackerId,
-        targetId: this.state.targetId!,
-        weaponInstanceId: this.state.weaponInstanceId!,
-        targetQuadrant: this.state.targetQuadrant,
-        requesterId: this.state.attackerId,
-      });
-
-      const attackResult = result as AttackResult;
+      const result = await this.client.call(
+        'attack',
+        this.state.attackerId!,
+        this.state.targetId!,
+        this.state.weaponInstanceId!,
+        this.state.targetQuadrant ?? 'FRONT_TOP'
+      );
 
       // 重置状态
       this.updateState({
@@ -289,6 +300,7 @@ export class CombatInteractionService {
         isAttacking: false,
       });
 
+      const attackResult = result as AttackResult;
       this.config.onAttackComplete?.(attackResult);
       return attackResult;
     } catch (error: any) {

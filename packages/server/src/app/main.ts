@@ -1,266 +1,174 @@
-import fastifyCors from "@fastify/cors";
-import fastifyStatic from "@fastify/static";
-import path from "path";
-import type { WSMessage } from "@vt/shared/ws";
-import Fastify, { FastifyInstance, type FastifyError } from "fastify";
-import { PlayerService } from "../application/player/PlayerService";
-import { SelectionService } from "../application/selection/SelectionService";
-import { ShipService } from "../application/ship/ShipService";
-import { FactionService } from "../application/faction/FactionService";
-import { FactionTurnService } from "../application/turn/FactionTurnService";
-import { config } from "../config";
-import { DomainEventAggregator } from "../infrastructure/events";
-import { EventBus } from "@vt/shared/events";
-import { MessageHandler } from "../infrastructure/ws/MessageHandler";
-import { RoomManager } from "../infrastructure/ws/RoomManager";
-import { WSServer } from "../infrastructure/ws/WSServer";
+/**
+ * 新版服务端入口
+ *
+ * 使用声明式房间框架
+ */
 
-export interface ServerOptions {
-	httpPort?: number;
-	wsPort?: number;
-	corsOrigins?: string[];
-}
+import Fastify from 'fastify';
+import fastifyCors from '@fastify/cors';
+import fastifyWebsocket from '@fastify/websocket';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
+import type { WebSocket } from 'ws';
+import { RoomManager, GameRoom, RoomWSHandler } from '../room';
+
+// ==================== 配置 ====================
+
+const config = {
+  httpPort: parseInt(process.env.PORT || '3000'),
+  wsPort: parseInt(process.env.WS_PORT || '3001'),
+  corsOrigins: (process.env.CORS_ORIGINS || '*').split(','),
+  maxPlayersPerRoom: 8,
+};
+
+// ==================== Application ====================
 
 export class Application {
-	private _fastify: FastifyInstance;
-	private _wsServer?: WSServer;
-	private _roomManager: RoomManager;
-	private _messageHandler?: MessageHandler;
-	private _playerService: PlayerService;
-	private _selectionService: SelectionService;
-	private _shipService: ShipService;
-	private _factionService: FactionService;
-	private _factionTurnService: FactionTurnService;
-	private _domainEventAggregator?: DomainEventAggregator;
-	private _eventBus?: EventBus;
+  private _fastify = Fastify({ logger: true });
+  private _roomManager: RoomManager;
+  private _wsHandler: RoomWSHandler;
 
-	constructor(options: ServerOptions = {}) {
-		this._fastify = Fastify({
-			logger: {
-				level: config.logLevel,
-			},
-		});
+  constructor() {
+    this._roomManager = new RoomManager(config.maxPlayersPerRoom);
+    this._roomManager.registerRoomType('game', GameRoom);
+    
+    this._wsHandler = new RoomWSHandler({
+      roomManager: this._roomManager,
+      wsServer: {
+        sendTo: (clientId, message) => {
+          // WebSocket 发送由 RoomWSHandler 内部处理
+        },
+      },
+    });
+  }
 
-		this._roomManager = new RoomManager(config.maxPlayersPerRoom);
-		this._playerService = new PlayerService();
-		this._selectionService = new SelectionService();
-		this._shipService = new ShipService();
-		this._factionService = new FactionService();
-		this._factionTurnService = new FactionTurnService(this._factionService);
-		// _eventBusManager 将在 _initializeWS 中初始化（需要 wsServer）
-	}
+  async initialize(): Promise<void> {
+    // CORS
+    await this._fastify.register(fastifyCors, {
+      origin: config.corsOrigins,
+    });
 
-	async initialize(): Promise<void> {
-		await this._setupCors();
+    // WebSocket
+    await this._fastify.register(fastifyWebsocket);
 
-		// Serve client static assets if present
-		try {
-			const publicDir = path.resolve(process.cwd(), "packages/server/dist/public");
-			this._fastify.register(fastifyStatic, {
-				root: publicDir,
-				prefix: "/",
-				index: "index.html",
-			});
+    // 静态文件
+    try {
+      const publicDir = path.resolve(process.cwd(), 'packages/server/dist/public');
+      this._fastify.register(fastifyStatic, {
+        root: publicDir,
+        prefix: '/',
+        index: 'index.html',
+      });
 
-			// SPA fallback to index.html for client-side routing
-			this._fastify.setNotFoundHandler((request, reply) => {
-				reply.sendFile("index.html");
-			});
-		} catch (err) {
-			this._fastify.log.info("No static client files found (skipping static serve)");
-		}
-		await this._setupHealthCheck();
-		await this._setupErrorHandler();
+      // SPA fallback
+      this._fastify.setNotFoundHandler((request, reply) => {
+        reply.sendFile('index.html');
+      });
+    } catch {
+      this._fastify.log.info('No static client files found');
+    }
 
-		this._initializeServices();
-		this._initializeWS();
-		this._initializeEventBus();
-	}
+    // WebSocket 路由
+    this._fastify.register(async (fastify) => {
+      fastify.get('/ws', { websocket: true }, (connection, request) => {
+        const clientId = this._generateClientId();
+        
+        // 处理连接
+        this._wsHandler.handleConnect(clientId, connection as unknown as WebSocket);
+        
+        // 发送连接确认
+        (connection as unknown as WebSocket).send(JSON.stringify({
+          type: 'CONNECTED',
+          clientId,
+          timestamp: Date.now(),
+        }));
+      });
+    });
 
-	async start(): Promise<void> {
-		const httpPort = config.httpPort;
-		await this._fastify.listen({ port: httpPort, host: "0.0.0.0" });
-		this._fastify.log.info(`HTTP server listening on port ${httpPort}`);
-	}
+    // REST API
+    this._setupRoutes();
+  }
 
-	async stop(): Promise<void> {
-		if (this._domainEventAggregator) {
-			this._domainEventAggregator.stop();
-		}
-		if (this._wsServer) {
-			this._wsServer.close();
-		}
-		await this._fastify.close();
-	}
+  private _setupRoutes(): void {
+    // 健康检查
+    this._fastify.get('/api/health', async () => ({
+      status: 'ok',
+      timestamp: Date.now(),
+    }));
 
-	get fastify(): FastifyInstance {
-		return this._fastify;
-	}
+    // 房间列表
+    this._fastify.get('/api/rooms', async () => ({
+      rooms: this._roomManager.listRooms(),
+    }));
 
-	get wsServer(): WSServer | undefined {
-		return this._wsServer;
-	}
+    // 创建房间
+    this._fastify.post('/api/rooms', async (request, reply) => {
+      const body = request.body as {
+        roomId?: string;
+        name?: string;
+        playerId: string;
+      };
 
-	get roomManager(): RoomManager {
-		return this._roomManager;
-	}
+      const roomId = body.roomId || this._generateRoomId();
+      const room = this._wsHandler.createRoom(roomId, body.playerId, body.name);
 
-	get playerService(): PlayerService {
-		return this._playerService;
-	}
+      return {
+        roomId: room.roomId,
+        success: true,
+      };
+    });
 
-	get shipService(): ShipService {
-		return this._shipService;
-	}
+    // 获取房间状态
+    this._fastify.get('/api/rooms/:roomId', async (request, reply) => {
+      const { roomId } = request.params as { roomId: string };
+      const state = this._wsHandler.getRoomState(roomId);
 
-	private async _setupCors(): Promise<void> {
-		await this._fastify.register(fastifyCors, {
-			origin: config.corsOrigins,
-			methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-			allowedHeaders: ["Content-Type", "Authorization"],
-			credentials: true,
-		});
-	}
+      if (!state) {
+        reply.code(404);
+        return { error: 'Room not found' };
+      }
 
-	private async _setupHealthCheck(): Promise<void> {
-		this._fastify.get("/health", async () => {
-			return {
-				status: "ok",
-				timestamp: Date.now(),
-				uptime: process.uptime(),
-			};
-		});
-	}
+      return { state };
+    });
 
-	private async _setupErrorHandler(): Promise<void> {
-		this._fastify.setErrorHandler((error: FastifyError, request, reply) => {
-			this._fastify.log.error(error);
+    // 测试场景（开发用）
+    if (process.env.NODE_ENV !== 'production') {
+      this._fastify.post('/api/test-scenario', async (request) => {
+        const { playerId } = request.body as { playerId: string };
+        // TODO: 创建测试场景
+        return { success: true };
+      });
+    }
+  }
 
-			reply.status(error.statusCode ?? 500).send({
-				error: {
-					code: error.name,
-					message: error.message,
-					statusCode: error.statusCode ?? 500,
-				},
-			});
-		});
-	}
+  async start(): Promise<void> {
+    try {
+      await this._fastify.listen({ port: config.httpPort, host: '0.0.0.0' });
+      this._fastify.log.info(`Server listening on port ${config.httpPort}`);
+    } catch (err) {
+      this._fastify.log.error(err);
+      process.exit(1);
+    }
+  }
 
-	private _initializeServices(): void {
-		this._playerService.setRoomManager(this._roomManager);
-		this._selectionService.setRoomManager(this._roomManager);
-		this._shipService.setRoomManager(this._roomManager);
-		this._factionService.setRoomManager(this._roomManager);
-		this._factionTurnService.setRoomManager(this._roomManager);
-	}
+  async stop(): Promise<void> {
+    await this._fastify.close();
+  }
 
-	private _initializeWS(): void {
-		this._wsServer = new WSServer({
-			port: config.wsPort,
-			onConnect: (clientId: string) => {
-				this._fastify.log.info(`Client connected: ${clientId}`);
-			},
-			onDisconnect: (clientId: string) => {
-				this._fastify.log.info(`Client disconnected: ${clientId}`);
-				this._handleClientDisconnect(clientId);
-			},
-			onMessage: async (clientId: string, message: WSMessage) => {
-				if (this._messageHandler) {
-					await this._messageHandler.handleMessage(clientId, message);
-				}
-			},
-		});
+  private _generateClientId(): string {
+    return `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
 
-		this._roomManager.setWSServer(this._wsServer);
-		this._playerService.setWSServer(this._wsServer);
-		this._selectionService.setWSServer(this._wsServer);
-		this._shipService.setWSServer(this._wsServer);
-		this._factionService.setWSServer(this._wsServer);
-		this._factionTurnService.setWSServer(this._wsServer);
-
-		this._messageHandler = new MessageHandler({
-			roomManager: this._roomManager,
-			playerService: this._playerService,
-			selectionService: this._selectionService,
-			shipService: this._shipService,
-			factionService: this._factionService,
-			factionTurnService: this._factionTurnService,
-			wsServer: this._wsServer,
-		});
-
-		this._fastify.log.info(`WebSocket server listening on port ${config.wsPort}`);
-	}
-
-	private _initializeEventBus(): void {
-		// 创建全局事件总线
-		this._eventBus = new EventBus();
-
-		// 创建领域事件聚合器，订阅领域事件并广播到 WS
-		if (this._wsServer) {
-			this._domainEventAggregator = new DomainEventAggregator(
-				this._eventBus,
-				this._wsServer,
-				this._roomManager as any, // 类型兼容性问题，暂时使用 as any
-				{
-					roomId: 'global', // 全局房间
-					enableLogging: process.env.NODE_ENV === 'development',
-				}
-			);
-			this._domainEventAggregator.start();
-			this._fastify.log.info("Event bus initialized with DomainEventAggregator");
-		}
-	}
-
-	private async _handleClientDisconnect(clientId: string): Promise<void> {
-		const player = this._playerService.getPlayer(clientId);
-		if (player) {
-			const room = this._roomManager.getPlayerRoom(clientId);
-			if (room) {
-				await this._playerService.leave(clientId, room.id);
-				// 清理玩家的选中状态
-				this._selectionService.handlePlayerLeave(clientId, room.id);
-				// 清理玩家的阵营数据
-				this._factionService.removePlayer(room.id, clientId);
-			}
-		}
-	}
+  private _generateRoomId(): string {
+    return Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
 }
 
-export const createApplication = (options: ServerOptions = {}): Application => {
-	return new Application(options);
-};
+// ==================== 启动 ====================
 
-export default Application;
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const app = new Application();
+  app.initialize().then(() => app.start());
+}
 
-// Server startup
-const startServer = async () => {
-	try {
-		console.log("Starting STFCS server...");
-		console.log("Environment:", process.env.NODE_ENV || "development");
-
-		const app = createApplication();
-		await app.initialize();
-		await app.start();
-
-		console.log("Server started successfully!");
-		console.log(`HTTP server: http://localhost:${config.httpPort}`);
-		console.log(`WebSocket server: ws://localhost:${config.wsPort}`);
-
-		// Handle graceful shutdown
-		const shutdown = async () => {
-			console.log("Shutting down server...");
-			await app.stop();
-			process.exit(0);
-		};
-
-		process.on("SIGINT", shutdown);
-		process.on("SIGTERM", shutdown);
-	} catch (error) {
-		console.error("Failed to start server:", error);
-		process.exit(1);
-	}
-};
-
-// Always start server when this file is imported/run
-// This ensures the server starts when using tsx watch
-startServer();
+export { config };

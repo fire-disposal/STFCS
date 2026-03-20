@@ -1,28 +1,19 @@
 /**
  * 房间准备视图
  *
- * 玩家可以：
- * 1. 选择角色（DM或玩家）
- * 2. 选择阵营
- * 3. 查看其他玩家状态
- * 4. DM可以开始游戏
+ * 使用新的房间框架：
+ * - useRoomState 订阅状态
+ * - useRoomOperations 调用操作
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { useAppSelector, useAppDispatch } from '@/store';
-import {
-  selectCurrentPlayerId,
-  selectPlayers,
-} from '@/store/slices/playerSlice';
-import {
-  selectSelectedFaction,
-  selectFaction,
-  selectPlayerFactions,
-} from '@/store/slices/factionSlice';
-import { selectIsDMMode, toggleDMMode } from '@/store/slices/uiSlice';
-import type { FactionId, PlayerInfo } from '@vt/shared/types';
+import React, { useCallback, useMemo } from 'react';
+import { useRoomState, useRoomOperations } from '@/room';
+import type { RoomClient } from '@/room';
+import type { OperationMap } from '@vt/shared/room';
+import type { FactionId } from '@vt/shared/types';
 
-// 样式
+// ==================== 样式 ====================
+
 const styles = {
   container: {
     display: 'flex',
@@ -57,40 +48,6 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-  },
-  roleSelector: {
-    display: 'flex',
-    gap: '12px',
-  },
-  roleCard: {
-    flex: 1,
-    padding: '16px',
-    borderRadius: '8px',
-    border: '2px solid var(--color-border)',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    textAlign: 'center' as const,
-  },
-  roleCardSelected: {
-    borderColor: 'var(--color-primary)',
-    backgroundColor: 'var(--color-primary-light)',
-  },
-  roleCardDisabled: {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-  },
-  roleIcon: {
-    fontSize: '32px',
-    marginBottom: '8px',
-  },
-  roleName: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    marginBottom: '4px',
-  },
-  roleDesc: {
-    fontSize: '11px',
-    color: 'var(--color-text-secondary)',
   },
   factionGrid: {
     display: 'grid',
@@ -171,6 +128,17 @@ const styles = {
     backgroundColor: 'var(--color-warning-light)',
     color: 'var(--color-warning)',
   },
+  kickButton: {
+    padding: '4px 8px',
+    borderRadius: '4px',
+    border: '1px solid var(--color-danger)',
+    backgroundColor: 'transparent',
+    color: 'var(--color-danger)',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s ease',
+  },
   button: {
     padding: '12px 24px',
     borderRadius: '6px',
@@ -223,7 +191,8 @@ const styles = {
   },
 };
 
-// 阵营配置
+// ==================== 阵营配置 ====================
+
 const FACTIONS: Array<{
   id: FactionId;
   name: string;
@@ -238,89 +207,104 @@ const FACTIONS: Array<{
   { id: 'independent', name: '独立', color: '#95a5a6', description: '多样化' },
 ];
 
+// ==================== Props ====================
+
 interface RoomLobbyViewProps {
-  roomId: string;
-  roomName?: string;
-  ownerId: string | null;
-  maxPlayers: number;
-  onStartGame: () => void;
+  client: RoomClient<OperationMap> | null;
+  currentPlayerId: string;
   onLeaveRoom: () => void;
-  onKickPlayer?: (playerId: string) => void;
 }
 
-export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
-  roomId,
-  roomName,
-  ownerId,
-  maxPlayers,
-  onStartGame,
-  onLeaveRoom,
-  onKickPlayer,
-}) => {
-  const dispatch = useAppDispatch();
-  const currentPlayerId = useAppSelector(selectCurrentPlayerId);
-  const players = useAppSelector(selectPlayers);
-  const playerFactions = useAppSelector(selectPlayerFactions);
-  const selectedFaction = useAppSelector(selectSelectedFaction);
-  const isDMMode = useAppSelector(selectIsDMMode);
+// ==================== Component ====================
 
-  const [selectedRole, setSelectedRole] = useState<'dm' | 'player' | null>(null);
-  const [isReady, setIsReady] = useState(false);
+export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
+  client,
+  currentPlayerId,
+  onLeaveRoom,
+}) => {
+  // 订阅房间状态
+  const state = useRoomState(client);
+  
+  // 获取操作调用器
+  const ops = useRoomOperations(client);
+
+  // 从状态中提取数据
+  const meta = state?.meta;
+  const players = state?.players || {};
+  const ownerId = meta?.ownerId || null;
+  const roomName = meta?.name || `房间 ${meta?.id?.slice(0, 6) || '未知'}`;
 
   // 当前玩家信息
   const currentPlayer = currentPlayerId ? players[currentPlayerId] : null;
   const isOwner = currentPlayerId === ownerId;
-  const hasDM = Object.values(players).some(p => p.isDMMode);
 
   // 已选择的阵营
-  const takenFactions = new Set(
-    Object.values(playerFactions)
-      .filter(pf => pf.playerId !== currentPlayerId)
-      .map(pf => pf.faction)
-  );
-
-  // 处理角色选择
-  const handleRoleSelect = useCallback((role: 'dm' | 'player') => {
-    if (role === 'dm' && hasDM && !isDMMode) {
-      return; // 已有DM
+  const takenFactions = useMemo(() => {
+    const taken = new Set<FactionId>();
+    for (const player of Object.values(players)) {
+      if (player.id !== currentPlayerId && player.faction) {
+        taken.add(player.faction);
+      }
     }
-
-    setSelectedRole(role);
-
-    if (role === 'dm') {
-      dispatch(toggleDMMode(true));
-    } else {
-      dispatch(toggleDMMode(false));
-    }
-  }, [hasDM, isDMMode, dispatch]);
+    return taken;
+  }, [players, currentPlayerId]);
 
   // 处理阵营选择
-  const handleFactionSelect = useCallback((faction: FactionId) => {
+  const handleFactionSelect = useCallback(async (faction: FactionId) => {
     if (takenFactions.has(faction)) return;
-    dispatch(selectFaction(faction));
-    setIsReady(true);
-  }, [takenFactions, dispatch]);
+    if (!ops) return;
+
+    try {
+      await ops.selectFaction(faction);
+    } catch (error) {
+      console.error('Failed to select faction:', error);
+      alert(error instanceof Error ? error.message : '选择阵营失败');
+    }
+  }, [takenFactions, ops]);
+
+  // 处理踢人
+  const handleKickPlayer = useCallback(async (targetId: string) => {
+    if (!ops) return;
+
+    try {
+      await ops.kick(targetId);
+    } catch (error) {
+      console.error('Failed to kick player:', error);
+      alert(error instanceof Error ? error.message : '踢出玩家失败');
+    }
+  }, [ops]);
 
   // 处理开始游戏
-  const handleStartGame = useCallback(() => {
-    // 验证条件
-    if (!hasDM) {
-      alert('需要一名DM才能开始游戏');
-      return;
-    }
+  const handleStartGame = useCallback(async () => {
+    if (!ops) return;
 
-    const playerCount = Object.values(players).filter(p => !p.isDMMode).length;
+    const playerCount = Object.keys(players).length;
     if (playerCount < 2) {
       alert('至少需要2名玩家才能开始游戏');
       return;
     }
 
-    onStartGame();
-  }, [hasDM, players, onStartGame]);
+    try {
+      await ops.startGame();
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      alert(error instanceof Error ? error.message : '开始游戏失败');
+    }
+  }, [players, ops]);
 
   // 检查是否可以开始游戏
-  const canStartGame = isDMMode && isOwner && hasDM &&
-    Object.values(players).filter(p => !p.isDMMode).length >= 2;
+  const canStartGame = isOwner && Object.keys(players).length >= 2;
+
+  // 加载状态
+  if (!state) {
+    return (
+      <div style={styles.container}>
+        <div style={{ ...styles.main, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div>加载中...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -328,50 +312,25 @@ export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
       <aside style={styles.sidebar}>
         {/* 房间信息 */}
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>🏠 {roomName || `房间 ${roomId.slice(0, 6)}`}</div>
+          <div style={styles.sectionTitle}>🏠 {roomName}</div>
           <div style={styles.roomInfo}>
-            玩家: {Object.keys(players).length}/{maxPlayers}
+            玩家: {Object.keys(players).length}/8
           </div>
+          {isOwner && (
+            <div style={{ marginTop: '8px', color: 'var(--color-warning)', fontSize: '12px' }}>
+              🎮 你是DM（房主）
+            </div>
+          )}
         </div>
 
-        {/* 角色选择 */}
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>🎭 选择角色</div>
-          <div style={styles.roleSelector}>
-            <div
-              style={{
-                ...styles.roleCard,
-                ...(selectedRole === 'dm' ? styles.roleCardSelected : {}),
-                ...(hasDM && !isDMMode ? styles.roleCardDisabled : {}),
-              }}
-              onClick={() => handleRoleSelect('dm')}
-            >
-              <div style={styles.roleIcon}>🎮</div>
-              <div style={styles.roleName}>DM</div>
-              <div style={styles.roleDesc}>游戏主持人</div>
-            </div>
-            <div
-              style={{
-                ...styles.roleCard,
-                ...(selectedRole === 'player' ? styles.roleCardSelected : {}),
-              }}
-              onClick={() => handleRoleSelect('player')}
-            >
-              <div style={styles.roleIcon}>🚀</div>
-              <div style={styles.roleName}>玩家</div>
-              <div style={styles.roleDesc}>指挥官</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 阵营选择（仅玩家可见） */}
-        {selectedRole === 'player' && (
+        {/* 阵营选择（非DM玩家可见） */}
+        {!isOwner && (
           <div style={styles.section}>
             <div style={styles.sectionTitle}>🏳️ 选择阵营</div>
             <div style={styles.factionGrid}>
               {FACTIONS.map(faction => {
                 const isTaken = takenFactions.has(faction.id);
-                const isSelected = selectedFaction === faction.id;
+                const isSelected = currentPlayer?.faction === faction.id;
 
                 return (
                   <div
@@ -394,7 +353,7 @@ export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
 
         {/* 操作按钮 */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {isDMMode && isOwner && (
+          {isOwner && (
             <button
               style={{
                 ...styles.button,
@@ -428,36 +387,52 @@ export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
           <div style={styles.sectionTitle}>👥 玩家列表</div>
           <div style={styles.playerList}>
             {Object.values(players).map(player => {
-              const playerFaction = playerFactions[player.id];
               const isCurrentPlayer = player.id === currentPlayerId;
+              const isPlayerDM = player.isDM;
+              const canKick = isOwner && !isCurrentPlayer;
 
               return (
                 <div key={player.id} style={styles.playerItem}>
                   <div style={styles.playerInfo}>
                     <span style={styles.playerName}>
-                      {player.name}
+                      {player.name || `玩家 ${player.id.slice(0, 6)}`}
                       {isCurrentPlayer && ' (你)'}
-                      {player.id === ownerId && ' 👑'}
+                      {isPlayerDM && ' 👑'}
                     </span>
                     <span style={styles.playerRole}>
-                      {player.isDMMode ? '🎮 DM' : '🚀 玩家'}
+                      {isPlayerDM ? '🎮 DM' : '🚀 玩家'}
                     </span>
-                    {playerFaction && (
+                    {player.faction && (
                       <span style={{
                         ...styles.playerFaction,
-                        backgroundColor: FACTIONS.find(f => f.id === playerFaction.faction)?.color || '#666',
+                        backgroundColor: FACTIONS.find(f => f.id === player.faction)?.color || '#666',
                         color: 'white',
                       }}>
-                        {FACTIONS.find(f => f.id === playerFaction.faction)?.name}
+                        {FACTIONS.find(f => f.id === player.faction)?.name}
                       </span>
                     )}
                   </div>
-                  <span style={{
-                    ...styles.readyBadge,
-                    ...(playerFaction || player.isDMMode ? styles.readyBadgeReady : styles.readyBadgeWaiting),
-                  }}>
-                    {playerFaction || player.isDMMode ? '✓ 就绪' : '○ 等待中'}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      ...styles.readyBadge,
+                      ...(player.isReady || isPlayerDM ? styles.readyBadgeReady : styles.readyBadgeWaiting),
+                    }}>
+                      {player.isReady || isPlayerDM ? '✓ 就绪' : '○ 等待中'}
+                    </span>
+                    {canKick && (
+                      <button
+                        style={styles.kickButton}
+                        onClick={() => {
+                          if (confirm(`确定要踢出玩家 ${player.name} 吗？`)) {
+                            handleKickPlayer(player.id);
+                          }
+                        }}
+                        title="踢出玩家"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -467,7 +442,7 @@ export const RoomLobbyView: React.FC<RoomLobbyViewProps> = ({
         {/* 游戏指南 */}
         <div style={styles.guide}>
           <div style={styles.guideTitle}>📋 准备指南</div>
-          {isDMMode ? (
+          {isOwner ? (
             <ol style={styles.guideList}>
               <li>等待玩家选择阵营</li>
               <li>确认所有玩家已就绪</li>

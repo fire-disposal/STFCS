@@ -5,7 +5,7 @@
  * 包含武器、护甲、护盾、辐能等完整状态
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import type {
   ShipDefinition,
   HullDefinition,
@@ -91,7 +91,7 @@ export class TokenFactory {
       return null;
     }
 
-    const tokenId = `ship_${uuidv4()}`;
+    const tokenId = `ship_${randomUUID()}`;
 
     // 构建武器系统
     const weapons = this._buildWeaponSystem(shipDef, hullDef);
@@ -195,7 +195,7 @@ export class TokenFactory {
       }
 
       // 创建武器实例
-      const instanceId = `weapon_${uuidv4()}`;
+      const instanceId = `weapon_${randomUUID()}`;
       const weaponInstance: WeaponInstanceState = {
         instanceId,
         weaponId: weaponId,

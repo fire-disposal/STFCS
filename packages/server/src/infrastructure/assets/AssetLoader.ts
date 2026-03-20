@@ -55,7 +55,7 @@ export class AssetLoader {
 				throw new Error(`Failed to load manifest: ${response.status}`);
 			}
 			
-			this._manifest = await response.json();
+			this._manifest = await response.json() as AssetManifest;
 			return this._manifest;
 		} catch (e) {
 			console.error('[AssetLoader] Failed to load manifest:', e);

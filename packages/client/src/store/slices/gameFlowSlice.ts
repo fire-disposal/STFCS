@@ -163,6 +163,7 @@ const gameFlowSlice = createSlice({
 			} else {
 				state.shipActionStates[shipId] = {
 					shipId,
+					hasActed: false,
 					hasMoved: false,
 					hasRotated: false,
 					hasFired: false,

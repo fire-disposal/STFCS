@@ -4,11 +4,6 @@
 
 export * from './EventBus.js';
 
-// 重新导出协议层的领域事件类型
-export type {
-  DomainEvent,
-  DomainEventType,
-  DomainEventPayloadMap,
-} from '../protocol/DomainEvents.js';
-
-export { createDomainEvent } from '../protocol/DomainEvents.js';
+// 从 protocol 重新导出事件类型
+export type { DomainEvent, DomainEventType, EventContext } from '../protocol/index.js';
+export { createDomainEvent } from '../protocol/index.js';

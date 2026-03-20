@@ -8,11 +8,19 @@ import React, { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/store";
 import { Shield, Zap, Target, Move, Crosshair, AlertTriangle } from "lucide-react";
-import { websocketService } from "@/services/websocket";
-import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { useRoomOperations } from "@/room";
+import type { RoomClient, OperationMap } from "@/room";
 
 interface TacticalCommandPanelProps {
 	className?: string;
+	// 房间客户端
+	client: RoomClient<OperationMap> | null;
+	// GameView 传递的 props
+	phase?: string;
+	round?: number;
+	turnPhase?: string;
+	tokens?: Record<string, unknown>;
+	selectedTokenId?: string | null;
 }
 
 /**
@@ -27,6 +35,7 @@ interface TacticalCommandPanelProps {
  */
 export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	className = "",
+	client,
 }) => {
 	const { t } = useTranslation();
 
@@ -35,6 +44,9 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 
 	// 当前选中标签
 	const [activeTab, setActiveTab] = useState<"move" | "weapons" | "systems">("move");
+
+	// 获取房间操作调用器
+	const ops = useRoomOperations(client);
 
 	// 从Redux获取状态
 	const selectedTokenId = useAppSelector((state) => state.selection.selectedTokenId);
@@ -61,55 +73,49 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	}, [selectedTokenId, isExpanded]);
 
 	// 处理结束回合
-	const handleEndTurn = useCallback(() => {
+	const handleEndTurn = useCallback(async () => {
 		if (!currentPlayerId || !selectedFaction) return;
 
-		websocketService.send({
-			type: WS_MESSAGE_TYPES.PLAYER_END_TURN,
-			payload: {
-				playerId: currentPlayerId,
-				playerName: currentPlayer?.name || '',
-				faction: selectedFaction,
-				timestamp: Date.now(),
-			},
-		});
-	}, [currentPlayerId, selectedFaction, currentPlayer]);
+		try {
+			await ops?.endTurn();
+		} catch (error) {
+			console.error('Failed to end turn:', error);
+		}
+	}, [currentPlayerId, selectedFaction, ops]);
 
 	// 处理紧急规避
-	const handleEmergencyEvasion = useCallback(() => {
+	const handleEmergencyEvasion = useCallback(async () => {
 		if (!selectedTokenId) return;
 
-		websocketService.send({
-			type: WS_MESSAGE_TYPES.SHIP_ACTION,
-			payload: {
-				shipId: selectedTokenId,
-				actionType: 'emergency_evasion',
-				timestamp: Date.now(),
-			},
-		});
-	}, [selectedTokenId]);
+		try {
+			// 紧急规避：结束舰船行动
+			await ops?.endShipAction(selectedTokenId);
+		} catch (error) {
+			console.error('Failed to execute emergency evasion:', error);
+		}
+	}, [selectedTokenId, ops]);
 
 	// 处理护盾开关
-	const handleShieldToggle = useCallback(() => {
+	const handleShieldToggle = useCallback(async () => {
 		if (!selectedTokenId) return;
 
-		websocketService.sendRequest('ship.toggleShield', {
-			shipId: selectedTokenId,
-		}).catch((error) => {
+		try {
+			await ops?.toggleShield(selectedTokenId);
+		} catch (error) {
 			console.error('Failed to toggle shield:', error);
-		});
-	}, [selectedTokenId]);
+		}
+	}, [selectedTokenId, ops]);
 
 	// 处理散热
-	const handleVentFlux = useCallback(() => {
+	const handleVentFlux = useCallback(async () => {
 		if (!selectedTokenId) return;
 
-		websocketService.sendRequest('ship.vent', {
-			shipId: selectedTokenId,
-		}).catch((error) => {
+		try {
+			await ops?.ventFlux(selectedTokenId);
+		} catch (error) {
 			console.error('Failed to vent flux:', error);
-		});
-	}, [selectedTokenId]);
+		}
+	}, [selectedTokenId, ops]);
 
 	// 渲染单位概览
 	const renderUnitOverview = () => {

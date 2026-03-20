@@ -357,14 +357,8 @@ export class ActionService implements IActionService {
 					payload: {
 						sourceShipId: shipId,
 						targetShipId,
-						weaponMountId,
-						hit: result.hit,
-						damage: result.damageResult.damage,
-						shieldAbsorbed: result.damageResult.shieldAbsorbed,
-						armorReduced: result.damageResult.armorReduced,
-						hullDamage: result.damageResult.hullDamage,
-						hitQuadrant: result.damageResult.hitQuadrant,
-						overloadTriggered: result.overloadTriggered,
+						weaponId: weaponMountId,
+						mountId: weaponMountId,
 						timestamp: Date.now(),
 					},
 				});
@@ -376,8 +370,14 @@ export class ActionService implements IActionService {
 						payload: {
 							targetShipId,
 							sourceShipId: shipId,
-							weaponMountId,
-							...result.damageResult,
+							hit: result.hit,
+							damage: result.damageResult.damage,
+							shieldAbsorbed: result.damageResult.shieldAbsorbed,
+							armorReduced: result.damageResult.armorReduced,
+							hullDamage: result.damageResult.hullDamage,
+							hitQuadrant: result.damageResult.hitQuadrant,
+							softFluxGenerated: result.damageResult.softFluxGenerated,
+							hardFluxGenerated: result.damageResult.hardFluxGenerated,
 							timestamp: Date.now(),
 						},
 					});
@@ -394,7 +394,8 @@ export class ActionService implements IActionService {
 				payload: {
 					sourceShipId: shipId,
 					targetShipId,
-					weaponMountId,
+					weaponId: weaponMountId,
+					mountId: weaponMountId,
 					timestamp: Date.now(),
 				},
 			});

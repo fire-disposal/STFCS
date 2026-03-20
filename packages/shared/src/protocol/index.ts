@@ -1,213 +1,275 @@
 /**
- * 协议层导出
+ * 协议类型定义
  *
- * 统一的消息协议 DSL 和领域事件定义
+ * 用于客户端和服务端共享的类型
  */
 
-// 消息协议 DSL
-export {
-  defineMessage,
-  defineRequest,
-  MessageValidator,
-  MessageDispatcher,
-} from './MessageDSL.js';
+import type { ArmorQuadrant, Point } from '../types/index.js';
 
-export type {
-  MessageConfig,
-  RequestConfig,
-  MessageDirectory,
-  InferMessageType,
-  InferRequestType,
-  InferResponseType,
-  InferMessageMap,
-  WSMessageFromDirectory,
-  WSMessagePayloadMap,
-} from './MessageDSL.js';
+// ==================== 回合阶段 ====================
 
-// 领域事件
-export {
-  DOMAIN_EVENTS,
-  createDomainEvent,
-} from './DomainEvents.js';
+export type TurnPhase = 'player_action' | 'dm_action' | 'resolution';
 
-export type {
-  DomainEventDirectory,
-  DomainEvent,
-  DomainEventType,
-  DomainEventPayloadMap,
-  EventContext,
-} from './DomainEvents.js';
+export type GamePhase = 'lobby' | 'deployment' | 'playing' | 'paused' | 'ended';
 
-// 事件 Schema（用于扩展和验证）
-export {
-  ShipMovedEventSchema,
-  ShieldToggledEventSchema,
-  FluxStateUpdatedEventSchema,
-  PlayerJoinedEventSchema,
-  PlayerLeftEventSchema,
-  PlayerDMModeChangedEventSchema,
-  ObjectSelectedEventSchema,
-  ObjectDeselectedEventSchema,
-  TokenMovedEventSchema,
-  TokenDragStartEventSchema,
-  TokenDraggingEventSchema,
-  TokenDragEndEventSchema,
-  WeaponFiredEventSchema,
-  DamageDealtEventSchema,
-  CameraUpdatedEventSchema,
-} from './DomainEvents.js';
+// ==================== 舰船行动状态 ====================
 
-// 游戏阶段
-export {
-  GamePhaseSchema,
-  TurnPhaseSchema,
-  ShipActionTypeSchema,
-  ActionRestrictionReasonSchema,
-  GameFlowStateSchema,
-  ShipActionStateSchema,
-  ActionRequestSchema,
-  ActionResultSchema,
-  VALID_PHASE_TRANSITIONS,
-  TURN_PHASE_ORDER,
-  ACTION_RESTRICTIONS,
-  isValidPhaseTransition,
-  getNextTurnPhase,
-  isActionRestricted,
-} from './GamePhase.js';
+export interface ShipActionState {
+  shipId: string;
+  hasActed: boolean;
+  movementRemaining: number;
+  isOverloaded: boolean;
+  // 新增属性
+  hasMoved: boolean;
+  hasFired: boolean;
+  hasVented: boolean;
+  hasToggledShield: boolean;
+  hasRotated: boolean;
+  overloadResetAvailable: boolean;
+  remainingActions: number;
+}
 
-export type {
-  GamePhase,
-  TurnPhase,
-  ShipActionType,
-  ActionRestrictionReason,
-  GameFlowState,
-  ShipActionState,
-  ActionRequest,
-  ActionResult,
-} from './GamePhase.js';
+// ==================== 攻击预览 ====================
 
-// 状态同步
-export {
-  TokenDeltaSchema,
-  ShipStatusDeltaSchema,
-  BatchStateUpdateSchema,
-  StateSyncRequestSchema,
-  StateSyncResponseSchema,
-  computeDelta,
-  applyDelta,
-  mergeDeltas,
-  MessageBatcher,
-  StateSnapshotManager,
-  WS_COMPRESSION_OPTIONS,
-} from './StateSync.js';
+export interface AttackPreviewResult {
+  attackerId: string;
+  targetId: string;
+  weaponId: string;
+  quadrant: ArmorQuadrant;
 
-export type {
-  TokenDelta,
-  ShipStatusDelta,
-  BatchStateUpdate,
-  StateSyncRequest,
-  StateSyncResponse,
-  StateSnapshot,
-} from './StateSync.js';
+  // 预计伤害
+  estimatedDamage: number;
+  shieldAbsorption: number;
+  armorReduction: number;
+  hullDamage: number;
 
-// 协议版本
-export { PROTOCOL_VERSION } from '../core-types.js';
+  // 辐能影响
+  attackerFluxCost: number;
+  targetFluxGenerated: number;
 
-// 重新导出 Zod 用于扩展
-export { z } from 'zod';
+  // 命中概率
+  hitChance: number;
 
-// ==================== 部署阶段协议 ====================
+  // 是否可能过载
+  canCauseOverload: boolean;
 
-export {
-  DEPLOYMENT_MESSAGE_TYPES,
-  DeployShipRequestSchema,
-  DeployShipResultSchema,
-  RemoveDeployedShipRequestSchema,
-  RemoveDeployedShipResultSchema,
-  DeploymentReadyRequestSchema,
-  DeploymentReadyUpdateSchema,
-  DeploymentStartSchema,
-  DeploymentCompleteSchema,
-  DeploymentCancelSchema,
-  DeploymentStateSchema,
-  DeploymentStateSyncSchema,
-  DeploymentShipsUpdateSchema,
-  DeploymentMessageDirectory,
-  createDefaultDeploymentState,
-  isValidDeploymentPosition,
-  areShipsOverlapping,
-} from './DeploymentProtocol.js';
+  // 新增属性
+  canAttack: boolean;
+  preview: {
+    baseDamage: number;
+    estimatedDamage: number;
+    estimatedShieldAbsorb: number;
+    estimatedArmorReduction: number;
+    estimatedHullDamage: number;
+    hitChance: number;
+    shieldAbsorption: number;
+    armorReduction: number;
+    hullDamage: number;
+    hitQuadrant: ArmorQuadrant;
+    fluxCost: number;
+    willGenerateHardFlux: boolean;
+  };
+  blockReason?: string;
+}
 
-export type {
-  DeploymentMessageType,
-  DeployShipRequest,
-  DeployShipResult,
-  RemoveDeployedShipRequest,
-  RemoveDeployedShipResult,
-  DeploymentReadyRequest,
-  DeploymentReadyUpdate,
-  DeploymentStart,
-  DeploymentComplete,
-  DeploymentCancel,
-  DeploymentState,
-  DeploymentStateSync,
-  DeploymentShipsUpdate,
-} from './DeploymentProtocol.js';
+// ==================== 战斗结果 ====================
 
-// ==================== 战斗交互协议 ====================
+export interface CombatResultPayload {
+  attackerId: string;
+  targetId: string;
+  weaponId: string;
+  quadrant: ArmorQuadrant;
 
-export {
-  COMBAT_MESSAGE_TYPES,
-  SelectTargetRequestSchema,
-  TargetSelectedSchema,
-  ClearTargetSchema,
-  SelectWeaponRequestSchema,
-  WeaponSelectedSchema,
-  ClearWeaponSchema,
-  SelectQuadrantRequestSchema,
-  QuadrantSelectedSchema,
-  ClearQuadrantSchema,
-  AttackPreviewRequestSchema,
-  AttackPreviewResultSchema,
-  ConfirmAttackRequestSchema,
-  AttackResultSchema,
-  DamageDealtEventSchema as CombatDamageDealtEventSchema,
-  ShipDestroyedEventSchema,
-  VentFluxRequestSchema,
-  VentFluxResultSchema,
-  OverloadTriggeredEventSchema,
-  OverloadRecoveredEventSchema,
-  ToggleShieldRequestSchema,
-  ShieldToggledEventSchema as CombatShieldToggledEventSchema,
-  CombatMessageDirectory,
-  DAMAGE_MODIFIERS,
-  MAX_DAMAGE_REDUCTION,
-  MIN_DAMAGE_RATIO,
-  calculateDamageModifier,
-  calculateArmorDamageReduction,
-} from './CombatProtocol.js';
+  damage: number;
+  shieldAbsorbed: number;
+  armorReduced: number;
+  hullDamage: number;
 
-export type {
-  CombatMessageType,
-  SelectTargetRequest,
-  TargetSelected,
-  ClearTarget,
-  SelectWeaponRequest,
-  WeaponSelected,
-  ClearWeapon,
-  SelectQuadrantRequest,
-  QuadrantSelected,
-  ClearQuadrant,
-  AttackPreviewRequest,
-  AttackPreviewResult,
-  ConfirmAttackRequest,
-  AttackResult,
-  DamageDealtEvent,
-  ShipDestroyedEvent,
-  VentFluxRequest,
-  VentFluxResult,
-  OverloadTriggeredEvent,
-  OverloadRecoveredEvent,
-  ToggleShieldRequest,
-  ShieldToggledEvent,
-} from './CombatProtocol.js';
+  targetDestroyed: boolean;
+  targetOverloaded: boolean;
+}
+
+// ==================== 战斗交互类型 ====================
+
+/** 攻击结果 */
+export interface AttackResult {
+  attackerId: string;
+  targetId: string;
+  weaponId: string;
+  quadrant: ArmorQuadrant;
+  hit: boolean;
+  damage: number;
+  shieldAbsorbed: number;
+  armorReduced: number;
+  hullDamage: number;
+  targetDestroyed: boolean;
+  targetOverloaded: boolean;
+  timestamp: number;
+}
+
+/** 武器选择事件 */
+export interface WeaponSelected {
+  shipId: string;
+  weaponInstanceId: string;
+  weaponId: string;
+  timestamp: number;
+}
+
+/** 目标选择事件 */
+export interface TargetSelected {
+  attackerId: string;
+  targetId: string;
+  timestamp: number;
+}
+
+/** 象限选择事件 */
+export interface QuadrantSelected {
+  attackerId: string;
+  targetId: string;
+  quadrant: ArmorQuadrant;
+  timestamp: number;
+}
+
+// ==================== 领域事件 ====================
+
+export interface DomainEvent<T = unknown> {
+  type: string;
+  payload: T;
+  timestamp: number;
+  source?: string;
+}
+
+export type DomainEventType = string;
+
+export interface EventContext {
+  roomId: string;
+  playerId?: string;
+  timestamp?: number;
+}
+
+// ==================== 事件载荷映射 ====================
+
+export interface DomainEventPayloadMap {
+  SHIP_MOVED: {
+    shipId: string;
+    phase: string;
+    newPosition: Point;
+    newHeading: number;
+    timestamp: number;
+  };
+  SHIELD_TOGGLED: {
+    shipId: string;
+    isActive: boolean;
+  };
+  FLUX_STATE_UPDATED: {
+    shipId: string;
+    fluxState: string;
+    currentFlux: number;
+    softFlux: number;
+    hardFlux: number;
+  };
+  PLAYER_JOINED: {
+    playerId: string;
+    playerName: string;
+    timestamp: number;
+  };
+  PLAYER_LEFT: {
+    playerId: string;
+    reason: string;
+  };
+  PLAYER_DM_MODE_CHANGED: {
+    playerId: string;
+    playerName: string;
+    isDMMode: boolean;
+  };
+  OBJECT_SELECTED: {
+    playerId: string;
+    playerName: string;
+    tokenId: string;
+    timestamp: number;
+    forceOverride?: boolean;
+  };
+  OBJECT_DESELECTED: {
+    playerId: string;
+    tokenId: string;
+    timestamp: number;
+    reason?: string;
+  };
+  TOKEN_MOVED: {
+    tokenId: string;
+    previousPosition: Point;
+    newPosition: Point;
+    previousHeading: number;
+    newHeading: number;
+    timestamp: number;
+  };
+  TOKEN_DRAG_START: {
+    tokenId: string;
+    playerId: string;
+    playerName: string;
+    position: Point;
+    heading: number;
+    timestamp: number;
+  };
+  TOKEN_DRAGGING: {
+    tokenId: string;
+    playerId: string;
+    playerName: string;
+    position: Point;
+    heading: number;
+    isDragging: boolean;
+    timestamp: number;
+  };
+  TOKEN_DRAG_END: {
+    tokenId: string;
+    playerId: string;
+    finalPosition: Point;
+    finalHeading: number;
+    committed: boolean;
+    timestamp: number;
+  };
+  WEAPON_FIRED: {
+    sourceShipId: string;
+    targetShipId: string;
+    weaponId: string;
+    mountId: string;
+    timestamp: number;
+  };
+  DAMAGE_DEALT: {
+    sourceShipId: string;
+    targetShipId: string;
+    hit: boolean;
+    damage: number;
+    shieldAbsorbed: number;
+    armorReduced: number;
+    hullDamage: number;
+    hitQuadrant: ArmorQuadrant;
+    softFluxGenerated: number;
+    hardFluxGenerated: number;
+    timestamp: number;
+  };
+  CAMERA_UPDATED: {
+    playerId: string;
+    playerName: string;
+    centerX: number;
+    centerY: number;
+    zoom: number;
+    rotation: number;
+    timestamp: number;
+  };
+}
+
+// ==================== 创建事件 ====================
+
+export function createDomainEvent<T extends DomainEventType>(
+  type: T,
+  payload: T extends keyof DomainEventPayloadMap ? DomainEventPayloadMap[T] : unknown,
+  source?: string
+): DomainEvent {
+  return {
+    type,
+    payload,
+    timestamp: Date.now(),
+    source,
+  };
+}

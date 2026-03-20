@@ -4,3 +4,4 @@
  */
 
 export * from "./TokenAddons";
+export { GameMap } from "./GameMap";

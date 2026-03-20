@@ -14,7 +14,6 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { websocketService } from "@/services/websocket";
 import { Lock, Crown, Users, Play, Pause, Circle, Zap, Home, Plus } from "lucide-react";
 
 export interface RoomInfo {
@@ -34,6 +33,7 @@ interface RoomSelectorProps {
 	onRoomSelect: (roomId: string, password?: string) => void;
 	onRoomCreate: (options: RoomCreateOptions) => Promise<void>;
 	disabled?: boolean;
+	rooms?: RoomInfo[];
 }
 
 export interface RoomCreateOptions {
@@ -51,10 +51,11 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 	onRoomSelect,
 	onRoomCreate,
 	disabled = false,
+	rooms: externalRooms,
 }) => {
 	const { t } = useTranslation();
 	const [mode, setMode] = useState<SelectionMode>("quick");
-	const [rooms, setRooms] = useState<RoomInfo[]>([]);
+	const [rooms, setRooms] = useState<RoomInfo[]>(externalRooms || []);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showCreateForm, setShowCreateForm] = useState(false);
 	const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -67,36 +68,12 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 	const [newRoomPassword, setNewRoomPassword] = useState("");
 	const [error, setError] = useState("");
 
-	// 获取房间列表
-	const fetchRooms = useCallback(async () => {
-		if (!websocketService.isConnected()) return;
-
-		setIsLoading(true);
-		try {
-			const result = await websocketService.sendRequest("room.list", {});
-			if (result.rooms) {
-				setRooms(result.rooms.map((r: any) => ({
-					roomId: r.roomId,
-					name: r.name || r.roomId,
-					playerCount: r.playerCount,
-					maxPlayers: r.maxPlayers,
-					createdAt: r.createdAt,
-					isPrivate: r.isPrivate ?? false,
-					hasPassword: r.hasPassword ?? false,
-					phase: r.phase ?? 'lobby',
-					ownerId: r.ownerId ?? null,
-				})));
-			}
-		} catch (err) {
-			console.error("Failed to fetch rooms:", err);
-		} finally {
-			setIsLoading(false);
-		}
-	}, []);
-
+	// 使用外部传入的房间列表
 	useEffect(() => {
-		fetchRooms();
-	}, [fetchRooms]);
+		if (externalRooms) {
+			setRooms(externalRooms);
+		}
+	}, [externalRooms]);
 
 	// 处理房间选择
 	const handleRoomSelect = useCallback((room: RoomInfo) => {
@@ -109,9 +86,8 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 	}, [onRoomSelect]);
 
 	// 处理密码提交
-	const handlePasswordSubmit = useCallback((e: React.FormEvent) => {
-		e.preventDefault();
-		if (selectedPrivateRoom) {
+	const handlePasswordSubmit = useCallback(() => {
+		if (selectedPrivateRoom && passwordInput) {
 			onRoomSelect(selectedPrivateRoom.roomId, passwordInput);
 			setShowPasswordModal(false);
 			setSelectedPrivateRoom(null);
@@ -120,550 +96,537 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 	}, [selectedPrivateRoom, passwordInput, onRoomSelect]);
 
 	// 处理创建房间
-	const handleCreateRoom = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleCreateRoom = useCallback(async () => {
 		if (!newRoomId.trim()) {
-			setError(t("room.error.roomIdRequired"));
-			return;
-		}
-		if (newRoomId.length > 32) {
-			setError(t("room.error.roomIdTooLong"));
-			return;
-		}
-		if (newRoomIsPrivate && !newRoomPassword) {
-			setError(t("room.error.passwordRequired"));
+			setError(t('room.error.idRequired'));
 			return;
 		}
 
-		setError("");
 		setIsLoading(true);
+		setError("");
+
 		try {
 			await onRoomCreate({
 				roomId: newRoomId.trim(),
-				name: newRoomName.trim() || newRoomId.trim(),
+				name: newRoomName.trim() || undefined,
 				maxPlayers: newRoomMaxPlayers,
 				isPrivate: newRoomIsPrivate,
 				password: newRoomIsPrivate ? newRoomPassword : undefined,
 			});
-			onRoomSelect(newRoomId.trim());
-			setShowCreateForm(false);
+
+			// 重置表单
 			setNewRoomId("");
 			setNewRoomName("");
-			setNewRoomPassword("");
+			setNewRoomMaxPlayers(8);
 			setNewRoomIsPrivate(false);
+			setNewRoomPassword("");
+			setShowCreateForm(false);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : String(err));
+			setError(err instanceof Error ? err.message : 'Failed to create room');
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [newRoomId, newRoomName, newRoomMaxPlayers, newRoomIsPrivate, newRoomPassword, onRoomCreate, t]);
 
 	// 获取阶段图标
-	const getPhaseIcon = (phase: RoomInfo['phase']) => {
+	const getPhaseIcon = useCallback((phase: string) => {
 		switch (phase) {
-			case 'lobby': return <Circle size={12} className="rs-phase-icon rs-phase-icon--lobby" />;
-			case 'deployment': return <Users size={12} className="rs-phase-icon rs-phase-icon--deployment" />;
-			case 'playing': return <Play size={12} className="rs-phase-icon rs-phase-icon--playing" />;
-			case 'paused': return <Pause size={12} className="rs-phase-icon rs-phase-icon--paused" />;
-			case 'ended': return <Circle size={12} className="rs-phase-icon rs-phase-icon--ended" />;
-			default: return null;
+			case 'lobby':
+				return <Home size={12} />;
+			case 'deployment':
+				return <Plus size={12} />;
+			case 'playing':
+				return <Play size={12} />;
+			case 'paused':
+				return <Pause size={12} />;
+			case 'ended':
+				return <Circle size={12} />;
+			default:
+				return <Circle size={12} />;
 		}
-	};
+	}, []);
 
-	// 获取阶段标签
-	const getPhaseLabel = (phase: RoomInfo['phase']) => {
-		return t(`room.phase.${phase}`);
-	};
+	// 获取阶段颜色
+	const getPhaseColor = useCallback((phase: string) => {
+		switch (phase) {
+			case 'lobby':
+				return 'var(--color-info)';
+			case 'deployment':
+				return 'var(--color-warning)';
+			case 'playing':
+				return 'var(--color-success)';
+			case 'paused':
+				return 'var(--color-text-secondary)';
+			case 'ended':
+				return 'var(--color-error)';
+			default:
+				return 'var(--color-text-secondary)';
+		}
+	}, []);
 
-	return (
-		<div className="rs-container">
-			<div className="rs-modes">
-				<label className={`rs-mode-option ${mode === "quick" ? "rs-mode-option--active" : ""}`}>
-					<input
-						type="radio"
-						name="roomMode"
-						value="quick"
-						checked={mode === "quick"}
-						onChange={() => {
-							setMode("quick");
-							onRoomSelect("default");
-						}}
-						disabled={disabled}
-					/>
-					<span className="rs-mode-label"><Zap size={14} /> {t("room.quickJoin")}</span>
-					<span className="rs-mode-desc">{t("room.quickJoinDescription")}</span>
-				</label>
-
-				<label className={`rs-mode-option ${mode === "select" ? "rs-mode-option--active" : ""}`}>
-					<input
-						type="radio"
-						name="roomMode"
-						value="select"
-						checked={mode === "select"}
-						onChange={() => setMode("select")}
-						disabled={disabled || rooms.length === 0}
-					/>
-					<span className="rs-mode-label"><Home size={14} /> {t("room.selectRoom")}</span>
-					<span className="rs-mode-desc">
-						{rooms.length > 0
-							? t("room.selectRoomDescription", { count: rooms.length })
-							: t("room.noRoomsAvailable")}
-					</span>
-				</label>
-
-				<label className={`rs-mode-option ${mode === "create" ? "rs-mode-option--active" : ""}`}>
-					<input
-						type="radio"
-						name="roomMode"
-						value="create"
-						checked={mode === "create"}
-						onChange={() => {
-							setMode("create");
-							setShowCreateForm(true);
-						}}
-						disabled={disabled}
-					/>
-					<span className="rs-mode-label"><Plus size={14} /> {t("room.createRoom")}</span>
-					<span className="rs-mode-desc">{t("room.createRoomDescription")}</span>
-				</label>
-			</div>
-
-			{/* 房间列表 */}
-			{mode === "select" && rooms.length > 0 && (
-				<div className="rs-room-list">
-					{rooms.map((room) => (
-						<button
-							key={room.roomId}
-							className={`rs-room-card ${selectedRoomId === room.roomId ? "rs-room-card--selected" : ""} ${room.playerCount >= room.maxPlayers ? "rs-room-card--full" : ""}`}
-							onClick={() => handleRoomSelect(room)}
-							disabled={disabled || isLoading || room.playerCount >= room.maxPlayers}
-							type="button"
-						>
-							<div className="rs-room-header">
-								<span className="rs-room-name">
-									{room.isPrivate && <Lock size={12} className="rs-private-icon" />}
-									{room.name}
+	// 渲染房间列表
+	const renderRoomList = () => (
+		<div className="room-list">
+			{rooms.length === 0 ? (
+				<div className="no-rooms">
+					<p>{t('room.noRooms')}</p>
+				</div>
+			) : (
+				rooms.map((room) => (
+					<div
+						key={room.roomId}
+						className={`room-item ${selectedRoomId === room.roomId ? 'selected' : ''}`}
+						onClick={() => handleRoomSelect(room)}
+					>
+						<div className="room-info">
+							<div className="room-name">
+								{room.isPrivate && <Lock size={12} />}
+								<span>{room.name || room.roomId}</span>
+							</div>
+							<div className="room-meta">
+								<span className="room-phase" style={{ color: getPhaseColor(room.phase) }}>
+									{getPhaseIcon(room.phase)}
+									{t(`phase.${room.phase}`)}
 								</span>
-								<span className="rs-room-players">
+								<span className="room-players">
 									<Users size={12} />
 									{room.playerCount}/{room.maxPlayers}
 								</span>
 							</div>
-							<div className="rs-room-info">
-								<span className="rs-room-phase">
-									{getPhaseIcon(room.phase)}
-									{getPhaseLabel(room.phase)}
-								</span>
-								{room.ownerId && (
-									<span className="rs-room-owner">
-										<Crown size={10} />
-										{room.ownerId}
-									</span>
-								)}
-							</div>
-						</button>
-					))}
-				</div>
-			)}
-
-			{/* 创建房间表单 */}
-			{mode === "create" && showCreateForm && (
-				<form className="rs-create-form" onSubmit={handleCreateRoom}>
-					<div className="rs-form-group">
-						<label htmlFor="newRoomId">{t("room.newRoomId")}</label>
-						<input
-							id="newRoomId"
-							type="text"
-							value={newRoomId}
-							onChange={(e) => setNewRoomId(e.target.value)}
-							placeholder={t("room.newRoomIdPlaceholder")}
-							disabled={disabled || isLoading}
-							maxLength={32}
-							className="rs-input"
-						/>
-					</div>
-					<div className="rs-form-group">
-						<label htmlFor="newRoomName">{t("room.newRoomName")}</label>
-						<input
-							id="newRoomName"
-							type="text"
-							value={newRoomName}
-							onChange={(e) => setNewRoomName(e.target.value)}
-							placeholder={t("room.newRoomNamePlaceholder")}
-							disabled={disabled || isLoading}
-							maxLength={32}
-							className="rs-input"
-						/>
-					</div>
-					<div className="rs-form-group">
-						<label htmlFor="maxPlayers">{t("room.maxPlayers")}</label>
-						<input
-							id="maxPlayers"
-							type="number"
-							value={newRoomMaxPlayers}
-							onChange={(e) => setNewRoomMaxPlayers(parseInt(e.target.value) || 8)}
-							min={2}
-							max={16}
-							disabled={disabled || isLoading}
-							className="rs-input"
-						/>
-					</div>
-					<div className="rs-form-group rs-form-group--checkbox">
-						<label>
-							<input
-								type="checkbox"
-								checked={newRoomIsPrivate}
-								onChange={(e) => setNewRoomIsPrivate(e.target.checked)}
-								disabled={disabled || isLoading}
-							/>
-							<Lock size={14} />
-							{t("room.privateRoom")}
-						</label>
-					</div>
-					{newRoomIsPrivate && (
-						<div className="rs-form-group">
-							<label htmlFor="roomPassword">{t("room.password")}</label>
-							<input
-								id="roomPassword"
-								type="password"
-								value={newRoomPassword}
-								onChange={(e) => setNewRoomPassword(e.target.value)}
-								placeholder={t("room.passwordPlaceholder")}
-								disabled={disabled || isLoading}
-								maxLength={32}
-								className="rs-input"
-							/>
 						</div>
-					)}
-					{error && <div className="rs-error">{error}</div>}
-					<button
-						type="submit"
-						disabled={disabled || isLoading || !newRoomId.trim()}
-						className="btn btn-primary rs-create-btn"
-					>
-						{isLoading ? t("room.creating") : t("room.createButton")}
-					</button>
-				</form>
+						{room.ownerId && (
+							<div className="room-owner">
+								<Crown size={12} />
+							</div>
+						)}
+					</div>
+				))
+			)}
+		</div>
+	);
+
+	// 渲染创建房间表单
+	const renderCreateForm = () => (
+		<div className="create-room-form">
+			<div className="form-group">
+				<label>{t('room.roomId')}</label>
+				<input
+					type="text"
+					value={newRoomId}
+					onChange={(e) => setNewRoomId(e.target.value)}
+					placeholder={t('room.placeholder.roomId')}
+					disabled={disabled || isLoading}
+				/>
+			</div>
+
+			<div className="form-group">
+				<label>{t('room.roomName')}</label>
+				<input
+					type="text"
+					value={newRoomName}
+					onChange={(e) => setNewRoomName(e.target.value)}
+					placeholder={t('room.placeholder.roomName')}
+					disabled={disabled || isLoading}
+				/>
+			</div>
+
+			<div className="form-group">
+				<label>{t('room.maxPlayers')}</label>
+				<input
+					type="number"
+					value={newRoomMaxPlayers}
+					onChange={(e) => setNewRoomMaxPlayers(parseInt(e.target.value) || 8)}
+					min={2}
+					max={8}
+					disabled={disabled || isLoading}
+				/>
+			</div>
+
+			<div className="form-group checkbox">
+				<label>
+					<input
+						type="checkbox"
+						checked={newRoomIsPrivate}
+						onChange={(e) => setNewRoomIsPrivate(e.target.checked)}
+						disabled={disabled || isLoading}
+					/>
+					{t('room.privateRoom')}
+				</label>
+			</div>
+
+			{newRoomIsPrivate && (
+				<div className="form-group">
+					<label>{t('room.password')}</label>
+					<input
+						type="password"
+						value={newRoomPassword}
+						onChange={(e) => setNewRoomPassword(e.target.value)}
+						placeholder={t('room.placeholder.password')}
+						disabled={disabled || isLoading}
+					/>
+				</div>
 			)}
 
-			{/* 密码输入模态框 */}
-			{showPasswordModal && selectedPrivateRoom && (
-				<div className="rs-modal-overlay">
-					<div className="rs-modal">
-						<h3 className="rs-modal-title">
-							<Lock size={16} />
-							{t("room.enterPassword")}
-						</h3>
-						<p className="rs-modal-desc">{t("room.privateRoomMessage", { name: selectedPrivateRoom.name })}</p>
-						<form onSubmit={handlePasswordSubmit}>
-							<input
-								type="password"
-								value={passwordInput}
-								onChange={(e) => setPasswordInput(e.target.value)}
-								placeholder={t("room.passwordPlaceholder")}
-								className="rs-input"
-								autoFocus
-							/>
-							<div className="rs-modal-actions">
-								<button
-									type="button"
-									onClick={() => {
-										setShowPasswordModal(false);
-										setSelectedPrivateRoom(null);
-										setPasswordInput("");
-									}}
-									className="btn btn-secondary"
-								>
-									{t("common.cancel")}
-								</button>
-								<button
-									type="submit"
-									disabled={!passwordInput}
-									className="btn btn-primary"
-								>
-									{t("room.join")}
-								</button>
-							</div>
-						</form>
+			{error && <div className="form-error">{error}</div>}
+
+			<div className="form-actions">
+				<button
+					className="btn-secondary"
+					onClick={() => setShowCreateForm(false)}
+					disabled={isLoading}
+				>
+					{t('common.cancel')}
+				</button>
+				<button
+					className="btn-primary"
+					onClick={handleCreateRoom}
+					disabled={isLoading || !newRoomId.trim()}
+				>
+					{isLoading ? t('common.creating') : t('room.create')}
+				</button>
+			</div>
+		</div>
+	);
+
+	// 渲染密码模态框
+	const renderPasswordModal = () => (
+		showPasswordModal && selectedPrivateRoom && (
+			<div className="password-modal-overlay">
+				<div className="password-modal">
+					<h3>{t('room.enterPassword')}</h3>
+					<p>{t('room.privateRoomPasswordRequired', { roomName: selectedPrivateRoom.name })}</p>
+					<input
+						type="password"
+						value={passwordInput}
+						onChange={(e) => setPasswordInput(e.target.value)}
+						placeholder={t('room.placeholder.password')}
+						autoFocus
+					/>
+					<div className="modal-actions">
+						<button
+							className="btn-secondary"
+							onClick={() => {
+								setShowPasswordModal(false);
+								setSelectedPrivateRoom(null);
+								setPasswordInput("");
+							}}
+						>
+							{t('common.cancel')}
+						</button>
+						<button
+							className="btn-primary"
+							onClick={handlePasswordSubmit}
+							disabled={!passwordInput}
+						>
+							{t('room.join')}
+						</button>
 					</div>
 				</div>
-			)}
+			</div>
+		)
+	);
 
-			{/* 加载状态 */}
-			{isLoading && mode !== "create" && (
-				<div className="rs-loading">
-					<div className="rs-spinner" />
-					{t("room.loadingRooms")}
-				</div>
-			)}
+	return (
+		<div className="room-selector">
+			{/* 模式切换 */}
+			<div className="mode-tabs">
+				<button
+					className={`mode-tab ${mode === 'quick' ? 'active' : ''}`}
+					onClick={() => setMode('quick')}
+					disabled={disabled}
+				>
+					<Zap size={14} />
+					{t('room.quickJoin')}
+				</button>
+				<button
+					className={`mode-tab ${mode === 'select' ? 'active' : ''}`}
+					onClick={() => setMode('select')}
+					disabled={disabled}
+				>
+					<Home size={14} />
+					{t('room.selectRoom')}
+				</button>
+				<button
+					className={`mode-tab ${mode === 'create' ? 'active' : ''}`}
+					onClick={() => setMode('create')}
+					disabled={disabled}
+				>
+					<Plus size={14} />
+					{t('room.createRoom')}
+				</button>
+			</div>
 
+			{/* 内容区域 */}
+			<div className="room-content">
+				{mode === 'quick' && (
+					<div className="quick-join">
+						<p>{t('room.quickJoinDescription')}</p>
+						<button
+							className="btn-primary btn-large"
+							onClick={() => onRoomSelect('default')}
+							disabled={disabled || isLoading}
+						>
+							<Zap size={16} />
+							{t('room.joinDefaultRoom')}
+						</button>
+					</div>
+				)}
+
+				{mode === 'select' && renderRoomList()}
+
+				{mode === 'create' && (showCreateForm ? renderCreateForm() : (
+					<div className="create-options">
+						<button
+							className="btn-primary"
+							onClick={() => setShowCreateForm(true)}
+							disabled={disabled}
+						>
+							<Plus size={14} />
+							{t('room.createNewRoom')}
+						</button>
+					</div>
+				))}
+			</div>
+
+			{/* 密码模态框 */}
+			{renderPasswordModal()}
+
+			{/* 样式 */}
 			<style>{`
-				.rs-container {
+				.room-selector {
 					display: flex;
 					flex-direction: column;
-					gap: var(--space-3);
+					gap: 12px;
 				}
 
-				.rs-modes {
+				.mode-tabs {
 					display: flex;
-					flex-direction: column;
-					gap: var(--space-2);
+					gap: 8px;
 				}
 
-				.rs-mode-option {
+				.mode-tab {
+					flex: 1;
 					display: flex;
-					flex-direction: column;
-					gap: var(--space-1);
-					padding: var(--space-3);
-					background: rgba(20, 25, 35, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.2);
-					border-radius: var(--radius-sm);
+					align-items: center;
+					justify-content: center;
+					gap: 6px;
+					padding: 10px;
+					background: var(--color-surface);
+					border: 1px solid var(--color-border);
+					border-radius: 6px;
+					color: var(--color-text-secondary);
 					cursor: pointer;
-					transition: var(--transition-fast);
+					transition: all 0.2s;
 				}
 
-				.rs-mode-option:hover {
-					background: rgba(30, 35, 45, 0.7);
-					border-color: rgba(74, 158, 255, 0.3);
+				.mode-tab:hover {
+					background: var(--color-surface-dark);
 				}
 
-				.rs-mode-option--active {
-					background: rgba(74, 158, 255, 0.15);
-					border-color: rgba(74, 158, 255, 0.4);
+				.mode-tab.active {
+					background: var(--color-primary);
+					border-color: var(--color-primary);
+					color: white;
 				}
 
-				.rs-mode-option input {
-					display: none;
+				.room-content {
+					min-height: 200px;
 				}
 
-				.rs-mode-label {
-					font-size: var(--text-sm);
-					font-weight: var(--font-semibold);
-					color: var(--text-primary);
-				}
-
-				.rs-mode-desc {
-					font-size: var(--text-xs);
-					color: var(--text-tertiary);
-				}
-
-				/* 房间列表 */
-				.rs-room-list {
+				.quick-join {
 					display: flex;
 					flex-direction: column;
-					gap: var(--space-2);
-					max-height: 200px;
+					align-items: center;
+					gap: 16px;
+					padding: 24px;
+					text-align: center;
+				}
+
+				.room-list {
+					display: flex;
+					flex-direction: column;
+					gap: 8px;
+					max-height: 300px;
 					overflow-y: auto;
 				}
 
-				.rs-room-card {
+				.room-item {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					padding: 12px;
+					background: var(--color-surface);
+					border: 1px solid var(--color-border);
+					border-radius: 6px;
+					cursor: pointer;
+					transition: all 0.2s;
+				}
+
+				.room-item:hover {
+					background: var(--color-surface-dark);
+				}
+
+				.room-item.selected {
+					border-color: var(--color-primary);
+					background: rgba(var(--color-primary-rgb), 0.1);
+				}
+
+				.room-info {
 					display: flex;
 					flex-direction: column;
-					gap: var(--space-1);
-					padding: var(--space-3);
-					background: rgba(20, 25, 35, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.2);
-					border-radius: var(--radius-sm);
+					gap: 4px;
+				}
+
+				.room-name {
+					display: flex;
+					align-items: center;
+					gap: 6px;
+					font-weight: 500;
+				}
+
+				.room-meta {
+					display: flex;
+					align-items: center;
+					gap: 12px;
+					font-size: 12px;
+				}
+
+				.room-phase, .room-players {
+					display: flex;
+					align-items: center;
+					gap: 4px;
+				}
+
+				.room-owner {
+					color: var(--color-warning);
+				}
+
+				.no-rooms {
+					padding: 24px;
+					text-align: center;
+					color: var(--color-text-secondary);
+				}
+
+				.create-room-form {
+					display: flex;
+					flex-direction: column;
+					gap: 12px;
+				}
+
+				.form-group {
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
+				}
+
+				.form-group label {
+					font-size: 12px;
+					color: var(--color-text-secondary);
+				}
+
+				.form-group input {
+					padding: 8px 12px;
+					background: var(--color-background);
+					border: 1px solid var(--color-border);
+					border-radius: 4px;
+					color: var(--color-text);
+				}
+
+				.form-group.checkbox {
+					flex-direction: row;
+					align-items: center;
+				}
+
+				.form-error {
+					padding: 8px;
+					background: rgba(var(--color-error-rgb), 0.1);
+					border: 1px solid var(--color-error);
+					border-radius: 4px;
+					color: var(--color-error);
+					font-size: 12px;
+				}
+
+				.form-actions {
+					display: flex;
+					gap: 8px;
+					justify-content: flex-end;
+				}
+
+				.password-modal-overlay {
+					position: fixed;
+					top: 0;
+					left: 0;
+					right: 0;
+					bottom: 0;
+					background: rgba(0, 0, 0, 0.5);
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					z-index: 1000;
+				}
+
+				.password-modal {
+					background: var(--color-surface);
+					padding: 24px;
+					border-radius: 8px;
+					max-width: 400px;
+					width: 90%;
+				}
+
+				.password-modal h3 {
+					margin: 0 0 8px;
+				}
+
+				.password-modal p {
+					margin: 0 0 16px;
+					color: var(--color-text-secondary);
+					font-size: 14px;
+				}
+
+				.password-modal input {
+					width: 100%;
+					padding: 10px;
+					margin-bottom: 16px;
+					background: var(--color-background);
+					border: 1px solid var(--color-border);
+					border-radius: 4px;
+					color: var(--color-text);
+				}
+
+				.modal-actions {
+					display: flex;
+					gap: 8px;
+					justify-content: flex-end;
+				}
+
+				.btn-primary {
+					padding: 8px 16px;
+					background: var(--color-primary);
+					border: none;
+					border-radius: 4px;
+					color: white;
 					cursor: pointer;
-					transition: var(--transition-fast);
-					text-align: left;
 				}
 
-				.rs-room-card:hover:not(:disabled) {
-					background: rgba(30, 35, 45, 0.7);
-					border-color: rgba(74, 158, 255, 0.4);
-				}
-
-				.rs-room-card--selected {
-					background: rgba(74, 158, 255, 0.15);
-					border-color: rgba(74, 158, 255, 0.5);
-				}
-
-				.rs-room-card--full {
+				.btn-primary:disabled {
 					opacity: 0.5;
 					cursor: not-allowed;
 				}
 
-				.rs-room-header {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
-				}
-
-				.rs-room-name {
-					display: flex;
-					align-items: center;
-					gap: var(--space-1);
-					font-size: var(--text-sm);
-					font-weight: var(--font-semibold);
-					color: var(--text-primary);
-				}
-
-				.rs-private-icon {
-					color: var(--color-warning);
-				}
-
-				.rs-room-players {
-					display: flex;
-					align-items: center;
-					gap: var(--space-1);
-					font-size: var(--text-xs);
-					color: var(--text-secondary);
-				}
-
-				.rs-room-info {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
-					font-size: var(--text-xs);
-					color: var(--text-tertiary);
-				}
-
-				.rs-room-phase {
-					display: flex;
-					align-items: center;
-					gap: var(--space-1);
-				}
-
-				.rs-phase-icon--lobby { color: var(--text-tertiary); }
-				.rs-phase-icon--deployment { color: var(--color-warning); }
-				.rs-phase-icon--playing { color: var(--color-success); }
-				.rs-phase-icon--paused { color: var(--color-warning); }
-				.rs-phase-icon--ended { color: var(--text-tertiary); }
-
-				.rs-room-owner {
-					display: flex;
-					align-items: center;
-					gap: 2px;
-					color: var(--color-primary);
-				}
-
-				/* 创建表单 */
-				.rs-create-form {
-					display: flex;
-					flex-direction: column;
-					gap: var(--space-3);
-					padding: var(--space-3);
-					background: rgba(20, 25, 35, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.2);
-					border-radius: var(--radius-sm);
-				}
-
-				.rs-form-group {
-					display: flex;
-					flex-direction: column;
-					gap: var(--space-1);
-				}
-
-				.rs-form-group label {
-					font-size: var(--text-xs);
-					color: var(--text-secondary);
-				}
-
-				.rs-form-group--checkbox label {
-					display: flex;
-					align-items: center;
-					gap: var(--space-2);
+				.btn-secondary {
+					padding: 8px 16px;
+					background: var(--color-surface);
+					border: 1px solid var(--color-border);
+					border-radius: 4px;
+					color: var(--color-text);
 					cursor: pointer;
 				}
 
-				.rs-input {
-					width: 100%;
-					padding: var(--space-2) var(--space-3);
-					background: rgba(0, 0, 0, 0.5);
-					border: 1px solid var(--border-color);
-					border-radius: var(--radius-sm);
-					color: var(--text-primary);
-					font-size: var(--text-sm);
-					transition: var(--transition-fast);
-					outline: none;
-				}
-
-				.rs-input:focus {
-					border-color: var(--border-color-active);
-					box-shadow: var(--shadow-glow-sm);
-				}
-
-				.rs-error {
-					font-size: var(--text-xs);
-					color: var(--color-danger);
-					padding: var(--space-2);
-					background: rgba(255, 68, 68, 0.1);
-					border-radius: var(--radius-sm);
-				}
-
-				.rs-create-btn {
-					width: 100%;
-				}
-
-				/* 模态框 */
-				.rs-modal-overlay {
-					position: fixed;
-					inset: 0;
-					background: rgba(0, 0, 0, 0.6);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					z-index: var(--z-modal-backdrop);
-				}
-
-				.rs-modal {
-					background: var(--bg-panel);
-					border: 1px solid var(--border-color);
-					border-radius: var(--radius-md);
-					padding: var(--space-4);
-					min-width: 300px;
-					max-width: 400px;
-				}
-
-				.rs-modal-title {
-					display: flex;
-					align-items: center;
-					gap: var(--space-2);
-					font-size: var(--text-base);
-					font-weight: var(--font-semibold);
-					color: var(--text-primary);
-					margin: 0 0 var(--space-2) 0;
-				}
-
-				.rs-modal-desc {
-					font-size: var(--text-sm);
-					color: var(--text-secondary);
-					margin: 0 0 var(--space-3) 0;
-				}
-
-				.rs-modal-actions {
-					display: flex;
-					justify-content: flex-end;
-					gap: var(--space-2);
-					margin-top: var(--space-3);
-				}
-
-				/* 加载状态 */
-				.rs-loading {
-					display: flex;
-					align-items: center;
-					gap: var(--space-2);
-					padding: var(--space-2);
-					color: var(--text-tertiary);
-					font-size: var(--text-xs);
-				}
-
-				.rs-spinner {
-					width: 12px;
-					height: 12px;
-					border: 2px solid rgba(74, 158, 255, 0.3);
-					border-top-color: var(--color-primary);
-					border-radius: 50%;
-					animation: rs-spin 0.8s linear infinite;
-				}
-
-				@keyframes rs-spin {
-					to { transform: rotate(360deg); }
+				.btn-large {
+					padding: 12px 24px;
+					font-size: 16px;
 				}
 			`}</style>
 		</div>
 	);
 };
-
-export default RoomSelector;

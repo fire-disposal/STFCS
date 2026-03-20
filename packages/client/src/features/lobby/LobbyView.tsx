@@ -9,12 +9,8 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '@/store';
-import {
-  selectPlayerName,
-  selectCurrentPlayerId,
-  setPlayerName,
-} from '@/store/slices/playerSlice';
+import { useAppSelector } from '@/store';
+import { selectCurrentPlayerId } from '@/store/slices/playerSlice';
 import { RoomCard } from './RoomCard';
 import { CreateRoomModal } from './CreateRoomModal';
 import type { RoomInfo } from '@vt/shared/types';
@@ -150,20 +146,11 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onRefresh,
   isLoading = false,
 }) => {
-  const dispatch = useAppDispatch();
-  const storedName = useAppSelector(selectPlayerName);
   const currentPlayerId = useAppSelector(selectCurrentPlayerId);
 
-  const [playerName, setPlayerNameState] = useState(storedName || '');
+  const [playerName, setPlayerNameState] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
-
-  // 保存玩家名称
-  useEffect(() => {
-    if (playerName && playerName !== storedName) {
-      dispatch(setPlayerName(playerName));
-    }
-  }, [playerName, storedName, dispatch]);
 
   // 处理加入房间
   const handleJoinRoom = useCallback((roomId: string, password?: string) => {

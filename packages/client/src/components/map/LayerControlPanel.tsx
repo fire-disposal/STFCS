@@ -11,6 +11,9 @@ import { Eye, EyeOff, Layers, ChevronDown, ChevronRight } from "lucide-react";
 
 interface LayerControlPanelProps {
 	className?: string;
+	// GameView 传递的 props
+	collapsed?: boolean;
+	onToggle?: () => void;
 }
 
 export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({

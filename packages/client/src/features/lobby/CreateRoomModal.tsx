@@ -131,7 +131,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   // 处理创建
   const handleCreate = () => {
     onCreate({
-      name: name.trim() || undefined,
+      name: name.trim() || '新房间',
       maxPlayers,
       isPrivate,
       password: isPrivate ? password : undefined,

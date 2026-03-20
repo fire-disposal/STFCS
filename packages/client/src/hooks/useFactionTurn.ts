@@ -21,8 +21,8 @@ import {
 	setDebounceStartTime,
 	setFactionTurnPhase,
 } from '@/store/slices/factionTurnSlice';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared';
+import { useRoomOperations } from '@/room';
+import type { RoomClient, OperationMap } from '@/room';
 import { FACTIONS, getFactionColor, getFactionLocalizedName } from '@vt/shared';
 import type { FactionId, PlayerFactionInfo } from '@vt/shared';
 
@@ -53,12 +53,15 @@ export interface UseFactionTurnReturn {
 	getFactionDisplayName: (factionId: FactionId) => string;
 
 	// 操作
-	endTurn: () => void;
-	cancelEndTurn: () => void;
+	endTurn: () => Promise<void>;
+	cancelEndTurn: () => Promise<void>;
 }
 
-export function useFactionTurn(): UseFactionTurnReturn {
+export function useFactionTurn(client: RoomClient<OperationMap> | null): UseFactionTurnReturn {
 	const dispatch = useAppDispatch();
+
+	// 获取操作调用器
+	const ops = useRoomOperations(client);
 
 	// 基础状态
 	const roundNumber = useAppSelector(selectRoundNumber);
@@ -109,7 +112,7 @@ export function useFactionTurn(): UseFactionTurnReturn {
 	}, []);
 
 	// 结束回合
-	const endTurn = useCallback(() => {
+	const endTurn = useCallback(async () => {
 		if (!isCurrentPlayerTurn || hasEndedTurn || !currentPlayerId || !selectedFaction) {
 			return;
 		}
@@ -124,27 +127,32 @@ export function useFactionTurn(): UseFactionTurnReturn {
 			})
 		);
 
-		// 发送 WebSocket 消息
-		websocketService.send({
-			type: WS_MESSAGE_TYPES.PLAYER_END_TURN,
-			payload: {
-				playerId: currentPlayerId,
-				playerName: currentPlayer?.playerName || '',
-				faction: selectedFaction,
-				timestamp: Date.now(),
-			},
-		});
+		// 调用服务器操作
+		try {
+			await ops?.endTurn();
+		} catch (error) {
+			console.error('Failed to end turn:', error);
+			// 回滚乐观更新
+			dispatch(
+				updatePlayerEndStatus({
+					playerId: currentPlayerId,
+					faction: selectedFaction,
+					hasEndedTurn: false,
+					endedAt: undefined,
+				})
+			);
+		}
 	}, [
 		isCurrentPlayerTurn,
 		hasEndedTurn,
 		currentPlayerId,
 		selectedFaction,
-		currentPlayer,
 		dispatch,
+		ops,
 	]);
 
 	// 取消结束回合
-	const cancelEndTurn = useCallback(() => {
+	const cancelEndTurn = useCallback(async () => {
 		if (!hasEndedTurn || !currentPlayerId || !selectedFaction) {
 			return;
 		}
@@ -163,17 +171,22 @@ export function useFactionTurn(): UseFactionTurnReturn {
 		dispatch(setDebounceStartTime(undefined));
 		dispatch(setFactionTurnPhase('action'));
 
-		// 发送 WebSocket 消息
-		websocketService.send({
-			type: WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN,
-			payload: {
-				playerId: currentPlayerId,
-				playerName: currentPlayer?.playerName || '',
-				faction: selectedFaction,
-				timestamp: Date.now(),
-			},
-		});
-	}, [hasEndedTurn, currentPlayerId, selectedFaction, currentPlayer, dispatch]);
+		// 调用服务器操作
+		try {
+			await ops?.cancelEndTurn();
+		} catch (error) {
+			console.error('Failed to cancel end turn:', error);
+			// 回滚乐观更新
+			dispatch(
+				updatePlayerEndStatus({
+					playerId: currentPlayerId,
+					faction: selectedFaction,
+					hasEndedTurn: true,
+					endedAt: Date.now(),
+				})
+			);
+		}
+	}, [hasEndedTurn, currentPlayerId, selectedFaction, dispatch, ops]);
 
 	return {
 		// 状态

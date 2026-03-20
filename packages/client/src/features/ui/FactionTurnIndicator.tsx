@@ -22,20 +22,25 @@ import {
   selectTotalPlayersCount,
   updatePlayerEndStatus,
 } from '@/store/slices/factionTurnSlice';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared';
+import { useRoomOperations } from '@/room';
+import type { RoomClient, OperationMap } from '@/room';
 import { FACTIONS, getFactionColor } from '@vt/shared';
 import type { FactionId } from '@vt/shared';
 
 interface FactionTurnIndicatorProps {
   className?: string;
+  client: RoomClient<OperationMap> | null;
 }
 
 export const FactionTurnIndicator: React.FC<FactionTurnIndicatorProps> = ({
   className = '',
+  client,
 }) => {
   const { t, i18n } = useTranslation();
   const dispatch = useAppDispatch();
+
+  // 获取操作调用器
+  const ops = useRoomOperations(client);
 
   // 选择器
   const currentFaction = useAppSelector(selectCurrentFaction);
@@ -62,7 +67,7 @@ export const FactionTurnIndicator: React.FC<FactionTurnIndicatorProps> = ({
   const isDebouncing = debounceStartTime !== undefined || phase === 'transition';
 
   // 处理结束回合
-  const handleEndTurn = () => {
+  const handleEndTurn = async () => {
     if (!isCurrentPlayerTurn || hasEndedTurn || !currentPlayerId || !selectedFaction) return;
 
     // 乐观更新本地状态
@@ -75,20 +80,25 @@ export const FactionTurnIndicator: React.FC<FactionTurnIndicatorProps> = ({
       })
     );
 
-    // 发送 WebSocket 消息
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.PLAYER_END_TURN,
-      payload: {
-        playerId: currentPlayerId,
-        playerName: currentPlayer?.playerName || '',
-        faction: selectedFaction,
-        timestamp: Date.now(),
-      },
-    });
+    // 调用服务器操作
+    try {
+      await ops?.endTurn();
+    } catch (error) {
+      console.error('Failed to end turn:', error);
+      // 回滚乐观更新
+      dispatch(
+        updatePlayerEndStatus({
+          playerId: currentPlayerId,
+          faction: selectedFaction,
+          hasEndedTurn: false,
+          endedAt: undefined,
+        })
+      );
+    }
   };
 
   // 处理取消结束
-  const handleCancelEndTurn = () => {
+  const handleCancelEndTurn = async () => {
     if (!hasEndedTurn || !currentPlayerId || !selectedFaction) return;
 
     // 乐观更新本地状态
@@ -101,16 +111,21 @@ export const FactionTurnIndicator: React.FC<FactionTurnIndicatorProps> = ({
       })
     );
 
-    // 发送 WebSocket 消息
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN,
-      payload: {
-        playerId: currentPlayerId,
-        playerName: currentPlayer?.playerName || '',
-        faction: selectedFaction,
-        timestamp: Date.now(),
-      },
-    });
+    // 调用服务器操作
+    try {
+      await ops?.cancelEndTurn();
+    } catch (error) {
+      console.error('Failed to cancel end turn:', error);
+      // 回滚乐观更新
+      dispatch(
+        updatePlayerEndStatus({
+          playerId: currentPlayerId,
+          faction: selectedFaction,
+          hasEndedTurn: true,
+          endedAt: Date.now(),
+        })
+      );
+    }
   };
 
   // 获取阵营显示名称

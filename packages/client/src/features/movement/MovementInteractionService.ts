@@ -10,8 +10,7 @@
 
 import type { MovementState, MovementPhase, MovementType, MovementAction } from '@vt/shared/types';
 import type { Point } from '@vt/shared/core-types';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
+import type { RoomClient, OperationMap } from '@/room';
 
 /**
  * 移动输入类型
@@ -50,6 +49,7 @@ export interface MovementInteractionConfig {
   initialState: MovementState;
   initialPosition: Point;
   initialHeading: number;
+  client: RoomClient<OperationMap>;
   onPreviewUpdate?: (preview: MovementPreviewResult | null) => void;
   onMoveComplete?: (action: MovementAction) => void;
   onError?: (error: string) => void;
@@ -67,6 +67,7 @@ export class MovementInteractionService {
   private previewHeading: number | null = null;
   private isDragging: boolean = false;
   private dragStartPosition: Point | null = null;
+  private client: RoomClient<OperationMap>;
 
   private config: MovementInteractionConfig;
 
@@ -76,6 +77,7 @@ export class MovementInteractionService {
     this.movementState = { ...config.initialState };
     this.currentPosition = { ...config.initialPosition };
     this.currentHeading = config.initialHeading;
+    this.client = config.client;
   }
 
   /**
@@ -543,23 +545,13 @@ export class MovementInteractionService {
   /**
    * 发送移动到服务器
    */
-  private sendMoveToServer(action: MovementAction): void {
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId: this.shipId,
-        actionType: 'move',
-        actionData: {
-          type: action.type,
-          distance: action.distance,
-          angle: action.angle,
-          newPosition: { x: action.newX, y: action.newY },
-          newHeading: action.newHeading,
-          phase: this.movementState.currentPhase,
-        },
-        timestamp: Date.now(),
-      },
-    });
+  private async sendMoveToServer(action: MovementAction): Promise<void> {
+    try {
+      await this.client.call('moveShip', this.shipId, { x: action.newX, y: action.newY }, action.newHeading);
+    } catch (error) {
+      console.error('Failed to send move to server:', error);
+      this.config.onError?.(error instanceof Error ? error.message : '移动失败');
+    }
   }
 
   /**
@@ -591,7 +583,7 @@ export class MovementInteractionService {
   /**
    * 结束移动阶段
    */
-  endMovement(): void {
+  async endMovement(): Promise<void> {
     // 标记所有未完成的阶段为完成
     if (!this.movementState.phase1Complete) {
       this.movementState.phase1Complete = true;
@@ -604,14 +596,12 @@ export class MovementInteractionService {
     }
 
     // 发送结束移动消息
-    websocketService.send({
-      type: WS_MESSAGE_TYPES.SHIP_ACTION,
-      payload: {
-        shipId: this.shipId,
-        actionType: 'end_movement',
-        timestamp: Date.now(),
-      },
-    });
+    try {
+      await this.client.call('endShipAction', this.shipId);
+    } catch (error) {
+      console.error('Failed to end movement:', error);
+      this.config.onError?.(error instanceof Error ? error.message : '结束移动失败');
+    }
   }
 
   /**

@@ -9,4 +9,4 @@ export {
 	type ActionValidationResult,
 } from './ActionService.js';
 
-export default ActionService;
+export { ActionService as default } from './ActionService.js';

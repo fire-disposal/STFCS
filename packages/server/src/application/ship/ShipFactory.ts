@@ -63,8 +63,8 @@ export class ShipFactory {
 				initialSoftFlux: 0,
 				initialHardFlux: 0,
 			},
-			shield: hullDef.shield ? {
-				type: hullDef.shield.type,
+			shield: hullDef.shield && hullDef.shield.type !== 'NONE' ? {
+				type: hullDef.shield.type as 'FRONT' | 'OMNI',
 				radius: hullDef.shield.radius,
 				centerOffset: hullDef.shield.centerOffset,
 				coverageAngle: hullDef.shield.coverageAngle,
@@ -181,7 +181,7 @@ export class ShipFactory {
 			fluxState: ship.status === 'OVERLOADED' ? 'overloaded' : ship.status === 'VENTING' ? 'venting' : 'normal',
 			shieldActive: ship.shield?.isActive ?? false,
 			shieldRadius: ship.shield?.radius ?? 0,
-			shieldType: (ship.shield?.type as 'FRONT' | 'OMNI') ?? 'FRONT',
+			shieldType: (ship.shield?.type as 'FRONT' | 'OMNI' | 'NONE') ?? 'NONE',
 			weaponCooldowns: {},
 			weaponAmmo: {},
 			remainingActions: 3,

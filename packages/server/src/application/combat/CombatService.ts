@@ -7,6 +7,16 @@ import type { Result } from "@vt/shared/types";
 import type { ArmorQuadrant } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 import type { IWSServer, WSMessage } from "@vt/shared/ws";
+import type {
+  SelectTargetResponse,
+  SelectWeaponResponse,
+  SelectQuadrantResponse,
+  AttackPreviewResponse,
+  ConfirmAttackResponse,
+} from "@vt/shared/protocol";
+
+// 从协议层导出 blockReason 枚举类型
+type BlockReason = NonNullable<AttackPreviewResponse['blockReason']>;
 
 // 魔法数字常量
 const LINE_OF_SIGHT_OBSTACLE_RADIUS = 10;
@@ -63,65 +73,21 @@ export interface CombatServiceDeps {
 
 export type AttackValidationResult =
 	| { canAttack: true }
-	| { canAttack: false; reason: string };
+	| { canAttack: false; reason: BlockReason };
 
 // ====== 战斗交互状态 ======
 
-/** 目标选择状态 */
-interface TargetSelection {
-	targetId: string;
-	targetInfo?: {
-		id: string;
-		name?: string;
-		hullSize?: string;
-		position: { x: number; y: number };
-		heading: number;
-		distance: number;
-	};
-}
+/** 目标选择状态 - 使用协议层类型 */
+type TargetSelection = Pick<SelectTargetResponse, 'targetId' | 'targetInfo'>;
 
-/** 武器选择状态 */
-interface WeaponSelection {
-	weaponInstanceId: string;
-	weaponInfo?: {
-		instanceId: string;
-		weaponId: string;
-		name: string;
-		damageType: string;
-		baseDamage: number;
-		range: number;
-		arc: number;
-		state: string;
-		canFire: boolean;
-	};
-}
+/** 武器选择状态 - 使用协议层类型 */
+type WeaponSelection = Pick<SelectWeaponResponse, 'weaponInstanceId' | 'weaponInfo'>;
 
-/** 象限选择状态 */
-interface QuadrantSelection {
-	targetId: string;
-	quadrant: ArmorQuadrant;
-	quadrantInfo?: {
-		quadrant: string;
-		currentArmor: number;
-		maxArmor: number;
-		armorPercent: number;
-	};
-}
+/** 象限选择状态 - 使用协议层类型 */
+type QuadrantSelection = Pick<SelectQuadrantResponse, 'targetId' | 'quadrant' | 'quadrantInfo'>;
 
-/** 攻击预览结果 */
-export interface AttackPreviewData {
-	canAttack: boolean;
-	preview?: {
-		baseDamage: number;
-		estimatedShieldAbsorb: number;
-		estimatedArmorReduction: number;
-		estimatedHullDamage: number;
-		hitQuadrant: ArmorQuadrant;
-		fluxCost: number;
-		willGenerateHardFlux: boolean;
-	};
-	blockReason?: string;
-}
+/** 攻击预览结果 - 使用协议层类型 */
+export type AttackPreviewData = Pick<AttackPreviewResponse, 'canAttack' | 'preview' | 'blockReason'>;
 
 export class CombatService {
 	private readonly _weaponMounts: Map<string, WeaponMountEntity>;
@@ -248,10 +214,11 @@ export class CombatService {
 				instanceId: weaponInstanceId,
 				weaponId: mount.weapon.id,
 				name: mount.weapon.name,
-				damageType: mount.weapon.type,
+				damageType: mount.weapon.type as 'KINETIC' | 'HIGH_EXPLOSIVE' | 'FRAGMENTATION' | 'ENERGY',
 				baseDamage: mount.weapon.damage,
 				range: mount.weapon.range,
 				arc: mount.weapon.arc,
+				fluxCostPerShot: mount.weapon.fluxCost,
 				state: 'ready', // TODO: 实际状态
 				canFire,
 			},
@@ -335,7 +302,7 @@ export class CombatService {
 		if (!sourceShip || !targetShip || !mount) {
 			return {
 				canAttack: false,
-				blockReason: 'INVALID_TARGET_OR_WEAPON',
+				blockReason: 'WEAPON_NOT_READY',
 			};
 		}
 
@@ -355,6 +322,7 @@ export class CombatService {
 		// 计算伤害预览
 		const damageInput = {
 			weapon: mount.weapon,
+			weaponDamageType: mount.weapon.type as any,
 			sourceShip,
 			targetShip,
 			hitPosition: targetShip.position,
@@ -380,24 +348,11 @@ export class CombatService {
 	 * 计算命中象限
 	 */
 	private _calculateHitQuadrant(sourceShip: Ship, targetShip: Ship): ArmorQuadrant {
-		const dx = targetShip.position.x - sourceShip.position.x;
-		const dy = targetShip.position.y - sourceShip.position.y;
-		const angleToTarget = Math.atan2(dy, dx);
-		const relativeAngle = angleToTarget - (targetShip.heading * Math.PI / 180);
-
-		// 标准化角度到 [-PI, PI]
-		const normalizedAngle = ((relativeAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
-
-		// 根据角度确定象限
-		if (normalizedAngle >= -Math.PI / 4 && normalizedAngle < Math.PI / 4) {
-			return 'front';
-		} else if (normalizedAngle >= Math.PI / 4 && normalizedAngle < 3 * Math.PI / 4) {
-			return 'right';
-		} else if (normalizedAngle >= -3 * Math.PI / 4 && normalizedAngle < -Math.PI / 4) {
-			return 'left';
-		} else {
-			return 'rear';
-		}
+		return DamageCalculator.determineHitQuadrant(
+			targetShip.position,
+			targetShip.position,
+			targetShip.heading
+		);
 	}
 
 	/**
@@ -414,36 +369,28 @@ export class CombatService {
 		const targetShip = this._deps.getShip(targetShipId);
 		const mount = this._weaponMounts.get(mountId);
 
-		if (!sourceShip) {
-			return { canAttack: false, reason: "Source ship not found" };
-		}
-
-		if (!targetShip) {
-			return { canAttack: false, reason: "Target ship not found" };
-		}
-
-		if (!mount) {
-			return { canAttack: false, reason: "Weapon mount not found" };
+		if (!sourceShip || !targetShip || !mount) {
+			return { canAttack: false, reason: "WEAPON_NOT_READY" };
 		}
 
 		const distance = DamageCalculator.calculateDistance(sourceShip.position, targetShip.position);
 
 		if (!mount.weapon.isWithinRange(distance)) {
-			return { canAttack: false, reason: "Target out of range" };
+			return { canAttack: false, reason: "OUT_OF_RANGE" };
 		}
 
 		if (!mount.isTargetInArc(targetShip.position, sourceShip.position)) {
-			return { canAttack: false, reason: "Target not in weapon arc" };
+			return { canAttack: false, reason: "NOT_IN_ARC" };
 		}
 
-		if (sourceShip.status === "OVERLOADED" || sourceShip.status === "DISABLED") {
-			return { canAttack: false, reason: "Source ship cannot fire weapons" };
+		if (sourceShip.status === "OVERLOADED") {
+			return { canAttack: false, reason: "SHIP_IS_OVERLOADED" };
 		}
 
 		// 检查辐能是否足够
 		const fluxCost = mount.weapon.fluxCost;
 		if (sourceShip.flux.current + fluxCost > sourceShip.flux.capacity) {
-			return { canAttack: false, reason: "Not enough flux capacity" };
+			return { canAttack: false, reason: "NOT_ENOUGH_FLUX_CAPACITY" };
 		}
 
 		return { canAttack: true };
@@ -487,6 +434,7 @@ export class CombatService {
 				shieldAbsorbed: 0,
 				armorReduced: 0,
 				hullDamage: 0,
+				empDamage: 0,
 				softFluxGenerated: 0,
 				hardFluxGenerated: 0,
 			},
@@ -534,6 +482,7 @@ export class CombatService {
 		// 计算伤害
 		const damageInput = {
 			weapon: mount.weapon,
+			weaponDamageType: mount.weapon.type as any,
 			sourceShip,
 			targetShip,
 			hitPosition: targetShip.position,

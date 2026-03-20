@@ -1,26 +1,19 @@
 /**
- * 部署阶段主视图
+ * 部署阶段视图
  *
- * 显示部署阶段的完整 UI：
- * - 舰船选择器
- * - 地图预览
- * - 放置预览
- * - 阵营部署面板
+ * 使用新的房间框架：
+ * - useRoomState 订阅状态
+ * - useRoomOperations 调用操作
  */
 
-import React, { useCallback, useState } from 'react';
-import { useAppSelector, useAppDispatch } from '@/store';
-import { selectGamePhase, selectDeploymentReady } from '@/store/slices/gameFlowSlice';
-import { selectSelectedFaction } from '@/store/slices/factionSlice';
-import { selectCurrentPlayerId } from '@/store/slices/playerSlice';
-import { ShipSelector } from './ShipSelector';
-import { ShipPlacementPreview } from './ShipPlacementPreview';
-import { FactionDeploymentPanel } from './FactionDeploymentPanel';
-import type { ShipDefinition } from '@vt/shared/config';
-import type { FactionId } from '@vt/shared/types';
-import type { Point } from '@vt/shared/core-types';
+import React, { useState, useCallback } from 'react';
+import { useRoomState, useRoomOperations } from '@/room';
+import type { RoomClient } from '@/room';
+import type { OperationMap } from '@vt/shared/room';
+import type { FactionId, Point } from '@vt/shared/types';
 
-// 样式
+// ==================== 样式 ====================
+
 const styles = {
   container: {
     display: 'flex',
@@ -54,208 +47,346 @@ const styles = {
     padding: '16px',
     borderBottom: '1px solid var(--color-border)',
   },
+  section: {
+    padding: '16px',
+    borderBottom: '1px solid var(--color-border)',
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    marginBottom: '12px',
+  },
+  shipList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  shipCard: {
+    padding: '12px',
+    backgroundColor: 'var(--color-background)',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    border: '2px solid transparent',
+    transition: 'all 0.2s ease',
+  },
+  shipCardSelected: {
+    borderColor: 'var(--color-primary)',
+    backgroundColor: 'var(--color-primary-light)',
+  },
+  shipName: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+  },
+  shipStats: {
+    fontSize: '12px',
+    color: 'var(--color-text-secondary)',
+    marginTop: '4px',
+  },
+  button: {
+    padding: '12px 24px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s ease',
+    marginTop: '16px',
+  },
+  primaryButton: {
+    backgroundColor: 'var(--color-primary)',
+    color: 'white',
+  },
+  secondaryButton: {
+    backgroundColor: 'var(--color-surface-dark)',
+    color: 'var(--color-text)',
+  },
+  disabledButton: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  statusItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--color-border)',
+  },
+  statusLabel: {
+    fontSize: '13px',
+    color: 'var(--color-text-secondary)',
+  },
+  statusValue: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+  },
+  readyBadge: {
+    fontSize: '11px',
+    padding: '2px 8px',
+    borderRadius: '4px',
+    fontWeight: 'bold',
+  },
+  readyBadgeReady: {
+    backgroundColor: 'var(--color-success-light)',
+    color: 'var(--color-success)',
+  },
+  readyBadgeWaiting: {
+    backgroundColor: 'var(--color-warning-light)',
+    color: 'var(--color-warning)',
+  },
 };
 
-interface PlacementPreviewData {
-  shipDefinitionId: string;
-  shipName: string;
-  hullId: string;
-}
+// ==================== 舰船预设 ====================
+
+const SHIP_PRESETS = [
+  {
+    id: 'frigate',
+    name: '护卫舰',
+    description: '快速、灵活',
+    config: { hull: 80, armor: 60, shield: 60, flux: 80, speed: 60, turnRate: 40, size: 40 },
+  },
+  {
+    id: 'destroyer',
+    name: '驱逐舰',
+    description: '平衡型',
+    config: { hull: 100, armor: 100, shield: 100, flux: 100, speed: 50, turnRate: 30, size: 50 },
+  },
+  {
+    id: 'cruiser',
+    name: '巡洋舰',
+    description: '重装甲、强火力',
+    config: { hull: 150, armor: 150, shield: 120, flux: 120, speed: 40, turnRate: 20, size: 70 },
+  },
+];
+
+// ==================== Props ====================
 
 interface DeploymentPhaseViewProps {
-  onDeployShip?: (params: {
-    shipDefinitionId: string;
-    position: Point;
-    heading: number;
-    faction: FactionId;
-    ownerId: string;
-  }) => void;
-  onReadyToggle?: (faction: FactionId, ready: boolean) => void;
+  client: RoomClient<OperationMap> | null;
+  currentPlayerId: string;
+  onDeploymentComplete?: () => void;
 }
 
+// ==================== Component ====================
+
 export const DeploymentPhaseView: React.FC<DeploymentPhaseViewProps> = ({
-  onDeployShip,
-  onReadyToggle,
+  client,
+  currentPlayerId,
+  onDeploymentComplete,
 }) => {
-  const dispatch = useAppDispatch();
-  const phase = useAppSelector(selectGamePhase);
-  const deploymentReady = useAppSelector(selectDeploymentReady);
-  const selectedFaction = useAppSelector(selectSelectedFaction);
-  const currentPlayerId = useAppSelector(selectCurrentPlayerId);
+  const state = useRoomState(client);
+  const ops = useRoomOperations(client);
 
-  // 本地状态管理
-  const [placementMode, setPlacementMode] = useState(false);
-  const [placementPreview, setPlacementPreview] = useState<PlacementPreviewData | null>(null);
+  const [selectedShip, setSelectedShip] = useState<string | null>(null);
+  const [placementPosition, setPlacementPosition] = useState<Point | null>(null);
+  const [placementHeading, setPlacementHeading] = useState(0);
 
-  // 只在部署阶段显示
-  if (phase !== 'deployment') {
-    return null;
-  }
+  // 从状态中提取数据
+  const meta = state?.meta;
+  const players = state?.players || {};
+  const tokens = state?.game?.tokens || {};
+
+  // 当前玩家信息
+  const currentPlayer = currentPlayerId ? players[currentPlayerId] : null;
+  const faction = currentPlayer?.faction;
+  const isReady = currentPlayer?.isReady;
+
+  // 已部署的舰船
+  const deployedShips = Object.values(tokens).filter(
+    t => t.faction === faction && t.type === 'ship'
+  );
 
   // 处理舰船选择
-  const handleShipSelect = useCallback((ship: ShipDefinition) => {
-    setPlacementMode(true);
-    setPlacementPreview({
-      shipDefinitionId: ship.id,
-      shipName: ship.name,
-      hullId: ship.hullId,
-    });
+  const handleShipSelect = useCallback((shipId: string) => {
+    setSelectedShip(shipId);
   }, []);
 
-  // 处理放置确认
-  const handlePlacementConfirm = useCallback((position: Point, heading: number) => {
-    if (!placementPreview || !selectedFaction || !currentPlayerId) return;
+  // 处理部署
+  const handleDeploy = useCallback(async (position: Point, heading: number) => {
+    if (!ops || !selectedShip || !faction) return;
 
-    const params = {
-      shipDefinitionId: placementPreview.shipDefinitionId,
-      position,
-      heading,
-      faction: selectedFaction,
-      ownerId: currentPlayerId,
-    };
+    const ship = SHIP_PRESETS.find(s => s.id === selectedShip);
+    if (!ship) return;
 
-    if (onDeployShip) {
-      onDeployShip(params);
+    try {
+      const tokenId = `ship_${faction}_${Date.now()}`;
+      await ops.deployShip(tokenId, position, heading, ship.config);
+      setSelectedShip(null);
+    } catch (error) {
+      console.error('Failed to deploy ship:', error);
+      alert(error instanceof Error ? error.message : '部署失败');
     }
+  }, [ops, selectedShip, faction]);
 
-    // 清除放置预览
-    setPlacementPreview(null);
-    setPlacementMode(false);
-  }, [placementPreview, selectedFaction, currentPlayerId, onDeployShip]);
+  // 处理移除舰船
+  const handleRemoveShip = useCallback(async (tokenId: string) => {
+    if (!ops) return;
 
-  // 处理放置取消
-  const handlePlacementCancel = useCallback(() => {
-    setPlacementPreview(null);
-    setPlacementMode(false);
-  }, []);
-
-  // 处理就绪切换
-  const handleReadyToggle = useCallback(() => {
-    if (!selectedFaction) return;
-
-    const newReady = !deploymentReady[selectedFaction];
-    if (onReadyToggle) {
-      onReadyToggle(selectedFaction, newReady);
+    try {
+      await ops.removeShip(tokenId);
+    } catch (error) {
+      console.error('Failed to remove ship:', error);
+      alert(error instanceof Error ? error.message : '移除失败');
     }
-  }, [selectedFaction, deploymentReady, onReadyToggle]);
+  }, [ops]);
+
+  // 处理确认部署
+  const handleConfirmDeployment = useCallback(async () => {
+    if (!ops) return;
+
+    try {
+      await ops.confirmDeployment();
+      onDeploymentComplete?.();
+    } catch (error) {
+      console.error('Failed to confirm deployment:', error);
+      alert(error instanceof Error ? error.message : '确认失败');
+    }
+  }, [ops, onDeploymentComplete]);
+
+  // 检查是否可以确认
+  const canConfirm = faction && deployedShips.length > 0 && !isReady;
+
+  // 加载状态
+  if (!state) {
+    return <div>加载中...</div>;
+  }
 
   return (
     <div style={styles.container}>
-      {/* 左侧边栏 - 舰船选择 */}
+      {/* 左侧：舰船选择 */}
       <aside style={styles.sidebar}>
-        <div style={styles.title}>部署舰船</div>
-        <ShipSelector
-          faction={selectedFaction}
-          onSelect={handleShipSelect}
-        />
-        <FactionDeploymentPanel
-          faction={selectedFaction}
-          isReady={selectedFaction ? deploymentReady[selectedFaction] ?? false : false}
-          onReadyToggle={handleReadyToggle}
-        />
+        <div style={styles.title}>🚀 部署舰船</div>
+
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>选择舰船类型</div>
+          <div style={styles.shipList}>
+            {SHIP_PRESETS.map(ship => (
+              <div
+                key={ship.id}
+                style={{
+                  ...styles.shipCard,
+                  ...(selectedShip === ship.id ? styles.shipCardSelected : {}),
+                }}
+                onClick={() => handleShipSelect(ship.id)}
+              >
+                <div style={styles.shipName}>{ship.name}</div>
+                <div style={styles.shipStats}>
+                  {ship.description} | 船体: {ship.config.hull} | 装甲: {ship.config.armor}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 已部署舰船 */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>已部署 ({deployedShips.length}/3)</div>
+          <div style={styles.shipList}>
+            {deployedShips.map(ship => (
+              <div
+                key={ship.id}
+                style={styles.shipCard}
+              >
+                <div style={styles.shipName}>
+                  舰船 {ship.id.slice(-4)}
+                  <button
+                    style={{ float: 'right', color: 'var(--color-danger)' }}
+                    onClick={() => handleRemoveShip(ship.id)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={styles.shipStats}>
+                  船体: {ship.hull}/{ship.maxHull} | 装甲: {ship.maxArmor}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 确认按钮 */}
+        <div style={{ padding: '16px', marginTop: 'auto' }}>
+          <button
+            style={{
+              ...styles.button,
+              ...styles.primaryButton,
+              ...(!canConfirm ? styles.disabledButton : {}),
+            }}
+            onClick={handleConfirmDeployment}
+            disabled={!canConfirm}
+          >
+            {isReady ? '✓ 已确认' : '确认部署'}
+          </button>
+        </div>
       </aside>
 
-      {/* 主区域 - 地图 */}
+      {/* 中央：部署区域 */}
       <main style={styles.main}>
-        {/* 地图渲染区域 - 这里应该包含 GameCanvas */}
-        <div style={{ flex: 1, position: 'relative' }}>
-          {/* GameCanvas 组件应该在这里渲染 */}
-          {/* 这里是一个占位符 */}
-          <div style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--color-text-secondary)',
-          }}>
-            地图渲染区域
-          </div>
-
-          {/* 放置预览 */}
-          {placementMode && placementPreview && (
-            <ShipPlacementPreview
-              shipDefinitionId={placementPreview.shipDefinitionId}
-              onConfirm={handlePlacementConfirm}
-              onCancel={handlePlacementCancel}
-            />
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'var(--color-background)',
+        }}>
+          {selectedShip ? (
+            <div style={{ textAlign: 'center' as const }}>
+              <p>点击地图放置舰船</p>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                已选择: {SHIP_PRESETS.find(s => s.id === selectedShip)?.name}
+              </p>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center' as const }}>
+              <p>请从左侧选择舰船类型</p>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                每个阵营最多部署 3 艘舰船
+              </p>
+            </div>
           )}
         </div>
       </main>
 
-      {/* 右侧状态面板 */}
+      {/* 右侧：状态面板 */}
       <aside style={styles.statusPanel}>
-        <DeploymentStatusPanel
-          deploymentReady={deploymentReady}
-          selectedFaction={selectedFaction}
-        />
+        <div style={styles.sectionTitle}>📊 部署状态</div>
+
+        <div style={styles.statusItem}>
+          <span style={styles.statusLabel}>阵营</span>
+          <span style={styles.statusValue}>{faction || '未选择'}</span>
+        </div>
+
+        <div style={styles.statusItem}>
+          <span style={styles.statusLabel}>已部署</span>
+          <span style={styles.statusValue}>{deployedShips.length}/3</span>
+        </div>
+
+        <div style={styles.statusItem}>
+          <span style={styles.statusLabel}>状态</span>
+          <span style={{
+            ...styles.readyBadge,
+            ...(isReady ? styles.readyBadgeReady : styles.readyBadgeWaiting),
+          }}>
+            {isReady ? '已就绪' : '等待中'}
+          </span>
+        </div>
+
+        {/* 其他玩家状态 */}
+        <div style={{ marginTop: '24px' }}>
+          <div style={styles.sectionTitle}>👥 其他玩家</div>
+          {Object.values(players)
+            .filter(p => !p.isDM && p.id !== currentPlayerId)
+            .map(player => (
+              <div key={player.id} style={styles.statusItem}>
+                <span style={styles.statusLabel}>{player.name}</span>
+                <span style={{
+                  ...styles.readyBadge,
+                  ...(player.isReady ? styles.readyBadgeReady : styles.readyBadgeWaiting),
+                }}>
+                  {player.isReady ? '就绪' : '等待'}
+                </span>
+              </div>
+            ))}
+        </div>
       </aside>
-    </div>
-  );
-};
-
-// ==================== 部署状态面板 ====================
-
-interface DeploymentStatusPanelProps {
-  deploymentReady: Record<string, boolean>;
-  selectedFaction: FactionId | null;
-}
-
-const DeploymentStatusPanel: React.FC<DeploymentStatusPanelProps> = ({
-  deploymentReady,
-  selectedFaction,
-}) => {
-  const factions = Object.keys(deploymentReady);
-
-  return (
-    <div>
-      <h3 style={{ marginBottom: '16px' }}>部署状态</h3>
-
-      {/* 阵营就绪状态 */}
-      <div style={{ marginBottom: '16px' }}>
-        <h4 style={{ marginBottom: '8px', fontSize: '14px' }}>阵营就绪状态</h4>
-        {factions.map(faction => (
-          <div
-            key={faction}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px',
-              marginBottom: '4px',
-              backgroundColor: faction === selectedFaction
-                ? 'var(--color-primary-light)'
-                : 'var(--color-background)',
-              borderRadius: '4px',
-            }}
-          >
-            <span>{faction}</span>
-            <span style={{
-              color: deploymentReady[faction]
-                ? 'var(--color-success)'
-                : 'var(--color-warning)',
-            }}>
-              {deploymentReady[faction] ? '✓ 就绪' : '○ 未就绪'}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* 操作提示 */}
-      <div style={{
-        padding: '12px',
-        backgroundColor: 'var(--color-info-light)',
-        borderRadius: '4px',
-        fontSize: '13px',
-      }}>
-        <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>操作说明</p>
-        <ul style={{ margin: 0, paddingLeft: '16px' }}>
-          <li>从左侧选择要部署的舰船</li>
-          <li>在地图上点击放置位置</li>
-          <li>使用滚轮调整朝向</li>
-          <li>点击确认完成部署</li>
-        </ul>
-      </div>
     </div>
   );
 };

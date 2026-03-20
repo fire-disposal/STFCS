@@ -12,8 +12,8 @@ import {
 	Graphics,
 } from "pixi.js";
 import React, { useEffect, useRef } from "react";
-import { websocketService } from "@/services/websocket";
-import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { useRoomOperations } from "@/room";
+import type { RoomClient, OperationMap } from "@/room";
 import {
 	createLayers,
 	setupLayerOrder,
@@ -38,9 +38,19 @@ import {
 interface GameCanvasProps {
 	width?: number;
 	height?: number;
+	// 房间客户端
+	client: RoomClient<OperationMap> | null;
+	// GameView 传递的 props
+	tokens?: unknown[];
+	selectedTokenId?: string | null;
+	selectedTool?: "select" | "draw" | "measure" | "pan";
+	onToolSelect?: (tool: string) => void;
+	onZoomIn?: () => void;
+	onZoomOut?: () => void;
+	onResetZoom?: () => void;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = () => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ client }) => {
 	const dispatch = useAppDispatch();
 	const {
 		config: mapConfig,
@@ -53,6 +63,9 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
 	const currentPlayerName = useAppSelector((state) => state.ui.connection.playerName);
 	const { cursor } = useAppSelector((state) => state.interaction);
+
+	// 获取房间操作调用器
+	const ops = useRoomOperations(client);
 
 	// 相机 ref - 直接镜像 Redux 状态，用于高性能更新
 	const cameraRef = useRef<CameraState>({ ...camera });
@@ -137,15 +150,15 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				isDragging: true,
 			};
 
-			// 发送拖拽开始消息
+			// 通过房间框架发送拖拽开始事件
 			if (currentPlayerId && currentPlayerName) {
-				websocketService.sendTokenDragStart(
+				client?.emit('token.drag.start', {
 					tokenId,
-					currentPlayerId,
-					currentPlayerName,
-					token.position,
-					token.heading || 0
-				);
+					playerId: currentPlayerId,
+					playerName: currentPlayerName,
+					position: token.position,
+					heading: token.heading || 0,
+				});
 			}
 		},
 		onTokenDrag: (tokenId, newPosition) => {
@@ -158,22 +171,22 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				updates: { position: newPosition },
 			}));
 
-			// 发送拖拽中消息（限流：每 100ms 一次）
+			// 通过房间框架发送拖拽中事件（限流：每 100ms 一次）
 			if (currentPlayerId && currentPlayerName && draggingTokenRef.current?.isDragging) {
 				const now = Date.now();
 				if (!draggingTokenRef.current.lastDragTime || now - draggingTokenRef.current.lastDragTime > 100) {
 					draggingTokenRef.current.lastDragTime = now;
-					websocketService.sendTokenDragging(
+					client?.emit('token.drag.move', {
 						tokenId,
-						currentPlayerId,
-						currentPlayerName,
-						newPosition,
-						token.heading || 0
-					);
+						playerId: currentPlayerId,
+						playerName: currentPlayerName,
+						position: newPosition,
+						heading: token.heading || 0,
+					});
 				}
 			}
 		},
-		onTokenDragEnd: (tokenId, finalPosition, cancelled) => {
+		onTokenDragEnd: async (tokenId, finalPosition, cancelled) => {
 			if (!draggingTokenRef.current) return;
 
 			const token = tokensRef.current[tokenId];
@@ -181,24 +194,34 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 
 			const committed = !cancelled && draggingTokenRef.current.isDragging;
 
-			// 发送拖拽结束消息
-			if (currentPlayerId) {
-				websocketService.sendTokenDragEnd(
-					tokenId,
-					currentPlayerId,
-					finalPosition,
-					token.heading || 0,
-					committed
-				);
-			}
-
-			// 如果取消拖拽，恢复原始位置
-			if (cancelled) {
+			// 如果确认移动，通过房间操作调用 moveShip
+			if (committed && currentPlayerId) {
+				try {
+					await ops?.moveShip(tokenId, finalPosition, token.heading);
+				} catch (error) {
+					console.error('Failed to move ship:', error);
+					// 移动失败，恢复原始位置
+					dispatch(updateToken({
+						id: tokenId,
+						updates: { position: draggingTokenRef.current.originalPosition },
+					}));
+				}
+			} else if (cancelled) {
+				// 如果取消拖拽，恢复原始位置
 				dispatch(updateToken({
 					id: tokenId,
 					updates: { position: draggingTokenRef.current.originalPosition },
 				}));
 			}
+
+			// 发送拖拽结束事件
+			client?.emit('token.drag.end', {
+				tokenId,
+				playerId: currentPlayerId,
+				position: finalPosition,
+				heading: token.heading || 0,
+				committed,
+			});
 
 			draggingTokenRef.current = null;
 		},
@@ -355,7 +378,7 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 		}
 	};
 
-	// 发送相机更新到 Redux 和 WebSocket（节流，不阻塞本地操作）
+	// 发送相机更新到 Redux 和房间（节流，不阻塞本地操作）
 	const syncCamera = (immediate = false) => {
 		const now = Date.now();
 		const timeSinceLastSync = now - lastSyncTimeRef.current;
@@ -376,22 +399,19 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				dispatch(updateCamera({ centerX: cam.centerX, centerY: cam.centerY, zoom: cam.zoom }));
 			});
 
-			// 异步发送到服务器
-			if (websocketService.isConnected() && currentPlayerId) {
+			// 异步发送到房间
+			if (client && currentPlayerId) {
 				requestAnimationFrame(() => {
-					websocketService.send({
-						type: WS_MESSAGE_TYPES.CAMERA_UPDATED,
-						payload: {
-							playerId: currentPlayerId,
-							playerName: currentPlayerName,
-							centerX: cam.centerX,
-							centerY: cam.centerY,
-							zoom: cam.zoom,
-							rotation: cam.rotation,
-							minZoom: cam.minZoom,
-							maxZoom: cam.maxZoom,
-							timestamp: Date.now(),
-						},
+					client.emit('camera.updated', {
+						playerId: currentPlayerId,
+						playerName: currentPlayerName,
+						centerX: cam.centerX,
+						centerY: cam.centerY,
+						zoom: cam.zoom,
+						rotation: cam.rotation,
+						minZoom: cam.minZoom,
+						maxZoom: cam.maxZoom,
+						timestamp: Date.now(),
 					});
 				});
 			}

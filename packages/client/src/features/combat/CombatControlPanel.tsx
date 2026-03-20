@@ -1,79 +1,56 @@
 /**
- * 战斗控制面板组件
+ * 战斗控制面板
  *
- * 提供完整的战斗交互界面：
- * - 目标选择
- * - 武器选择
- * - 象限选择
- * - 攻击预览
- * - 攻击确认
+ * 使用新的房间框架：
+ * - useRoomState 订阅状态
+ * - useRoomOperations 调用操作
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useAppSelector, useAppDispatch } from '@/store';
-import { websocketService } from '@/services/websocket';
-import { WS_MESSAGE_TYPES } from '@vt/shared/ws';
-import type { DamageType, ArmorQuadrant } from '@vt/shared/config';
-import type { AttackPreviewResult, AttackResult } from '@vt/shared/protocol';
-import { CombatInteractionService, CombatPhase, CombatState, WeaponInfo, TargetInfo } from './CombatInteractionService';
-import {
-  Target,
-  Crosshair,
-  Shield,
-  Sword,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  ChevronRight,
-  Zap,
-} from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Target, Crosshair, Shield, Sword, Zap, AlertTriangle } from 'lucide-react';
+import { useRoomState, useRoomOperations } from '@/room';
+import type { RoomClient } from '@/room';
+import type { OperationMap } from '@vt/shared/room';
+import type { ArmorQuadrant, FactionId } from '@vt/shared/types';
+import type { TokenState } from '@vt/shared/room';
 
-// 样式
+// ==================== 样式 ====================
+
 const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '8px',
-    padding: '8px',
-    backgroundColor: 'rgba(15, 18, 25, 0.8)',
-    borderRadius: '6px',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
+    padding: '12px',
+    backgroundColor: 'var(--color-surface)',
+    borderRadius: '8px',
+    border: '1px solid var(--color-border)',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '4px',
+    marginBottom: '8px',
   },
   title: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 'bold',
-    color: 'rgba(239, 68, 68, 1)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    color: 'var(--color-danger)',
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-  },
-  phaseIndicator: {
-    fontSize: '10px',
-    padding: '2px 8px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    color: 'rgba(239, 68, 68, 1)',
+    gap: '6px',
   },
   section: {
-    padding: '8px',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: '4px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: '12px',
+    backgroundColor: 'var(--color-background)',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
   },
   sectionTitle: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: '6px',
+    color: 'var(--color-text-secondary)',
+    marginBottom: '8px',
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
@@ -82,573 +59,398 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '4px',
-    maxHeight: '120px',
+    maxHeight: '150px',
     overflowY: 'auto' as const,
   },
   listItem: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '6px 8px',
+    padding: '8px 12px',
     borderRadius: '4px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    border: '1px solid transparent',
+    border: '2px solid transparent',
+    backgroundColor: 'var(--color-surface)',
   },
-  listItemHover: {
-    backgroundColor: 'rgba(74, 158, 255, 0.1)',
-    borderColor: 'rgba(74, 158, 255, 0.3)',
-  },
-  listItemActive: {
-    backgroundColor: 'rgba(74, 158, 255, 0.2)',
-    borderColor: 'rgba(74, 158, 255, 0.5)',
+  listItemSelected: {
+    borderColor: 'var(--color-primary)',
+    backgroundColor: 'var(--color-primary-light)',
   },
   listItemDisabled: {
-    opacity: 0.4,
+    opacity: 0.5,
     cursor: 'not-allowed',
   },
   itemName: {
-    fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  itemInfo: {
-    fontSize: '10px',
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  preview: {
-    padding: '8px',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    borderRadius: '4px',
-    border: '1px solid rgba(74, 158, 255, 0.2)',
-  },
-  previewRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '4px 0',
-    fontSize: '11px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-  },
-  previewLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  previewValue: {
+    fontSize: '13px',
     fontWeight: 'bold',
   },
-  damageBar: {
-    display: 'flex',
-    height: '16px',
-    borderRadius: '4px',
-    overflow: 'hidden',
-    marginTop: '8px',
-  },
-  damageSegment: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '9px',
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  buttons: {
-    display: 'flex',
-    gap: '6px',
-    marginTop: '8px',
+  itemStats: {
+    fontSize: '11px',
+    color: 'var(--color-text-secondary)',
   },
   button: {
-    flex: 1,
+    padding: '10px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '4px',
-    padding: '8px 12px',
-    borderRadius: '4px',
-    border: '1px solid rgba(74, 158, 255, 0.3)',
-    backgroundColor: 'rgba(74, 158, 255, 0.1)',
-    color: 'rgba(74, 158, 255, 1)',
-    fontSize: '11px',
-    fontWeight: 'medium',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    gap: '6px',
   },
-  buttonPrimary: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-    color: 'rgba(239, 68, 68, 1)',
+  primaryButton: {
+    backgroundColor: 'var(--color-danger)',
+    color: 'white',
   },
-  buttonSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    color: 'rgba(34, 197, 94, 1)',
+  secondaryButton: {
+    backgroundColor: 'var(--color-surface-dark)',
+    color: 'var(--color-text)',
   },
-  buttonDisabled: {
-    opacity: 0.4,
+  disabledButton: {
+    opacity: 0.5,
     cursor: 'not-allowed',
-  },
-  error: {
-    padding: '8px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: '4px',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: 'rgba(239, 68, 68, 1)',
-    fontSize: '11px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  empty: {
-    padding: '16px',
-    textAlign: 'center' as const,
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: '11px',
   },
   quadrantGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateRows: 'repeat(2, 1fr)',
     gap: '4px',
-    marginTop: '4px',
+    width: '100%',
+    aspectRatio: '3/2',
   },
   quadrantButton: {
-    padding: '8px 4px',
+    padding: '8px',
     borderRadius: '4px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: '9px',
-    textAlign: 'center' as const,
+    border: '2px solid var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
     cursor: 'pointer',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    textAlign: 'center' as const,
     transition: 'all 0.15s ease',
   },
-  quadrantButtonActive: {
-    backgroundColor: 'rgba(74, 158, 255, 0.2)',
-    borderColor: 'rgba(74, 158, 255, 0.5)',
-    color: 'rgba(74, 158, 255, 1)',
+  quadrantButtonSelected: {
+    borderColor: 'var(--color-primary)',
+    backgroundColor: 'var(--color-primary-light)',
+  },
+  statusText: {
+    fontSize: '12px',
+    color: 'var(--color-text-secondary)',
+    textAlign: 'center' as const,
+    padding: '8px',
+  },
+  warningText: {
+    color: 'var(--color-warning)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
   },
 };
 
-// 伤害类型颜色
-const damageTypeColors: Record<DamageType, string> = {
-  KINETIC: '#4a90d9',
-  HIGH_EXPLOSIVE: '#e74c3c',
-  FRAGMENTATION: '#95a5a6',
-  ENERGY: '#f39c12',
-};
+// ==================== 武器配置 ====================
 
-// 阶段名称
-const phaseNames: Record<CombatPhase, string> = {
-  idle: '空闲',
-  select_target: '选择目标',
-  select_weapon: '选择武器',
-  select_quadrant: '选择象限',
-  preview: '预览攻击',
-  confirm: '确认攻击',
-  executing: '执行中',
-};
+const WEAPONS = [
+  { id: 'auto_cannon', name: '自动炮', damage: 20, range: 500, fluxCost: 10 },
+  { id: 'pulse_laser', name: '脉冲激光', damage: 30, range: 600, fluxCost: 20 },
+  { id: 'harpoon', name: '鱼叉导弹', damage: 50, range: 800, fluxCost: 30 },
+];
 
-// 象限名称
-const quadrantNames: Record<ArmorQuadrant, string> = {
-  FRONT_TOP: '前上',
-  FRONT_BOTTOM: '前下',
-  RIGHT_TOP: '右上',
-  RIGHT_BOTTOM: '右下',
-  LEFT_TOP: '左上',
-  LEFT_BOTTOM: '左下',
-};
+// ==================== 象限配置 ====================
+
+const QUADRANTS: { id: ArmorQuadrant; name: string }[] = [
+  { id: 'LEFT_TOP', name: '左上' },
+  { id: 'FRONT_TOP', name: '前上' },
+  { id: 'RIGHT_TOP', name: '右上' },
+  { id: 'LEFT_BOTTOM', name: '左下' },
+  { id: 'FRONT_BOTTOM', name: '前下' },
+  { id: 'RIGHT_BOTTOM', name: '右下' },
+];
+
+// ==================== Props ====================
 
 interface CombatControlPanelProps {
-  shipId: string;
-  availableWeapons: WeaponInfo[];
-  nearbyTargets: TargetInfo[];
-  disabled?: boolean;
-  onAttackComplete?: (result: AttackResult) => void;
+  client: RoomClient<OperationMap> | null;
+  currentPlayerId: string;
+  selectedShipId?: string;
 }
 
+// ==================== Component ====================
+
 export const CombatControlPanel: React.FC<CombatControlPanelProps> = ({
-  shipId,
-  availableWeapons,
-  nearbyTargets,
-  disabled = false,
-  onAttackComplete,
+  client,
+  currentPlayerId,
+  selectedShipId,
 }) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const state = useRoomState(client);
+  const ops = useRoomOperations(client);
 
-  const [combatService] = useState(() => new CombatInteractionService({
-    attackerId: shipId,
-    onStateChange: (state) => setCombatState(state),
-    onAttackComplete: (result) => {
-      onAttackComplete?.(result);
-    },
-    onError: (error) => setError(error),
-  }));
+  // 从状态中提取数据
+  const tokens = state?.game?.tokens || {};
+  const selectedTargets = state?.game?.selectedTargets[currentPlayerId] || [];
+  const selectedWeapon = state?.game?.selectedWeapons[currentPlayerId];
+  const selectedQuadrant = state?.game?.selectedQuadrants[currentPlayerId];
 
-  const [combatState, setCombatState] = useState<CombatState>(combatService.getState());
-  const [error, setError] = useState<string | null>(null);
+  // 当前玩家信息
+  const currentPlayer = state?.players[currentPlayerId];
+  const playerFaction = currentPlayer?.faction;
+  const isDM = currentPlayer?.isDM;
 
-  // 清除错误
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
+  // 选中的舰船
+  const selectedShip = selectedShipId ? tokens[selectedShipId] : null;
+
+  // 可攻击的目标（敌方舰船）
+  const availableTargets = useMemo(() => {
+    return Object.values(tokens).filter(token => {
+      if (token.type !== 'ship') return false;
+      if (isDM) return true; // DM 可以攻击任何目标
+      return token.faction !== playerFaction;
+    });
+  }, [tokens, playerFaction, isDM]);
+
+  // 处理目标选择
+  const handleSelectTarget = useCallback(async (targetId: string) => {
+    if (!ops) return;
+
+    try {
+      if (selectedTargets.includes(targetId)) {
+        await ops.clearTarget(targetId);
+      } else {
+        await ops.selectTarget(targetId);
+      }
+    } catch (error) {
+      console.error('Failed to select target:', error);
     }
-  }, [error]);
+  }, [ops, selectedTargets]);
 
-  // 开始攻击
-  const handleStartAttack = useCallback(() => {
-    if (disabled) return;
-    setError(null);
-    combatService.startAttack();
-  }, [disabled, combatService]);
+  // 处理武器选择
+  const handleSelectWeapon = useCallback(async (weaponId: string) => {
+    if (!ops) return;
 
-  // 取消攻击
-  const handleCancelAttack = useCallback(() => {
-    combatService.cancelAttack();
-    setError(null);
-  }, [combatService]);
+    try {
+      if (selectedWeapon === weaponId) {
+        await ops.clearWeapon();
+      } else {
+        await ops.selectWeapon(weaponId);
+      }
+    } catch (error) {
+      console.error('Failed to select weapon:', error);
+    }
+  }, [ops, selectedWeapon]);
 
-  // 选择目标
-  const handleSelectTarget = useCallback((targetId: string) => {
-    combatService.selectTarget(targetId).catch((err) => {
-      setError(err.message);
-    });
-  }, [combatService]);
+  // 处理象限选择
+  const handleSelectQuadrant = useCallback(async (quadrant: ArmorQuadrant) => {
+    if (!ops) return;
 
-  // 选择武器
-  const handleSelectWeapon = useCallback((weaponInstanceId: string) => {
-    combatService.selectWeapon(weaponInstanceId).catch((err) => {
-      setError(err.message);
-    });
-  }, [combatService]);
+    try {
+      if (selectedQuadrant === quadrant) {
+        await ops.clearQuadrant();
+      } else {
+        await ops.selectQuadrant(quadrant);
+      }
+    } catch (error) {
+      console.error('Failed to select quadrant:', error);
+    }
+  }, [ops, selectedQuadrant]);
 
-  // 选择象限
-  const handleSelectQuadrant = useCallback((quadrant: ArmorQuadrant) => {
-    combatService.selectQuadrant(quadrant).catch((err) => {
-      setError(err.message);
-    });
-  }, [combatService]);
+  // 处理攻击
+  const handleAttack = useCallback(async () => {
+    if (!ops || !selectedShipId || selectedTargets.length === 0 || !selectedWeapon || !selectedQuadrant) {
+      return;
+    }
 
-  // 确认攻击
-  const handleConfirmAttack = useCallback(() => {
-    combatService.confirmAttack().catch((err) => {
-      setError(err.message);
-    });
-  }, [combatService]);
+    try {
+      const result = await ops.attack(
+        selectedShipId,
+        selectedTargets[0],
+        selectedWeapon,
+        selectedQuadrant
+      );
 
-  // 快速攻击
-  const handleQuickAttack = useCallback((targetId: string, weaponInstanceId: string) => {
-    combatService.quickAttack(targetId, weaponInstanceId).catch((err) => {
-      setError(err.message);
-    });
-  }, [combatService]);
+      // 清除选择
+      await ops.clearTarget();
+      await ops.clearWeapon();
+      await ops.clearQuadrant();
 
-  // 渲染阶段指示器
-  const renderPhaseIndicator = () => (
-    <div style={styles.header}>
-      <span style={styles.title}>
-        <Sword size={12} />
-        战斗控制
-      </span>
-      <span style={styles.phaseIndicator}>
-        {phaseNames[combatState.phase]}
-      </span>
-    </div>
-  );
+      if (result.destroyed) {
+        alert('目标已被摧毁！');
+      }
+    } catch (error) {
+      console.error('Failed to attack:', error);
+      alert(error instanceof Error ? error.message : '攻击失败');
+    }
+  }, [ops, selectedShipId, selectedTargets, selectedWeapon, selectedQuadrant]);
 
-  // 渲染目标选择
-  const renderTargetSelection = () => {
-    if (combatState.phase !== 'select_target') return null;
+  // 检查是否可以攻击
+  const canAttack = selectedShip && 
+    !selectedShip.hasActed && 
+    !selectedShip.isOverloaded &&
+    selectedTargets.length > 0 && 
+    selectedWeapon && 
+    selectedQuadrant;
 
-    return (
+  // 加载状态
+  if (!state) {
+    return <div style={styles.container}>加载中...</div>;
+  }
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <div style={styles.title}>
+          <Sword size={16} />
+          战斗控制
+        </div>
+      </div>
+
+      {/* 当前舰船状态 */}
+      {selectedShip && (
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>当前舰船</div>
+          <div style={styles.listItem}>
+            <div>
+              <div style={styles.itemName}>舰船 {selectedShip.id.slice(-4)}</div>
+              <div style={styles.itemStats}>
+                船体: {selectedShip.hull}/{selectedShip.maxHull} | 
+                辐能: {selectedShip.flux}/{selectedShip.maxFlux}
+              </div>
+            </div>
+            {selectedShip.isOverloaded && (
+              <span style={styles.warningText}>
+                <AlertTriangle size={14} />
+                过载
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 目标选择 */}
       <div style={styles.section}>
         <div style={styles.sectionTitle}>
-          <Target size={12} />
+          <Target size={14} />
           选择目标
         </div>
-        {nearbyTargets.length === 0 ? (
-          <div style={styles.empty}>附近没有可攻击的目标</div>
+        {availableTargets.length === 0 ? (
+          <div style={styles.statusText}>没有可攻击的目标</div>
         ) : (
           <div style={styles.list}>
-            {nearbyTargets.map((target) => (
+            {availableTargets.map(target => (
               <div
                 key={target.id}
                 style={{
                   ...styles.listItem,
-                  ...(combatState.targetId === target.id ? styles.listItemActive : {}),
+                  ...(selectedTargets.includes(target.id) ? styles.listItemSelected : {}),
                 }}
                 onClick={() => handleSelectTarget(target.id)}
               >
                 <div>
-                  <div style={styles.itemName}>{target.name}</div>
-                  <div style={styles.itemInfo}>
-                    {target.hullSize} · {target.distance.toFixed(0)}m
+                  <div style={styles.itemName}>舰船 {target.id.slice(-4)}</div>
+                  <div style={styles.itemStats}>
+                    船体: {target.hull}/{target.maxHull}
                   </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {target.shieldActive && <Shield size={12} style={{ color: '#4a9eff' }} />}
-                  <span style={{ fontSize: '10px', color: target.isEnemy ? '#ef4444' : '#22c55e' }}>
-                    {target.isEnemy ? '敌方' : '友方'}
-                  </span>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-    );
-  };
 
-  // 渲染武器选择
-  const renderWeaponSelection = () => {
-    if (combatState.phase !== 'select_weapon') return null;
-
-    const readyWeapons = availableWeapons.filter(w => w.canFire);
-
-    return (
+      {/* 武器选择 */}
       <div style={styles.section}>
         <div style={styles.sectionTitle}>
-          <Crosshair size={12} />
+          <Crosshair size={14} />
           选择武器
         </div>
-        {readyWeapons.length === 0 ? (
-          <div style={styles.empty}>没有可用的武器</div>
-        ) : (
-          <div style={styles.list}>
-            {readyWeapons.map((weapon) => (
-              <div
-                key={weapon.instanceId}
-                style={{
-                  ...styles.listItem,
-                  ...(combatState.weaponInstanceId === weapon.instanceId ? styles.listItemActive : {}),
-                }}
-                onClick={() => handleSelectWeapon(weapon.instanceId)}
-              >
-                <div>
-                  <div style={styles.itemName}>{weapon.name}</div>
-                  <div style={styles.itemInfo}>
-                    {weapon.damageType} · {weapon.baseDamage} dmg · {weapon.range}m
-                  </div>
-                </div>
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: damageTypeColors[weapon.damageType],
-                }} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // 渲染象限选择
-  const renderQuadrantSelection = () => {
-    if (combatState.phase !== 'select_quadrant') return null;
-
-    const quadrants: ArmorQuadrant[] = [
-      'LEFT_TOP', 'FRONT_TOP', 'RIGHT_TOP',
-      'LEFT_BOTTOM', 'FRONT_BOTTOM', 'RIGHT_BOTTOM',
-    ];
-
-    return (
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>
-          <Target size={12} />
-          选择攻击象限
-        </div>
-        <div style={styles.quadrantGrid}>
-          {quadrants.map((quadrant) => (
+        <div style={styles.list}>
+          {WEAPONS.map(weapon => (
             <div
-              key={quadrant}
+              key={weapon.id}
               style={{
-                ...styles.quadrantButton,
-                ...(combatState.targetQuadrant === quadrant ? styles.quadrantButtonActive : {}),
+                ...styles.listItem,
+                ...(selectedWeapon === weapon.id ? styles.listItemSelected : {}),
               }}
-              onClick={() => handleSelectQuadrant(quadrant)}
+              onClick={() => handleSelectWeapon(weapon.id)}
             >
-              {quadrantNames[quadrant]}
+              <div>
+                <div style={styles.itemName}>{weapon.name}</div>
+                <div style={styles.itemStats}>
+                  伤害: {weapon.damage} | 射程: {weapon.range} | 辐能: {weapon.fluxCost}
+                </div>
+              </div>
             </div>
           ))}
         </div>
       </div>
-    );
-  };
 
-  // 渲染攻击预览
-  const renderAttackPreview = () => {
-    if (combatState.phase !== 'confirm' && combatState.phase !== 'preview') return null;
-    if (!combatState.preview) return null;
-
-    const preview = combatState.preview;
-    const canAttack = preview.canAttack && preview.preview;
-
-    return (
+      {/* 象限选择 */}
       <div style={styles.section}>
         <div style={styles.sectionTitle}>
-          {canAttack ? <CheckCircle size={12} style={{ color: '#22c55e' }} /> : <XCircle size={12} style={{ color: '#ef4444' }} />}
-          攻击预览
+          <Shield size={14} />
+          攻击象限
         </div>
-
-        {!canAttack && preview.blockReason && (
-          <div style={{ ...styles.error, marginBottom: '8px' }}>
-            <AlertTriangle size={12} />
-            无法攻击: {preview.blockReason}
-          </div>
-        )}
-
-        {canAttack && preview.preview && (
-          <>
-            {/* 伤害分布条 */}
-            <div style={styles.damageBar}>
-              {preview.preview.estimatedShieldAbsorb > 0 && (
-                <div
-                  style={{
-                    ...styles.damageSegment,
-                    backgroundColor: '#3498db',
-                    width: `${(preview.preview.estimatedShieldAbsorb / preview.preview.baseDamage) * 100}%`,
-                  }}
-                >
-                  护盾
-                </div>
-              )}
-              {preview.preview.estimatedArmorReduction > 0 && (
-                <div
-                  style={{
-                    ...styles.damageSegment,
-                    backgroundColor: '#e67e22',
-                    width: `${(preview.preview.estimatedArmorReduction / preview.preview.baseDamage) * 100}%`,
-                  }}
-                >
-                  护甲
-                </div>
-              )}
-              {preview.preview.estimatedHullDamage > 0 && (
-                <div
-                  style={{
-                    ...styles.damageSegment,
-                    backgroundColor: '#e74c3c',
-                    width: `${(preview.preview.estimatedHullDamage / preview.preview.baseDamage) * 100}%`,
-                  }}
-                >
-                  船体
-                </div>
-              )}
+        <div style={styles.quadrantGrid}>
+          {QUADRANTS.map(quadrant => (
+            <div
+              key={quadrant.id}
+              style={{
+                ...styles.quadrantButton,
+                ...(selectedQuadrant === quadrant.id ? styles.quadrantButtonSelected : {}),
+              }}
+              onClick={() => handleSelectQuadrant(quadrant.id)}
+            >
+              {quadrant.name}
             </div>
-
-            {/* 详细信息 */}
-            <div style={styles.preview}>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>基础伤害</span>
-                <span style={styles.previewValue}>{preview.preview.baseDamage}</span>
-              </div>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>护盾吸收</span>
-                <span style={{ ...styles.previewValue, color: '#3498db' }}>
-                  {Math.round(preview.preview.estimatedShieldAbsorb)}
-                </span>
-              </div>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>护甲减免</span>
-                <span style={{ ...styles.previewValue, color: '#e67e22' }}>
-                  {Math.round(preview.preview.estimatedArmorReduction)}
-                </span>
-              </div>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>船体伤害</span>
-                <span style={{ ...styles.previewValue, color: '#e74c3c' }}>
-                  {Math.round(preview.preview.estimatedHullDamage)}
-                </span>
-              </div>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>命中象限</span>
-                <span style={styles.previewValue}>
-                  {quadrantNames[preview.preview.hitQuadrant]}
-                </span>
-              </div>
-              <div style={styles.previewRow}>
-                <span style={styles.previewLabel}>辐能消耗</span>
-                <span style={{ ...styles.previewValue, color: '#f39c12' }}>
-                  <Zap size={10} style={{ marginRight: '2px' }} />
-                  {preview.preview.fluxCost}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
+          ))}
+        </div>
       </div>
-    );
-  };
 
-  // 渲染错误信息
-  const renderError = () => {
-    if (!error) return null;
+      {/* 攻击按钮 */}
+      <button
+        style={{
+          ...styles.button,
+          ...styles.primaryButton,
+          ...(!canAttack ? styles.disabledButton : {}),
+        }}
+        onClick={handleAttack}
+        disabled={!canAttack}
+      >
+        <Zap size={16} />
+        发动攻击
+      </button>
 
-    return (
-      <div style={styles.error}>
-        <AlertTriangle size={12} />
-        {error}
-      </div>
-    );
-  };
-
-  // 渲染按钮
-  const renderButtons = () => {
-    if (combatState.phase === 'idle') {
-      return (
-        <div style={styles.buttons}>
+      {/* 其他操作 */}
+      {selectedShip && (
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            style={{ ...styles.button, ...styles.buttonPrimary }}
-            onClick={handleStartAttack}
-            disabled={disabled}
+            style={{
+              ...styles.button,
+              ...styles.secondaryButton,
+              flex: 1,
+            }}
+            onClick={() => ops?.toggleShield(selectedShipId!)}
+            disabled={selectedShip.isOverloaded}
           >
-            <Sword size={12} />
-            开始攻击
+            <Shield size={14} />
+            {selectedShip.isShieldOn ? '关闭护盾' : '开启护盾'}
+          </button>
+          <button
+            style={{
+              ...styles.button,
+              ...styles.secondaryButton,
+              flex: 1,
+            }}
+            onClick={() => ops?.ventFlux(selectedShipId!)}
+            disabled={selectedShip.hasActed}
+          >
+            <Zap size={14} />
+            散热
           </button>
         </div>
-      );
-    }
-
-    if (combatState.phase === 'confirm' && combatState.preview?.canAttack) {
-      return (
-        <div style={styles.buttons}>
-          <button
-            style={styles.button}
-            onClick={handleCancelAttack}
-          >
-            取消
-          </button>
-          <button
-            style={{ ...styles.button, ...styles.buttonSuccess }}
-            onClick={handleConfirmAttack}
-            disabled={combatState.isAttacking}
-          >
-            {combatState.isAttacking ? '攻击中...' : '确认攻击'}
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <div style={styles.buttons}>
-        <button
-          style={styles.button}
-          onClick={handleCancelAttack}
-        >
-          取消攻击
-        </button>
-      </div>
-    );
-  };
-
-  return (
-    <div style={styles.container}>
-      {renderPhaseIndicator()}
-      {renderTargetSelection()}
-      {renderWeaponSelection()}
-      {renderQuadrantSelection()}
-      {renderAttackPreview()}
-      {renderError()}
-      {renderButtons()}
+      )}
     </div>
   );
 };

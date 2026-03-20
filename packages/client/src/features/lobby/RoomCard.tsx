@@ -129,11 +129,13 @@ const styles = {
 };
 
 // 房间状态映射
-const ROOM_STATUS = {
-  waiting: { label: '等待中', style: styles.statusWaiting },
+const ROOM_STATUS: Record<string, { label: string; style: React.CSSProperties }> = {
+  lobby: { label: '等待中', style: styles.statusWaiting },
+  deployment: { label: '部署中', style: styles.statusWaiting },
   playing: { label: '游戏中', style: styles.statusPlaying },
+  paused: { label: '已暂停', style: styles.statusWaiting },
   ended: { label: '已结束', style: styles.statusEnded },
-} as const;
+};
 
 interface RoomCardProps {
   room: RoomInfo;
@@ -153,7 +155,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   const [password, setPassword] = useState('');
 
   // 是否可以加入
-  const canJoin = room.phase === 'waiting' && room.playerCount < room.maxPlayers;
+  const canJoin = room.phase === 'lobby' && room.playerCount < room.maxPlayers;
 
   // 处理点击
   const handleClick = () => {
@@ -174,7 +176,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   };
 
   // 获取状态样式
-  const statusConfig = ROOM_STATUS[room.phase] || ROOM_STATUS.waiting;
+  const statusConfig = ROOM_STATUS[room.phase] || ROOM_STATUS.lobby;
 
   return (
     <>
@@ -203,9 +205,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           <div style={styles.info}>
             <div style={styles.infoItem}>
               👥 {room.playerCount}/{room.maxPlayers}
-            </div>
-            <div style={styles.infoItem}>
-              🎮 {room.hasDM ? '有DM' : '缺DM'}
             </div>
             {room.isPrivate && (
               <div style={styles.infoItem}>

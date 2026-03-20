@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { RulerZoomIndicator } from "@/features/ui/RulerZoomIndicator";
 import { FactionTurnIndicator } from "@/features/ui/FactionTurnIndicator";
 import { useAppSelector } from "@/store";
+import type { RoomClient, OperationMap } from "@/room";
 
 interface TopBarMenuProps {
 	onDisconnect?: () => void;
@@ -22,6 +23,15 @@ interface TopBarMenuProps {
 	onZoomIn?: () => void;
 	onZoomOut?: () => void;
 	onReset?: () => void;
+	// GameView 传递的 props
+	roomName?: string;
+	phase?: string;
+	round?: number;
+	turnPhase?: string;
+	isDM?: boolean;
+	onLeaveRoom?: () => Promise<void>;
+	// RoomClient
+	client?: RoomClient<OperationMap> | null;
 }
 
 export const TopBarMenu: React.FC<TopBarMenuProps> = ({
@@ -34,6 +44,8 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 	onZoomIn,
 	onZoomOut,
 	onReset,
+	// RoomClient
+	client,
 }) => {
 	const { t, i18n } = useTranslation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -84,7 +96,7 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 			{/* 中央：阵营回合指示器 + 表尺缩放指示器 */}
 			<div className="top-bar-center">
 				{/* 阵营回合指示器 */}
-				{isFactionTurnInitialized && <FactionTurnIndicator />}
+				{isFactionTurnInitialized && <FactionTurnIndicator client={client ?? null} />}
 
 				{/* 表尺缩放指示器 */}
 				{onZoomIn && onZoomOut && onReset && (
