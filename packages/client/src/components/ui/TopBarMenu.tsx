@@ -1,6 +1,7 @@
 /**
  * 顶栏菜单组件
  * 保持现有不透明风格，缩放指示器移至中央并改为表尺风格
+ * 集成阵营回合指示器
  */
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -8,6 +9,8 @@ import { Globe, LogOut, Menu, RotateCcw, Settings, User, Volume2, VolumeX } from
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RulerZoomIndicator } from "@/features/ui/RulerZoomIndicator";
+import { FactionTurnIndicator } from "@/features/ui/FactionTurnIndicator";
+import { useAppSelector } from "@/store";
 
 interface TopBarMenuProps {
 	onDisconnect?: () => void;
@@ -41,6 +44,11 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 		return saved === "inverted";
 	});
 
+	// 获取阵营回合初始化状态
+	const isFactionTurnInitialized = useAppSelector(
+		(state) => state.factionTurn?.isInitialized ?? false
+	);
+
 	const changeLanguage = (lng: string) => {
 		i18n.changeLanguage(lng);
 		document.documentElement.lang = lng;
@@ -73,8 +81,12 @@ export const TopBarMenu: React.FC<TopBarMenuProps> = ({
 				<span className="game-title">STFCS</span>
 			</div>
 
-			{/* 中央：表尺缩放指示器 */}
+			{/* 中央：阵营回合指示器 + 表尺缩放指示器 */}
 			<div className="top-bar-center">
+				{/* 阵营回合指示器 */}
+				{isFactionTurnInitialized && <FactionTurnIndicator />}
+
+				{/* 表尺缩放指示器 */}
 				{onZoomIn && onZoomOut && onReset && (
 					<RulerZoomIndicator
 						zoom={zoom}

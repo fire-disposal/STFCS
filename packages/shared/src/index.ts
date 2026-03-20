@@ -7,6 +7,58 @@
 // 导出常量和配置
 export * from './constants/index.js';
 
+// 导出数据驱动配置模块（排除与协议冲突的导出）
+export {
+  // schemas
+  DamageTypeSchema,
+  WeaponCategorySchema,
+  MountTypeSchema,
+  ShieldTypeSchema,
+  HullSizeSchema,
+  ArmorQuadrantConfigSchema,
+  WeaponDefinitionSchema,
+  ShieldConfigSchema,
+  FluxConfigSchema,
+  ArmorConfigSchema,
+  HullDefinitionSchema,
+  ShipDefinitionSchema,
+  AssetManifestSchema,
+  // types
+  type DamageModifiers,
+  type WeaponSlotSize,
+  type CreateShipInstanceParams,
+  type ShipInstanceState,
+  type IConfigLoader,
+  type ConfigValidationResult,
+  type ConfigValidationError,
+  type AssetRef,
+  DAMAGE_MODIFIERS,
+  WEAPON_SIZE_COMPATIBILITY,
+  DEFAULT_SHIP_STATS,
+  DEFAULT_WEAPON_STATS,
+  DEFAULT_FLUX_STATS,
+  // validation
+  validateWeaponDefinition,
+  validateHullDefinition,
+  validateShipDefinition,
+} from './config/index.js';
+
+// 导出配置类型
+export type {
+  DamageType,
+  WeaponCategory,
+  MountType,
+  ShieldType,
+  HullSize,
+  WeaponDefinition,
+  HullDefinition,
+  ShipDefinition,
+  ShieldConfig,
+  FluxConfig,
+  ArmorConfig,
+  AssetManifest,
+} from './config/schemas.js';
+
 // 导出 Zod schemas
 export * from './schemas/index.js';
 
@@ -50,11 +102,18 @@ export type {
   PlayerCamera,
   CameraUpdateCommand,
   CameraConfig,
-  // 回合系统
-  TurnPhase,
-  TurnUnit,
-  TurnOrder,
-  TurnState,
+  // 阵营系统
+  FactionId,
+  FactionDefinition,
+  PlayerFactionInfo,
+  FactionTurnPhase,
+  TurnHistoryEntry,
+  FactionTurnState,
+  FactionTurnInitParams,
+  // 房间系统
+  RoomPhase,
+  RoomInfo,
+  RoomState,
 } from './types/index.js';
 
 // 导出结果类型工具函数
@@ -108,12 +167,14 @@ export {
   type TokenDragStartMessage,
   type TokenDraggingMessage,
   type TokenDragEndMessage,
-  // 回合系统
-  type TurnOrderInitializedMessage,
-  type TurnOrderUpdatedMessage,
-  type TurnIndexChangedMessage,
-  type UnitStateChangedMessage,
-  type RoundIncrementedMessage,
+  // 阵营回合系统
+  type FactionSelectedMessage,
+  type FactionTurnStartMessage,
+  type FactionTurnEndMessage,
+  type PlayerEndTurnMessage,
+  type PlayerCancelEndTurnMessage,
+  type RoundStartMessage,
+  type FactionOrderDeterminedMessage,
   // 请求 - 响应
   type RequestMessage,
   type ResponseMessage,

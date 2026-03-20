@@ -7,6 +7,7 @@
     "title": "Join STFCS Game",
     "description": "Enter your player name to join the tactical space fleet combat simulation.",
     "playerName": "Player Name",
+    "roomSelection": "Room Selection",
     "unableToConnect": "Unable to connect to server",
     "connectionStatusText": "Unable to connect to {{url}}. Please check if the server is running.",
     "formHelp": "Maximum 32 characters. Must be unique in the room.",
@@ -19,6 +20,7 @@
     "error": {
       "nameRequired": "Please enter your player name",
       "nameTooLong": "Player name must be 32 characters or less",
+      "roomRequired": "Please select or create a room",
       "failedToJoin": "Failed to join: {{error}}",
       "failedToReconnect": "Failed to reconnect: {{error}}"
     }
@@ -28,7 +30,7 @@
     "autoConnect": "Auto-connected to: {{url}}",
     "serverRunning": "Server running on localhost:3001",
     "uniqueName": "Player names must be unique in each room",
-    "changeRooms": "You can change rooms after joining"
+    "selectOrCreateRoom": "Select an existing room or create a new one"
   },
   "game": {
     "title": "Game",
@@ -124,7 +126,43 @@
     "notJoined": "Not joined",
     "players": "Players",
     "connected": "Connected",
-    "disconnected": "Disconnected"
+    "disconnected": "Disconnected",
+    "quickJoin": "Quick Join",
+    "quickJoinDescription": "Automatically join the default room",
+    "selectRoom": "Select Room",
+    "selectRoomDescription": "Choose from {{count}} available rooms",
+    "noRoomsAvailable": "No rooms available",
+    "createRoom": "Create Room",
+    "createRoomDescription": "Create a new private room",
+    "selectPlaceholder": "Select a room...",
+    "newRoomId": "Room Name",
+    "newRoomIdPlaceholder": "Enter room name",
+    "newRoomName": "Display Name",
+    "newRoomNamePlaceholder": "Enter display name (optional)",
+    "maxPlayers": "Max Players",
+    "privateRoom": "Private Room",
+    "password": "Password",
+    "passwordPlaceholder": "Enter room password",
+    "enterPassword": "Enter Password",
+    "privateRoomMessage": "Room \"{{name}}\" requires a password to join",
+    "join": "Join",
+    "transferOwner": "Transfer Owner",
+    "kickPlayer": "Kick Player",
+    "createButton": "Create & Join",
+    "creating": "Creating...",
+    "loadingRooms": "Loading room list...",
+    "phase": {
+      "lobby": "Lobby",
+      "deployment": "Deployment",
+      "playing": "Playing",
+      "paused": "Paused",
+      "ended": "Ended"
+    },
+    "error": {
+      "roomIdRequired": "Please enter a room name",
+      "roomIdTooLong": "Room name must be 32 characters or less",
+      "passwordRequired": "Private room requires a password"
+    }
   },
   "player": {
     "controls": "Player Controls",
@@ -142,6 +180,46 @@
       "holdToToggle": "HOLD 3s TO TOGGLE",
       "clickToEnable": "Hold to enable DM mode",
       "clickToDisable": "Hold to disable DM mode"
+    }
+  },
+  "dm": {
+    "controlPanel": {
+      "title": "DM Control Panel",
+      "gameFlow": "Game Flow",
+      "turnControl": "Turn Control",
+      "enemyUnits": "Enemy Units",
+      "pause": "Pause",
+      "resume": "Resume",
+      "endGame": "End Game",
+      "advancePhase": "Advance Phase",
+      "phase": "Game Phase",
+      "currentPhase": "Current Turn Phase",
+      "noEnemies": "No enemy units"
+    },
+    "action": {
+      "move": "Move",
+      "attack": "Attack",
+      "defend": "Defend"
+    },
+    "confirm": {
+      "endGame": {
+        "title": "End Game",
+        "message": "Are you sure you want to end the game? This action cannot be undone."
+      }
+    }
+  },
+  "game": {
+    "phase": {
+      "lobby": "Lobby",
+      "deployment": "Deployment",
+      "playing": "Playing",
+      "paused": "Paused",
+      "ended": "Ended"
+    },
+    "turnPhase": {
+      "player_action": "Player Action",
+      "dm_action": "DM Action",
+      "resolution": "Resolution"
     }
   },
   "combat": {
@@ -290,5 +368,25 @@
     "aim": "Aim",
     "cancel": "Cancel",
     "confirm": "Confirm"
+  },
+  "faction": {
+    "selectFaction": "Select Faction",
+    "federation": "Federation",
+    "empire": "Empire",
+    "federationDescription": "United Federation of Planets - defenders of peace and democracy",
+    "empireDescription": "Galactic Empire - conquerors seeking total domination",
+    "selected": "Selected",
+    "confirmed": "Faction confirmed",
+    "error": {
+      "factionRequired": "Please select a faction"
+    }
+  },
+  "factionTurn": {
+    "playersEnded": "ended",
+    "transitioning": "Transitioning...",
+    "endTurn": "End Turn",
+    "cancelEnd": "Cancel",
+    "yourTurn": "Your Turn",
+    "waitingFor": "Waiting for {{faction}}"
   }
 }

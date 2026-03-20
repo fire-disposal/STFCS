@@ -1,11 +1,12 @@
 /**
  * DM模式切换按钮 - 简约风格
- * 
+ *
  * 设计要点：
  * 1. 边缘触发器 - 右侧细线
  * 2. 小抽屉面板 - 与竖线长度相当
  * 3. 简约按钮 - 标准按钮组件
  * 4. 后端集成 - 实际DM切换逻辑
+ * 5. 统一样式 - 使用设计系统CSS变量
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -36,23 +37,25 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 
 	// 监听后端的 DM 状态更新
 	useEffect(() => {
-		const handleDMStatusUpdate = (payload: any) => {
+		const handleDMStatusUpdate = (payload: unknown) => {
 			console.log("[DM] Status update received:", payload);
-			if (payload.players) {
-				dispatch(updateDMPlayers(payload.players));
+			const data = payload as { players?: Array<{ id: string; name: string; isDMMode: boolean }>; isDMMode?: boolean };
+			if (data.players) {
+				dispatch(updateDMPlayers(data.players));
 			}
-			if (payload.isDMMode !== undefined) {
-				dispatch(setDMMode(payload.isDMMode));
+			if (data.isDMMode !== undefined) {
+				dispatch(setDMMode(data.isDMMode));
 			}
 		};
 
-		const handleDMToggle = (payload: any) => {
+		const handleDMToggle = (payload: unknown) => {
 			console.log("[DM] Toggle event received:", payload);
-			if (payload.players) {
-				dispatch(updateDMPlayers(payload.players));
+			const data = payload as { players?: Array<{ id: string; name: string; isDMMode: boolean }>; playerId?: string; isDMMode?: boolean };
+			if (data.players) {
+				dispatch(updateDMPlayers(data.players));
 			}
-			if (payload.playerId === currentPlayerId && payload.isDMMode !== undefined) {
-				dispatch(setDMMode(payload.isDMMode));
+			if (data.playerId === currentPlayerId && data.isDMMode !== undefined) {
+				dispatch(setDMMode(data.isDMMode));
 			}
 		};
 
@@ -127,8 +130,8 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					senderId: "system",
 					senderName: "System",
 					content: newDMState
-						? `🎮 ${currentPlayerName || currentPlayerId} 已启用 DM 模式`
-						: `👤 ${currentPlayerName || currentPlayerId} 已禁用 DM 模式`,
+						? `[DM] ${currentPlayerName || currentPlayerId} 已启用 DM 模式`
+						: `[DM] ${currentPlayerName || currentPlayerId} 已禁用 DM 模式`,
 					timestamp: Date.now(),
 				},
 			});
@@ -184,10 +187,8 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 						title={t("player.dmMode.toggle")}
 					>
 						{/* 触发器线条 */}
-						<div className={`dm-trigger-line ${displayDMState ? 'active' : ''}`}>
-							{displayDMState && (
-								<div className="dm-trigger-pulse" />
-							)}
+						<div className={`dm-trigger-line ${displayDMState ? 'dm-trigger-line--active' : ''}`}>
+							{displayDMState && <div className="dm-trigger-pulse" />}
 						</div>
 
 						{/* 悬停提示 */}
@@ -209,7 +210,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					>
 						{/* 简约按钮 */}
 						<button
-							className={`dm-toggle-btn ${displayDMState ? 'active' : ''} ${isLoading ? 'loading' : ''}`}
+							className={`dm-toggle-btn ${displayDMState ? 'dm-toggle-btn--active' : ''} ${isLoading ? 'dm-toggle-btn--loading' : ''}`}
 							onClick={handleDMToggle}
 							disabled={isLoading}
 							type="button"
@@ -222,16 +223,17 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 									<span className="dm-btn-text">
 										{displayDMState ? t("player.dmMode.disable") : t("player.dmMode.enable")}
 									</span>
-									<div className={`dm-status-dot ${displayDMState ? 'on' : 'off'}`} />
+									<div className={`dm-status-dot ${displayDMState ? 'dm-status-dot--on' : 'dm-status-dot--off'}`} />
 								</>
 							)}
 						</button>
 
 						{/* 关闭按钮 */}
-						<button 
+						<button
 							className="dm-close-btn"
 							onClick={() => setIsExpanded(false)}
 							type="button"
+							aria-label="Close"
 						>
 							×
 						</button>
@@ -240,6 +242,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 			</AnimatePresence>
 
 			<style>{`
+				/* ====== DM切换按钮容器 ====== */
 				.dm-toggle-container {
 					position: fixed;
 					top: 50%;
@@ -249,7 +252,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					pointer-events: none;
 				}
 
-				/* ========== 边缘触发器 ========== */
+				/* 边缘触发器 */
 				.dm-edge-trigger {
 					position: absolute;
 					right: 0;
@@ -270,16 +273,16 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					background: linear-gradient(
 						180deg,
 						transparent 0%,
-						rgba(100, 100, 150, 0.3) 20%,
-						rgba(100, 100, 150, 0.3) 80%,
+						var(--border-color) 20%,
+						var(--border-color) 80%,
 						transparent 100%
 					);
 					position: relative;
 					transition: var(--transition-fast);
-					border-radius: 2px;
+					border-radius: var(--radius-sm);
 				}
 
-				.dm-trigger-line.active {
+				.dm-trigger-line--active {
 					background: linear-gradient(
 						180deg,
 						transparent 0%,
@@ -293,11 +296,11 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					position: absolute;
 					inset: -2px;
 					background: rgba(255, 68, 68, 0.3);
-					border-radius: 4px;
-					animation: pulse 1.5s ease-in-out infinite;
+					border-radius: var(--radius-md);
+					animation: dm-pulse 1.5s ease-in-out infinite;
 				}
 
-				@keyframes pulse {
+				@keyframes dm-pulse {
 					0%, 100% { opacity: 0.3; transform: scale(1); }
 					50% { opacity: 0.6; transform: scale(1.1); }
 				}
@@ -309,8 +312,8 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					transform: translateY(-50%);
 					display: flex;
 					align-items: center;
-					gap: 4px;
-					padding: 4px 8px;
+					gap: var(--space-1);
+					padding: var(--space-1) var(--space-2);
 					background: var(--bg-panel);
 					border: 1px solid var(--border-color);
 					color: var(--text-tertiary);
@@ -340,7 +343,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					);
 				}
 
-				/* ========== 抽屉面板 ========== */
+				/* 抽屉面板 */
 				.dm-drawer {
 					position: absolute;
 					right: 8px;
@@ -358,7 +361,7 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					pointer-events: auto;
 				}
 
-				/* ========== 切换按钮 ========== */
+				/* 切换按钮 */
 				.dm-toggle-btn {
 					display: flex;
 					align-items: center;
@@ -379,18 +382,18 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 				}
 
 				.dm-toggle-btn:hover:not(:disabled) {
-					background: rgba(74, 158, 255, 0.15);
+					background: var(--tactical-hover);
 					border-color: rgba(74, 158, 255, 0.4);
 					color: var(--color-primary);
 				}
 
-				.dm-toggle-btn.active {
+				.dm-toggle-btn--active {
 					background: rgba(255, 68, 68, 0.15);
 					border-color: rgba(255, 68, 68, 0.4);
 					color: var(--color-danger);
 				}
 
-				.dm-toggle-btn.active:hover:not(:disabled) {
+				.dm-toggle-btn--active:hover:not(:disabled) {
 					background: rgba(255, 68, 68, 0.25);
 					border-color: rgba(255, 68, 68, 0.6);
 				}
@@ -412,17 +415,17 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					transition: var(--transition-fast);
 				}
 
-				.dm-status-dot.on {
+				.dm-status-dot--on {
 					background: var(--color-danger);
 					box-shadow: 0 0 6px var(--color-danger-glow);
-					animation: blink 1.5s ease-in-out infinite;
+					animation: dm-blink 1.5s ease-in-out infinite;
 				}
 
-				.dm-status-dot.off {
+				.dm-status-dot--off {
 					background: var(--text-tertiary);
 				}
 
-				@keyframes blink {
+				@keyframes dm-blink {
 					0%, 100% { opacity: 1; }
 					50% { opacity: 0.4; }
 				}
@@ -433,14 +436,14 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					border: 2px solid rgba(74, 158, 255, 0.2);
 					border-top-color: var(--color-primary);
 					border-radius: var(--radius-full);
-					animation: spin 0.8s linear infinite;
+					animation: dm-spin 0.8s linear infinite;
 				}
 
-				@keyframes spin {
+				@keyframes dm-spin {
 					to { transform: rotate(360deg); }
 				}
 
-				/* ========== 关闭按钮 ========== */
+				/* 关闭按钮 */
 				.dm-close-btn {
 					width: 20px;
 					height: 20px;

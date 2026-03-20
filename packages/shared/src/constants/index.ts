@@ -14,6 +14,21 @@ export const WS_HEARTBEAT_INTERVAL = 30000;
 export const WS_RECONNECT_DELAY = 1000;
 export const MAX_RECONNECT_ATTEMPTS = 5;
 
+// 导出阵营常量
+export {
+	FACTIONS,
+	DEFAULT_FACTION_IDS,
+	FACTION_TURN_DEBOUNCE_MS,
+	FACTION_TURN_TIMEOUT_MS,
+	MIN_PLAYERS_PER_FACTION,
+	MAX_PLAYERS_PER_FACTION,
+	getFactionList,
+	getFaction,
+	isValidFaction,
+	getFactionColor,
+	getFactionLocalizedName,
+} from './factions.js';
+
 /**
  * 获取默认 WebSocket URL
  * - 浏览器环境：使用当前 host 的 /ws 路径（通过 Vite 代理）

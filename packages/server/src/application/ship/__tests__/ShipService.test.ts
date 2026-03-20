@@ -106,6 +106,14 @@ describe('ShipService', () => {
       const config = createTestShipConfig('ship-1');
       service.createShip(config);
 
+      // 先完成阶段1
+      await service.moveShip('ship-1', {
+        shipId: 'ship-1',
+        phase: 1,
+        type: 'straight',
+        distance: 5,
+      });
+
       const result = await service.moveShip('ship-1', {
         shipId: 'ship-1',
         phase: 2,

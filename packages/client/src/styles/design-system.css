@@ -212,6 +212,33 @@
   --panel-width-collapsed: clamp(28px, 3vw, 32px);
   --bottom-panel-height: clamp(56px, 8vw, 64px);
   --bottom-panel-expanded: clamp(240px, 30vw, 280px);
+
+  /*
+   * 战术面板专用颜色
+   */
+  --tactical-bg: rgba(10, 12, 20, 0.98);
+  --tactical-border: rgba(74, 158, 255, 0.3);
+  --tactical-section-bg: rgba(20, 25, 35, 0.8);
+  --tactical-hover: rgba(74, 158, 255, 0.15);
+  --tactical-active: rgba(74, 158, 255, 0.25);
+
+  /*
+   * 状态条颜色
+   */
+  --status-shield: linear-gradient(90deg, #2a5a8a, var(--color-primary));
+  --status-armor: linear-gradient(90deg, #8a6a2a, var(--color-warning));
+  --status-structure: linear-gradient(90deg, #8a2a2a, var(--color-danger));
+  --status-flux: linear-gradient(90deg, #8a2a8a, #ff44ff);
+  --status-energy: linear-gradient(90deg, #2a8a5a, var(--color-success));
+
+  /*
+   * 响应式断点
+   */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 2560px;
 }
 
 /* ====== 高分辨率屏幕适配 ====== */

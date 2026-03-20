@@ -245,54 +245,6 @@ export class DefaultEventTranslator implements EventTranslator {
           },
         };
 
-      // 回合事件
-      case 'TURN_ORDER_INITIALIZED':
-        return {
-          type: WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED,
-          payload: {
-            units: payload.units,
-            roundNumber: payload.roundNumber,
-            phase: payload.phase,
-          },
-        };
-
-      case 'TURN_ORDER_UPDATED':
-        return {
-          type: WS_MESSAGE_TYPES.TURN_ORDER_UPDATED,
-          payload: {
-            units: payload.units,
-            roundNumber: payload.roundNumber,
-            phase: payload.phase,
-          },
-        };
-
-      case 'TURN_INDEX_CHANGED':
-        return {
-          type: WS_MESSAGE_TYPES.TURN_INDEX_CHANGED,
-          payload: {
-            currentIndex: payload.currentIndex,
-            previousIndex: payload.previousIndex,
-            roundNumber: payload.roundNumber,
-          },
-        };
-
-      case 'UNIT_STATE_CHANGED':
-        return {
-          type: WS_MESSAGE_TYPES.UNIT_STATE_CHANGED,
-          payload: {
-            unitId: payload.unitId,
-            state: payload.state,
-          },
-        };
-
-      case 'ROUND_INCREMENTED':
-        return {
-          type: WS_MESSAGE_TYPES.ROUND_INCREMENTED,
-          payload: {
-            roundNumber: payload.roundNumber,
-          },
-        };
-
       default:
         // 未知事件类型，不广播
         return null;

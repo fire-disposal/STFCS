@@ -19,12 +19,25 @@ import type {
 	TokenDragStartMessage,
 	TokenDraggingMessage,
 	WSMessage,
+	DeploymentStartMessage,
+	DeploymentReadyMessage,
+	DeploymentTokenPlacedMessage,
+	GamePhaseChangedMessage,
+	TurnPhaseChangedMessage,
+	TurnResolutionMessage,
+	ShipActionMessage,
+	ShipActionResultMessage,
 } from "@vt/shared/ws";
 import { MapSnapshotSchema } from "@vt/shared/core-types";
 import { WS_MESSAGE_TYPES, isRequestMessage, isShipMovedMessage } from "@vt/shared/ws";
 import type { PlayerService } from "../../application/player/PlayerService";
 import type { SelectionService } from "../../application/selection/SelectionService";
 import type { ShipService } from "../../application/ship/ShipService";
+import type { FactionService } from "../../application/faction/FactionService";
+import type { FactionTurnService } from "../../application/turn/FactionTurnService";
+import type { GameFlowService } from "../../application/game/GameFlowService";
+import type { CombatService } from "../../application/combat/CombatService";
+import type { DeploymentService } from "../../application/deployment/DeploymentService";
 import type { RoomManager } from "../../infrastructure/ws/RoomManager";
 
 interface WSSender {
@@ -36,6 +49,11 @@ export interface MessageHandlerOptions {
 	playerService: PlayerService;
 	shipService: ShipService;
 	selectionService: SelectionService;
+	factionService: FactionService;
+	factionTurnService: FactionTurnService;
+	gameFlowService?: GameFlowService;
+	combatService?: CombatService;
+	deploymentService?: DeploymentService;
 	wsServer?: WSSender;
 }
 
@@ -44,6 +62,11 @@ export class MessageHandler {
 	private _playerService: PlayerService;
 	private _shipService: ShipService;
 	private _selectionService: SelectionService;
+	private _factionService: FactionService;
+	private _factionTurnService: FactionTurnService;
+	private _gameFlowService?: GameFlowService;
+	private _combatService?: CombatService;
+	private _deploymentService?: DeploymentService;
 	private _roomDrawings: Map<string, DrawingElement[]>;
 	private _requestHandlers: RequestHandlers;
 	private _wsServer?: WSSender;
@@ -53,6 +76,11 @@ export class MessageHandler {
 		this._playerService = options.playerService;
 		this._shipService = options.shipService;
 		this._selectionService = options.selectionService;
+		this._factionService = options.factionService;
+		this._factionTurnService = options.factionTurnService;
+		this._gameFlowService = options.gameFlowService;
+		this._combatService = options.combatService;
+		this._deploymentService = options.deploymentService;
 		this._wsServer = options.wsServer;
 		this._roomDrawings = new Map();
 		this._requestHandlers = this._createRequestHandlers();
@@ -76,6 +104,25 @@ export class MessageHandler {
 			"map.snapshot.save": this._handleMapSnapshotSave.bind(this),
 			"map.token.move": this._handleMapTokenMove.bind(this),
 			"room.state.get": this._handleRoomStateGet.bind(this),
+			// 三阶段移动操作
+			"movement.start": this._handleMovementStart.bind(this),
+			"movement.preview": this._handleMovementPreview.bind(this),
+			"movement.commit": this._handleMovementCommit.bind(this),
+			"movement.cancel": this._handleMovementCancel.bind(this),
+			// 战斗交互操作
+			"combat.selectTarget": this._handleCombatSelectTarget.bind(this),
+			"combat.clearTarget": this._handleCombatClearTarget.bind(this),
+			"combat.selectWeapon": this._handleCombatSelectWeapon.bind(this),
+			"combat.clearWeapon": this._handleCombatClearWeapon.bind(this),
+			"combat.selectQuadrant": this._handleCombatSelectQuadrant.bind(this),
+			"combat.clearQuadrant": this._handleCombatClearQuadrant.bind(this),
+			"combat.attackPreview": this._handleCombatAttackPreview.bind(this),
+			"combat.confirmAttack": this._handleCombatConfirmAttack.bind(this),
+			// 部署操作
+			"deployment.deployShip": this._handleDeploymentDeployShip.bind(this),
+			"deployment.removeShip": this._handleDeploymentRemoveShip.bind(this),
+			"deployment.setReady": this._handleDeploymentSetReady.bind(this),
+			"deployment.getState": this._handleDeploymentGetState.bind(this),
 		};
 	}
 
@@ -125,6 +172,35 @@ export class MessageHandler {
 					break;
 				case WS_MESSAGE_TYPES.TOKEN_DRAG_END:
 					await this._handleTokenDragEnd(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.FACTION_SELECTED:
+					await this._handleFactionSelected(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.PLAYER_END_TURN:
+					await this._handlePlayerEndTurn(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN:
+					await this._handlePlayerCancelEndTurn(clientId, message);
+					break;
+				// 游戏流程控制消息
+				case WS_MESSAGE_TYPES.DEPLOYMENT_START:
+					await this._handleDeploymentStart(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED:
+					await this._handleDeploymentTokenPlaced(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.DEPLOYMENT_READY:
+					await this._handleDeploymentReady(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.GAME_PHASE_CHANGED:
+					await this._handleGamePhaseChanged(clientId, message);
+					break;
+				case WS_MESSAGE_TYPES.TURN_PHASE_CHANGED:
+					await this._handleTurnPhaseChanged(clientId, message);
+					break;
+				// 行动系统消息
+				case WS_MESSAGE_TYPES.SHIP_ACTION:
+					await this._handleShipAction(clientId, message);
 					break;
 				case WS_MESSAGE_TYPES.PING:
 					await this._handlePing(clientId, message);
@@ -903,6 +979,349 @@ export class MessageHandler {
 		}
 	}
 
+	// ====== 阵营消息处理 ======
+
+	/**
+	 * 处理玩家选择阵营消息
+	 */
+	private async _handleFactionSelected(clientId: string, message: WSMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		const payload = message.payload as { faction: string };
+		const player = this._playerService.getPlayer(clientId);
+		if (!player) {
+			this._sendError(clientId, "PLAYER_NOT_FOUND", "Player not found");
+			return;
+		}
+
+		// 设置玩家阵营
+		const success = this._factionService.setPlayerFaction(
+			playerRoom.id,
+			clientId,
+			player.name,
+			payload.faction
+		);
+
+		if (!success) {
+			this._sendError(clientId, "FACTION_ERROR", "Failed to set player faction");
+		}
+	}
+
+	/**
+	 * 处理玩家宣告结束回合消息
+	 */
+	private async _handlePlayerEndTurn(clientId: string, message: WSMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		// 检查回合系统是否已初始化
+		if (!this._factionTurnService.isTurnSystemInitialized(playerRoom.id)) {
+			this._sendError(clientId, "TURN_SYSTEM_NOT_INITIALIZED", "Turn system not initialized");
+			return;
+		}
+
+		// 检查玩家是否有阵营
+		if (!this._factionService.hasPlayerFaction(playerRoom.id, clientId)) {
+			this._sendError(clientId, "NO_FACTION", "Player has no faction assigned");
+			return;
+		}
+
+		const result = this._factionTurnService.playerEndTurn(playerRoom.id, clientId);
+		if (!result.success) {
+			this._sendError(clientId, "END_TURN_ERROR", "Failed to end turn");
+		}
+	}
+
+	/**
+	 * 处理玩家取消结束回合消息
+	 */
+	private async _handlePlayerCancelEndTurn(clientId: string, message: WSMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		// 检查回合系统是否已初始化
+		if (!this._factionTurnService.isTurnSystemInitialized(playerRoom.id)) {
+			this._sendError(clientId, "TURN_SYSTEM_NOT_INITIALIZED", "Turn system not initialized");
+			return;
+		}
+
+		// 检查玩家是否有阵营
+		if (!this._factionService.hasPlayerFaction(playerRoom.id, clientId)) {
+			this._sendError(clientId, "NO_FACTION", "Player has no faction assigned");
+			return;
+		}
+
+		const result = this._factionTurnService.playerCancelEndTurn(playerRoom.id, clientId);
+		if (!result.success) {
+			this._sendError(clientId, "CANCEL_END_TURN_ERROR", "Failed to cancel end turn");
+		}
+	}
+
+	// ====== 游戏流程控制消息处理 ======
+
+	/**
+	 * 处理部署开始消息
+	 */
+	private async _handleDeploymentStart(clientId: string, message: DeploymentStartMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		if (!this._gameFlowService) {
+			this._sendError(clientId, "GAME_FLOW_NOT_INITIALIZED", "Game flow service not initialized");
+			return;
+		}
+
+		// 检查玩家是否为DM
+		const player = this._playerService.getPlayer(clientId);
+		if (!player?.isDMMode) {
+			this._sendError(clientId, "NOT_DM", "Only DM can start deployment");
+			return;
+		}
+
+		try {
+			this._gameFlowService.startDeployment(playerRoom.id, message.payload.factions as string[]);
+		} catch (error) {
+			this._sendError(clientId, "DEPLOYMENT_ERROR", error instanceof Error ? error.message : "Failed to start deployment");
+		}
+	}
+
+	/**
+	 * 处理部署Token放置消息
+	 */
+	private async _handleDeploymentTokenPlaced(clientId: string, message: DeploymentTokenPlacedMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		// 记录部署的Token到GameFlowService
+		if (this._gameFlowService && message.payload.faction && message.payload.tokenId) {
+			try {
+				this._gameFlowService.registerDeployedToken(
+					playerRoom.id,
+					message.payload.faction as string,
+					message.payload.tokenId,
+					clientId
+				);
+			} catch (error) {
+				console.warn('[_handleDeploymentTokenPlaced] Failed to register token:', error);
+			}
+		}
+
+		// 部署阶段Token可以自由放置，广播给其他玩家
+		this._roomManager.broadcastToRoom(playerRoom.id, {
+			type: WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED,
+			payload: {
+				...message.payload,
+				playerId: clientId,
+				timestamp: Date.now(),
+			},
+		}, clientId);
+	}
+
+	/**
+	 * 处理部署准备消息
+	 */
+	private async _handleDeploymentReady(clientId: string, message: DeploymentReadyMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		if (!this._gameFlowService) {
+			this._sendError(clientId, "GAME_FLOW_NOT_INITIALIZED", "Game flow service not initialized");
+			return;
+		}
+
+		this._gameFlowService.setDeploymentReady(
+			playerRoom.id,
+			message.payload.faction as string,
+			clientId,
+			message.payload.ready
+		);
+
+		// 检查是否所有阵营都准备好了
+		if (this._gameFlowService.isDeploymentComplete(playerRoom.id)) {
+			// 完成部署，开始游戏
+			this._gameFlowService.completeDeployment(playerRoom.id);
+			this._gameFlowService.startGame(playerRoom.id);
+		}
+	}
+
+	/**
+	 * 处理游戏阶段变更消息
+	 */
+	private async _handleGamePhaseChanged(clientId: string, message: GamePhaseChangedMessage): Promise<void> {
+		// 游戏阶段变更由服务端发起，客户端只接收
+		console.log(`Game phase changed: ${message.payload.previousPhase} -> ${message.payload.newPhase}`);
+	}
+
+	/**
+	 * 处理回合阶段变更消息
+	 */
+	private async _handleTurnPhaseChanged(clientId: string, message: TurnPhaseChangedMessage): Promise<void> {
+		// 回合阶段变更由服务端发起，客户端只接收
+		console.log(`Turn phase changed: ${message.payload.previousPhase} -> ${message.payload.newPhase}`);
+	}
+
+	// ====== 行动系统消息处理 ======
+
+	/**
+	 * 处理舰船行动消息
+	 */
+	private async _handleShipAction(clientId: string, message: ShipActionMessage): Promise<void> {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) {
+			this._sendError(clientId, "NOT_IN_ROOM", "Player is not in a room");
+			return;
+		}
+
+		if (!this._gameFlowService) {
+			this._sendError(clientId, "GAME_FLOW_NOT_INITIALIZED", "Game flow service not initialized");
+			return;
+		}
+
+		const { shipId, actionType, actionData } = message.payload;
+
+		// 获取舰船行动状态
+		const actionState = this._gameFlowService.getShipActionState(playerRoom.id, shipId);
+		if (!actionState) {
+			this._sendError(clientId, "SHIP_NOT_FOUND", "Ship not found");
+			return;
+		}
+
+		// 检查行动限制
+		const { isActionRestricted } = await import('@vt/shared/protocol');
+		const restriction = isActionRestricted(actionType as any, {
+			isOverloaded: actionState.isOverloaded,
+			isVenting: actionState.hasVented,
+			hasFiredThisTurn: actionState.hasFired,
+		});
+
+		if (restriction.restricted) {
+			// 发送行动失败结果
+			if (this._wsServer) {
+				this._wsServer.sendTo(clientId, {
+					type: WS_MESSAGE_TYPES.SHIP_ACTION_RESULT,
+					payload: {
+						success: false,
+						shipId,
+						actionType,
+						error: `Action restricted: ${restriction.reason}`,
+						restrictionReason: restriction.reason,
+						timestamp: Date.now(),
+					},
+				});
+			}
+			return;
+		}
+
+		// 执行行动
+		try {
+			let success = false;
+
+			switch (actionType) {
+				case 'move':
+				case 'rotate':
+					// 移动和转向通过现有的ship.move处理
+					if (actionData) {
+						const moveResult = await this._shipService.moveShip(shipId, actionData as any);
+						success = moveResult.success;
+					}
+					break;
+				case 'fire':
+					// 开火处理
+					success = true; // TODO: 实现开火逻辑
+					break;
+				case 'shield_toggle':
+					// 护盾切换
+					success = await this._shipService.toggleShield(shipId);
+					break;
+				case 'vent':
+					// 主动排散
+					success = await this._shipService.ventShip(shipId);
+					break;
+				case 'overload_reset':
+					// 解除过载
+					if (actionState.isOverloaded && actionState.overloadResetAvailable) {
+						// TODO: 调用ShipService解除过载
+						success = true;
+					}
+					break;
+			}
+
+			// 更新行动状态
+			if (success) {
+				const updates: Partial<typeof actionState> = {};
+
+				switch (actionType) {
+					case 'move':
+						updates.hasMoved = true;
+						break;
+					case 'rotate':
+						updates.hasRotated = true;
+						break;
+					case 'fire':
+						updates.hasFired = true;
+						break;
+					case 'shield_toggle':
+						updates.hasToggledShield = true;
+						break;
+					case 'vent':
+						updates.hasVented = true;
+						break;
+					case 'overload_reset':
+						updates.isOverloaded = false;
+						updates.overloadResetAvailable = false;
+						break;
+				}
+
+				this._gameFlowService.updateShipActionState(playerRoom.id, shipId, updates);
+			}
+
+			// 发送行动结果
+			if (this._wsServer) {
+				this._wsServer.sendTo(clientId, {
+					type: WS_MESSAGE_TYPES.SHIP_ACTION_RESULT,
+					payload: {
+						success,
+						shipId,
+						actionType,
+						timestamp: Date.now(),
+					},
+				});
+			}
+		} catch (error) {
+			if (this._wsServer) {
+				this._wsServer.sendTo(clientId, {
+					type: WS_MESSAGE_TYPES.SHIP_ACTION_RESULT,
+					payload: {
+						success: false,
+						shipId,
+						actionType,
+						error: error instanceof Error ? error.message : "Unknown error",
+						timestamp: Date.now(),
+					},
+				});
+			}
+		}
+	}
+
 	private async _handlePing(clientId: string, message: WSMessage): Promise<void> {
 		if (this._wsServer) {
 			this._wsServer.sendTo(clientId, {
@@ -910,6 +1329,458 @@ export class MessageHandler {
 				payload: { timestamp: (message as { payload: { timestamp: number } }).payload.timestamp },
 			});
 		}
+	}
+
+	// ====== 三阶段移动处理 ======
+
+	private async _handleMovementStart(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'movement.start' }>['data']
+	) {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) throw new Error("Player is not in a room");
+
+		// 广播移动阶段开始
+		this._roomManager.broadcastToRoom(playerRoom.id, {
+			type: WS_MESSAGE_TYPES.MOVEMENT_PHASE_START,
+			payload: {
+				shipId: data.shipId,
+				phase: data.phase,
+				timestamp: Date.now(),
+			},
+		});
+
+		return { success: true, phase: data.phase, shipId: data.shipId };
+	}
+
+	private async _handleMovementPreview(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'movement.preview' }>['data']
+	) {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) throw new Error("Player is not in a room");
+
+		const status = this._shipService.getShipStatus(data.shipId);
+		if (!status) throw new Error("Ship not found");
+
+		// 计算预览位置
+		let previewPosition = { ...status.position };
+		let previewHeading = status.heading;
+
+		if (data.type === 'straight' && data.distance) {
+			const rad = (previewHeading * Math.PI) / 180;
+			previewPosition = {
+				x: previewPosition.x + Math.cos(rad) * data.distance,
+				y: previewPosition.y + Math.sin(rad) * data.distance,
+			};
+		} else if (data.type === 'strafe' && data.distance) {
+			const rad = ((previewHeading + 90) * Math.PI) / 180;
+			previewPosition = {
+				x: previewPosition.x + Math.cos(rad) * data.distance,
+				y: previewPosition.y + Math.sin(rad) * data.distance,
+			};
+		} else if (data.type === 'rotate' && data.angle) {
+			previewHeading = (previewHeading + data.angle + 360) % 360;
+		}
+
+		return {
+			success: true,
+			shipId: data.shipId,
+			phase: data.phase,
+			preview: {
+				startPosition: status.position,
+				endPosition: previewPosition,
+				startHeading: status.heading,
+				endHeading: previewHeading,
+				path: [status.position, previewPosition],
+				isValid: true,
+			},
+		};
+	}
+
+	private async _handleMovementCommit(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'movement.commit' }>['data']
+	) {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) throw new Error("Player is not in a room");
+
+		// 执行移动
+		const result = await this._shipService.moveShip(data.shipId, {
+			shipId: data.shipId,
+			phase: data.phase === 'translate_a' ? 1 : data.phase === 'rotate' ? 2 : 3,
+			type: data.type,
+			distance: data.distance,
+			angle: data.angle,
+		});
+
+		if (!result.success) throw new Error(result.error ?? "Movement failed");
+
+		const status = this._shipService.getShipStatus(data.shipId);
+
+		// 广播移动提交
+		this._roomManager.broadcastToRoom(playerRoom.id, {
+			type: WS_MESSAGE_TYPES.MOVEMENT_COMMIT,
+			payload: {
+				shipId: data.shipId,
+				newPosition: status?.position ?? { x: 0, y: 0 },
+				newHeading: status?.heading ?? 0,
+				movementUsed: data.distance ?? 0,
+				timestamp: Date.now(),
+			},
+		});
+
+		return {
+			success: true,
+			shipId: data.shipId,
+			newPosition: status?.position ?? { x: 0, y: 0 },
+			newHeading: status?.heading ?? 0,
+		};
+	}
+
+	private async _handleMovementCancel(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'movement.cancel' }>['data']
+	) {
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) throw new Error("Player is not in a room");
+
+		// 广播移动取消
+		this._roomManager.broadcastToRoom(playerRoom.id, {
+			type: WS_MESSAGE_TYPES.MOVEMENT_CANCEL,
+			payload: {
+				shipId: data.shipId,
+				timestamp: Date.now(),
+			},
+		});
+
+		return { success: true, shipId: data.shipId };
+	}
+
+	// ====== 战斗交互处理 ======
+
+	private async _handleCombatSelectTarget(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.selectTarget' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		const selection = this._combatService.selectTarget(data.attackerId, data.targetId);
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (playerRoom) {
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.TARGET_SELECTED,
+				payload: {
+					attackerId: data.attackerId,
+					targetId: data.targetId,
+					targetInfo: selection.targetInfo,
+					timestamp: Date.now(),
+				},
+			});
+		}
+
+		return {
+			success: true,
+			attackerId: data.attackerId,
+			targetId: data.targetId,
+			targetInfo: selection.targetInfo,
+		};
+	}
+
+	private async _handleCombatClearTarget(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.clearTarget' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		this._combatService.clearTarget(data.attackerId);
+
+		return { success: true, attackerId: data.attackerId };
+	}
+
+	private async _handleCombatSelectWeapon(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.selectWeapon' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		const selection = this._combatService.selectWeapon(data.shipId, data.weaponInstanceId);
+		if (!selection) throw new Error("Failed to select weapon");
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (playerRoom) {
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.WEAPON_SELECTED,
+				payload: {
+					shipId: data.shipId,
+					weaponInstanceId: data.weaponInstanceId,
+					weaponInfo: selection.weaponInfo,
+					timestamp: Date.now(),
+				},
+			});
+		}
+
+		return {
+			success: true,
+			shipId: data.shipId,
+			weaponInstanceId: data.weaponInstanceId,
+			weaponInfo: selection.weaponInfo,
+		};
+	}
+
+	private async _handleCombatClearWeapon(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.clearWeapon' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		this._combatService.clearWeapon(data.shipId);
+
+		return { success: true, shipId: data.shipId };
+	}
+
+	private async _handleCombatSelectQuadrant(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.selectQuadrant' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		const selection = this._combatService.selectQuadrant(
+			data.attackerId,
+			data.targetId,
+			data.quadrant as 'front' | 'rear' | 'left' | 'right'
+		);
+		if (!selection) throw new Error("Failed to select quadrant");
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (playerRoom) {
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.QUADRANT_SELECTED,
+				payload: {
+					attackerId: data.attackerId,
+					targetId: data.targetId,
+					quadrant: data.quadrant,
+					quadrantInfo: selection.quadrantInfo,
+					timestamp: Date.now(),
+				},
+			});
+		}
+
+		return {
+			success: true,
+			attackerId: data.attackerId,
+			targetId: data.targetId,
+			quadrant: data.quadrant,
+			quadrantInfo: selection.quadrantInfo,
+		};
+	}
+
+	private async _handleCombatClearQuadrant(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.clearQuadrant' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		this._combatService.clearQuadrant(data.attackerId);
+
+		return { success: true, attackerId: data.attackerId };
+	}
+
+	private async _handleCombatAttackPreview(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.attackPreview' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		const preview = this._combatService.getAttackPreview(
+			data.attackerId,
+			data.targetId,
+			data.weaponInstanceId,
+			data.targetQuadrant as 'front' | 'rear' | 'left' | 'right' | undefined
+		);
+
+		return {
+			success: true,
+			attackerId: data.attackerId,
+			targetId: data.targetId,
+			weaponInstanceId: data.weaponInstanceId,
+			canAttack: preview.canAttack,
+			preview: preview.preview,
+			blockReason: preview.blockReason,
+		};
+	}
+
+	private async _handleCombatConfirmAttack(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'combat.confirmAttack' }>['data']
+	) {
+		if (!this._combatService) throw new Error("Combat service not available");
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (!playerRoom) throw new Error("Player is not in a room");
+
+		// 执行攻击
+		const result = this._combatService.executeAttack({
+			sourceShipId: data.attackerId,
+			targetShipId: data.targetId,
+			weaponMountId: data.weaponInstanceId,
+			timestamp: Date.now(),
+		}, playerRoom.id);
+
+		// 广播攻击确认
+		this._roomManager.broadcastToRoom(playerRoom.id, {
+			type: WS_MESSAGE_TYPES.ATTACK_CONFIRMED,
+			payload: {
+				attackerId: data.attackerId,
+				targetId: data.targetId,
+				weaponInstanceId: data.weaponInstanceId,
+				damage: result.hit ? {
+					hit: true,
+					baseDamage: result.damageResult.damage,
+					shieldAbsorbed: result.damageResult.shieldAbsorbed,
+					armorReduced: result.damageResult.armorReduced,
+					hullDamage: result.damageResult.hullDamage,
+					hitQuadrant: result.damageResult.hitQuadrant,
+				} : undefined,
+				timestamp: Date.now(),
+			},
+		});
+
+		return {
+			success: true,
+			attackerId: data.attackerId,
+			targetId: data.targetId,
+			weaponInstanceId: data.weaponInstanceId,
+			damage: result.hit ? {
+				hit: true,
+				baseDamage: result.damageResult.damage,
+				shieldAbsorbed: result.damageResult.shieldAbsorbed,
+				armorReduced: result.damageResult.armorReduced,
+				hullDamage: result.damageResult.hullDamage,
+				hitQuadrant: result.damageResult.hitQuadrant,
+			} : undefined,
+		};
+	}
+
+	// ====== 部署操作处理 ======
+
+	private async _handleDeploymentDeployShip(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'deployment.deployShip' }>['data']
+	) {
+		if (!this._deploymentService) throw new Error("Deployment service not available");
+
+		const result = this._deploymentService.deployShip({
+			shipDefinitionId: data.shipDefinitionId,
+			ownerId: data.ownerId,
+			faction: data.faction,
+			position: data.position,
+			heading: data.heading,
+			shipName: data.shipName,
+		}, clientId);
+
+		if (!result.success) {
+			return { success: false, error: result.error };
+		}
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (playerRoom && result.token) {
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED,
+				payload: {
+					tokenId: result.token.id,
+					playerId: clientId,
+					faction: data.faction,
+					position: data.position,
+					heading: data.heading,
+					timestamp: Date.now(),
+				},
+			});
+		}
+
+		return {
+			success: true,
+			token: result.token ? {
+				id: result.token.id,
+				type: result.token.type,
+				position: result.token.position,
+				heading: result.token.heading,
+				ownerId: result.token.ownerId,
+				faction: data.faction,
+			} : undefined,
+		};
+	}
+
+	private async _handleDeploymentRemoveShip(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'deployment.removeShip' }>['data']
+	) {
+		if (!this._deploymentService) throw new Error("Deployment service not available");
+
+		const result = this._deploymentService.removeDeployedShip({
+			tokenId: data.tokenId,
+			requesterId: clientId,
+		});
+
+		return {
+			success: result.success,
+			tokenId: result.tokenId,
+			error: result.error,
+		};
+	}
+
+	private async _handleDeploymentSetReady(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'deployment.setReady' }>['data']
+	) {
+		if (!this._deploymentService) throw new Error("Deployment service not available");
+
+		const success = this._deploymentService.setDeploymentReady({
+			faction: data.faction,
+			playerId: data.playerId,
+			ready: data.ready,
+		});
+
+		const playerRoom = this._roomManager.getPlayerRoom(clientId);
+		if (playerRoom) {
+			this._roomManager.broadcastToRoom(playerRoom.id, {
+				type: WS_MESSAGE_TYPES.DEPLOYMENT_READY,
+				payload: {
+					faction: data.faction,
+					playerId: data.playerId,
+					ready: data.ready,
+					timestamp: Date.now(),
+				},
+			});
+		}
+
+		return { success, faction: data.faction, ready: data.ready };
+	}
+
+	private async _handleDeploymentGetState(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: 'deployment.getState' }>['data']
+	) {
+		if (!this._deploymentService) throw new Error("Deployment service not available");
+
+		const state = this._deploymentService.getState();
+
+		return {
+			isDeploymentPhase: state.isDeploymentPhase,
+			deployedShips: Object.fromEntries(
+				Object.entries(state.deployedShips).map(([faction, ships]) => [
+					faction,
+					ships.map(ship => ({
+						id: ship.id,
+						position: ship.position,
+						heading: ship.heading,
+						ownerId: ship.ownerId,
+					})),
+				])
+			),
+			readyStatus: state.readyStatus,
+		};
 	}
 }
 

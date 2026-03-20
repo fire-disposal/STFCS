@@ -33,6 +33,7 @@ import type {
   ArmorQuadrantSchema,
   PointSchema,
 } from '../core-types.js';
+import { FactionIdSchema } from '../core-types.js';
 
 // ==================== 消息类型常量 ====================
 export const WS_MESSAGE_TYPES = {
@@ -80,12 +81,57 @@ export const WS_MESSAGE_TYPES = {
   TOKEN_DRAGGING: 'TOKEN_DRAGGING',
   TOKEN_DRAG_END: 'TOKEN_DRAG_END',
 
-  // 回合系统
-  TURN_ORDER_INITIALIZED: 'TURN_ORDER_INITIALIZED',
-  TURN_ORDER_UPDATED: 'TURN_ORDER_UPDATED',
-  TURN_INDEX_CHANGED: 'TURN_INDEX_CHANGED',
-  UNIT_STATE_CHANGED: 'UNIT_STATE_CHANGED',
-  ROUND_INCREMENTED: 'ROUND_INCREMENTED',
+  // 阵营回合系统
+  FACTION_SELECTED: 'FACTION_SELECTED',
+  FACTION_TURN_START: 'FACTION_TURN_START',
+  FACTION_TURN_END: 'FACTION_TURN_END',
+  PLAYER_END_TURN: 'PLAYER_END_TURN',
+  PLAYER_CANCEL_END_TURN: 'PLAYER_CANCEL_END_TURN',
+  ROUND_START: 'ROUND_START',
+  FACTION_ORDER_DETERMINED: 'FACTION_ORDER_DETERMINED',
+
+  // 游戏流程控制
+  GAME_PHASE_CHANGED: 'GAME_PHASE_CHANGED',
+  GAME_STATE_SYNC: 'GAME_STATE_SYNC',
+  GAME_STATE_UPDATE: 'GAME_STATE_UPDATE',
+  DEPLOYMENT_START: 'DEPLOYMENT_START',
+  DEPLOYMENT_TOKEN_PLACED: 'DEPLOYMENT_TOKEN_PLACED',
+  DEPLOYMENT_READY: 'DEPLOYMENT_READY',
+  DEPLOYMENT_COMPLETE: 'DEPLOYMENT_COMPLETE',
+  TURN_PHASE_CHANGED: 'TURN_PHASE_CHANGED',
+
+  // 房间状态
+  ROOM_STATE_UPDATE: 'ROOM_STATE_UPDATE',
+  TURN_RESOLUTION: 'TURN_RESOLUTION',
+
+  // 行动系统
+  SHIP_ACTION: 'SHIP_ACTION',
+  SHIP_ACTION_RESULT: 'SHIP_ACTION_RESULT',
+  SHIP_ACTION_STATE_UPDATE: 'SHIP_ACTION_STATE_UPDATE',
+  OVERLOAD_RESET_AVAILABLE: 'OVERLOAD_RESET_AVAILABLE',
+
+  // 三阶段移动系统
+  MOVEMENT_PHASE_START: 'MOVEMENT_PHASE_START',
+  MOVEMENT_PHASE_UPDATE: 'MOVEMENT_PHASE_UPDATE',
+  MOVEMENT_PHASE_COMPLETE: 'MOVEMENT_PHASE_COMPLETE',
+  MOVEMENT_PREVIEW: 'MOVEMENT_PREVIEW',
+  MOVEMENT_COMMIT: 'MOVEMENT_COMMIT',
+  MOVEMENT_CANCEL: 'MOVEMENT_CANCEL',
+
+  // 战斗交互系统
+  TARGET_SELECTED: 'TARGET_SELECTED',
+  WEAPON_SELECTED: 'WEAPON_SELECTED',
+  QUADRANT_SELECTED: 'QUADRANT_SELECTED',
+  ATTACK_PREVIEW: 'ATTACK_PREVIEW',
+  ATTACK_CONFIRMED: 'ATTACK_CONFIRMED',
+  OVERLOAD_TRIGGERED: 'OVERLOAD_TRIGGERED',
+  OVERLOAD_RECOVERED: 'OVERLOAD_RECOVERED',
+  SHIP_DESTROYED: 'SHIP_DESTROYED',
+
+  // 引导系统
+  GUIDE_TIP_SHOWN: 'GUIDE_TIP_SHOWN',
+  GUIDE_TIP_DISMISSED: 'GUIDE_TIP_DISMISSED',
+  GUIDE_PROGRESS_UPDATE: 'GUIDE_PROGRESS_UPDATE',
 } as const;
 
 export type WSMessageType = (typeof WS_MESSAGE_TYPES)[keyof typeof WS_MESSAGE_TYPES];
@@ -104,6 +150,8 @@ export const RequestOperationSchema = z.enum([
   'player.list',
   'room.list',
   'room.create',
+  'room.kick',
+  'room.setOwner',
   'ship.move',
   'ship.toggleShield',
   'ship.vent',
@@ -115,6 +163,31 @@ export const RequestOperationSchema = z.enum([
   'map.snapshot.save',
   'map.token.move',
   'room.state.get',
+  // DM专属操作
+  'game.pause',
+  'game.resume',
+  'game.end',
+  'game.advancePhase',
+  'game.controlEnemy',
+  // 三阶段移动操作
+  'movement.start',
+  'movement.preview',
+  'movement.commit',
+  'movement.cancel',
+  // 战斗交互操作
+  'combat.selectTarget',
+  'combat.clearTarget',
+  'combat.selectWeapon',
+  'combat.clearWeapon',
+  'combat.selectQuadrant',
+  'combat.clearQuadrant',
+  'combat.attackPreview',
+  'combat.confirmAttack',
+  // 部署操作
+  'deployment.deployShip',
+  'deployment.removeShip',
+  'deployment.setReady',
+  'deployment.getState',
 ]);
 
 export type RequestOperation = z.infer<typeof RequestOperationSchema>;
@@ -124,6 +197,7 @@ export const PlayerJoinRequestSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(32),
   roomId: z.string().optional(),
+  faction: FactionIdSchema.optional(),
 });
 
 export const PlayerLeaveRequestSchema = z.object({
@@ -139,7 +213,10 @@ export const RoomListRequestSchema = z.object({});
 
 export const RoomCreateRequestSchema = z.object({
   roomId: z.string(),
+  name: z.string().optional(),
   maxPlayers: z.number().optional(),
+  isPrivate: z.boolean().optional(),
+  password: z.string().optional(),
 });
 
 export const ShipMoveRequestSchema = z.object({
@@ -198,6 +275,157 @@ export const RoomStateGetRequestSchema = z.object({
   roomId: z.string().optional(),
 });
 
+// 房间管理请求
+export const RoomKickRequestSchema = z.object({
+  roomId: z.string(),
+  playerId: z.string(),
+});
+
+export const RoomSetOwnerRequestSchema = z.object({
+  roomId: z.string(),
+  newOwnerId: z.string(),
+});
+
+// DM专属操作请求
+export const GamePauseRequestSchema = z.object({
+  roomId: z.string(),
+});
+
+export const GameResumeRequestSchema = z.object({
+  roomId: z.string(),
+});
+
+export const GameEndRequestSchema = z.object({
+  roomId: z.string(),
+  winner: FactionIdSchema.optional(),
+});
+
+export const GameAdvancePhaseRequestSchema = z.object({
+  roomId: z.string(),
+});
+
+export const GameControlEnemyRequestSchema = z.object({
+  roomId: z.string(),
+  enemyTokenId: z.string(),
+  action: z.enum(['move', 'attack', 'ability']),
+  targetId: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
+});
+
+// ====== 三阶段移动请求 Schema ======
+
+/** 移动阶段开始请求 */
+export const MovementStartRequestSchema = z.object({
+  shipId: z.string(),
+  phase: z.enum(['translate_a', 'rotate', 'translate_b']),
+});
+
+/** 移动预览请求 */
+export const MovementPreviewRequestSchema = z.object({
+  shipId: z.string(),
+  phase: z.enum(['translate_a', 'rotate', 'translate_b']),
+  type: z.enum(['straight', 'strafe', 'rotate']),
+  distance: z.number().optional(),
+  angle: z.number().optional(),
+});
+
+/** 移动提交请求 */
+export const MovementCommitRequestSchema = z.object({
+  shipId: z.string(),
+  phase: z.enum(['translate_a', 'rotate', 'translate_b']),
+  type: z.enum(['straight', 'strafe', 'rotate']),
+  distance: z.number().optional(),
+  angle: z.number().optional(),
+  finalPosition: z.object({ x: z.number(), y: z.number() }).optional(),
+  finalHeading: z.number().optional(),
+});
+
+/** 移动取消请求 */
+export const MovementCancelRequestSchema = z.object({
+  shipId: z.string(),
+});
+
+// ====== 战斗交互请求 Schema ======
+
+/** 选择目标请求 */
+export const CombatSelectTargetRequestSchema = z.object({
+  attackerId: z.string(),
+  targetId: z.string(),
+});
+
+/** 清除目标请求 */
+export const CombatClearTargetRequestSchema = z.object({
+  attackerId: z.string(),
+});
+
+/** 选择武器请求 */
+export const CombatSelectWeaponRequestSchema = z.object({
+  shipId: z.string(),
+  weaponInstanceId: z.string(),
+});
+
+/** 清除武器请求 */
+export const CombatClearWeaponRequestSchema = z.object({
+  shipId: z.string(),
+});
+
+/** 选择象限请求 */
+export const CombatSelectQuadrantRequestSchema = z.object({
+  attackerId: z.string(),
+  targetId: z.string(),
+  quadrant: z.enum(['front', 'rear', 'left', 'right']),
+});
+
+/** 清除象限请求 */
+export const CombatClearQuadrantRequestSchema = z.object({
+  attackerId: z.string(),
+});
+
+/** 攻击预览请求 */
+export const CombatAttackPreviewRequestSchema = z.object({
+  attackerId: z.string(),
+  targetId: z.string(),
+  weaponInstanceId: z.string(),
+  targetQuadrant: z.enum(['front', 'rear', 'left', 'right']).optional(),
+});
+
+/** 确认攻击请求 */
+export const CombatConfirmAttackRequestSchema = z.object({
+  attackerId: z.string(),
+  targetId: z.string(),
+  weaponInstanceId: z.string(),
+  targetQuadrant: z.enum(['front', 'rear', 'left', 'right']).optional(),
+});
+
+// ====== 部署请求 Schema ======
+
+/** 部署舰船请求 */
+export const DeploymentDeployShipRequestSchema = z.object({
+  shipDefinitionId: z.string(),
+  ownerId: z.string(),
+  faction: FactionIdSchema,
+  position: z.object({ x: z.number(), y: z.number() }),
+  heading: z.number(),
+  shipName: z.string().optional(),
+});
+
+/** 移除已部署舰船请求 */
+export const DeploymentRemoveShipRequestSchema = z.object({
+  tokenId: z.string(),
+});
+
+/** 设置部署就绪请求 */
+export const DeploymentSetReadyRequestSchema = z.object({
+  faction: FactionIdSchema,
+  playerId: z.string(),
+  ready: z.boolean(),
+});
+
+/** 获取部署状态请求 */
+export const DeploymentGetStateRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
 // 请求负载联合 Schema
 export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('player.join'), data: PlayerJoinRequestSchema }),
@@ -205,6 +433,8 @@ export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('player.list'), data: PlayerListRequestSchema }),
   z.object({ operation: z.literal('room.list'), data: RoomListRequestSchema }),
   z.object({ operation: z.literal('room.create'), data: RoomCreateRequestSchema }),
+  z.object({ operation: z.literal('room.kick'), data: RoomKickRequestSchema }),
+  z.object({ operation: z.literal('room.setOwner'), data: RoomSetOwnerRequestSchema }),
   z.object({ operation: z.literal('ship.move'), data: ShipMoveRequestSchema }),
   z.object({ operation: z.literal('ship.toggleShield'), data: ShipToggleShieldRequestSchema }),
   z.object({ operation: z.literal('ship.vent'), data: ShipVentRequestSchema }),
@@ -216,6 +446,31 @@ export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('map.snapshot.save'), data: MapSnapshotSaveRequestSchema }),
   z.object({ operation: z.literal('map.token.move'), data: MapTokenMoveRequestSchema }),
   z.object({ operation: z.literal('room.state.get'), data: RoomStateGetRequestSchema }),
+  // DM专属操作
+  z.object({ operation: z.literal('game.pause'), data: GamePauseRequestSchema }),
+  z.object({ operation: z.literal('game.resume'), data: GameResumeRequestSchema }),
+  z.object({ operation: z.literal('game.end'), data: GameEndRequestSchema }),
+  z.object({ operation: z.literal('game.advancePhase'), data: GameAdvancePhaseRequestSchema }),
+  z.object({ operation: z.literal('game.controlEnemy'), data: GameControlEnemyRequestSchema }),
+  // 三阶段移动操作
+  z.object({ operation: z.literal('movement.start'), data: MovementStartRequestSchema }),
+  z.object({ operation: z.literal('movement.preview'), data: MovementPreviewRequestSchema }),
+  z.object({ operation: z.literal('movement.commit'), data: MovementCommitRequestSchema }),
+  z.object({ operation: z.literal('movement.cancel'), data: MovementCancelRequestSchema }),
+  // 战斗交互操作
+  z.object({ operation: z.literal('combat.selectTarget'), data: CombatSelectTargetRequestSchema }),
+  z.object({ operation: z.literal('combat.clearTarget'), data: CombatClearTargetRequestSchema }),
+  z.object({ operation: z.literal('combat.selectWeapon'), data: CombatSelectWeaponRequestSchema }),
+  z.object({ operation: z.literal('combat.clearWeapon'), data: CombatClearWeaponRequestSchema }),
+  z.object({ operation: z.literal('combat.selectQuadrant'), data: CombatSelectQuadrantRequestSchema }),
+  z.object({ operation: z.literal('combat.clearQuadrant'), data: CombatClearQuadrantRequestSchema }),
+  z.object({ operation: z.literal('combat.attackPreview'), data: CombatAttackPreviewRequestSchema }),
+  z.object({ operation: z.literal('combat.confirmAttack'), data: CombatConfirmAttackRequestSchema }),
+  // 部署操作
+  z.object({ operation: z.literal('deployment.deployShip'), data: DeploymentDeployShipRequestSchema }),
+  z.object({ operation: z.literal('deployment.removeShip'), data: DeploymentRemoveShipRequestSchema }),
+  z.object({ operation: z.literal('deployment.setReady'), data: DeploymentSetReadyRequestSchema }),
+  z.object({ operation: z.literal('deployment.getState'), data: DeploymentGetStateRequestSchema }),
 ]);
 
 export type RequestPayload = z.infer<typeof RequestPayloadSchema>;
@@ -277,6 +532,35 @@ export type MapSnapshotGetRequestPayload = z.infer<typeof MapSnapshotGetRequestS
 export type MapSnapshotSaveRequestPayload = z.infer<typeof MapSnapshotSaveRequestSchema>;
 export type MapTokenMoveRequestPayload = z.infer<typeof MapTokenMoveRequestSchema>;
 export type RoomStateGetRequestPayload = z.infer<typeof RoomStateGetRequestSchema>;
+export type RoomKickRequestPayload = z.infer<typeof RoomKickRequestSchema>;
+export type RoomSetOwnerRequestPayload = z.infer<typeof RoomSetOwnerRequestSchema>;
+export type GamePauseRequestPayload = z.infer<typeof GamePauseRequestSchema>;
+export type GameResumeRequestPayload = z.infer<typeof GameResumeRequestSchema>;
+export type GameEndRequestPayload = z.infer<typeof GameEndRequestSchema>;
+export type GameAdvancePhaseRequestPayload = z.infer<typeof GameAdvancePhaseRequestSchema>;
+export type GameControlEnemyRequestPayload = z.infer<typeof GameControlEnemyRequestSchema>;
+
+// 三阶段移动请求类型
+export type MovementStartRequestPayload = z.infer<typeof MovementStartRequestSchema>;
+export type MovementPreviewRequestPayload = z.infer<typeof MovementPreviewRequestSchema>;
+export type MovementCommitRequestPayload = z.infer<typeof MovementCommitRequestSchema>;
+export type MovementCancelRequestPayload = z.infer<typeof MovementCancelRequestSchema>;
+
+// 战斗交互请求类型
+export type CombatSelectTargetRequestPayload = z.infer<typeof CombatSelectTargetRequestSchema>;
+export type CombatClearTargetRequestPayload = z.infer<typeof CombatClearTargetRequestSchema>;
+export type CombatSelectWeaponRequestPayload = z.infer<typeof CombatSelectWeaponRequestSchema>;
+export type CombatClearWeaponRequestPayload = z.infer<typeof CombatClearWeaponRequestSchema>;
+export type CombatSelectQuadrantRequestPayload = z.infer<typeof CombatSelectQuadrantRequestSchema>;
+export type CombatClearQuadrantRequestPayload = z.infer<typeof CombatClearQuadrantRequestSchema>;
+export type CombatAttackPreviewRequestPayload = z.infer<typeof CombatAttackPreviewRequestSchema>;
+export type CombatConfirmAttackRequestPayload = z.infer<typeof CombatConfirmAttackRequestSchema>;
+
+// 部署请求类型
+export type DeploymentDeployShipRequestPayload = z.infer<typeof DeploymentDeployShipRequestSchema>;
+export type DeploymentRemoveShipRequestPayload = z.infer<typeof DeploymentRemoveShipRequestSchema>;
+export type DeploymentSetReadyRequestPayload = z.infer<typeof DeploymentSetReadyRequestSchema>;
+export type DeploymentGetStateRequestPayload = z.infer<typeof DeploymentGetStateRequestSchema>;
 
 // 响应负载类型
 export type PlayerJoinResponsePayload = PlayerInfo;
@@ -286,6 +570,8 @@ export type RoomListResponsePayload = {
   rooms: Array<{ roomId: string; playerCount: number; maxPlayers: number; createdAt: number }>;
 };
 export type RoomCreateResponsePayload = { roomId: string };
+export type RoomKickResponsePayload = { success: boolean };
+export type RoomSetOwnerResponsePayload = { success: boolean };
 export type ShipMoveResponsePayload = ShipStatus | null;
 export type ShipToggleShieldResponsePayload = ShipStatus | null;
 export type ShipVentResponsePayload = ShipStatus | null;
@@ -302,6 +588,138 @@ export type RoomStateGetResponsePayload = {
   dm: { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
   snapshot: MapSnapshot;
 };
+export type GamePauseResponsePayload = { success: boolean };
+export type GameResumeResponsePayload = { success: boolean };
+export type GameEndResponsePayload = { success: boolean; winner?: string };
+export type GameAdvancePhaseResponsePayload = { success: boolean; newPhase: string };
+export type GameControlEnemyResponsePayload = { success: boolean; enemyTokenId: string };
+
+// 三阶段移动响应类型
+export type MovementStartResponsePayload = { success: boolean; phase: string; shipId: string };
+export type MovementPreviewResponsePayload = {
+  success: boolean;
+  shipId: string;
+  phase: string;
+  preview: {
+    startPosition: { x: number; y: number };
+    endPosition: { x: number; y: number };
+    startHeading: number;
+    endHeading: number;
+    path: Array<{ x: number; y: number }>;
+    isValid: boolean;
+    invalidReason?: string;
+  };
+};
+export type MovementCommitResponsePayload = { success: boolean; shipId: string; newPosition: { x: number; y: number }; newHeading: number };
+export type MovementCancelResponsePayload = { success: boolean; shipId: string };
+
+// 战斗交互响应类型
+export type CombatSelectTargetResponsePayload = {
+  success: boolean;
+  attackerId: string;
+  targetId: string;
+  targetInfo?: {
+    id: string;
+    name?: string;
+    hullSize?: string;
+    position: { x: number; y: number };
+    heading: number;
+    distance: number;
+  };
+};
+export type CombatClearTargetResponsePayload = { success: boolean; attackerId: string };
+export type CombatSelectWeaponResponsePayload = {
+  success: boolean;
+  shipId: string;
+  weaponInstanceId: string;
+  weaponInfo?: {
+    instanceId: string;
+    weaponId: string;
+    name: string;
+    damageType: string;
+    baseDamage: number;
+    range: number;
+    arc: number;
+    state: string;
+    canFire: boolean;
+  };
+};
+export type CombatClearWeaponResponsePayload = { success: boolean; shipId: string };
+export type CombatSelectQuadrantResponsePayload = {
+  success: boolean;
+  attackerId: string;
+  targetId: string;
+  quadrant: string;
+  quadrantInfo?: {
+    quadrant: string;
+    currentArmor: number;
+    maxArmor: number;
+    armorPercent: number;
+  };
+};
+export type CombatClearQuadrantResponsePayload = { success: boolean; attackerId: string };
+export type CombatAttackPreviewResponsePayload = {
+  success: boolean;
+  attackerId: string;
+  targetId: string;
+  weaponInstanceId: string;
+  canAttack: boolean;
+  preview?: {
+    baseDamage: number;
+    estimatedShieldAbsorb: number;
+    estimatedArmorReduction: number;
+    estimatedHullDamage: number;
+    hitQuadrant: string;
+    fluxCost: number;
+    willGenerateHardFlux: boolean;
+  };
+  blockReason?: string;
+};
+export type CombatConfirmAttackResponsePayload = {
+  success: boolean;
+  attackerId: string;
+  targetId: string;
+  weaponInstanceId: string;
+  damage?: {
+    hit: boolean;
+    baseDamage: number;
+    shieldAbsorbed: number;
+    armorReduced: number;
+    hullDamage: number;
+    hitQuadrant?: string;
+  };
+  targetState?: {
+    shieldChange?: number;
+    hullChange?: number;
+    destroyed?: boolean;
+  };
+};
+
+// 部署响应类型
+export type DeploymentDeployShipResponsePayload = {
+  success: boolean;
+  token?: {
+    id: string;
+    type: string;
+    position: { x: number; y: number };
+    heading: number;
+    ownerId: string;
+    faction: string;
+  };
+  error?: string;
+};
+export type DeploymentRemoveShipResponsePayload = { success: boolean; tokenId?: string; error?: string };
+export type DeploymentSetReadyResponsePayload = { success: boolean; faction: string; ready: boolean };
+export type DeploymentGetStateResponsePayload = {
+  isDeploymentPhase: boolean;
+  deployedShips: Record<string, Array<{
+    id: string;
+    position: { x: number; y: number };
+    heading: number;
+    ownerId: string;
+  }>>;
+  readyStatus: Record<string, boolean>;
+};
 
 // 响应数据联合类型
 export type ResponseData =
@@ -310,6 +728,8 @@ export type ResponseData =
   | { operation: 'player.list'; data: PlayerListResponsePayload }
   | { operation: 'room.list'; data: RoomListResponsePayload }
   | { operation: 'room.create'; data: RoomCreateResponsePayload }
+  | { operation: 'room.kick'; data: RoomKickResponsePayload }
+  | { operation: 'room.setOwner'; data: RoomSetOwnerResponsePayload }
   | { operation: 'ship.move'; data: ShipMoveResponsePayload }
   | { operation: 'ship.toggleShield'; data: ShipToggleShieldResponsePayload }
   | { operation: 'ship.vent'; data: ShipVentResponsePayload }
@@ -320,7 +740,31 @@ export type ResponseData =
   | { operation: 'map.snapshot.get'; data: MapSnapshotGetResponsePayload }
   | { operation: 'map.snapshot.save'; data: MapSnapshotSaveResponsePayload }
   | { operation: 'map.token.move'; data: MapTokenMoveResponsePayload }
-  | { operation: 'room.state.get'; data: RoomStateGetResponsePayload };
+  | { operation: 'room.state.get'; data: RoomStateGetResponsePayload }
+  | { operation: 'game.pause'; data: GamePauseResponsePayload }
+  | { operation: 'game.resume'; data: GameResumeResponsePayload }
+  | { operation: 'game.end'; data: GameEndResponsePayload }
+  | { operation: 'game.advancePhase'; data: GameAdvancePhaseResponsePayload }
+  | { operation: 'game.controlEnemy'; data: GameControlEnemyResponsePayload }
+  // 三阶段移动
+  | { operation: 'movement.start'; data: MovementStartResponsePayload }
+  | { operation: 'movement.preview'; data: MovementPreviewResponsePayload }
+  | { operation: 'movement.commit'; data: MovementCommitResponsePayload }
+  | { operation: 'movement.cancel'; data: MovementCancelResponsePayload }
+  // 战斗交互
+  | { operation: 'combat.selectTarget'; data: CombatSelectTargetResponsePayload }
+  | { operation: 'combat.clearTarget'; data: CombatClearTargetResponsePayload }
+  | { operation: 'combat.selectWeapon'; data: CombatSelectWeaponResponsePayload }
+  | { operation: 'combat.clearWeapon'; data: CombatClearWeaponResponsePayload }
+  | { operation: 'combat.selectQuadrant'; data: CombatSelectQuadrantResponsePayload }
+  | { operation: 'combat.clearQuadrant'; data: CombatClearQuadrantResponsePayload }
+  | { operation: 'combat.attackPreview'; data: CombatAttackPreviewResponsePayload }
+  | { operation: 'combat.confirmAttack'; data: CombatConfirmAttackResponsePayload }
+  // 部署
+  | { operation: 'deployment.deployShip'; data: DeploymentDeployShipResponsePayload }
+  | { operation: 'deployment.removeShip'; data: DeploymentRemoveShipResponsePayload }
+  | { operation: 'deployment.setReady'; data: DeploymentSetReadyResponsePayload }
+  | { operation: 'deployment.getState'; data: DeploymentGetStateResponsePayload };
 
 export type ResponsePayload<T extends RequestOperation = RequestOperation> =
   | z.infer<typeof SuccessResponseSchema> & { operation: T }
@@ -400,11 +844,49 @@ export type WSMessage =
   | { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END; payload: { tokenId: string; playerId: string; finalPosition: { x: number; y: number }; finalHeading: number; timestamp: number; committed: boolean } }
   | { type: typeof WS_MESSAGE_TYPES.DM_STATUS_UPDATE; payload: { players: Array<{ id: string; name: string; isDMMode: boolean }> } }
   | { type: typeof WS_MESSAGE_TYPES.DM_TOGGLE; payload: { playerId: string; playerName: string; enable: boolean; timestamp: number } }
-  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
-  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
-  | { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED; payload: { currentIndex: number; previousIndex: number; roundNumber: number } }
-  | { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED; payload: { unitId: string; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended' } }
-  | { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED; payload: { roundNumber: number } }
+  // 阵营回合系统消息
+  | { type: typeof WS_MESSAGE_TYPES.FACTION_SELECTED; payload: { playerId: string; playerName: string; faction: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.FACTION_TURN_START; payload: { faction: string; roundNumber: number; playerEndStatus: Array<{ playerId: string; playerName: string; faction: string; hasEndedTurn: boolean; endedAt?: number }>; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.FACTION_TURN_END; payload: { faction: string; roundNumber: number; endedPlayers: string[]; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.PLAYER_END_TURN; payload: { playerId: string; playerName: string; faction: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN; payload: { playerId: string; playerName: string; faction: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.ROUND_START; payload: { roundNumber: number; factionOrder: string[]; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.FACTION_ORDER_DETERMINED; payload: { roundNumber: number; factionOrder: string[]; timestamp: number } }
+  // 游戏流程控制消息
+  | { type: typeof WS_MESSAGE_TYPES.GAME_PHASE_CHANGED; payload: { previousPhase: string; newPhase: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.GAME_STATE_SYNC; payload: { phase: string; turnPhase: string; roundNumber: number; currentFaction?: string; deploymentReady: Record<string, boolean>; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_START; payload: { factions: string[]; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED; payload: { tokenId: string; playerId: string; faction: string; position: { x: number; y: number }; heading: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_READY; payload: { faction: string; playerId: string; ready: boolean; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_COMPLETE; payload: { timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_PHASE_CHANGED; payload: { previousPhase: string; newPhase: string; roundNumber: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_RESOLUTION; payload: { roundNumber: number; fluxDissipation: Array<{ shipId: string; previousFlux: number; newFlux: number }>; overloadResets: string[]; ventCompletions: string[]; timestamp: number } }
+  // 行动系统消息
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION; payload: { shipId: string; actionType: string; actionData?: Record<string, unknown>; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION_RESULT; payload: { success: boolean; shipId: string; actionType: string; error?: string; restrictionReason?: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION_STATE_UPDATE; payload: { shipId: string; hasMoved: boolean; hasRotated: boolean; hasFired: boolean; hasToggledShield: boolean; hasVented: boolean; isOverloaded: boolean; overloadResetAvailable: boolean; remainingActions: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.OVERLOAD_RESET_AVAILABLE; payload: { shipId: string; available: boolean; timestamp: number } }
+  // 三阶段移动消息
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_PHASE_START; payload: { shipId: string; phase: 'translate_a' | 'rotate' | 'translate_b'; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_PHASE_UPDATE; payload: { shipId: string; phase: 'translate_a' | 'rotate' | 'translate_b'; previewPosition: { x: number; y: number }; previewHeading: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_PHASE_COMPLETE; payload: { shipId: string; phase: 'translate_a' | 'rotate' | 'translate_b'; finalPosition: { x: number; y: number }; finalHeading: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_PREVIEW; payload: { shipId: string; path: Array<{ x: number; y: number }>; isValid: boolean; invalidReason?: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_COMMIT; payload: { shipId: string; newPosition: { x: number; y: number }; newHeading: number; movementUsed: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.MOVEMENT_CANCEL; payload: { shipId: string; timestamp: number } }
+  // 战斗交互消息
+  | { type: typeof WS_MESSAGE_TYPES.TARGET_SELECTED; payload: { attackerId: string; targetId: string; targetInfo?: { id: string; name?: string; hullSize?: string; position: { x: number; y: number }; heading: number; distance: number }; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.WEAPON_SELECTED; payload: { shipId: string; weaponInstanceId: string; weaponInfo?: { instanceId: string; weaponId: string; name: string; damageType: string; baseDamage: number; range: number; arc: number; state: string; canFire: boolean }; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.QUADRANT_SELECTED; payload: { attackerId: string; targetId: string; quadrant: string; quadrantInfo?: { quadrant: string; currentArmor: number; maxArmor: number; armorPercent: number }; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.ATTACK_PREVIEW; payload: { attackerId: string; targetId: string; weaponInstanceId: string; canAttack: boolean; preview?: { baseDamage: number; estimatedShieldAbsorb: number; estimatedArmorReduction: number; estimatedHullDamage: number; hitQuadrant: string; fluxCost: number }; blockReason?: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.ATTACK_CONFIRMED; payload: { attackerId: string; targetId: string; weaponInstanceId: string; damage?: { hit: boolean; baseDamage: number; shieldAbsorbed: number; armorReduced: number; hullDamage: number; hitQuadrant?: string }; targetState?: { shieldChange?: number; hullChange?: number; destroyed?: boolean }; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.OVERLOAD_TRIGGERED; payload: { shipId: string; fluxAtOverload: number; overloadDuration: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.OVERLOAD_RECOVERED; payload: { shipId: string; fluxAfterRecovery: number; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.SHIP_DESTROYED; payload: { tokenId: string; killerId?: string; killerFaction?: string; reason: string; finalBlow?: { weaponId: string; damageType: string; damage: number }; timestamp: number } }
+  // 引导系统消息
+  | { type: typeof WS_MESSAGE_TYPES.GUIDE_TIP_SHOWN; payload: { playerId: string; tipId: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.GUIDE_TIP_DISMISSED; payload: { playerId: string; tipId: string; timestamp: number } }
+  | { type: typeof WS_MESSAGE_TYPES.GUIDE_PROGRESS_UPDATE; payload: { playerId: string; completedTips: string[]; currentStep: string; timestamp: number } }
+  // 战斗消息
   | { type: typeof WS_MESSAGE_TYPES.WEAPON_FIRED; payload: { sourceShipId: string; targetShipId: string; weaponId: string; mountId: string; timestamp: number } }
   | { type: typeof WS_MESSAGE_TYPES.DAMAGE_DEALT; payload: { sourceShipId: string; targetShipId: string; hit: boolean; damage?: number; shieldAbsorbed: number; armorReduced: number; hullDamage: number; hitQuadrant?: ArmorQuadrant; softFluxGenerated: number; hardFluxGenerated: number; timestamp: number } }
   | { type: typeof WS_MESSAGE_TYPES.EXPLOSION; payload: { id: string; position: { x: number; y: number }; radius: number; damage: number; sourceShipId?: string; targetShipId?: string; hitQuadrant?: ArmorQuadrant; timestamp: number } }
@@ -521,8 +1003,25 @@ export type SelectionUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAG
 export type TokenDragStartMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_START }>;
 export type TokenDraggingMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAGGING }>;
 export type TokenDragEndMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END }>;
-export type TurnOrderInitializedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED }>;
-export type TurnOrderUpdatedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED }>;
-export type TurnIndexChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED }>;
-export type UnitStateChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED }>;
-export type RoundIncrementedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED }>;
+// 阵营回合消息类型别名
+export type FactionSelectedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.FACTION_SELECTED }>;
+export type FactionTurnStartMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.FACTION_TURN_START }>;
+export type FactionTurnEndMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.FACTION_TURN_END }>;
+export type PlayerEndTurnMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PLAYER_END_TURN }>;
+export type PlayerCancelEndTurnMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN }>;
+export type RoundStartMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROUND_START }>;
+export type FactionOrderDeterminedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.FACTION_ORDER_DETERMINED }>;
+// 游戏流程控制消息类型别名
+export type GamePhaseChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.GAME_PHASE_CHANGED }>;
+export type GameStateSyncMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.GAME_STATE_SYNC }>;
+export type DeploymentStartMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_START }>;
+export type DeploymentTokenPlacedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED }>;
+export type DeploymentReadyMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_READY }>;
+export type DeploymentCompleteMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.DEPLOYMENT_COMPLETE }>;
+export type TurnPhaseChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_PHASE_CHANGED }>;
+export type TurnResolutionMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_RESOLUTION }>;
+// 行动系统消息类型别名
+export type ShipActionMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION }>;
+export type ShipActionResultMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION_RESULT }>;
+export type ShipActionStateUpdateMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.SHIP_ACTION_STATE_UPDATE }>;
+export type OverloadResetAvailableMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.OVERLOAD_RESET_AVAILABLE }>;

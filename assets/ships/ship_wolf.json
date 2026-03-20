@@ -1,0 +1,20 @@
+{
+	"id": "ship_wolf",
+	"name": "Wolf-class Frigate",
+	"nameLocalized": {
+		"zh": "狼级护卫舰",
+		"en": "Wolf-class Frigate"
+	},
+	"description": "A fast attack frigate with energy weapons. Excellent for flanking maneuvers and hit-and-run tactics.",
+	"hullId": "hull_frigate",
+	"weaponLoadout": {
+		"slot_front_medium": "weapon_laser",
+		"slot_front_small": "weapon_laser",
+		"slot_front_small_2": "weapon_laser",
+		"slot_rear_small": "weapon_flak"
+	},
+	"variant": "Standard",
+	"tags": ["fast", "energy", "attack", "frigate"],
+	"faction": "federation",
+	"cost": 8
+}

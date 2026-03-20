@@ -268,18 +268,6 @@ export class StateSyncV2 implements DomainEventHandler {
         break;
       }
 
-      // ===== 回合系统相关 =====
-      case 'TURN_ORDER_INITIALIZED':
-      case 'TURN_ORDER_UPDATED':
-      case 'TURN_INDEX_CHANGED':
-      case 'UNIT_STATE_CHANGED':
-      case 'ROUND_INCREMENTED':
-        // TODO: 实现回合状态同步
-        if (this.enableLogging) {
-          console.log('[StateSyncV2] Turn event:', type);
-        }
-        break;
-
       default:
         // 未知事件类型，忽略
         if (this.enableLogging) {

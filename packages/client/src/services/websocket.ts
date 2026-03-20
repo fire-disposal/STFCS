@@ -1,6 +1,12 @@
 import { store } from "@/store";
 import { removeOtherPlayerCamera } from "@/store/slices/mapSlice";
 import { updateOtherPlayerCamera } from "@/store/slices/mapSlice";
+import {
+	activateFactionTokens,
+	resetTokensForNewRound,
+	updateTokenTurnState,
+	updateTokensTurnStateByFaction,
+} from "@/store/slices/mapSlice";
 import { beginTokenDrag, endTokenDrag, updateTokenDrag } from "@/store/slices/selectionSlice";
 import {
 	setConnected,
@@ -9,6 +15,27 @@ import {
 	setRoomId,
 	updatePing,
 } from "@/store/slices/uiSlice";
+import {
+	initializeFactionTurn,
+	setCurrentFaction,
+	setFactionOrder,
+	setRoundNumber,
+	setDebounceStartTime,
+	setFactionTurnPhase,
+	updatePlayerEndStatus,
+	advanceToNextFaction,
+} from "@/store/slices/factionTurnSlice";
+import {
+	setGamePhase,
+	setTurnPhase,
+	startDeployment,
+	setDeploymentReady,
+	completeDeployment,
+	startGame,
+	updateShipActionState,
+	setOverloadResetAvailable,
+	handleTurnResolution,
+} from "@/store/slices/gameFlowSlice";
 import { createStateSyncV2, createWSEventBusIntegration } from "@/store/sync";
 import type { PlayerCamera, ShipMovement } from "@vt/shared/types";
 import type {
@@ -140,6 +167,219 @@ export class WebSocketService {
 		// 响应处理器
 		this.on(WS_MESSAGE_TYPES.RESPONSE, (payload) => {
 			this.handleResponse(payload);
+		});
+
+		// 阵营回合系统消息处理
+		this.on(WS_MESSAGE_TYPES.FACTION_TURN_START, (payload) => {
+			console.log("Faction turn started:", payload);
+			store.dispatch(setCurrentFaction(payload.faction as any));
+			store.dispatch(setRoundNumber(payload.roundNumber));
+			store.dispatch(setDebounceStartTime(undefined));
+			store.dispatch(setFactionTurnPhase('action'));
+
+			// 更新玩家结束状态
+			if (payload.playerEndStatus) {
+				const playerEndStatus: Record<string, any[]> = {};
+				const playerIds: string[] = [];
+				payload.playerEndStatus.forEach((player: any) => {
+					if (!playerEndStatus[player.faction]) {
+						playerEndStatus[player.faction] = [];
+					}
+					playerEndStatus[player.faction].push({
+						playerId: player.playerId,
+						playerName: player.playerName,
+						faction: player.faction,
+						hasEndedTurn: player.hasEndedTurn,
+						endedAt: player.endedAt,
+					});
+					playerIds.push(player.playerId);
+				});
+				store.dispatch(initializeFactionTurn({
+					factionOrder: [payload.faction],
+					playerEndStatus,
+				}));
+
+				// 激活当前阵营的 Token
+				store.dispatch(activateFactionTokens({
+					faction: payload.faction,
+					playerIds,
+				}));
+			}
+		});
+
+		this.on(WS_MESSAGE_TYPES.FACTION_TURN_END, (payload) => {
+			console.log("Faction turn ended:", payload);
+			store.dispatch(setDebounceStartTime(Date.now()));
+			store.dispatch(setFactionTurnPhase('transition'));
+
+			// 将当前阵营的 Token 设为 ended 状态
+			if (payload.endedPlayers && payload.endedPlayers.length > 0) {
+				store.dispatch(updateTokensTurnStateByFaction({
+					faction: payload.faction,
+					turnState: 'ended',
+					playerIds: payload.endedPlayers,
+				}));
+			}
+
+			// 延迟后自动进入下一阵营
+			setTimeout(() => {
+				store.dispatch(advanceToNextFaction());
+			}, 1000);
+		});
+
+		this.on(WS_MESSAGE_TYPES.PLAYER_END_TURN, (payload) => {
+			console.log("Player ended turn:", payload);
+			store.dispatch(updatePlayerEndStatus({
+				playerId: payload.playerId,
+				faction: payload.faction as any,
+				hasEndedTurn: true,
+				endedAt: payload.timestamp,
+			}));
+
+			// 更新该玩家的 Token 状态为 ended
+			store.dispatch(updateTokensTurnStateByFaction({
+				faction: payload.faction,
+				turnState: 'ended',
+				playerIds: [payload.playerId],
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.PLAYER_CANCEL_END_TURN, (payload) => {
+			console.log("Player cancelled end turn:", payload);
+			store.dispatch(updatePlayerEndStatus({
+				playerId: payload.playerId,
+				faction: payload.faction as any,
+				hasEndedTurn: false,
+				endedAt: undefined,
+			}));
+			// 取消防抖状态
+			store.dispatch(setDebounceStartTime(undefined));
+			store.dispatch(setFactionTurnPhase('action'));
+
+			// 更新该玩家的 Token 状态为 active
+			store.dispatch(updateTokensTurnStateByFaction({
+				faction: payload.faction,
+				turnState: 'active',
+				playerIds: [payload.playerId],
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.ROUND_START, (payload) => {
+			console.log("Round started:", payload);
+			store.dispatch(setRoundNumber(payload.roundNumber));
+			store.dispatch(setFactionOrder(payload.factionOrder as any));
+			store.dispatch(setDebounceStartTime(undefined));
+			store.dispatch(setFactionTurnPhase('action'));
+
+			// 重置所有 Token 状态
+			store.dispatch(resetTokensForNewRound());
+		});
+
+		this.on(WS_MESSAGE_TYPES.FACTION_ORDER_DETERMINED, (payload) => {
+			console.log("Faction order determined:", payload);
+			store.dispatch(setFactionOrder(payload.factionOrder as any));
+			store.dispatch(setRoundNumber(payload.roundNumber));
+		});
+
+		this.on(WS_MESSAGE_TYPES.FACTION_SELECTED, (payload) => {
+			console.log("Faction selected:", payload);
+			// 玩家选择阵营后的处理（可选）
+		});
+
+		// ====== 游戏流程控制消息处理 ======
+
+		this.on(WS_MESSAGE_TYPES.GAME_PHASE_CHANGED, (payload) => {
+			console.log("Game phase changed:", payload);
+			store.dispatch(setGamePhase({
+				phase: payload.newPhase as any,
+				previousPhase: payload.previousPhase as any,
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.GAME_STATE_SYNC, (payload) => {
+			console.log("Game state sync:", payload);
+			store.dispatch(setGamePhase({ phase: payload.phase as any }));
+			store.dispatch(setTurnPhase({ turnPhase: payload.turnPhase as any, roundNumber: payload.roundNumber }));
+		});
+
+		this.on(WS_MESSAGE_TYPES.DEPLOYMENT_START, (payload) => {
+			console.log("Deployment started:", payload);
+			store.dispatch(startDeployment({ factions: payload.factions as any }));
+		});
+
+		this.on(WS_MESSAGE_TYPES.DEPLOYMENT_TOKEN_PLACED, (payload) => {
+			console.log("Deployment token placed:", payload);
+			// Token放置由mapSlice处理
+		});
+
+		this.on(WS_MESSAGE_TYPES.DEPLOYMENT_READY, (payload) => {
+			console.log("Deployment ready:", payload);
+			store.dispatch(setDeploymentReady({
+				faction: payload.faction as any,
+				playerId: payload.playerId,
+				ready: payload.ready,
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.DEPLOYMENT_COMPLETE, (payload) => {
+			console.log("Deployment complete:", payload);
+			store.dispatch(completeDeployment());
+		});
+
+		this.on(WS_MESSAGE_TYPES.TURN_PHASE_CHANGED, (payload) => {
+			console.log("Turn phase changed:", payload);
+			store.dispatch(setTurnPhase({
+				turnPhase: payload.newPhase as any,
+				roundNumber: payload.roundNumber,
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.TURN_RESOLUTION, (payload) => {
+			console.log("Turn resolution:", payload);
+			store.dispatch(handleTurnResolution({
+				roundNumber: payload.roundNumber,
+				fluxDissipation: payload.fluxDissipation,
+				overloadResets: payload.overloadResets,
+				ventCompletions: payload.ventCompletions,
+			}));
+		});
+
+		// ====== 行动系统消息处理 ======
+
+		this.on(WS_MESSAGE_TYPES.SHIP_ACTION, (payload) => {
+			console.log("Ship action:", payload);
+			// 行动由发起者处理，其他玩家只接收广播
+		});
+
+		this.on(WS_MESSAGE_TYPES.SHIP_ACTION_RESULT, (payload) => {
+			console.log("Ship action result:", payload);
+			// 行动结果处理
+		});
+
+		this.on(WS_MESSAGE_TYPES.SHIP_ACTION_STATE_UPDATE, (payload) => {
+			console.log("Ship action state update:", payload);
+			store.dispatch(updateShipActionState({
+				shipId: payload.shipId,
+				state: {
+					shipId: payload.shipId,
+					hasMoved: payload.hasMoved,
+					hasRotated: payload.hasRotated,
+					hasFired: payload.hasFired,
+					hasToggledShield: payload.hasToggledShield,
+					hasVented: payload.hasVented,
+					isOverloaded: payload.isOverloaded,
+					overloadResetAvailable: payload.overloadResetAvailable,
+					remainingActions: payload.remainingActions,
+				},
+			}));
+		});
+
+		this.on(WS_MESSAGE_TYPES.OVERLOAD_RESET_AVAILABLE, (payload) => {
+			console.log("Overload reset available:", payload);
+			store.dispatch(setOverloadResetAvailable({
+				shipId: payload.shipId,
+				available: payload.available,
+			}));
 		});
 	}
 

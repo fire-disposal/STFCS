@@ -1,0 +1,25 @@
+{
+	"id": "weapon_laser",
+	"name": "Laser Cannon",
+	"nameLocalized": {
+		"zh": "激光炮",
+		"en": "Laser Cannon"
+	},
+	"description": "Energy weapon with consistent damage output. Deals EMP damage that can disable enemy systems.",
+	"category": "ENERGY",
+	"damageType": "ENERGY",
+	"mountType": "FIXED",
+	"damage": 80,
+	"empDamage": 20,
+	"range": 600,
+	"arc": 30,
+	"turnRate": 0,
+	"fluxCost": 120,
+	"cooldown": 1.0,
+	"chargeTime": 0,
+	"burstSize": 1,
+	"burstDelay": 0,
+	"sprite": "weapon_laser",
+	"projectileSprite": "projectile_energy",
+	"sound": "weapon_laser_fire"
+}

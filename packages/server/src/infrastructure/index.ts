@@ -6,6 +6,7 @@
  * 2. 基础设施抽象接口
  * 3. 事件驱动架构组件
  * 4. WS 通信实现
+ * 5. 资源管理
  */
 
 // 依赖注入
@@ -18,3 +19,6 @@ export * from './events';
 export { WSServer } from './ws/WSServer';
 export { RoomManager } from './ws/RoomManager';
 export { MessageHandler } from './ws/MessageHandler';
+
+// 资源管理
+export * from './assets';

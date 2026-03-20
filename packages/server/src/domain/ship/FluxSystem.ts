@@ -127,6 +127,34 @@ export class FluxSystem implements IFluxSystem {
     this._softFlux = Math.max(0, this._softFlux - this._dissipation);
   }
 
+  /**
+   * 散发指定数量的软辐能
+   */
+  dissipateSoftFlux(amount: number): void {
+    if (this._state === FluxStateValues.OVERLOADED) {
+      return;
+    }
+    this._softFlux = Math.max(0, this._softFlux - amount);
+  }
+
+  /**
+   * 清空所有辐能
+   */
+  clearFlux(): void {
+    this._softFlux = 0;
+    this._hardFlux = 0;
+    this._state = FluxStateValues.NORMAL;
+  }
+
+  /**
+   * 设置辐能值
+   */
+  setFlux(softFlux: number, hardFlux: number): void {
+    this._softFlux = Math.max(0, Math.min(softFlux, this._capacity));
+    this._hardFlux = Math.max(0, Math.min(hardFlux, this._capacity - this._softFlux));
+    this._updateState();
+  }
+
   copy(): FluxSystem {
     const copy = new FluxSystem({
       capacity: this._capacity,

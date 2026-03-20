@@ -13,6 +13,12 @@ import {
 	createSelectionLock,
 	type AddonConfig,
 } from "@/features/game/components/TokenAddons";
+// 几何体渲染器（素材缺失时的回退）
+import {
+	renderShipGeometry,
+	HULL_SIZE_COLORS,
+} from "@/features/game/utils/geometry";
+import { getAssetRegistry } from "@/services/AssetRegistry";
 
 /**
  * Token 渲染器配置
@@ -110,7 +116,7 @@ export function renderToken(
 	const tokenBody = new Graphics();
 
 	if (token.type === "ship") {
-		drawShipBody(tokenBody, tokenSize, TOKEN_COLORS.ship);
+		drawShipBody(tokenBody, tokenSize, TOKEN_COLORS.ship, token);
 	} else if (token.type === "station") {
 		drawStationBody(tokenBody, tokenSize, TOKEN_COLORS.station);
 	} else {
@@ -196,8 +202,43 @@ export function renderToken(
 
 /**
  * 绘制舰船主体
+ * 
+ * 优先使用素材，如果素材不存在则使用几何体绘制
  */
-function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship): void {
+function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship, token?: TokenInfo): void {
+	// 尝试从 AssetRegistry 获取素材
+	const registry = getAssetRegistry();
+	let hasSprite = false;
+
+	if (token?.metadata?.shipDefinitionId) {
+		const shipDef = registry.getShip(token.metadata.shipDefinitionId as string);
+		if (shipDef) {
+			const hullDef = registry.getHull(shipDef.hullId);
+			if (hullDef?.sprite) {
+				const sprite = registry.getSprite(hullDef.sprite);
+				hasSprite = !!sprite;
+			}
+		}
+	}
+
+	// 如果有素材，使用简单的几何体作为占位符（素材渲染在其他地方处理）
+	// 如果没有素材，使用几何体绘制
+	if (!hasSprite) {
+		// 使用几何体绘制 - 简洁的示波器风格
+		drawShipGeometryFallback(graphics, size, colors);
+	} else {
+		// 有素材时绘制简单的占位符
+		drawShipGeometryFallback(graphics, size, colors);
+	}
+}
+
+/**
+ * 舰船几何体绘制回退方案
+ * 
+ * 使用简洁的几何体绘制舰船形状
+ */
+function drawShipGeometryFallback(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship): void {
+	// 主体 - 箭头形状
 	const points = [
 		new Point(size, 0),
 		new Point(-size * 0.5, size * 0.4),
@@ -208,6 +249,7 @@ function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COL
 	graphics.poly(points);
 	graphics.fill({ color: colors.body, alpha: colors.bodyAlpha });
 
+	// 中心线
 	const centerLine = new Graphics();
 	centerLine.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 0.3 });
 	centerLine.moveTo(-size * 0.3, 0);
@@ -215,6 +257,7 @@ function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COL
 	centerLine.stroke();
 	graphics.addChild(centerLine);
 
+	// 碰撞半径指示
 	graphics.setStrokeStyle({ width: 2, color: colors.stroke, alpha: colors.strokeAlpha });
 	graphics.circle(0, 0, size + 2);
 	graphics.stroke();

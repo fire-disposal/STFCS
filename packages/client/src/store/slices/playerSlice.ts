@@ -167,4 +167,14 @@ export const {
 	setFluxVenting,
 } = playerSlice.actions;
 
+// 选择器
+export const selectCurrentPlayerId = (state: { player: PlayerState }) =>
+	state.player.currentPlayerId;
+
+export const selectPlayers = (state: { player: PlayerState }) =>
+	state.player.players;
+
+export const selectCurrentPlayer = (state: { player: PlayerState }) =>
+	state.player.currentPlayerId ? state.player.players[state.player.currentPlayerId] : null;
+
 export default playerSlice.reducer;

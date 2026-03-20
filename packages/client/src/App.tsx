@@ -1,4 +1,6 @@
 import { SciFiLanguageSwitcher } from "@/components/ui/SciFiLanguageSwitcher";
+import { RoomSelector } from "@/components/login/RoomSelector";
+import { FactionSelector } from "@/components/login/FactionSelector";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,6 +8,7 @@ import { DEFAULT_WS_URL } from "@/config";
 import GameView from "@/features/game/GameView";
 import { websocketService } from "@/services/websocket";
 import { useAppDispatch, useAppSelector } from "@/store";
+import { selectFaction, confirmFaction } from "@/store/slices/factionSlice";
 import { loadMapSnapshot } from "@/store/slices/mapSlice";
 import { addPlayer, clearPlayers, setCurrentPlayer } from "@/store/slices/playerSlice";
 import {
@@ -17,16 +20,21 @@ import {
 	setRoomId,
 	updateDMPlayers,
 } from "@/store/slices/uiSlice";
+import type { FactionId } from "@vt/shared/types";
+import { DEFAULT_FACTION_IDS } from "@vt/shared/constants";
 
-// 简化的连接视图 - 只输入玩家名称
+// 登录视图 - 输入用户名并选择房间
 const PlayerNameView: React.FC<{
 	isConnecting: boolean;
 	isConnected: boolean;
-	onJoin: (playerName: string) => Promise<void>;
+	onJoin: (playerName: string, roomId: string, faction: FactionId) => Promise<void>;
 	onReconnect: () => Promise<void>;
-}> = ({ isConnecting, isConnected, onJoin, onReconnect }) => {
+	onCreateRoom: (options: { roomId: string; name?: string; maxPlayers: number; isPrivate: boolean; password?: string }) => Promise<void>;
+}> = ({ isConnecting, isConnected, onJoin, onReconnect, onCreateRoom }) => {
 	const { t } = useTranslation();
 	const [name, setName] = useState("");
+	const [selectedRoomId, setSelectedRoomId] = useState<string>("default");
+	const [selectedFaction, setSelectedFaction] = useState<FactionId>(DEFAULT_FACTION_IDS[0]);
 	const [error, setError] = useState("");
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -54,9 +62,17 @@ const PlayerNameView: React.FC<{
 			setError(t("connection.error.nameTooLong"));
 			return;
 		}
+		if (!selectedRoomId) {
+			setError(t("connection.error.roomRequired"));
+			return;
+		}
+		if (!selectedFaction) {
+			setError(t("faction.error.factionRequired"));
+			return;
+		}
 		setError("");
 		try {
-			await onJoin(name);
+			await onJoin(name, selectedRoomId, selectedFaction);
 		} catch (err) {
 			setError(
 				t("connection.error.failedToJoin", {
@@ -68,7 +84,7 @@ const PlayerNameView: React.FC<{
 
 	return (
 		<div className="connection-view">
-			<div className="connection-card">
+			<div className="connection-card connection-card-expanded">
 				<div className="connection-header">
 					<h2>{t("connection.title")}</h2>
 					<SciFiLanguageSwitcher />
@@ -76,6 +92,7 @@ const PlayerNameView: React.FC<{
 				<p className="connection-description">{t("connection.description")}</p>
 
 				<form onSubmit={handleSubmit} className="connection-form">
+					{/* 用户名输入 */}
 					<div className="form-group">
 						<label htmlFor="playerName">
 							{isConnected ? t("connection.playerName") : t("connection.unableToConnect")}
@@ -98,8 +115,33 @@ const PlayerNameView: React.FC<{
 							</div>
 						)}
 						{isConnected ? <small className="form-help">{t("connection.formHelp")}</small> : null}
-						{error && <div className="form-error">{error}</div>}
 					</div>
+
+					{/* 房间选择 */}
+					{isConnected && (
+						<div className="form-group">
+							<label>{t("connection.roomSelection")}</label>
+							<RoomSelector
+								selectedRoomId={selectedRoomId}
+								onRoomSelect={setSelectedRoomId}
+								onRoomCreate={onCreateRoom}
+								disabled={isConnecting}
+							/>
+						</div>
+					)}
+
+					{/* 阵营选择 */}
+					{isConnected && (
+						<div className="form-group">
+							<FactionSelector
+								selectedFaction={selectedFaction}
+								onFactionSelect={setSelectedFaction}
+								disabled={isConnecting}
+							/>
+						</div>
+					)}
+
+					{error && <div className="form-error">{error}</div>}
 
 					<div className="form-actions">
 						<button
@@ -129,7 +171,7 @@ const PlayerNameView: React.FC<{
 						<li>{t("connectionInfo.autoConnect", { url: DEFAULT_WS_URL })}</li>
 						<li>{t("connectionInfo.serverRunning")}</li>
 						<li>{t("connectionInfo.uniqueName")}</li>
-						<li>{t("connectionInfo.changeRooms")}</li>
+						<li>{t("connectionInfo.selectOrCreateRoom")}</li>
 					</ul>
 				</div>
 			</div>
@@ -191,7 +233,7 @@ const App: React.FC = () => {
 		};
 	}, [dispatch]);
 
-	const handlePlayerJoin = async (name: string) => {
+	const handlePlayerJoin = async (name: string, roomId: string, faction: FactionId) => {
 		dispatch(setConnecting(true));
 
 		try {
@@ -200,24 +242,29 @@ const App: React.FC = () => {
 			}
 
 			const tempPlayerId = `player_${Date.now()}`;
-			const defaultRoomId = "default_room";
+			const targetRoomId = roomId || "default";
 
 			await websocketService.sendRequest("player.join", {
 				id: tempPlayerId,
 				name,
-				roomId: defaultRoomId,
+				roomId: targetRoomId,
+				faction,
 			});
 
-			const roomState = await websocketService.getRoomState(defaultRoomId);
+			const roomState = await websocketService.getRoomState(targetRoomId);
 
 			dispatch(setPlayerName(name));
 			dispatch(setPlayerId(tempPlayerId));
-			dispatch(setRoomId(defaultRoomId));
+			dispatch(setRoomId(targetRoomId));
 			dispatch(clearPlayers());
 			dispatch(setCurrentPlayer(tempPlayerId));
 			dispatch(loadMapSnapshot(roomState.snapshot));
 			dispatch(setDMMode(roomState.dm.isDMMode));
 			dispatch(updateDMPlayers(roomState.dm.players));
+
+			// 确认阵营选择
+			dispatch(selectFaction(faction));
+			dispatch(confirmFaction());
 
 			roomState.players.forEach((player, index) => {
 				dispatch(
@@ -233,7 +280,7 @@ const App: React.FC = () => {
 						selectedTargets: [],
 						usedActions: 0,
 						pendingActions: 0,
-						roomId: defaultRoomId,
+						roomId: targetRoomId,
 						slotIndex: index,
 						hasActed: false,
 						fluxVentingActive: false,
@@ -243,7 +290,7 @@ const App: React.FC = () => {
 			});
 
 			console.log(
-				`Player ${name} joined the game in room ${defaultRoomId} with MVP room bootstrap`
+				`Player ${name} joined the game in room ${targetRoomId} with faction ${faction}`
 			);
 		} catch (error) {
 			console.error("Failed to join game:", error);
@@ -251,6 +298,23 @@ const App: React.FC = () => {
 		} finally {
 			dispatch(setConnecting(false));
 		}
+	};
+
+	// 创建新房间
+	const handleCreateRoom = async (options: { roomId: string; name?: string; maxPlayers: number; isPrivate: boolean; password?: string }) => {
+		if (!websocketService.isConnected()) {
+			throw new Error("Not connected to server");
+		}
+
+		await websocketService.sendRequest("room.create", {
+			roomId: options.roomId,
+			name: options.name,
+			maxPlayers: options.maxPlayers,
+			isPrivate: options.isPrivate,
+			password: options.password,
+		});
+
+		console.log(`Room ${options.roomId} created with max ${options.maxPlayers} players`);
 	};
 
 	const handleReconnect = async () => {
@@ -288,6 +352,7 @@ const App: React.FC = () => {
 			isConnected={isConnected}
 			onJoin={handlePlayerJoin}
 			onReconnect={handleReconnect}
+			onCreateRoom={handleCreateRoom}
 		/>
 	);
 };

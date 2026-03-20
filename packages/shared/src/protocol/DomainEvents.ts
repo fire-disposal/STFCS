@@ -185,69 +185,6 @@ export const CameraUpdatedEventSchema = z.object({
   timestamp: z.number(),
 });
 
-/**
- * 回合初始化事件
- */
-export const TurnOrderInitializedEventSchema = z.object({
-  units: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    ownerId: z.string(),
-    ownerName: z.string(),
-    unitType: z.enum(['ship', 'station', 'npc']),
-    state: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-    initiative: z.number(),
-  })),
-  roundNumber: z.number(),
-  phase: z.enum(['planning', 'movement', 'action', 'resolution']),
-  timestamp: z.number(),
-});
-
-/**
- * 回合更新事件
- */
-export const TurnOrderUpdatedEventSchema = z.object({
-  units: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    ownerId: z.string(),
-    ownerName: z.string(),
-    unitType: z.enum(['ship', 'station', 'npc']),
-    state: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-    initiative: z.number(),
-  })),
-  roundNumber: z.number(),
-  phase: z.enum(['planning', 'movement', 'action', 'resolution']),
-  timestamp: z.number(),
-});
-
-/**
- * 回合索引变更事件
- */
-export const TurnIndexChangedEventSchema = z.object({
-  currentIndex: z.number(),
-  previousIndex: z.number(),
-  roundNumber: z.number(),
-  timestamp: z.number(),
-});
-
-/**
- * 单位状态变更事件
- */
-export const UnitStateChangedEventSchema = z.object({
-  unitId: z.string(),
-  state: z.enum(['waiting', 'active', 'moved', 'acted', 'ended']),
-  timestamp: z.number(),
-});
-
-/**
- * 回合数增加事件
- */
-export const RoundIncrementedEventSchema = z.object({
-  roundNumber: z.number(),
-  timestamp: z.number(),
-});
-
 // ==================== 事件目录 ====================
 
 /**
@@ -325,28 +262,6 @@ export const DOMAIN_EVENTS = {
   CAMERA_UPDATED: defineMessage('CAMERA_UPDATED', CameraUpdatedEventSchema, {
     broadcast: true,
     description: '相机更新',
-  }),
-
-  // 回合事件
-  TURN_ORDER_INITIALIZED: defineMessage('TURN_ORDER_INITIALIZED', TurnOrderInitializedEventSchema, {
-    broadcast: true,
-    description: '回合顺序初始化',
-  }),
-  TURN_ORDER_UPDATED: defineMessage('TURN_ORDER_UPDATED', TurnOrderUpdatedEventSchema, {
-    broadcast: true,
-    description: '回合顺序更新',
-  }),
-  TURN_INDEX_CHANGED: defineMessage('TURN_INDEX_CHANGED', TurnIndexChangedEventSchema, {
-    broadcast: true,
-    description: '回合索引变更',
-  }),
-  UNIT_STATE_CHANGED: defineMessage('UNIT_STATE_CHANGED', UnitStateChangedEventSchema, {
-    broadcast: true,
-    description: '单位状态变更',
-  }),
-  ROUND_INCREMENTED: defineMessage('ROUND_INCREMENTED', RoundIncrementedEventSchema, {
-    broadcast: true,
-    description: '回合数增加',
   }),
 } as const;
 

@@ -7,6 +7,7 @@
     "title": "加入 STFCS 游戏",
     "description": "输入您的玩家名称加入太空舰队战术战斗模拟。",
     "playerName": "玩家名称",
+    "roomSelection": "房间选择",
     "unableToConnect": "无法连接到服务器",
     "connectionStatusText": "无法连接到 {{url}}。请检查服务器是否正在运行。",
     "formHelp": "最多 32 个字符。在房间中必须唯一。",
@@ -19,6 +20,7 @@
     "error": {
       "nameRequired": "请输入玩家名称",
       "nameTooLong": "玩家名称不能超过 32 个字符",
+      "roomRequired": "请选择或创建一个房间",
       "failedToJoin": "加入失败：{{error}}",
       "failedToReconnect": "重新连接失败：{{error}}"
     }
@@ -28,7 +30,7 @@
     "autoConnect": "自动连接到：{{url}}",
     "serverRunning": "服务器运行在 localhost:3001",
     "uniqueName": "玩家名称在每个房间中必须唯一",
-    "changeRooms": "加入后可以切换房间"
+    "selectOrCreateRoom": "选择现有房间或创建新房间"
   },
   "game": {
     "title": "游戏",
@@ -124,7 +126,43 @@
     "notJoined": "未加入",
     "players": "玩家",
     "connected": "已连接",
-    "disconnected": "已断开"
+    "disconnected": "已断开",
+    "quickJoin": "快速加入",
+    "quickJoinDescription": "自动加入默认房间",
+    "selectRoom": "选择房间",
+    "selectRoomDescription": "从 {{count}} 个可用房间中选择",
+    "noRoomsAvailable": "暂无可用房间",
+    "createRoom": "创建房间",
+    "createRoomDescription": "创建一个新的私人房间",
+    "selectPlaceholder": "选择一个房间...",
+    "newRoomId": "房间名称",
+    "newRoomIdPlaceholder": "输入房间名称",
+    "newRoomName": "房间显示名称",
+    "newRoomNamePlaceholder": "输入显示名称（可选）",
+    "maxPlayers": "最大玩家数",
+    "privateRoom": "私密房间",
+    "password": "密码",
+    "passwordPlaceholder": "输入房间密码",
+    "enterPassword": "输入密码",
+    "privateRoomMessage": "房间 \"{{name}}\" 需要密码才能加入",
+    "join": "加入",
+    "transferOwner": "转让房主",
+    "kickPlayer": "踢出玩家",
+    "createButton": "创建并加入",
+    "creating": "创建中...",
+    "loadingRooms": "加载房间列表...",
+    "phase": {
+      "lobby": "大厅",
+      "deployment": "部署",
+      "playing": "游戏中",
+      "paused": "暂停",
+      "ended": "已结束"
+    },
+    "error": {
+      "roomIdRequired": "请输入房间名称",
+      "roomIdTooLong": "房间名称不能超过 32 个字符",
+      "passwordRequired": "私密房间需要设置密码"
+    }
   },
   "player": {
     "controls": "玩家控制",
@@ -142,6 +180,46 @@
       "holdToToggle": "长按 3 秒切换",
       "clickToEnable": "长按启用 DM 模式",
       "clickToDisable": "长按禁用 DM 模式"
+    }
+  },
+  "dm": {
+    "controlPanel": {
+      "title": "DM 控制面板",
+      "gameFlow": "游戏流程",
+      "turnControl": "回合控制",
+      "enemyUnits": "敌方单位",
+      "pause": "暂停",
+      "resume": "继续",
+      "endGame": "结束游戏",
+      "advancePhase": "推进阶段",
+      "phase": "游戏阶段",
+      "currentPhase": "当前回合阶段",
+      "noEnemies": "没有敌方单位"
+    },
+    "action": {
+      "move": "移动",
+      "attack": "攻击",
+      "defend": "防御"
+    },
+    "confirm": {
+      "endGame": {
+        "title": "结束游戏",
+        "message": "确定要结束游戏吗？此操作不可撤销。"
+      }
+    }
+  },
+  "game": {
+    "phase": {
+      "lobby": "大厅",
+      "deployment": "部署",
+      "playing": "游戏中",
+      "paused": "暂停",
+      "ended": "已结束"
+    },
+    "turnPhase": {
+      "player_action": "玩家行动",
+      "dm_action": "DM 行动",
+      "resolution": "结算"
     }
   },
   "combat": {
@@ -290,5 +368,25 @@
     "aim": "瞄准",
     "cancel": "取消",
     "confirm": "确认"
+  },
+  "faction": {
+    "selectFaction": "选择阵营",
+    "federation": "联邦",
+    "empire": "帝国",
+    "federationDescription": "星际联邦 - 和平与民主的守护者",
+    "empireDescription": "银河帝国 - 追求全面征服的征服者",
+    "selected": "已选择",
+    "confirmed": "阵营已确认",
+    "error": {
+      "factionRequired": "请选择一个阵营"
+    }
+  },
+  "factionTurn": {
+    "playersEnded": "已结束",
+    "transitioning": "切换中...",
+    "endTurn": "结束回合",
+    "cancelEnd": "取消结束",
+    "yourTurn": "你的回合",
+    "waitingFor": "等待 {{faction}} 行动"
   }
 }

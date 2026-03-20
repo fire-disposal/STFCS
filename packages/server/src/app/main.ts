@@ -6,6 +6,8 @@ import Fastify, { FastifyInstance, type FastifyError } from "fastify";
 import { PlayerService } from "../application/player/PlayerService";
 import { SelectionService } from "../application/selection/SelectionService";
 import { ShipService } from "../application/ship/ShipService";
+import { FactionService } from "../application/faction/FactionService";
+import { FactionTurnService } from "../application/turn/FactionTurnService";
 import { config } from "../config";
 import { DomainEventAggregator } from "../infrastructure/events";
 import { EventBus } from "@vt/shared/events";
@@ -27,6 +29,8 @@ export class Application {
 	private _playerService: PlayerService;
 	private _selectionService: SelectionService;
 	private _shipService: ShipService;
+	private _factionService: FactionService;
+	private _factionTurnService: FactionTurnService;
 	private _domainEventAggregator?: DomainEventAggregator;
 	private _eventBus?: EventBus;
 
@@ -41,6 +45,8 @@ export class Application {
 		this._playerService = new PlayerService();
 		this._selectionService = new SelectionService();
 		this._shipService = new ShipService();
+		this._factionService = new FactionService();
+		this._factionTurnService = new FactionTurnService(this._factionService);
 		// _eventBusManager 将在 _initializeWS 中初始化（需要 wsServer）
 	}
 
@@ -144,6 +150,8 @@ export class Application {
 		this._playerService.setRoomManager(this._roomManager);
 		this._selectionService.setRoomManager(this._roomManager);
 		this._shipService.setRoomManager(this._roomManager);
+		this._factionService.setRoomManager(this._roomManager);
+		this._factionTurnService.setRoomManager(this._roomManager);
 	}
 
 	private _initializeWS(): void {
@@ -167,12 +175,16 @@ export class Application {
 		this._playerService.setWSServer(this._wsServer);
 		this._selectionService.setWSServer(this._wsServer);
 		this._shipService.setWSServer(this._wsServer);
+		this._factionService.setWSServer(this._wsServer);
+		this._factionTurnService.setWSServer(this._wsServer);
 
 		this._messageHandler = new MessageHandler({
 			roomManager: this._roomManager,
 			playerService: this._playerService,
 			selectionService: this._selectionService,
 			shipService: this._shipService,
+			factionService: this._factionService,
+			factionTurnService: this._factionTurnService,
 			wsServer: this._wsServer,
 		});
 
@@ -207,6 +219,8 @@ export class Application {
 				await this._playerService.leave(clientId, room.id);
 				// 清理玩家的选中状态
 				this._selectionService.handlePlayerLeave(clientId, room.id);
+				// 清理玩家的阵营数据
+				this._factionService.removePlayer(room.id, clientId);
 			}
 		}
 	}

@@ -453,3 +453,586 @@
   pointer-events: none;
   cursor: not-allowed;
 }
+
+/* ====== 房间选择器组件 ====== */
+.room-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.room-selector-modes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: rgba(20, 25, 35, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.mode-option:hover {
+  background: rgba(30, 35, 45, 0.7);
+  border-color: rgba(74, 158, 255, 0.3);
+}
+
+.mode-option.active {
+  background: rgba(74, 158, 255, 0.15);
+  border-color: rgba(74, 158, 255, 0.4);
+}
+
+.mode-option input[type="radio"] {
+  display: none;
+}
+
+.mode-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.mode-description {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.room-select-container {
+  margin-top: var(--space-2);
+}
+
+.room-select {
+  width: 100%;
+  height: var(--height-md);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  outline: none;
+}
+
+.room-select:focus {
+  border-color: var(--border-color-active);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.room-select option {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  padding: var(--space-2);
+}
+
+.room-select option:disabled {
+  color: var(--text-tertiary);
+}
+
+.create-room-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: rgba(20, 25, 35, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.create-room-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--height-md);
+  background: rgba(74, 158, 255, 0.15);
+  border: 1px solid rgba(74, 158, 255, 0.4);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.create-room-button:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: rgba(74, 158, 255, 0.6);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.create-room-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.room-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ====== 扩展登录卡片 ====== */
+.connection-card-expanded {
+  max-width: 480px;
+}
+
+/* ====== 阵营选择器 ====== */
+.faction-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.faction-selector-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.faction-cards {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.faction-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: rgba(20, 25, 35, 0.6);
+  border: 2px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  position: relative;
+}
+
+.faction-card:hover {
+  background: rgba(30, 35, 45, 0.7);
+  border-color: rgba(74, 158, 255, 0.4);
+}
+
+.faction-card.selected {
+  background: rgba(74, 158, 255, 0.15);
+  border-width: 2px;
+}
+
+.faction-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 24px;
+}
+
+.faction-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.faction-name {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.faction-description {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.faction-selected-indicator {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  color: var(--color-success);
+  font-size: var(--text-lg);
+}
+
+/* ====== 战术面板组件 ====== */
+
+/* 战术按钮基础样式 */
+.btn-tactical {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-tactical:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 战术主要按钮 */
+.btn-tactical--primary {
+  background: var(--tactical-hover);
+  border-color: var(--tactical-border);
+  color: var(--color-primary);
+}
+
+.btn-tactical--primary:hover:not(:disabled) {
+  background: var(--tactical-active);
+  border-color: rgba(74, 158, 255, 0.6);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* 战术危险按钮 */
+.btn-tactical--danger {
+  background: rgba(180, 40, 40, 0.15);
+  border-color: rgba(255, 68, 68, 0.4);
+  color: var(--color-danger);
+}
+
+.btn-tactical--danger:hover:not(:disabled) {
+  background: rgba(255, 68, 68, 0.2);
+  border-color: rgba(255, 68, 68, 0.6);
+  box-shadow: var(--shadow-glow-danger);
+}
+
+/* 战术警告按钮 */
+.btn-tactical--warning {
+  background: rgba(100, 60, 20, 0.4);
+  border-color: rgba(255, 170, 0, 0.3);
+  color: var(--color-warning);
+}
+
+.btn-tactical--warning:hover:not(:disabled) {
+  background: rgba(255, 170, 0, 0.2);
+  border-color: rgba(255, 170, 0, 0.5);
+}
+
+/* 战术标签按钮 */
+.btn-tactical-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(30, 35, 45, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-tactical-tab:hover {
+  background: rgba(40, 50, 70, 0.6);
+  border-color: rgba(74, 158, 255, 0.4);
+  color: var(--text-secondary);
+}
+
+.btn-tactical-tab.active {
+  background: var(--tactical-hover);
+  border-color: rgba(74, 158, 255, 0.5);
+  color: var(--color-primary);
+}
+
+/* 战术切换按钮 */
+.btn-tactical-toggle {
+  padding: var(--space-1) var(--space-2);
+  background: rgba(40, 50, 70, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  min-width: 28px;
+}
+
+.btn-tactical-toggle:hover {
+  background: rgba(60, 70, 90, 0.7);
+  border-color: rgba(74, 158, 255, 0.5);
+  color: var(--text-secondary);
+}
+
+.btn-tactical-toggle.active {
+  background: var(--tactical-hover);
+  border-color: rgba(74, 158, 255, 0.5);
+  color: var(--color-primary);
+}
+
+/* 战术面板容器 */
+.tactical-panel {
+  background: var(--tactical-bg);
+  border-top: 1px solid var(--tactical-border);
+}
+
+/* 战术状态条 */
+.tactical-status-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.tactical-status-fill {
+  height: 100%;
+  transition: width var(--transition-slow);
+}
+
+.tactical-status-fill--shield {
+  background: var(--status-shield);
+  box-shadow: 0 0 6px rgba(74, 158, 255, 0.3);
+}
+
+.tactical-status-fill--flux {
+  background: var(--status-flux);
+}
+
+.tactical-status-fill--armor {
+  background: var(--status-armor);
+}
+
+.tactical-status-fill--structure {
+  background: var(--status-structure);
+}
+
+/* 战术单位缩略图 */
+.tactical-unit-thumb {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  background: var(--tactical-section-bg);
+  border: 1px solid rgba(74, 158, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 战术行动点指示器 */
+.tactical-ap-dot {
+  width: 8px;
+  height: 8px;
+  background: rgba(40, 50, 70, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  transition: var(--transition-fast);
+}
+
+.tactical-ap-dot.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 6px rgba(74, 158, 255, 0.4);
+}
+
+/* 战术控制占位符 */
+.tactical-control-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  background: rgba(20, 25, 35, 0.6);
+  border: 1px dashed rgba(74, 158, 255, 0.3);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.tactical-control-placeholder svg {
+  color: var(--color-primary);
+  opacity: 0.5;
+}
+
+/* ====== 信息面板组件 ====== */
+
+/* 信息面板标签 */
+.info-panel-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.info-panel-tab:hover {
+  color: var(--text-secondary);
+  background: rgba(74, 158, 255, 0.05);
+}
+
+.info-panel-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* 信息面板消息 */
+.info-panel-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.info-panel-message--system {
+  background: rgba(74, 158, 255, 0.1);
+  border-left: 2px solid rgba(74, 158, 255, 0.4);
+}
+
+.info-panel-message--event {
+  background: rgba(100, 100, 150, 0.1);
+  border-left: 2px solid rgba(100, 100, 150, 0.3);
+  color: var(--text-tertiary);
+}
+
+.info-panel-message--chat {
+  background: rgba(40, 50, 70, 0.3);
+}
+
+.info-panel-message--self {
+  background: rgba(74, 158, 255, 0.15);
+  border-left: 2px solid rgba(74, 158, 255, 0.4);
+}
+
+/* 信息面板日志条目 */
+.info-panel-log-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(30, 30, 60, 0.3);
+  border-left: 2px solid transparent;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.info-panel-log-entry--attack {
+  border-left-color: var(--color-danger);
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.info-panel-log-entry--damage {
+  border-left-color: var(--color-warning);
+  background: rgba(255, 170, 0, 0.1);
+}
+
+.info-panel-log-entry--shield {
+  border-left-color: var(--color-primary);
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.info-panel-log-entry--move {
+  border-left-color: var(--color-success);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.info-panel-log-entry--turn {
+  border-left-color: #ff44ff;
+  background: rgba(255, 68, 255, 0.1);
+}
+
+/* 信息面板输入框 */
+.info-panel-input {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid rgba(74, 158, 255, 0.2);
+  background: rgba(10, 12, 20, 0.8);
+}
+
+.info-panel-input input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+.info-panel-input input:focus {
+  border-color: rgba(74, 158, 255, 0.6);
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.2);
+}
+
+.info-panel-input button {
+  width: var(--height-md);
+  height: var(--height-md);
+  background: var(--tactical-hover);
+  border: 1px solid rgba(74, 158, 255, 0.4);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border-radius: var(--radius-sm);
+  padding: 0;
+}
+
+.info-panel-input button:hover {
+  background: var(--tactical-active);
+  border-color: rgba(74, 158, 255, 0.6);
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+}

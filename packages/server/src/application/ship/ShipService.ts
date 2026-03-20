@@ -49,6 +49,10 @@ export interface IShipService {
 	enableShield(shipId: string): Promise<boolean>;
 	disableShield(shipId: string): Promise<boolean>;
 	ventShip(shipId: string): Promise<boolean>;
+	dissipateFlux(shipId: string, amount?: number): Promise<boolean>;
+	completeVent(shipId: string): Promise<boolean>;
+	resetOverload(shipId: string): Promise<boolean>;
+	setFlux(shipId: string, softFlux: number, hardFlux: number): Promise<boolean>;
 	getShipStatus(shipId: string): ShipStatus | undefined;
 	subscribeToEvents(handler: (events: ShipEvent[]) => void): void;
 }
@@ -188,6 +192,67 @@ export class ShipService extends BaseService implements IShipService {
 			this._broadcastShipEvents(ship);
 		}
 		return success;
+	}
+
+	/**
+	 * 执行辐能下降
+	 */
+	async dissipateFlux(shipId: string, amount?: number): Promise<boolean> {
+		const ship = this._ships.get(shipId);
+		if (!ship) {
+			return false;
+		}
+
+		const dissipationAmount = amount ?? ship.flux.dissipation;
+		ship.flux.dissipateSoftFlux(dissipationAmount);
+		this._broadcastShipEvents(ship);
+		return true;
+	}
+
+	/**
+	 * 完成主动排散（辐能清空）
+	 */
+	async completeVent(shipId: string): Promise<boolean> {
+		const ship = this._ships.get(shipId);
+		if (!ship) {
+			return false;
+		}
+
+		ship.flux.clearFlux();
+		ship.endVent();
+		this._broadcastShipEvents(ship);
+		return true;
+	}
+
+	/**
+	 * 重置过载状态
+	 */
+	async resetOverload(shipId: string): Promise<boolean> {
+		const ship = this._ships.get(shipId);
+		if (!ship) {
+			return false;
+		}
+
+		// 过载恢复后，辐能降至容量的一半
+		const newFlux = Math.floor(ship.flux.capacity / 2);
+		ship.flux.setFlux(newFlux, 0);
+		ship.recoverFromOverload();
+		this._broadcastShipEvents(ship);
+		return true;
+	}
+
+	/**
+	 * 设置辐能值
+	 */
+	async setFlux(shipId: string, softFlux: number, hardFlux: number): Promise<boolean> {
+		const ship = this._ships.get(shipId);
+		if (!ship) {
+			return false;
+		}
+
+		ship.flux.setFlux(softFlux, hardFlux);
+		this._broadcastShipEvents(ship);
+		return true;
 	}
 
 	getShipStatus(shipId: string): ShipStatus | undefined {

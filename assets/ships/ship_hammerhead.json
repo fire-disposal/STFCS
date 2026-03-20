@@ -1,0 +1,22 @@
+{
+	"id": "ship_hammerhead",
+	"name": "Hammerhead Destroyer",
+	"nameLocalized": {
+		"zh": "锤头鲨驱逐舰",
+		"en": "Hammerhead Destroyer"
+	},
+	"description": "A balanced destroyer with mixed armament. The hammerhead design provides excellent forward firepower.",
+	"hullId": "hull_destroyer",
+	"weaponLoadout": {
+		"slot_front_large": "weapon_autocannon",
+		"slot_front_medium": "weapon_autocannon",
+		"slot_front_medium_2": "weapon_autocannon",
+		"slot_side_small": "weapon_flak",
+		"slot_side_small_2": "weapon_flak",
+		"slot_rear_medium": "weapon_missile"
+	},
+	"variant": "Standard",
+	"tags": ["balanced", "ballistic", "line", "destroyer"],
+	"faction": "federation",
+	"cost": 15
+}

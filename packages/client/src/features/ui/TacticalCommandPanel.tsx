@@ -6,15 +6,10 @@
 
 import React, { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useAppSelector, useAppDispatch } from "@/store";
-import { selectToken } from "@/store/slices/selectionSlice";
+import { useAppSelector } from "@/store";
 import { Shield, Zap, Target, Move, Crosshair, AlertTriangle } from "lucide-react";
-
-// 子组件导入（后续实现）
-// import { HeadingControl } from "./HeadingControl";
-// import { DistanceControl } from "./DistanceControl";
-// import { WeaponMountPanel } from "./WeaponMountPanel";
-// import { StatusBar } from "./StatusBar";
+import { websocketService } from "@/services/websocket";
+import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 
 interface TacticalCommandPanelProps {
 	className?: string;
@@ -22,80 +17,106 @@ interface TacticalCommandPanelProps {
 
 /**
  * 战术指挥面板
- * 
+ *
  * 设计原则:
  * 1. 纯游戏相关 - 只包含战术操作，无系统设置
  * 2. 动态自适应 - 根据选中对象类型切换显示
  * 3. 信息密度高 - 在有限空间展示关键数据
  * 4. 硬朗风格 - 最小圆角，锐利线条
+ * 5. 统一样式 - 使用设计系统CSS变量
  */
 export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	className = "",
 }) => {
 	const { t } = useTranslation();
-	const dispatch = useAppDispatch();
-	
+
 	// 展开/折叠状态
 	const [isExpanded, setIsExpanded] = useState(false);
-	
+
 	// 当前选中标签
 	const [activeTab, setActiveTab] = useState<"move" | "weapons" | "systems">("move");
-	
+
 	// 从Redux获取状态
 	const selectedTokenId = useAppSelector((state) => state.selection.selectedTokenId);
 	const tokens = useAppSelector((state) => state.map.tokens);
 	const ships = useAppSelector((state) => state.ship.ships);
-	const currentUnit = useAppSelector((state) => {
-		const turnOrder = state.turn.order;
-		if (!turnOrder) return null;
-		return turnOrder.units[turnOrder.currentIndex];
-	});
+	const currentFaction = useAppSelector((state) => state.factionTurn.currentFaction);
+	const selectedFaction = useAppSelector((state) => state.faction.selectedFaction);
+	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
+	const players = useAppSelector((state) => state.player.players);
+	const currentPlayer = currentPlayerId ? players[currentPlayerId] : null;
 
 	// 获取选中单位数据
 	const selectedToken = selectedTokenId ? tokens[selectedTokenId] : null;
 	const selectedShip = selectedTokenId ? ships[selectedTokenId] : null;
 
-	// 判断是否为当前回合单位
-	const isCurrentTurn = currentUnit?.id === selectedTokenId;
+	// 判断当前玩家是否属于当前行动阵营
+	const isCurrentTurn = selectedFaction === currentFaction;
 
 	// 处理单位选择
 	const handleUnitClick = useCallback(() => {
 		if (selectedTokenId) {
-			// 可以展开详细面板
 			setIsExpanded(!isExpanded);
 		}
 	}, [selectedTokenId, isExpanded]);
 
 	// 处理结束回合
 	const handleEndTurn = useCallback(() => {
-		// TODO: 实现结束回合逻辑
-		console.log("End turn");
-	}, []);
+		if (!currentPlayerId || !selectedFaction) return;
+
+		websocketService.send({
+			type: WS_MESSAGE_TYPES.PLAYER_END_TURN,
+			payload: {
+				playerId: currentPlayerId,
+				playerName: currentPlayer?.name || '',
+				faction: selectedFaction,
+				timestamp: Date.now(),
+			},
+		});
+	}, [currentPlayerId, selectedFaction, currentPlayer]);
 
 	// 处理紧急规避
 	const handleEmergencyEvasion = useCallback(() => {
-		// TODO: 实现紧急规避逻辑
-		console.log("Emergency evasion");
-	}, []);
+		if (!selectedTokenId) return;
+
+		websocketService.send({
+			type: WS_MESSAGE_TYPES.SHIP_ACTION,
+			payload: {
+				shipId: selectedTokenId,
+				actionType: 'emergency_evasion',
+				timestamp: Date.now(),
+			},
+		});
+	}, [selectedTokenId]);
 
 	// 处理护盾开关
 	const handleShieldToggle = useCallback(() => {
-		// TODO: 实现护盾开关逻辑
-		console.log("Toggle shield");
-	}, []);
+		if (!selectedTokenId) return;
+
+		websocketService.sendRequest('ship.toggleShield', {
+			shipId: selectedTokenId,
+		}).catch((error) => {
+			console.error('Failed to toggle shield:', error);
+		});
+	}, [selectedTokenId]);
 
 	// 处理散热
 	const handleVentFlux = useCallback(() => {
-		// TODO: 实现散热逻辑
-		console.log("Vent flux");
-	}, []);
+		if (!selectedTokenId) return;
+
+		websocketService.sendRequest('ship.vent', {
+			shipId: selectedTokenId,
+		}).catch((error) => {
+			console.error('Failed to vent flux:', error);
+		});
+	}, [selectedTokenId]);
 
 	// 渲染单位概览
 	const renderUnitOverview = () => {
 		if (!selectedToken) {
 			return (
-				<div className="tactical-unit-empty">
-					<span className="tactical-empty-text">{t("tactical.noSelection")}</span>
+				<div className="tcp-unit-empty">
+					<span className="tcp-empty-text">{t("tactical.noSelection")}</span>
 				</div>
 			);
 		}
@@ -104,43 +125,43 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 		const shipData = isShip ? selectedShip : null;
 
 		return (
-			<div className="tactical-unit-overview">
+			<div className="tcp-unit-overview">
 				{/* 单位缩略图 */}
-				<div className="tactical-unit-thumbnail">
-					<div className={`tactical-unit-icon ${selectedToken.type}`}>
+				<div className="tcp-unit-thumbnail">
+					<div className={`tcp-unit-icon tcp-unit-icon--${selectedToken.type}`}>
 						{isShip ? <Target size={20} /> : <Crosshair size={20} />}
 					</div>
 					{/* 朝向指示器 */}
-					<div 
-						className="tactical-heading-indicator"
+					<div
+						className="tcp-heading-indicator"
 						style={{ transform: `rotate(${selectedToken.heading}deg)` }}
 					/>
 				</div>
 
 				{/* 单位信息 */}
-				<div className="tactical-unit-info">
-					<div className="tactical-unit-name">
+				<div className="tcp-unit-info">
+					<div className="tcp-unit-name">
 						{(selectedToken.metadata?.name as string) || selectedToken.id}
-						{isCurrentTurn ? <span className="tactical-turn-badge">{t("tactical.current")}</span> : null}
+						{isCurrentTurn && <span className="tcp-turn-badge">{t("tactical.current")}</span>}
 					</div>
-					<div className="tactical-unit-type">
+					<div className="tcp-unit-type">
 						{t(`token.type.${selectedToken.type}`)} · {selectedToken.ownerId}
 					</div>
-					
+
 					{/* 状态条 */}
 					{shipData && (
-						<div className="tactical-status-bars">
-							<div className="tactical-status-bar">
-								<div className="tactical-bar-label">{t("status.shield")}</div>
-								<div className="tactical-bar-track">
-									<div 
-										className="tactical-bar-fill shield"
-										style={{ 
-											width: `${(shipData.shield.current / shipData.shield.max) * 100}%` 
+						<div className="tcp-status-bars">
+							<div className="tcp-status-bar">
+								<div className="tcp-bar-label">{t("status.shield")}</div>
+								<div className="tcp-bar-track">
+									<div
+										className="tcp-bar-fill tcp-bar-fill--shield"
+										style={{
+											width: `${(shipData.shield.current / shipData.shield.max) * 100}%`
 										}}
 									/>
 								</div>
-								<span className="tactical-bar-value">
+								<span className="tcp-bar-value">
 									{Math.round((shipData.shield.current / shipData.shield.max) * 100)}%
 								</span>
 							</div>
@@ -149,10 +170,11 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				</div>
 
 				{/* 展开按钮 */}
-				<button 
-					className="tactical-expand-btn"
+				<button
+					className="tcp-expand-btn"
 					onClick={handleUnitClick}
 					type="button"
+					aria-label={isExpanded ? "Collapse panel" : "Expand panel"}
 				>
 					{isExpanded ? "▲" : "▼"}
 				</button>
@@ -164,25 +186,23 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	const renderCommandConsole = () => {
 		if (!selectedToken || selectedToken.type !== "ship") {
 			return (
-				<div className="tactical-console-empty">
-					<div className="tactical-global-status">
-						<span className="tactical-global-label">{t("tactical.globalView")}</span>
-						{currentUnit && (
-							<span className="tactical-current-unit">
-								{t("tactical.currentTurn")}: {currentUnit.name}
-							</span>
-						)}
+				<div className="tcp-console-empty">
+					<div className="tcp-global-status">
+						<span className="tcp-global-label">{t("tactical.globalView")}</span>
+						<span className="tcp-current-unit">
+							{t("tactical.currentTurn")}: {currentFaction === 'federation' ? t('faction.federation') : t('faction.empire')}
+						</span>
 					</div>
 				</div>
 			);
 		}
 
 		return (
-			<div className="tactical-command-console">
+			<div className="tcp-command-console">
 				{/* 标签切换 */}
-				<div className="tactical-console-tabs">
+				<div className="tcp-console-tabs">
 					<button
-						className={`tactical-tab ${activeTab === "move" ? "active" : ""}`}
+						className={`btn-tactical-tab ${activeTab === "move" ? "active" : ""}`}
 						onClick={() => setActiveTab("move")}
 						type="button"
 					>
@@ -190,7 +210,7 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 						<span>{t("tactical.move")}</span>
 					</button>
 					<button
-						className={`tactical-tab ${activeTab === "weapons" ? "active" : ""}`}
+						className={`btn-tactical-tab ${activeTab === "weapons" ? "active" : ""}`}
 						onClick={() => setActiveTab("weapons")}
 						type="button"
 					>
@@ -198,7 +218,7 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 						<span>{t("tactical.weapons")}</span>
 					</button>
 					<button
-						className={`tactical-tab ${activeTab === "systems" ? "active" : ""}`}
+						className={`btn-tactical-tab ${activeTab === "systems" ? "active" : ""}`}
 						onClick={() => setActiveTab("systems")}
 						type="button"
 					>
@@ -208,9 +228,9 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				</div>
 
 				{/* 控制台内容 */}
-				<div className="tactical-console-content">
+				<div className="tcp-console-content">
 					{activeTab === "move" && (
-						<div className="tactical-move-controls">
+						<div className="tcp-move-controls">
 							<div className="tactical-control-placeholder">
 								<Move size={24} />
 								<span>{t("tactical.headingControl")}</span>
@@ -222,7 +242,7 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 						</div>
 					)}
 					{activeTab === "weapons" && (
-						<div className="tactical-weapons-controls">
+						<div className="tcp-weapons-controls">
 							<div className="tactical-control-placeholder">
 								<Crosshair size={24} />
 								<span>{t("tactical.weaponMounts")}</span>
@@ -230,7 +250,7 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 						</div>
 					)}
 					{activeTab === "systems" && (
-						<div className="tactical-systems-controls">
+						<div className="tcp-systems-controls">
 							<div className="tactical-control-placeholder">
 								<Zap size={24} />
 								<span>{t("tactical.systemManagement")}</span>
@@ -246,26 +266,26 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	const renderCombatStatus = () => {
 		if (!selectedShip) {
 			return (
-				<div className="tactical-combat-empty">
-					<span className="tactical-combat-label">{t("tactical.noShipSelected")}</span>
+				<div className="tcp-combat-empty">
+					<span className="tcp-combat-label">{t("tactical.noShipSelected")}</span>
 				</div>
 			);
 		}
 
 		return (
-			<div className="tactical-combat-status">
+			<div className="tcp-combat-status">
 				{/* 状态条组 */}
-				<div className="tactical-status-group">
-					<div className="tactical-status-row">
+				<div className="tcp-status-group">
+					<div className="tcp-status-row">
 						<Shield size={12} />
-						<div className="tactical-mini-bar">
-							<div 
-								className="tactical-mini-fill shield"
+						<div className="tactical-status-track">
+							<div
+								className="tactical-status-fill tactical-status-fill--shield"
 								style={{ width: `${(selectedShip.shield.current / selectedShip.shield.max) * 100}%` }}
 							/>
 						</div>
-						<button 
-							className={`tactical-toggle-btn ${selectedShip.shield.active ? "active" : ""}`}
+						<button
+							className={`btn-tactical-toggle ${selectedShip.shield.active ? "active" : ""}`}
 							onClick={handleShieldToggle}
 							type="button"
 						>
@@ -273,16 +293,16 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 						</button>
 					</div>
 
-					<div className="tactical-status-row">
+					<div className="tcp-status-row">
 						<Zap size={12} />
-						<div className="tactical-mini-bar">
-							<div 
-								className="tactical-mini-fill flux"
+						<div className="tactical-status-track">
+							<div
+								className="tactical-status-fill tactical-status-fill--flux"
 								style={{ width: `${(selectedShip.flux.current / selectedShip.flux.capacity) * 100}%` }}
 							/>
 						</div>
-						<button 
-							className="tactical-action-btn"
+						<button
+							className="btn-tactical btn-tactical--warning"
 							onClick={handleVentFlux}
 							type="button"
 						>
@@ -292,12 +312,12 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				</div>
 
 				{/* 行动点 */}
-				<div className="tactical-action-points">
-					<span className="tactical-ap-label">{t("tactical.actionPoints")}</span>
-					<div className="tactical-ap-dots">
+				<div className="tcp-action-points">
+					<span className="tcp-ap-label">{t("tactical.actionPoints")}</span>
+					<div className="tcp-ap-dots">
 						{Array.from({ length: selectedShip.actionsPerTurn || 3 }).map((_, i) => (
-							<span 
-								key={i} 
+							<span
+								key={i}
 								className={`tactical-ap-dot ${i < (selectedShip.remainingActions || 0) ? "active" : ""}`}
 							/>
 						))}
@@ -305,17 +325,17 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				</div>
 
 				{/* 战术按钮 */}
-				<div className="tactical-action-buttons">
-					<button 
-						className="tactical-btn tactical-btn--primary"
+				<div className="tcp-action-buttons">
+					<button
+						className="btn-tactical btn-tactical--primary"
 						onClick={handleEndTurn}
 						disabled={!isCurrentTurn}
 						type="button"
 					>
 						{t("tactical.endTurn")}
 					</button>
-					<button 
-						className="tactical-btn tactical-btn--danger"
+					<button
+						className="btn-tactical btn-tactical--danger"
 						onClick={handleEmergencyEvasion}
 						type="button"
 					>
@@ -328,30 +348,30 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	};
 
 	return (
-		<div className={`tactical-command-panel ${isExpanded ? "expanded" : ""} ${className}`}>
+		<div className={`tcp-panel ${isExpanded ? "tcp-panel--expanded" : ""} ${className}`}>
 			{/* 紧凑模式 */}
-			<div className="tactical-panel-compact">
+			<div className="tcp-compact">
 				{/* 左侧：单位概览 */}
-				<div className="tactical-section tactical-section--left">
+				<div className="tcp-section tcp-section--left">
 					{renderUnitOverview()}
 				</div>
 
 				{/* 中央：控制台 */}
-				<div className="tactical-section tactical-section--center">
+				<div className="tcp-section tcp-section--center">
 					{renderCommandConsole()}
 				</div>
 
 				{/* 右侧：战斗状态 */}
-				<div className="tactical-section tactical-section--right">
+				<div className="tcp-section tcp-section--right">
 					{renderCombatStatus()}
 				</div>
 			</div>
 
 			{/* 展开详细模式 */}
 			{isExpanded && selectedToken && (
-				<div className="tactical-panel-expanded">
-					<div className="tactical-expanded-content">
-						<div className="tactical-expanded-placeholder">
+				<div className="tcp-expanded">
+					<div className="tcp-expanded-content">
+						<div className="tcp-expanded-placeholder">
 							<span>{t("tactical.detailedView")}</span>
 							<p>{t("tactical.detailedViewDescription")}</p>
 						</div>
@@ -360,88 +380,89 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 			)}
 
 			<style>{`
-				.tactical-command-panel {
+				/* ====== 战术指挥面板 ====== */
+				.tcp-panel {
 					position: fixed;
 					bottom: 0;
 					left: 0;
 					right: 0;
-					height: 64px;
-					background: rgba(10, 12, 20, 0.98);
-					border-top: 1px solid rgba(74, 158, 255, 0.3);
-					z-index: 1100;
-					transition: height 0.3s ease;
+					height: var(--bottom-panel-height);
+					background: var(--tactical-bg);
+					border-top: 1px solid var(--tactical-border);
+					z-index: var(--z-sticky);
+					transition: height var(--transition-slow);
 				}
 
-				.tactical-command-panel.expanded {
-					height: 280px;
+				.tcp-panel--expanded {
+					height: var(--bottom-panel-expanded);
 				}
 
 				/* 紧凑模式 */
-				.tactical-panel-compact {
+				.tcp-compact {
 					display: flex;
-					height: 64px;
-					padding: 8px 16px;
-					gap: 16px;
+					height: var(--bottom-panel-height);
+					padding: var(--space-2) var(--space-4);
+					gap: var(--space-4);
 				}
 
-				.tactical-section {
+				.tcp-section {
 					display: flex;
 					align-items: center;
 				}
 
-				.tactical-section--left {
+				.tcp-section--left {
 					width: 220px;
 					flex-shrink: 0;
 				}
 
-				.tactical-section--center {
+				.tcp-section--center {
 					flex: 1;
 					min-width: 0;
 				}
 
-				.tactical-section--right {
+				.tcp-section--right {
 					width: 200px;
 					flex-shrink: 0;
 				}
 
 				/* 单位概览 */
-				.tactical-unit-empty {
+				.tcp-unit-empty {
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					height: 100%;
-					color: #5a6478;
-					font-size: 12px;
+					color: var(--text-tertiary);
+					font-size: var(--text-xs);
 				}
 
-				.tactical-unit-overview {
+				.tcp-unit-overview {
 					display: flex;
 					align-items: center;
-					gap: 10px;
+					gap: var(--space-2);
 					width: 100%;
 				}
 
-				.tactical-unit-thumbnail {
+				.tcp-unit-thumbnail {
 					position: relative;
 					width: 44px;
 					height: 44px;
-					background: rgba(20, 25, 35, 0.8);
+					background: var(--tactical-section-bg);
 					border: 1px solid rgba(74, 158, 255, 0.4);
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					border-radius: 0;
+					border-radius: var(--radius-sm);
 				}
 
-				.tactical-unit-icon {
-					color: #4a9eff;
+				.tcp-unit-icon {
+					color: var(--color-primary);
 				}
 
-				.tactical-unit-icon.ship {
-					color: #4a9eff;
+				.tcp-unit-icon--ship {
+					color: var(--color-primary);
 				}
 
-				.tactical-heading-indicator {
+				.tcp-heading-indicator {
 					position: absolute;
 					top: 4px;
 					left: 50%;
@@ -449,429 +470,272 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 					height: 0;
 					border-left: 3px solid transparent;
 					border-right: 3px solid transparent;
-					border-bottom: 5px solid #4a9eff;
+					border-bottom: 5px solid var(--color-primary);
 					transform-origin: 50% 250%;
 					transform: translateX(-50%);
 				}
 
-				.tactical-unit-info {
+				.tcp-unit-info {
 					flex: 1;
 					min-width: 0;
 				}
 
-				.tactical-unit-name {
+				.tcp-unit-name {
 					display: flex;
 					align-items: center;
-					gap: 6px;
-					font-size: 13px;
-					font-weight: 600;
-					color: #e0e6f0;
+					gap: var(--space-2);
+					font-size: var(--text-sm);
+					font-weight: var(--font-semibold);
+					color: var(--text-primary);
 					margin-bottom: 2px;
 				}
 
-				.tactical-turn-badge {
+				.tcp-turn-badge {
 					font-size: 9px;
 					padding: 1px 4px;
-					background: rgba(74, 158, 255, 0.2);
+					background: var(--tactical-hover);
 					border: 1px solid rgba(74, 158, 255, 0.4);
-					color: #4a9eff;
-					border-radius: 0;
+					color: var(--color-primary);
+					border-radius: var(--radius-sm);
 				}
 
-				.tactical-unit-type {
-					font-size: 10px;
-					color: #6a7a9f;
-					margin-bottom: 4px;
+				.tcp-unit-type {
+					font-size: var(--text-xs);
+					color: var(--text-secondary);
+					margin-bottom: var(--space-1);
 				}
 
-				.tactical-status-bars {
+				.tcp-status-bars {
 					display: flex;
 					flex-direction: column;
 					gap: 3px;
 				}
 
-				.tactical-status-bar {
+				.tcp-status-bar {
 					display: flex;
 					align-items: center;
-					gap: 6px;
+					gap: var(--space-2);
 				}
 
-				.tactical-bar-label {
+				.tcp-bar-label {
 					font-size: 9px;
-					color: #5a6478;
+					color: var(--text-tertiary);
 					width: 30px;
 					text-transform: uppercase;
 				}
 
-				.tactical-bar-track {
+				.tcp-bar-track {
 					flex: 1;
 					height: 4px;
 					background: rgba(0, 0, 0, 0.5);
 					position: relative;
 				}
 
-				.tactical-bar-fill {
+				.tcp-bar-fill {
 					height: 100%;
-					transition: width 0.3s ease;
+					transition: width var(--transition-slow);
 				}
 
-				.tactical-bar-fill.shield {
-					background: linear-gradient(90deg, #2a5a8a, #4a9eff);
+				.tcp-bar-fill--shield {
+					background: var(--status-shield);
 					box-shadow: 0 0 6px rgba(74, 158, 255, 0.3);
 				}
 
-				.tactical-bar-value {
+				.tcp-bar-value {
 					font-size: 9px;
-					color: #4a9eff;
-					font-family: 'Share Tech Mono', monospace;
+					color: var(--color-primary);
+					font-family: var(--font-mono);
 					width: 28px;
 					text-align: right;
 				}
 
-				.tactical-expand-btn {
+				.tcp-expand-btn {
 					width: 20px;
 					height: 20px;
 					background: rgba(40, 50, 70, 0.6);
 					border: 1px solid rgba(74, 158, 255, 0.3);
-					color: #6a7a9f;
+					color: var(--text-secondary);
 					font-size: 10px;
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
+					transition: var(--transition-fast);
+					border-radius: var(--radius-sm);
 					padding: 0;
 				}
 
-				.tactical-expand-btn:hover {
-					background: rgba(74, 158, 255, 0.2);
+				.tcp-expand-btn:hover {
+					background: var(--tactical-hover);
 					border-color: rgba(74, 158, 255, 0.5);
-					color: #4a9eff;
+					color: var(--color-primary);
 				}
 
 				/* 控制台 */
-				.tactical-console-empty {
+				.tcp-console-empty {
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					height: 100%;
 				}
 
-				.tactical-global-status {
+				.tcp-global-status {
 					display: flex;
 					flex-direction: column;
 					align-items: center;
-					gap: 4px;
+					gap: var(--space-1);
 				}
 
-				.tactical-global-label {
-					font-size: 11px;
-					color: #5a6478;
+				.tcp-global-label {
+					font-size: var(--text-xs);
+					color: var(--text-tertiary);
 					text-transform: uppercase;
-					letter-spacing: 1px;
+					letter-spacing: var(--tracking-wide);
 				}
 
-				.tactical-current-unit {
-					font-size: 12px;
-					color: #4a9eff;
+				.tcp-current-unit {
+					font-size: var(--text-sm);
+					color: var(--color-primary);
 				}
 
-				.tactical-command-console {
+				.tcp-command-console {
 					display: flex;
 					flex-direction: column;
 					width: 100%;
 					height: 100%;
 				}
 
-				.tactical-console-tabs {
+				.tcp-console-tabs {
 					display: flex;
-					gap: 4px;
-					margin-bottom: 8px;
+					gap: var(--space-1);
+					margin-bottom: var(--space-2);
 				}
 
-				.tactical-tab {
-					display: flex;
-					align-items: center;
-					gap: 6px;
-					padding: 4px 12px;
-					background: rgba(30, 35, 45, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.2);
-					color: #6a7a9f;
-					font-size: 11px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
-				}
-
-				.tactical-tab:hover {
-					background: rgba(40, 50, 70, 0.6);
-					border-color: rgba(74, 158, 255, 0.4);
-					color: #8a9ebf;
-				}
-
-				.tactical-tab.active {
-					background: rgba(74, 158, 255, 0.15);
-					border-color: rgba(74, 158, 255, 0.5);
-					color: #4a9eff;
-				}
-
-				.tactical-console-content {
+				.tcp-console-content {
 					flex: 1;
 					background: rgba(15, 18, 25, 0.6);
 					border: 1px solid rgba(74, 158, 255, 0.15);
-					padding: 8px;
+					border-radius: var(--radius-sm);
+					padding: var(--space-2);
 					display: flex;
 					align-items: center;
 					justify-content: center;
 				}
 
-				.tactical-move-controls,
-				.tactical-weapons-controls,
-				.tactical-systems-controls {
+				.tcp-move-controls,
+				.tcp-weapons-controls,
+				.tcp-systems-controls {
 					display: flex;
-					gap: 16px;
+					gap: var(--space-4);
 					align-items: center;
-				}
-
-				.tactical-control-placeholder {
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					gap: 8px;
-					padding: 12px 24px;
-					background: rgba(20, 25, 35, 0.6);
-					border: 1px dashed rgba(74, 158, 255, 0.3);
-					color: #5a6478;
-					font-size: 11px;
-					border-radius: 0;
-				}
-
-				.tactical-control-placeholder svg {
-					color: #4a9eff;
-					opacity: 0.5;
 				}
 
 				/* 战斗状态 */
-				.tactical-combat-empty {
+				.tcp-combat-empty {
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					height: 100%;
-					color: #5a6478;
-					font-size: 11px;
+					color: var(--text-tertiary);
+					font-size: var(--text-xs);
 				}
 
-				.tactical-combat-status {
+				.tcp-combat-status {
 					display: flex;
 					flex-direction: column;
-					gap: 8px;
+					gap: var(--space-2);
 					width: 100%;
 				}
 
-				.tactical-status-group {
+				.tcp-status-group {
 					display: flex;
 					flex-direction: column;
-					gap: 6px;
+					gap: var(--space-2);
 				}
 
-				.tactical-status-row {
+				.tcp-status-row {
 					display: flex;
 					align-items: center;
-					gap: 8px;
-					color: #6a7a9f;
+					gap: var(--space-2);
+					color: var(--text-secondary);
 				}
 
-				.tactical-mini-bar {
-					flex: 1;
-					height: 4px;
-					background: rgba(0, 0, 0, 0.5);
-					position: relative;
-				}
-
-				.tactical-mini-fill {
-					height: 100%;
-					transition: width 0.3s ease;
-				}
-
-				.tactical-mini-fill.shield {
-					background: linear-gradient(90deg, #2a5a8a, #4a9eff);
-				}
-
-				.tactical-mini-fill.flux {
-					background: linear-gradient(90deg, #8a2a8a, #ff44ff);
-				}
-
-				.tactical-toggle-btn {
-					padding: 2px 6px;
-					background: rgba(40, 50, 70, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.3);
-					color: #6a7a9f;
-					font-size: 9px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
-					min-width: 28px;
-				}
-
-				.tactical-toggle-btn.active {
-					background: rgba(74, 158, 255, 0.2);
-					border-color: rgba(74, 158, 255, 0.5);
-					color: #4a9eff;
-				}
-
-				.tactical-action-btn {
-					padding: 2px 6px;
-					background: rgba(100, 60, 20, 0.4);
-					border: 1px solid rgba(255, 170, 0, 0.3);
-					color: #ffaa00;
-					font-size: 9px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-					border-radius: 0;
-				}
-
-				.tactical-action-btn:hover {
-					background: rgba(255, 170, 0, 0.2);
-					border-color: rgba(255, 170, 0, 0.5);
-				}
-
-				.tactical-action-points {
+				.tcp-action-points {
 					display: flex;
 					align-items: center;
 					justify-content: space-between;
-					padding: 4px 0;
+					padding: var(--space-1) 0;
 					border-top: 1px solid rgba(74, 158, 255, 0.1);
 					border-bottom: 1px solid rgba(74, 158, 255, 0.1);
 				}
 
-				.tactical-ap-label {
-					font-size: 10px;
-					color: #5a6478;
+				.tcp-ap-label {
+					font-size: var(--text-xs);
+					color: var(--text-tertiary);
 				}
 
-				.tactical-ap-dots {
+				.tcp-ap-dots {
 					display: flex;
-					gap: 4px;
+					gap: var(--space-1);
 				}
 
-				.tactical-ap-dot {
-					width: 8px;
-					height: 8px;
-					background: rgba(40, 50, 70, 0.6);
-					border: 1px solid rgba(74, 158, 255, 0.3);
-					border-radius: 0;
-					transition: all 0.15s ease;
-				}
-
-				.tactical-ap-dot.active {
-					background: #4a9eff;
-					border-color: #4a9eff;
-					box-shadow: 0 0 6px rgba(74, 158, 255, 0.4);
-				}
-
-				.tactical-action-buttons {
+				.tcp-action-buttons {
 					display: flex;
-					gap: 6px;
-				}
-
-				.tactical-btn {
-					flex: 1;
-					padding: 6px 10px;
-					font-size: 10px;
-					font-weight: 600;
-					text-transform: uppercase;
-					letter-spacing: 0.5px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					gap: 4px;
-					border-radius: 0;
-					border: 1px solid transparent;
-				}
-
-				.tactical-btn:disabled {
-					opacity: 0.3;
-					cursor: not-allowed;
-				}
-
-				.tactical-btn--primary {
-					background: rgba(74, 158, 255, 0.15);
-					border-color: rgba(74, 158, 255, 0.4);
-					color: #4a9eff;
-				}
-
-				.tactical-btn--primary:hover:not(:disabled) {
-					background: rgba(74, 158, 255, 0.25);
-					border-color: rgba(74, 158, 255, 0.6);
-					box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
-				}
-
-				.tactical-btn--danger {
-					background: rgba(180, 40, 40, 0.15);
-					border-color: rgba(255, 68, 68, 0.4);
-					color: #ff4444;
-				}
-
-				.tactical-btn--danger:hover:not(:disabled) {
-					background: rgba(255, 68, 68, 0.2);
-					border-color: rgba(255, 68, 68, 0.6);
-					box-shadow: 0 0 8px rgba(255, 68, 68, 0.3);
+					gap: var(--space-2);
 				}
 
 				/* 展开详细模式 */
-				.tactical-panel-expanded {
-					height: 216px;
+				.tcp-expanded {
+					height: calc(var(--bottom-panel-expanded) - var(--bottom-panel-height) - var(--space-4));
 					border-top: 1px solid rgba(74, 158, 255, 0.2);
-					padding: 16px;
+					padding: var(--space-4);
 					overflow: hidden;
 				}
 
-				.tactical-expanded-content {
+				.tcp-expanded-content {
 					height: 100%;
 					background: rgba(15, 18, 25, 0.6);
 					border: 1px solid rgba(74, 158, 255, 0.15);
+					border-radius: var(--radius-sm);
 					display: flex;
 					align-items: center;
 					justify-content: center;
 				}
 
-				.tactical-expanded-placeholder {
+				.tcp-expanded-placeholder {
 					text-align: center;
-					color: #5a6478;
+					color: var(--text-tertiary);
 				}
 
-				.tactical-expanded-placeholder span {
-					font-size: 14px;
-					color: #6a7a9f;
+				.tcp-expanded-placeholder span {
+					font-size: var(--text-base);
+					color: var(--text-secondary);
 					display: block;
-					margin-bottom: 8px;
+					margin-bottom: var(--space-2);
 				}
 
-				.tactical-expanded-placeholder p {
-					font-size: 11px;
+				.tcp-expanded-placeholder p {
+					font-size: var(--text-xs);
 				}
 
 				/* 响应式 */
 				@media (max-width: 1024px) {
-					.tactical-section--left {
+					.tcp-section--left {
 						width: 180px;
 					}
 
-					.tactical-section--right {
+					.tcp-section--right {
 						width: 160px;
 					}
 
-					.tactical-panel-compact {
-						padding: 8px 12px;
-						gap: 12px;
+					.tcp-compact {
+						padding: var(--space-2) var(--space-3);
+						gap: var(--space-3);
 					}
 				}
 
 				@media (max-width: 768px) {
-					.tactical-command-panel {
+					.tcp-panel {
 						display: none; /* 移动端使用抽屉式面板 */
 					}
 				}

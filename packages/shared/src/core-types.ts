@@ -182,6 +182,9 @@ export const MapConfigSchema = z.object({
 
 export const TokenTypeSchema = z.enum(['ship', 'station', 'asteroid']);
 
+// 阵营 ID Schema（提前定义，供 TokenInfoSchema 使用）
+export const FactionIdSchema = z.string().min(1);
+
 export const UnitTurnStateSchema = z.enum([
   'waiting',
   'active',
@@ -207,6 +210,12 @@ export const TokenInfoSchema = z.object({
   layer: z.number(),
   collisionRadius: z.number(),
   metadata: z.record(z.string(), z.unknown()),
+  // 阵营归属（可选，默认从 ownerId 继承）
+  faction: FactionIdSchema.optional(),
+  // 控制玩家ID（用于多玩家模式，区分哪个玩家可以操作此Token）
+  controllingPlayerId: z.string().optional(),
+  // 是否为敌方单位（DM控制）
+  isEnemy: z.boolean().optional(),
 });
 
 
@@ -282,33 +291,53 @@ export const CameraConfigSchema = z.object({
   maxZoom: z.number().optional(),
 });
 
-// ==================== 回合系统 Schema ====================
-export const TurnPhaseSchema = z.enum(['planning', 'movement', 'action', 'resolution']);
-
-export const TurnUnitSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  ownerId: z.string(),
-  ownerName: z.string(),
-  unitType: z.enum(['ship', 'station', 'npc']),
-  state: UnitTurnStateSchema,
-  initiative: z.number(),
-  avatarColor: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+// ==================== 阵营系统 Schema ====================
+export const FactionDefinitionSchema = z.object({
+  id: FactionIdSchema,
+  name: z.string().min(1),
+  nameLocalized: z.object({
+    zh: z.string().min(1),
+    en: z.string().min(1),
+  }),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  icon: z.string().min(1),
+  description: z.string(),
 });
 
-export const TurnOrderSchema = z.object({
-  currentIndex: z.number(),
-  units: z.array(TurnUnitSchema),
-  roundNumber: z.number(),
-  phase: TurnPhaseSchema,
-  isComplete: z.boolean(),
+export const PlayerFactionInfoSchema = z.object({
+  playerId: z.string().min(1),
+  playerName: z.string().min(1),
+  faction: FactionIdSchema,
+  hasEndedTurn: z.boolean(),
+  endedAt: z.number().optional(),
 });
 
-export const TurnStateSchema = z.object({
-  order: TurnOrderSchema.nullable(),
-  isInitialized: z.boolean(),
-  lastUpdated: z.number(),
+// ==================== 阵营回合系统 Schema ====================
+export const FactionTurnPhaseSchema = z.enum(['action', 'transition']);
+
+export const TurnHistoryEntrySchema = z.object({
+  roundNumber: z.number().int().min(1),
+  faction: FactionIdSchema,
+  startedAt: z.number(),
+  endedAt: z.number().optional(),
+  endedPlayers: z.array(z.string()),
+});
+
+export const FactionTurnStateSchema = z.object({
+  roundNumber: z.number().int().min(1),
+  currentFaction: FactionIdSchema,
+  factionOrder: z.array(FactionIdSchema),
+  currentFactionIndex: z.number().int().min(0),
+  phase: FactionTurnPhaseSchema,
+  playerEndStatus: z.record(FactionIdSchema, z.array(PlayerFactionInfoSchema)),
+  debounceStartTime: z.number().optional(),
+  history: z.array(TurnHistoryEntrySchema),
+});
+
+export const FactionTurnInitParamsSchema = z.object({
+  factions: z.array(FactionIdSchema).min(1),
+  players: z.array(PlayerFactionInfoSchema),
+  roundNumber: z.number().int().min(1).optional(),
 });
 
 // ==================== 类型推导 (从 Schema 推导) ====================
@@ -343,7 +372,51 @@ export type CameraState = z.infer<typeof CameraStateSchema>;
 export type PlayerCamera = z.infer<typeof PlayerCameraSchema>;
 export type CameraUpdateCommand = z.infer<typeof CameraUpdateCommandSchema>;
 export type CameraConfig = z.infer<typeof CameraConfigSchema>;
-export type TurnPhase = z.infer<typeof TurnPhaseSchema>;
-export type TurnUnit = z.infer<typeof TurnUnitSchema>;
-export type TurnOrder = z.infer<typeof TurnOrderSchema>;
-export type TurnState = z.infer<typeof TurnStateSchema>;
+// 阵营系统类型
+export type FactionId = z.infer<typeof FactionIdSchema>;
+export type FactionDefinition = z.infer<typeof FactionDefinitionSchema>;
+export type PlayerFactionInfo = z.infer<typeof PlayerFactionInfoSchema>;
+export type FactionTurnPhase = z.infer<typeof FactionTurnPhaseSchema>;
+export type TurnHistoryEntry = z.infer<typeof TurnHistoryEntrySchema>;
+export type FactionTurnState = z.infer<typeof FactionTurnStateSchema>;
+export type FactionTurnInitParams = z.infer<typeof FactionTurnInitParamsSchema>;
+
+// ==================== 房间系统 Schema ====================
+export const RoomPhaseSchema = z.enum(['lobby', 'deployment', 'playing', 'paused', 'ended']);
+
+export const RoomInfoSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  ownerId: z.string().nullable(),
+  maxPlayers: z.number().min(2).max(16),
+  isPrivate: z.boolean(),
+  hasPassword: z.boolean(),
+  phase: RoomPhaseSchema,
+  playerCount: z.number().min(0),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+export const RoomStateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  ownerId: z.string().nullable(),
+  maxPlayers: z.number().min(2).max(16),
+  isPrivate: z.boolean(),
+  phase: RoomPhaseSchema,
+  players: z.array(PlayerInfoSchema),
+  dm: z.object({
+    isDMMode: z.boolean(),
+    players: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      isDMMode: z.boolean(),
+    })),
+  }),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+export type RoomPhase = z.infer<typeof RoomPhaseSchema>;
+export type RoomInfo = z.infer<typeof RoomInfoSchema>;
+export type RoomState = z.infer<typeof RoomStateSchema>;

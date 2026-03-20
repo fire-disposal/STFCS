@@ -12,6 +12,14 @@ import {
 	type ShipArmorQuadrantType,
 } from "./types";
 import type { ShipStatus } from "./ShipStatus";
+import {
+	type MovementState,
+	type MovementAction,
+	type MovementType,
+	createDefaultMovementState,
+	resetMovementState,
+	canExecutePhase,
+} from "@vt/shared/types";
 
 // 魔法数字常量
 const EPSILON = 0.001;
@@ -36,6 +44,7 @@ export class Ship implements IShip {
 	private readonly _fluxSystem: FluxSystem;
 	private _status: ShipStatus;
 	private readonly _events: ShipEvent[];
+	private _movementState: MovementState;
 
 	constructor(config: ShipConfig) {
 		if (config.speed <= 0) {
@@ -57,6 +66,7 @@ export class Ship implements IShip {
 			? ShipStatusValues.OVERLOADED
 			: ShipStatusValues.NORMAL;
 		this._events = [];
+		this._movementState = createDefaultMovementState(config.speed, config.maneuverability);
 	}
 
 	// ====== 简化 Getter 方法 ======
@@ -98,6 +108,18 @@ export class Ship implements IShip {
 
 	get events(): ShipEvent[] {
 		return [...this._events];
+	}
+
+	get movementState(): MovementState {
+		return { ...this._movementState };
+	}
+
+	/**
+	 * 获取移动状态（方法形式）
+	 * @returns 当前移动状态的副本
+	 */
+	getMovementState(): MovementState {
+		return { ...this._movementState };
 	}
 
 	// ====== 装甲相关方法 ======
@@ -154,6 +176,183 @@ export class Ship implements IShip {
 	}
 
 	// ====== 移动验证和执行 ======
+
+	/**
+	 * 重置移动阶段（新回合开始时调用）
+	 */
+	resetMovementPhase(): void {
+		this._movementState = resetMovementState(this._movementState);
+	}
+
+	/**
+	 * 获取当前可执行的移动阶段
+	 */
+	getCurrentPhase(): ShipMovementPhase {
+		return this._movementState.currentPhase as ShipMovementPhase;
+	}
+
+	/**
+	 * 检查是否可以执行指定阶段的移动
+	 */
+	canExecutePhase(phase: ShipMovementPhase): boolean {
+		return canExecutePhase(this._movementState, phase);
+	}
+
+	/**
+	 * 执行阶段移动（新方法）
+	 * @param command 移动命令
+	 * @returns 验证结果
+	 */
+	executePhaseMovement(command: MovementAction): MovementValidationResult {
+		// 验证当前阶段是否可执行
+		if (!this.canExecutePhase(command.type === 'rotate' ? 2 as ShipMovementPhase : (this._movementState.phase1Complete ? 3 as ShipMovementPhase : 1 as ShipMovementPhase))) {
+			const currentPhase = this._movementState.currentPhase;
+			const phaseNames = ['', '平移A', '转向', '平移B'];
+			return {
+				isValid: false,
+				reason: `当前阶段不正确。当前应执行：${phaseNames[currentPhase]}`,
+			};
+		}
+
+		// 验证舰船状态
+		if (this._isShipDisabled()) {
+			return {
+				isValid: false,
+				reason: "舰船已过载或禁用，无法移动",
+			};
+		}
+
+		if (this._fluxSystem.state === "VENTING") {
+			return {
+				isValid: false,
+				reason: "舰船正在排散，无法移动",
+			};
+		}
+
+		const phase = this._movementState.currentPhase;
+
+		// 根据移动类型验证
+		if (command.type === 'rotate') {
+			// 阶段2必须是转向
+			if (phase !== 2) {
+				return {
+					isValid: false,
+					reason: "转向只能在阶段2执行",
+				};
+			}
+			const rotationValidation = this._validateRotation(command.angle ?? 0);
+			if (!rotationValidation.isValid) {
+				return rotationValidation;
+			}
+		} else {
+			// 阶段1和3必须是平移
+			if (phase !== 1 && phase !== 3) {
+				return {
+					isValid: false,
+					reason: "平移只能在阶段1或阶段3执行",
+				};
+			}
+			const translationValidation = this._validateTranslationByType(
+				command.type,
+				command.distance ?? 0
+			);
+			if (!translationValidation.isValid) {
+				return translationValidation;
+			}
+		}
+
+		// 执行移动
+		this._executeMovement(command);
+
+		// 更新阶段状态
+		this._updatePhaseState(phase);
+
+		return { isValid: true };
+	}
+
+	/**
+	 * 根据移动类型执行移动
+	 */
+	private _executeMovement(command: MovementAction): void {
+		const oldPosition = { ...this._position };
+		const oldHeading = this._heading;
+
+		if (command.type === 'rotate') {
+			// 转向
+			const rotation = command.angle ?? 0;
+			this._heading = ((this._heading + rotation) % 360 + 360) % 360;
+		} else {
+			// 平移（前进/后退或横移）
+			this._position.x = command.newX;
+			this._position.y = command.newY;
+		}
+
+		// 记录移动历史
+		this._movementState.movementHistory.push(command);
+
+		// 发送事件
+		this._events.push({
+			type: "SHIP_MOVED",
+			timestamp: Date.now(),
+			shipId: this._id,
+			previousPosition: oldPosition,
+			newPosition: { ...this._position },
+			previousHeading: oldHeading,
+			newHeading: this._heading,
+			phase: this._movementState.currentPhase,
+		});
+	}
+
+	/**
+	 * 更新阶段状态
+	 */
+	private _updatePhaseState(completedPhase: number): void {
+		switch (completedPhase) {
+			case 1:
+				this._movementState.phase1Complete = true;
+				this._movementState.currentPhase = 2;
+				break;
+			case 2:
+				this._movementState.phase2Complete = true;
+				this._movementState.currentPhase = 3;
+				break;
+			case 3:
+				this._movementState.phase3Complete = true;
+				// 所有阶段完成，保持阶段3
+				break;
+		}
+	}
+
+	/**
+	 * 根据移动类型验证平移
+	 */
+	private _validateTranslationByType(type: MovementType, distance: number): MovementValidationResult {
+		const absDistance = Math.abs(distance);
+
+		if (type === 'straight') {
+			// 前进/后退：最大 2 * speed
+			if (absDistance > this._speed * 2) {
+				return {
+					isValid: false,
+					reason: `前进/后退距离超过最大值 ${this._speed * 2}`,
+				};
+			}
+		} else if (type === 'strafe') {
+			// 横移：最大 speed
+			if (absDistance > this._speed) {
+				return {
+					isValid: false,
+					reason: `横移距离超过最大值 ${this._speed}`,
+				};
+			}
+		}
+
+		return { isValid: true };
+	}
+
+	/**
+	 * 验证移动（兼容旧接口）
+	 */
 	validateMovement(
 		displacement: Point,
 		rotation: number,
@@ -173,8 +372,34 @@ export class Ship implements IShip {
 			};
 		}
 
+		// 检查阶段是否可执行
+		if (!this.canExecutePhase(phase)) {
+			const phaseNames = ['', '平移A', '转向', '平移B'];
+			const currentPhase = this._movementState.currentPhase;
+			return {
+				isValid: false,
+				reason: `阶段顺序错误。当前应执行：${phaseNames[currentPhase]}`,
+			};
+		}
+
 		if (phase === 2) {
+			// 阶段2只允许转向，不允许平移
+			const distance = Math.sqrt(displacement.x ** 2 + displacement.y ** 2);
+			if (distance > EPSILON) {
+				return {
+					isValid: false,
+					reason: "阶段2只能转向，不能平移",
+				};
+			}
 			return this._validateRotation(rotation);
+		}
+
+		// 阶段1和3只允许平移，不允许转向
+		if (Math.abs(rotation) > EPSILON) {
+			return {
+				isValid: false,
+				reason: "阶段1和3只能平移，不能转向",
+			};
 		}
 
 		return this._validateTranslation(displacement, phase);
@@ -200,7 +425,6 @@ export class Ship implements IShip {
 		displacement: Point,
 		phase: ShipMovementPhase
 	): MovementValidationResult {
-		const distance = Math.sqrt(displacement.x ** 2 + displacement.y ** 2);
 		const angleRad = (this._heading * Math.PI) / 180;
 		const headingVec = { x: Math.cos(angleRad), y: Math.sin(angleRad) };
 		const perpVec = { x: -Math.sin(angleRad), y: Math.cos(angleRad) };
@@ -211,24 +435,16 @@ export class Ship implements IShip {
 		const absForward = Math.abs(forwardComponent);
 		const absStrafe = Math.abs(strafeComponent);
 
-		// 检查是否混合了前进和横移
-		if (absStrafe > EPSILON && absForward > EPSILON) {
-			return {
-				isValid: false,
-				reason: "Cannot combine forward and strafe movement in phase 1/3",
-			};
-		}
-
-		// 前进验证
-		if (absForward > EPSILON && absForward > this._speed * 2) {
+		// 前进验证：最大 2 * speed
+		if (absForward > this._speed * 2 + EPSILON) {
 			return {
 				isValid: false,
 				reason: `Forward movement exceeds maximum distance of ${this._speed * 2}`,
 			};
 		}
 
-		// 横移验证
-		if (absStrafe > EPSILON && absStrafe > this._speed) {
+		// 横移验证：最大 speed
+		if (absStrafe > this._speed + EPSILON) {
 			return {
 				isValid: false,
 				reason: `Strafe movement exceeds maximum distance of ${this._speed}`,
@@ -238,6 +454,9 @@ export class Ship implements IShip {
 		return { isValid: true };
 	}
 
+	/**
+	 * 执行移动（兼容旧接口）
+	 */
 	move(displacement: Point, rotation: number, phase: ShipMovementPhase): boolean {
 		const validation = this.validateMovement(displacement, rotation, phase);
 		if (!validation.isValid) {
@@ -255,6 +474,21 @@ export class Ship implements IShip {
 		if (phase === 2) {
 			this._heading = ((this._heading + rotation) % 360 + 360) % 360;
 		}
+
+		// 更新阶段状态
+		this._updatePhaseState(phase);
+
+		// 记录移动历史
+		const movementAction: MovementAction = {
+			type: phase === 2 ? 'rotate' : 'straight',
+			distance: phase !== 2 ? Math.sqrt(displacement.x ** 2 + displacement.y ** 2) : undefined,
+			angle: phase === 2 ? rotation : undefined,
+			newX: this._position.x,
+			newY: this._position.y,
+			newHeading: this._heading,
+			timestamp: Date.now(),
+		};
+		this._movementState.movementHistory.push(movementAction);
 
 		this._events.push({
 			type: "SHIP_MOVED",
@@ -304,6 +538,14 @@ export class Ship implements IShip {
 			this._fluxSystem.endOverload();
 			this._status = ShipStatusValues.NORMAL;
 		}
+	}
+
+	/**
+	 * 从过载状态恢复
+	 * 与 endOverload 相同，但更明确的命名
+	 */
+	recoverFromOverload(): void {
+		this.endOverload();
 	}
 
 	startTurn(): void {

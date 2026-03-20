@@ -272,6 +272,73 @@ const mapSlice = createSlice({
 				currentStarId: null,
 			};
 		},
+		// ===== 阵营回合系统相关 =====
+		/**
+		 * 更新单个 Token 的回合状态
+		 */
+		updateTokenTurnState: (
+			state,
+			action: PayloadAction<{ tokenId: string; turnState: TokenInfo['turnState'] }>
+		) => {
+			const token = state.tokens[action.payload.tokenId];
+			if (token) {
+				token.turnState = action.payload.turnState;
+			}
+		},
+		/**
+		 * 根据阵营批量更新 Token 状态
+		 * 用于阵营回合切换时更新所有相关 Token 的状态
+		 */
+		updateTokensTurnStateByFaction: (
+			state,
+			action: PayloadAction<{
+				faction: string;
+				turnState: TokenInfo['turnState'];
+				playerIds?: string[]; // 可选，指定玩家 ID 列表
+			}>
+		) => {
+			const { faction, turnState, playerIds } = action.payload;
+			Object.values(state.tokens).forEach((token) => {
+				// 如果指定了玩家列表，只更新这些玩家的 Token
+				if (playerIds && !playerIds.includes(token.ownerId)) {
+					return;
+				}
+				// 检查 Token 的阵营（通过 faction 字段或 ownerId）
+				const tokenFaction = token.faction;
+				if (tokenFaction === faction) {
+					token.turnState = turnState;
+				}
+			});
+		},
+		/**
+		 * 新回合开始时重置 Token 状态
+		 */
+		resetTokensForNewRound: (state) => {
+			Object.values(state.tokens).forEach((token) => {
+				token.remainingMovement = token.maxMovement;
+				token.remainingActions = token.actionsPerTurn;
+				token.turnState = 'waiting';
+			});
+		},
+		/**
+		 * 设置当前行动阵营的 Token 为 active 状态
+		 */
+		activateFactionTokens: (
+			state,
+			action: PayloadAction<{ faction: string; playerIds: string[] }>
+		) => {
+			const { faction, playerIds } = action.payload;
+			// 先将所有 Token 设为 waiting
+			Object.values(state.tokens).forEach((token) => {
+				token.turnState = 'waiting';
+			});
+			// 然后将指定阵营的 Token 设为 active
+			Object.values(state.tokens).forEach((token) => {
+				if (playerIds.includes(token.ownerId) || token.faction === faction) {
+					token.turnState = 'active';
+				}
+			});
+		},
 	},
 });
 
@@ -296,6 +363,11 @@ export const {
 	updatePlanet,
 	removePlanet,
 	loadMapSnapshot,
+	// 阵营回合系统相关
+	updateTokenTurnState,
+	updateTokensTurnStateByFaction,
+	resetTokensForNewRound,
+	activateFactionTokens,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;

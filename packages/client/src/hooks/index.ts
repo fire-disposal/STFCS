@@ -10,7 +10,8 @@ export { useTokenSelection } from "./useTokenSelection";
 export { useWebSocket, useWebSocketStatus } from "./useWebSocket";
 export type { UseWebSocketOptions, UseWebSocketReturn } from "./useWebSocket";
 
-export { useTurnOrder } from "./useTurnOrder";
+export { useFactionTurn } from "./useFactionTurn";
+export type { UseFactionTurnReturn } from "./useFactionTurn";
 
 export { usePixiApp } from "./usePixiApp";
 export type { UsePixiAppOptions, UsePixiAppReturn } from "./usePixiApp";
