@@ -56,8 +56,17 @@ export class RoomMapStore {
 		const existing = snapshot.tokens.find((token) => token.id === tokenId);
 
 		if (existing) {
+			existing.ownerId = ownerId;
+			existing.type = type;
+			existing.size = size;
+			existing.collisionRadius = Math.max(40, size);
 			existing.position = position;
 			existing.heading = heading;
+			existing.metadata = {
+				...existing.metadata,
+				...metadata,
+				updatedAt: Date.now(),
+			};
 			snapshot.savedAt = Date.now();
 			return existing;
 		}
