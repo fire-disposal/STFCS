@@ -193,9 +193,19 @@ export class RoomManager implements IRoomManager {
 		ownerId = "mvp",
 		type: TokenInfo["type"] = "ship",
 		size = 50,
+		metadata: Record<string, unknown> = {},
 	): TokenInfo {
 		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
-		const updated = this._mapStore.upsertToken(roomId, tokenId, position, heading, ownerId, type, size);
+		const updated = this._mapStore.upsertToken(
+			roomId,
+			tokenId,
+			position,
+			heading,
+			ownerId,
+			type,
+			size,
+			metadata
+		);
 		room.mapSnapshot = this._mapStore.getSnapshot(roomId);
 		return updated;
 	}

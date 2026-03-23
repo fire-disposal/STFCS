@@ -42,6 +42,8 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	
 	// 当前选中标签
 	const [activeTab, setActiveTab] = useState<"move" | "weapons" | "systems">("move");
+	const [deploying, setDeploying] = useState(false);
+	const [deployError, setDeployError] = useState<string | null>(null);
 	
 	// 从Redux获取状态
 	const selectedTokenId = useAppSelector((state) => state.selection.selectedTokenId);
@@ -124,27 +126,36 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	);
 
 	const handleDeployFromDock = useCallback(async () => {
-		if (!currentPlayerId || !selectedDockedShip || !selectedDockedAsset) return;
-		const deployIndex = hangar?.dockedShips.findIndex((ship) => ship.id === selectedDockedShip.id) ?? 0;
-		const position = {
-			x: 500 + deployIndex * 180,
-			y: 240,
-		};
-		await websocketService.deployMapToken(
-			`ship_${currentPlayerId}_${selectedDockedShip.id}`,
-			position,
-			0,
-			undefined,
-			currentPlayerId,
-			{
-				shipAssetId: selectedDockedAsset.id,
-				dockedShipId: selectedDockedShip.id,
-				customization: selectedDockedShip.customization,
-			}
-		);
-		const refreshed = await websocketService.getPlayerHangar();
-		dispatch(setCurrentPlayerHangar(refreshed));
-	}, [currentPlayerId, selectedDockedShip, selectedDockedAsset, hangar, dispatch]);
+		if (!currentPlayerId || !selectedDockedShip || !selectedDockedAsset || deploying) return;
+		setDeployError(null);
+		setDeploying(true);
+		try {
+			const deployIndex = hangar?.dockedShips.findIndex((ship) => ship.id === selectedDockedShip.id) ?? 0;
+			const position = {
+				x: 500 + deployIndex * 180,
+				y: 240,
+			};
+			const deployResult = await websocketService.deployMapToken(
+				`ship_${currentPlayerId}_${selectedDockedShip.id}`,
+				position,
+				0,
+				undefined,
+				currentPlayerId,
+				{
+					shipAssetId: selectedDockedAsset.id,
+					dockedShipId: selectedDockedShip.id,
+					customization: selectedDockedShip.customization,
+				}
+			);
+			dispatch(selectToken(deployResult.token.id));
+			const refreshed = await websocketService.getPlayerHangar();
+			dispatch(setCurrentPlayerHangar(refreshed));
+		} catch (error) {
+			setDeployError(error instanceof Error ? error.message : "舰船部署失败，请稍后重试");
+		} finally {
+			setDeploying(false);
+		}
+	}, [currentPlayerId, selectedDockedShip, selectedDockedAsset, hangar, dispatch, deploying]);
 
 	// 处理散热
 	const handleVentFlux = useCallback(() => {
@@ -153,6 +164,12 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	}, []);
 
 	// 渲染单位概览
+	const canDeploySelectedShip =
+		currentPhase === "deployment" &&
+		Boolean(selectedDockedShip) &&
+		!selectedDockedShip?.assignedTokenId &&
+		!deploying;
+
 	const renderUnitOverview = () => {
 		if (!selectedToken) {
 			return (
@@ -323,10 +340,20 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 								<button
 									type="button"
 									onClick={handleDeployFromDock}
-									disabled={currentPhase !== "deployment" || !selectedDockedShip}
+									disabled={!canDeploySelectedShip}
 								>
-									部署选中舰船
+									{deploying ? "部署中..." : "部署选中舰船"}
 								</button>
+								{selectedDockedShip?.assignedTokenId ? (
+									<div className="tactical-dock-inventory-count">
+										该舰船已部署（Token: {selectedDockedShip.assignedTokenId}）
+									</div>
+								) : null}
+								{deployError ? (
+									<div className="tactical-dock-inventory-count" role="alert">
+										{deployError}
+									</div>
+								) : null}
 								<div className="tactical-dock-inventory-count">
 									物品栏：{hangar?.inventory.reduce((sum, item) => sum + item.quantity, 0) ?? 0}
 								</div>

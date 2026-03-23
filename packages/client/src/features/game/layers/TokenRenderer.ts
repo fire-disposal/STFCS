@@ -69,6 +69,14 @@ const TOKEN_COLORS = {
 	},
 } as const;
 
+type ShipGeometryStyle = "arrowhead" | "frigate" | "destroyer" | "cruiser" | "capital";
+
+interface ShipGeometryPreset {
+	style: ShipGeometryStyle;
+	points: Point[];
+	engineNozzles: Point[];
+}
+
 /**
  * 状态条颜色
  */
@@ -110,11 +118,11 @@ export function renderToken(
 	const tokenBody = new Graphics();
 
 	if (token.type === "ship") {
-		drawShipBody(tokenBody, tokenSize, TOKEN_COLORS.ship);
+		drawShipBody(tokenBody, token, tokenSize, TOKEN_COLORS.ship);
 	} else if (token.type === "station") {
 		drawStationBody(tokenBody, tokenSize, TOKEN_COLORS.station);
 	} else {
-		drawAsteroidBody(tokenBody, tokenSize, TOKEN_COLORS.asteroid);
+		drawAsteroidBody(tokenBody, token, tokenSize, TOKEN_COLORS.asteroid);
 	}
 
 	rotationContainer.addChild(tokenBody);
@@ -197,27 +205,168 @@ export function renderToken(
 /**
  * 绘制舰船主体
  */
-function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship): void {
-	const points = [
-		new Point(size, 0),
-		new Point(-size * 0.5, size * 0.4),
-		new Point(-size * 0.3, 0),
-		new Point(-size * 0.5, -size * 0.4),
-	];
-
-	graphics.poly(points);
+function drawShipBody(
+	graphics: Graphics,
+	token: TokenInfo,
+	size: number,
+	colors: typeof TOKEN_COLORS.ship
+): void {
+	const geometry = resolveShipGeometry(token, size);
+	graphics.poly(geometry.points);
 	graphics.fill({ color: colors.body, alpha: colors.bodyAlpha });
 
+	const contour = new Graphics();
+	contour.setStrokeStyle({ width: 2, color: colors.stroke, alpha: colors.strokeAlpha });
+	contour.poly(geometry.points);
+	contour.stroke();
+	graphics.addChild(contour);
+
 	const centerLine = new Graphics();
-	centerLine.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 0.3 });
-	centerLine.moveTo(-size * 0.3, 0);
-	centerLine.lineTo(size, 0);
+	centerLine.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 0.35 });
+	centerLine.moveTo(-size * 0.55, 0);
+	centerLine.lineTo(size * 0.92, 0);
 	centerLine.stroke();
 	graphics.addChild(centerLine);
+
+	const canopy = new Graphics();
+	canopy.ellipse(size * 0.24, 0, size * 0.2, size * 0.12);
+	canopy.fill({ color: 0xd7f3ff, alpha: 0.45 });
+	graphics.addChild(canopy);
+
+	const engineGlow = new Graphics();
+	for (const nozzle of geometry.engineNozzles) {
+		engineGlow.circle(nozzle.x, nozzle.y, size * 0.085);
+	}
+	engineGlow.fill({ color: 0x7dd3fc, alpha: 0.55 });
+	graphics.addChild(engineGlow);
 
 	graphics.setStrokeStyle({ width: 2, color: colors.stroke, alpha: colors.strokeAlpha });
 	graphics.circle(0, 0, size + 2);
 	graphics.stroke();
+}
+
+function resolveShipGeometry(token: TokenInfo, size: number): ShipGeometryPreset {
+	const metadata = token.metadata as Record<string, unknown> | undefined;
+	const explicitStyle = metadata?.shipGeometryStyle;
+	if (isShipGeometryStyle(explicitStyle)) {
+		return createShipGeometryPreset(explicitStyle, size);
+	}
+
+	const hullClass = metadata?.hullClass;
+	if (typeof hullClass === "string") {
+		if (hullClass === "frigate") return createShipGeometryPreset("frigate", size);
+		if (hullClass === "destroyer") return createShipGeometryPreset("destroyer", size);
+		if (hullClass === "cruiser") return createShipGeometryPreset("cruiser", size);
+		if (hullClass === "capital") return createShipGeometryPreset("capital", size);
+	}
+
+	if (size <= 56) return createShipGeometryPreset("frigate", size);
+	if (size <= 70) return createShipGeometryPreset("destroyer", size);
+	if (size <= 86) return createShipGeometryPreset("cruiser", size);
+	return createShipGeometryPreset("capital", size);
+}
+
+function createShipGeometryPreset(style: ShipGeometryStyle, size: number): ShipGeometryPreset {
+	switch (style) {
+		case "frigate":
+			return {
+				style,
+				points: [
+					new Point(size * 0.98, 0),
+					new Point(size * 0.24, size * 0.4),
+					new Point(-size * 0.68, size * 0.28),
+					new Point(-size * 0.48, 0),
+					new Point(-size * 0.68, -size * 0.28),
+					new Point(size * 0.24, -size * 0.4),
+				],
+				engineNozzles: [new Point(-size * 0.62, -size * 0.15), new Point(-size * 0.62, size * 0.15)],
+			};
+		case "destroyer":
+			return {
+				style,
+				points: [
+					new Point(size, 0),
+					new Point(size * 0.42, size * 0.35),
+					new Point(-size * 0.25, size * 0.47),
+					new Point(-size * 0.72, size * 0.23),
+					new Point(-size * 0.55, 0),
+					new Point(-size * 0.72, -size * 0.23),
+					new Point(-size * 0.25, -size * 0.47),
+					new Point(size * 0.42, -size * 0.35),
+				],
+				engineNozzles: [
+					new Point(-size * 0.64, -size * 0.2),
+					new Point(-size * 0.68, 0),
+					new Point(-size * 0.64, size * 0.2),
+				],
+			};
+		case "cruiser":
+			return {
+				style,
+				points: [
+					new Point(size, 0),
+					new Point(size * 0.52, size * 0.33),
+					new Point(size * 0.18, size * 0.56),
+					new Point(-size * 0.36, size * 0.58),
+					new Point(-size * 0.82, size * 0.27),
+					new Point(-size * 0.68, 0),
+					new Point(-size * 0.82, -size * 0.27),
+					new Point(-size * 0.36, -size * 0.58),
+					new Point(size * 0.18, -size * 0.56),
+					new Point(size * 0.52, -size * 0.33),
+				],
+				engineNozzles: [
+					new Point(-size * 0.72, -size * 0.24),
+					new Point(-size * 0.76, 0),
+					new Point(-size * 0.72, size * 0.24),
+				],
+			};
+		case "capital":
+			return {
+				style,
+				points: [
+					new Point(size, 0),
+					new Point(size * 0.62, size * 0.35),
+					new Point(size * 0.32, size * 0.62),
+					new Point(-size * 0.12, size * 0.66),
+					new Point(-size * 0.62, size * 0.5),
+					new Point(-size * 0.92, size * 0.22),
+					new Point(-size * 0.78, 0),
+					new Point(-size * 0.92, -size * 0.22),
+					new Point(-size * 0.62, -size * 0.5),
+					new Point(-size * 0.12, -size * 0.66),
+					new Point(size * 0.32, -size * 0.62),
+					new Point(size * 0.62, -size * 0.35),
+				],
+				engineNozzles: [
+					new Point(-size * 0.86, -size * 0.24),
+					new Point(-size * 0.9, 0),
+					new Point(-size * 0.86, size * 0.24),
+				],
+			};
+		default:
+			return {
+				style: "arrowhead",
+				points: [
+					new Point(size, 0),
+					new Point(-size * 0.5, size * 0.4),
+					new Point(-size * 0.3, 0),
+					new Point(-size * 0.5, -size * 0.4),
+				],
+				engineNozzles: [new Point(-size * 0.42, 0)],
+			};
+	}
+}
+
+function isShipGeometryStyle(value: unknown): value is ShipGeometryStyle {
+	return (
+		typeof value === "string" &&
+		(value === "arrowhead" ||
+			value === "frigate" ||
+			value === "destroyer" ||
+			value === "cruiser" ||
+			value === "capital")
+	);
 }
 
 /**
@@ -241,12 +390,18 @@ function drawStationBody(graphics: Graphics, size: number, colors: typeof TOKEN_
 /**
  * 绘制小行星主体
  */
-function drawAsteroidBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.asteroid): void {
+function drawAsteroidBody(
+	graphics: Graphics,
+	token: TokenInfo,
+	size: number,
+	colors: typeof TOKEN_COLORS.asteroid
+): void {
 	const points: Point[] = [];
 	const segments = 8;
+	const seed = stringHash(`${token.id}:${size}`);
 	for (let i = 0; i < segments; i++) {
 		const angle = (i / segments) * Math.PI * 2;
-		const variance = 0.8 + Math.random() * 0.4;
+		const variance = 0.8 + seededRandom(seed + i) * 0.4;
 		const r = size * variance;
 		points.push(new Point(Math.cos(angle) * r, Math.sin(angle) * r));
 	}
@@ -257,6 +412,20 @@ function drawAsteroidBody(graphics: Graphics, size: number, colors: typeof TOKEN
 	graphics.setStrokeStyle({ width: 2, color: colors.stroke, alpha: colors.strokeAlpha });
 	graphics.poly(points);
 	graphics.stroke();
+}
+
+function stringHash(value: string): number {
+	let hash = 0;
+	for (let i = 0; i < value.length; i++) {
+		hash = (hash << 5) - hash + value.charCodeAt(i);
+		hash |= 0;
+	}
+	return Math.abs(hash);
+}
+
+function seededRandom(seed: number): number {
+	const x = Math.sin(seed) * 10000;
+	return x - Math.floor(x);
 }
 
 /**

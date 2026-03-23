@@ -882,6 +882,22 @@ export class MessageHandler {
 			throw new Error(validation.reason ?? "Invalid deployment position");
 		}
 
+		const allAssets = this._playerService.getShipAssets();
+		const requestedAsset = data.shipAssetId
+			? allAssets.find((asset) => asset.id === data.shipAssetId)
+			: undefined;
+		if (data.shipAssetId && !requestedAsset) {
+			throw new Error(`Unknown ship asset: ${data.shipAssetId}`);
+		}
+
+		const tokenMetadata: Record<string, unknown> = {};
+		if (requestedAsset) {
+			tokenMetadata.assetId = requestedAsset.id;
+			tokenMetadata.assetName = requestedAsset.name;
+			tokenMetadata.hullClass = requestedAsset.hullClass;
+			tokenMetadata.manufacturer = requestedAsset.manufacturer;
+		}
+
 		const token = this._roomManager.upsertTokenPosition(
 			roomId,
 			data.tokenId,
@@ -889,30 +905,38 @@ export class MessageHandler {
 			data.heading,
 			ownerId,
 			data.type ?? "ship",
-			data.size ?? 56
+			data.size ?? requestedAsset?.baseStats.size ?? 56,
+			tokenMetadata
 		);
 		if (data.dockedShipId) {
 			const hangar = this._playerService.getPlayerHangar(ownerId);
 			const docked = hangar?.dockedShips.find((ship) => ship.id === data.dockedShipId);
-			if (docked) {
-				docked.assignedTokenId = token.id;
-				if (data.customization) {
-					docked.customization = {
-						...docked.customization,
-						...(data.customization as Record<string, unknown>),
-					} as typeof docked.customization;
-				}
-				token.maxMovement = this._playerService
-					.getShipAssets()
-					.find((asset) => asset.id === docked.assetId)?.baseStats.maxMovement ?? token.maxMovement;
-				token.remainingMovement = token.maxMovement;
-				token.metadata = {
-					...token.metadata,
-					dockedShipId: docked.id,
-					assetId: docked.assetId,
-					customization: docked.customization,
-				};
+			if (!docked) {
+				throw new Error("Docked ship not found");
 			}
+			if (docked.assignedTokenId && docked.assignedTokenId !== token.id) {
+				throw new Error("Docked ship is already deployed");
+			}
+			docked.assignedTokenId = token.id;
+			if (data.customization) {
+				docked.customization = {
+					...docked.customization,
+					...(data.customization as Record<string, unknown>),
+				} as typeof docked.customization;
+			}
+			const dockedAsset = allAssets.find((asset) => asset.id === docked.assetId);
+			token.maxMovement = dockedAsset?.baseStats.maxMovement ?? token.maxMovement;
+			token.remainingMovement = token.maxMovement;
+			token.metadata = {
+				...token.metadata,
+				dockedShipId: docked.id,
+				assetId: docked.assetId,
+				assetName: dockedAsset?.name,
+				hullClass: dockedAsset?.hullClass,
+				manufacturer: dockedAsset?.manufacturer,
+				name: docked.displayName,
+				customization: docked.customization,
+			};
 		}
 
 		this._roomManager.broadcastToRoom(roomId, {
