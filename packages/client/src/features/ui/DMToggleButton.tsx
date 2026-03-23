@@ -165,6 +165,26 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 	const currentPlayerDMState = players.find((p) => p.id === currentPlayerId);
 	const displayDMState = currentPlayerDMState?.isDMMode ?? isDMMode;
 
+	const handleInitializeTurn = async () => {
+		if (!displayDMState) return;
+		await websocketService.initializeTurn();
+	};
+
+	const handleAdvanceTurn = async () => {
+		if (!displayDMState) return;
+		await websocketService.advanceTurn();
+	};
+
+	const handleSetMovementPhase = async () => {
+		if (!displayDMState) return;
+		await websocketService.setTurnPhase("movement");
+	};
+
+	const handleSetDeploymentPhase = async () => {
+		if (!displayDMState) return;
+		await websocketService.setTurnPhase("deployment");
+	};
+
 	return (
 		<div className={`dm-toggle-container ${className}`}>
 			<AnimatePresence mode="wait">
@@ -235,6 +255,23 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 						>
 							×
 						</button>
+
+						{displayDMState && (
+							<div className="dm-ops-panel">
+								<button className="dm-op-btn" type="button" onClick={handleInitializeTurn}>
+									初始化回合
+								</button>
+								<button className="dm-op-btn" type="button" onClick={handleAdvanceTurn}>
+									推进回合
+								</button>
+								<button className="dm-op-btn" type="button" onClick={handleSetDeploymentPhase}>
+									部署阶段
+								</button>
+								<button className="dm-op-btn" type="button" onClick={handleSetMovementPhase}>
+									移动阶段
+								</button>
+							</div>
+						)}
 					</motion.div>
 				)}
 			</AnimatePresence>
@@ -456,6 +493,28 @@ const DMToggleButton: React.FC<DMToggleButtonProps> = ({ className = "" }) => {
 					transition: var(--transition-fast);
 					padding: 0;
 					line-height: 1;
+				}
+
+				.dm-ops-panel {
+					margin-top: 8px;
+					display: grid;
+					grid-template-columns: 1fr 1fr;
+					gap: 6px;
+				}
+
+				.dm-op-btn {
+					background: rgba(26, 26, 32, 0.95);
+					border: 1px solid rgba(120, 120, 180, 0.4);
+					color: rgba(210, 210, 255, 0.9);
+					font-size: 11px;
+					padding: 6px 8px;
+					cursor: pointer;
+					transition: var(--transition-fast);
+				}
+
+				.dm-op-btn:hover {
+					border-color: rgba(130, 220, 255, 0.8);
+					color: rgba(240, 255, 255, 0.95);
 				}
 
 				.dm-close-btn:hover {

@@ -166,7 +166,7 @@ export function useTurnOrder() {
 	// 计算属性
 	const totalUnits = units.length;
 	const progress = totalUnits > 0 ? ((currentIndex + 1) / totalUnits) * 100 : 0;
-	const currentPhase = turnOrder?.phase ?? "planning";
+	const currentPhase = turnOrder?.phase ?? "deployment";
 	const currentRound = turnOrder?.roundNumber ?? 1;
 
 	// 获取指定单位的索引
