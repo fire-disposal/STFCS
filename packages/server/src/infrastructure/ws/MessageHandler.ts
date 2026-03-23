@@ -200,6 +200,18 @@ export class MessageHandler {
 		const result = await this._playerService.join(playerInfo, roomId);
 		if (!result.success) throw new Error(result.error ?? "Failed to join");
 		if (!result.data) throw new Error("No player data returned");
+		const joinedRoomId = roomId ?? "default";
+
+		// 为玩家创建最小可操作 Token（已存在则不覆盖 owner）
+		this._roomManager.upsertTokenPosition(
+			joinedRoomId,
+			`ship_${data.id}`,
+			this._createSpawnPosition(joinedRoomId, data.id),
+			0,
+			data.id,
+			"ship",
+			56
+		);
 
 		return result.data;
 	}
@@ -716,6 +728,10 @@ export class MessageHandler {
 		data: Extract<RequestPayload, { operation: "map.token.move" }>["data"]
 	) {
 		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		if (!this._canControlToken(roomId, clientId, data.tokenId)) {
+			throw new Error("You are not allowed to control this token");
+		}
+
 		const existing = this._roomManager
 			.getMapSnapshot(roomId)
 			.tokens.find((token) => token.id === data.tokenId);
@@ -880,6 +896,10 @@ export class MessageHandler {
 			const existing = this._roomManager
 				.getMapSnapshot(playerRoom.id)
 				.tokens.find((t) => t.id === message.payload.tokenId);
+			if (!this._canControlToken(playerRoom.id, clientId, message.payload.tokenId)) {
+				this._sendError(clientId, "DRAG_END_ERROR", "You are not allowed to control this token");
+				return;
+			}
 			const previousPosition = existing?.position ?? message.payload.finalPosition;
 			const previousHeading = existing?.heading ?? message.payload.finalHeading;
 			this._roomManager.upsertTokenPosition(
@@ -910,6 +930,27 @@ export class MessageHandler {
 				payload: { timestamp: (message as { payload: { timestamp: number } }).payload.timestamp },
 			});
 		}
+	}
+
+	private _canControlToken(roomId: string, clientId: string, tokenId: string): boolean {
+		const token = this._roomManager.getMapSnapshot(roomId).tokens.find((item) => item.id === tokenId);
+		if (!token) return true;
+		if (token.ownerId === clientId) return true;
+		const player = this._playerService.getPlayer(clientId);
+		return Boolean(player?.isDMMode);
+	}
+
+	private _createSpawnPosition(roomId: string, playerId: string): { x: number; y: number } {
+		const snapshot = this._roomManager.getMapSnapshot(roomId);
+		const playerTokenCount = snapshot.tokens.filter((token) => token.ownerId === playerId).length;
+		const index = snapshot.tokens.filter((token) => token.type === "ship").length + playerTokenCount;
+		const baseX = 800;
+		const baseY = 900;
+		const step = 280;
+		return {
+			x: baseX + (index % 4) * step,
+			y: baseY + Math.floor(index / 4) * step,
+		};
 	}
 }
 

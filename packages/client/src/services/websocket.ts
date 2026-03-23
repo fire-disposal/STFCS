@@ -9,7 +9,7 @@ import {
 	setRoomId,
 	updatePing,
 } from "@/store/slices/uiSlice";
-import { createStateSyncV2, createWSEventBusIntegration } from "@/store/sync";
+import { updateToken } from "@/store/slices/mapSlice";
 import type { PlayerCamera, ShipMovement } from "@vt/shared/types";
 import type {
 	PlayerJoinedMessage,
@@ -54,13 +54,6 @@ export class WebSocketService {
 	private pendingRequests = new Map<string, PendingRequest>();
 	private requestTimeout = 10000;
 
-	// 新架构：状态同步器和事件总线集成
-	private stateSync = createStateSyncV2({ enableLogging: false });
-	private eventBusIntegration = createWSEventBusIntegration(this, {
-		roomId: "default", // 初始房间，连接后更新
-		enableLogging: false,
-	});
-
 	constructor() {
 		this.setupMessageHandlers();
 	}
@@ -79,6 +72,18 @@ export class WebSocketService {
 
 		this.on(WS_MESSAGE_TYPES.SHIP_MOVED, (payload) => {
 			console.log("Ship moved:", payload);
+		});
+
+		this.on(WS_MESSAGE_TYPES.TOKEN_MOVED, (payload) => {
+			store.dispatch(
+				updateToken({
+					id: payload.tokenId,
+					updates: {
+						position: payload.newPosition,
+						heading: payload.newHeading,
+					},
+				})
+			);
 		});
 
 		this.on(WS_MESSAGE_TYPES.CHAT_MESSAGE, (payload) => {

@@ -136,17 +136,6 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				originalPosition: { ...token.position },
 				isDragging: true,
 			};
-
-			// 发送拖拽开始消息
-			if (currentPlayerId && currentPlayerName) {
-				websocketService.sendTokenDragStart(
-					tokenId,
-					currentPlayerId,
-					currentPlayerName,
-					token.position,
-					token.heading || 0
-				);
-			}
 		},
 		onTokenDrag: (tokenId, newPosition) => {
 			const token = tokensRef.current[tokenId];
@@ -158,20 +147,6 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 				updates: { position: newPosition },
 			}));
 
-			// 发送拖拽中消息（限流：每 100ms 一次）
-			if (currentPlayerId && currentPlayerName && draggingTokenRef.current?.isDragging) {
-				const now = Date.now();
-				if (!draggingTokenRef.current.lastDragTime || now - draggingTokenRef.current.lastDragTime > 100) {
-					draggingTokenRef.current.lastDragTime = now;
-					websocketService.sendTokenDragging(
-						tokenId,
-						currentPlayerId,
-						currentPlayerName,
-						newPosition,
-						token.heading || 0
-					);
-				}
-			}
 		},
 		onTokenDragEnd: (tokenId, finalPosition, cancelled) => {
 			if (!draggingTokenRef.current) return;
@@ -181,23 +156,26 @@ const GameCanvas: React.FC<GameCanvasProps> = () => {
 
 			const committed = !cancelled && draggingTokenRef.current.isDragging;
 
-			// 发送拖拽结束消息
-			if (currentPlayerId) {
-				websocketService.sendTokenDragEnd(
-					tokenId,
-					currentPlayerId,
-					finalPosition,
-					token.heading || 0,
-					committed
-				);
-			}
-
 			// 如果取消拖拽，恢复原始位置
 			if (cancelled) {
 				dispatch(updateToken({
 					id: tokenId,
 					updates: { position: draggingTokenRef.current.originalPosition },
 				}));
+			} else if (committed) {
+				websocketService
+					.moveMapToken(tokenId, finalPosition, token.heading || 0)
+					.catch((error) => {
+						console.error("Failed to sync token move:", error);
+						if (draggingTokenRef.current) {
+							dispatch(
+								updateToken({
+									id: tokenId,
+									updates: { position: draggingTokenRef.current.originalPosition },
+								})
+							);
+						}
+					});
 			}
 
 			draggingTokenRef.current = null;
