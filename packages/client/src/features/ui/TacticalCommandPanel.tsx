@@ -8,6 +8,8 @@ import React, { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { selectToken } from "@/store/slices/selectionSlice";
+import { selectDockedShip, setCurrentPlayerHangar } from "@/store/slices/hangarSlice";
+import { websocketService } from "@/services/websocket";
 import { Shield, Zap, Target, Move, Crosshair, AlertTriangle } from "lucide-react";
 
 // 子组件导入（后续实现）
@@ -43,8 +45,13 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	
 	// 从Redux获取状态
 	const selectedTokenId = useAppSelector((state) => state.selection.selectedTokenId);
+	const currentPlayerId = useAppSelector((state) => state.player.currentPlayerId);
 	const tokens = useAppSelector((state) => state.map.tokens);
 	const ships = useAppSelector((state) => state.ship.ships);
+	const currentPhase = useAppSelector((state) => state.turn.order?.phase ?? "deployment");
+	const hangar = useAppSelector((state) => state.hangar.currentPlayerHangar);
+	const selectedDockedShipId = useAppSelector((state) => state.hangar.selectedDockedShipId);
+	const shipAssets = useAppSelector((state) => state.hangar.assets);
 	const currentUnit = useAppSelector((state) => {
 		const turnOrder = state.turn.order;
 		if (!turnOrder) return null;
@@ -54,6 +61,8 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 	// 获取选中单位数据
 	const selectedToken = selectedTokenId ? tokens[selectedTokenId] : null;
 	const selectedShip = selectedTokenId ? ships[selectedTokenId] : null;
+	const selectedDockedShip = hangar?.dockedShips.find((ship) => ship.id === selectedDockedShipId) ?? null;
+	const selectedDockedAsset = shipAssets.find((asset) => asset.id === selectedDockedShip?.assetId);
 
 	// 判断是否为当前回合单位
 	const isCurrentTurn = currentUnit?.id === selectedTokenId;
@@ -83,6 +92,59 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 		// TODO: 实现护盾开关逻辑
 		console.log("Toggle shield");
 	}, []);
+
+	const [step1Forward, setStep1Forward] = useState(0);
+	const [step2Rotation, setStep2Rotation] = useState(0);
+	const [step3Forward, setStep3Forward] = useState(0);
+
+	const handleMoveStep = useCallback(
+		async (stepIndex: 1 | 2 | 3) => {
+			if (!selectedTokenId) return;
+			if (!isCurrentTurn) return;
+			if (stepIndex === 1) {
+				await websocketService.moveMapTokenStep(selectedTokenId, { stepIndex, forward: step1Forward });
+			}
+			if (stepIndex === 2) {
+				await websocketService.moveMapTokenStep(selectedTokenId, { stepIndex, rotation: step2Rotation });
+			}
+			if (stepIndex === 3) {
+				await websocketService.moveMapTokenStep(selectedTokenId, { stepIndex, forward: step3Forward });
+			}
+		},
+		[selectedTokenId, isCurrentTurn, step1Forward, step2Rotation, step3Forward]
+	);
+
+	const handleSelectDockedShip = useCallback(
+		async (dockedShipId: string) => {
+			dispatch(selectDockedShip(dockedShipId));
+			const updated = await websocketService.setActiveDockedShip(dockedShipId);
+			dispatch(setCurrentPlayerHangar(updated));
+		},
+		[dispatch]
+	);
+
+	const handleDeployFromDock = useCallback(async () => {
+		if (!currentPlayerId || !selectedDockedShip || !selectedDockedAsset) return;
+		const deployIndex = hangar?.dockedShips.findIndex((ship) => ship.id === selectedDockedShip.id) ?? 0;
+		const position = {
+			x: 500 + deployIndex * 180,
+			y: 240,
+		};
+		await websocketService.deployMapToken(
+			`ship_${currentPlayerId}_${selectedDockedShip.id}`,
+			position,
+			0,
+			undefined,
+			currentPlayerId,
+			{
+				shipAssetId: selectedDockedAsset.id,
+				dockedShipId: selectedDockedShip.id,
+				customization: selectedDockedShip.customization,
+			}
+		);
+		const refreshed = await websocketService.getPlayerHangar();
+		dispatch(setCurrentPlayerHangar(refreshed));
+	}, [currentPlayerId, selectedDockedShip, selectedDockedAsset, hangar, dispatch]);
 
 	// 处理散热
 	const handleVentFlux = useCallback(() => {
@@ -211,13 +273,63 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 				<div className="tactical-console-content">
 					{activeTab === "move" && (
 						<div className="tactical-move-controls">
-							<div className="tactical-control-placeholder">
-								<Move size={24} />
-								<span>{t("tactical.headingControl")}</span>
+							<div className="tactical-move-step">
+								<label>Step1 平移A</label>
+								<input
+									type="number"
+									value={step1Forward}
+									onChange={(e) => setStep1Forward(Number(e.target.value))}
+								/>
+								<button type="button" onClick={() => handleMoveStep(1)} disabled={!isCurrentTurn || currentPhase !== "movement"}>
+									应用
+								</button>
 							</div>
-							<div className="tactical-control-placeholder">
-								<Target size={24} />
-								<span>{t("tactical.distanceControl")}</span>
+							<div className="tactical-move-step">
+								<label>Step2 转向</label>
+								<input
+									type="number"
+									value={step2Rotation}
+									onChange={(e) => setStep2Rotation(Number(e.target.value))}
+								/>
+								<button type="button" onClick={() => handleMoveStep(2)} disabled={!isCurrentTurn || currentPhase !== "movement"}>
+									应用
+								</button>
+							</div>
+							<div className="tactical-move-step">
+								<label>Step3 平移B</label>
+								<input
+									type="number"
+									value={step3Forward}
+									onChange={(e) => setStep3Forward(Number(e.target.value))}
+								/>
+								<button type="button" onClick={() => handleMoveStep(3)} disabled={!isCurrentTurn || currentPhase !== "movement"}>
+									应用
+								</button>
+							</div>
+							<div className="tactical-dock-panel">
+								<div className="tactical-dock-title">船坞与物品栏</div>
+								<div className="tactical-dock-ships">
+									{hangar?.dockedShips.map((ship) => (
+										<button
+											key={ship.id}
+											type="button"
+											className={ship.id === selectedDockedShipId ? "active" : ""}
+											onClick={() => handleSelectDockedShip(ship.id)}
+										>
+											{ship.displayName}
+										</button>
+									))}
+								</div>
+								<button
+									type="button"
+									onClick={handleDeployFromDock}
+									disabled={currentPhase !== "deployment" || !selectedDockedShip}
+								>
+									部署选中舰船
+								</button>
+								<div className="tactical-dock-inventory-count">
+									物品栏：{hangar?.inventory.reduce((sum, item) => sum + item.quantity, 0) ?? 0}
+								</div>
 							</div>
 						</div>
 					)}
@@ -632,6 +744,69 @@ export const TacticalCommandPanel: React.FC<TacticalCommandPanelProps> = ({
 					display: flex;
 					gap: 16px;
 					align-items: center;
+				}
+
+				.tactical-move-step {
+					display: flex;
+					flex-direction: column;
+					gap: 6px;
+					padding: 8px;
+					background: rgba(20, 25, 35, 0.6);
+					border: 1px solid rgba(74, 158, 255, 0.25);
+				}
+
+				.tactical-move-step label {
+					font-size: 10px;
+					color: #8ea4d0;
+				}
+
+				.tactical-move-step input {
+					width: 80px;
+					background: rgba(5, 8, 14, 0.9);
+					border: 1px solid rgba(74, 158, 255, 0.25);
+					color: #c3d6ff;
+					padding: 4px;
+				}
+
+				.tactical-move-step button,
+				.tactical-dock-panel button {
+					background: rgba(35, 48, 75, 0.7);
+					border: 1px solid rgba(74, 158, 255, 0.3);
+					color: #c8d9ff;
+					padding: 4px 8px;
+					font-size: 10px;
+					cursor: pointer;
+				}
+
+				.tactical-dock-panel button.active {
+					border-color: rgba(255, 188, 81, 0.8);
+					color: #ffbc51;
+				}
+
+				.tactical-dock-panel {
+					min-width: 220px;
+					padding: 8px;
+					border: 1px solid rgba(255, 188, 81, 0.3);
+					background: rgba(26, 20, 12, 0.55);
+					display: flex;
+					flex-direction: column;
+					gap: 6px;
+				}
+
+				.tactical-dock-title {
+					font-size: 11px;
+					color: #ffbc51;
+				}
+
+				.tactical-dock-ships {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 4px;
+				}
+
+				.tactical-dock-inventory-count {
+					font-size: 10px;
+					color: #9ea7b9;
 				}
 
 				.tactical-control-placeholder {

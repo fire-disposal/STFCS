@@ -1,8 +1,16 @@
-import type { PlayerInfo, Result } from "@vt/shared/types";
+import type {
+	DockedShip,
+	InventoryItem,
+	PlayerHangar,
+	PlayerInfo,
+	Result,
+	ShipAssetDefinition,
+} from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
 import type { IWSServer } from "@vt/shared/ws";
 import type { RoomManager } from "../../infrastructure/ws/RoomManager";
 import { BaseService } from "../common/BaseService";
+import { ShipAssetLibrary } from "./ShipAssetLibrary";
 
 export type JoinPlayerResult = Result<PlayerInfo>;
 export type LeavePlayerResult = Result<void>;
@@ -13,14 +21,21 @@ export interface IPlayerService {
 	getPlayer(playerId: string): PlayerInfo | undefined;
 	listPlayers(roomId: string): PlayerInfo[];
 	toggleDMMode(playerId: string, enable: boolean): Promise<boolean>;
+	getShipAssets(): ShipAssetDefinition[];
+	getPlayerHangar(playerId: string): PlayerHangar | null;
+	setActiveDockedShip(playerId: string, dockedShipId: string): PlayerHangar | null;
 }
 
 export class PlayerService extends BaseService implements IPlayerService {
 	private _players: Map<string, PlayerInfo>;
+	private _shipAssetLibrary: ShipAssetLibrary;
+	private _hangars: Map<string, PlayerHangar>;
 
 	constructor() {
 		super();
 		this._players = new Map();
+		this._shipAssetLibrary = new ShipAssetLibrary();
+		this._hangars = new Map();
 	}
 
 	async join(player: PlayerInfo, roomId?: string): Promise<JoinPlayerResult> {
@@ -37,6 +52,7 @@ export class PlayerService extends BaseService implements IPlayerService {
 		};
 
 		this._players.set(player.id, completePlayer);
+		this._ensurePlayerHangar(player.id);
 
 		if (this._roomManager) {
 			const targetRoom = roomId ?? "default";
@@ -72,6 +88,7 @@ export class PlayerService extends BaseService implements IPlayerService {
 		}
 
 		this._players.delete(playerId);
+		this._hangars.delete(playerId);
 
 		if (this._wsServer) {
 			this._roomManager?.broadcastToRoom(roomId, {
@@ -85,6 +102,28 @@ export class PlayerService extends BaseService implements IPlayerService {
 
 	getPlayer(playerId: string): PlayerInfo | undefined {
 		return this._players.get(playerId);
+	}
+
+	getShipAssets(): ShipAssetDefinition[] {
+		return this._shipAssetLibrary.listAssets();
+	}
+
+	getPlayerHangar(playerId: string): PlayerHangar | null {
+		const player = this._players.get(playerId);
+		if (!player) return null;
+		return this._ensurePlayerHangar(playerId);
+	}
+
+	setActiveDockedShip(playerId: string, dockedShipId: string): PlayerHangar | null {
+		const hangar = this.getPlayerHangar(playerId);
+		if (!hangar) return null;
+		const exists = hangar.dockedShips.some((ship) => ship.id === dockedShipId);
+		if (!exists) {
+			return hangar;
+		}
+		hangar.activeShipId = dockedShipId;
+		hangar.updatedAt = Date.now();
+		return hangar;
 	}
 
 	listPlayers(roomId: string): PlayerInfo[] {
@@ -146,6 +185,50 @@ export class PlayerService extends BaseService implements IPlayerService {
 				players: dmStatus,
 			},
 		});
+	}
+
+	private _ensurePlayerHangar(playerId: string): PlayerHangar {
+		const existing = this._hangars.get(playerId);
+		if (existing) {
+			return existing;
+		}
+
+		const assets = this._shipAssetLibrary.listAssets();
+		const dockedShips: DockedShip[] = assets.map((asset, index) => ({
+			id: `${playerId}_dock_${asset.id}`,
+			assetId: asset.id,
+			displayName: asset.defaultCustomization.nickname ?? `${asset.name}-${index + 1}`,
+			customization: { ...asset.defaultCustomization },
+			cargoSlots: asset.hullClass === "frigate" ? 2 : 4,
+			assignedTokenId: null,
+		}));
+
+		const inventory: InventoryItem[] = [
+			{
+				id: `${playerId}_module_burst_laser`,
+				name: "Burst Laser",
+				category: "module",
+				quantity: 2,
+				metadata: { type: "weapon" },
+			},
+			{
+				id: `${playerId}_resource_supplies`,
+				name: "Supplies",
+				category: "resource",
+				quantity: 120,
+				metadata: { unit: "crate" },
+			},
+		];
+
+		const created: PlayerHangar = {
+			playerId,
+			dockedShips,
+			inventory,
+			activeShipId: dockedShips[0]?.id ?? null,
+			updatedAt: Date.now(),
+		};
+		this._hangars.set(playerId, created);
+		return created;
 	}
 }
 

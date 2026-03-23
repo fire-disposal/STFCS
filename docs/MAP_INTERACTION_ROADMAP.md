@@ -22,7 +22,7 @@
 
 ## 1. 目标闭环（最小可玩 Match Loop）
 
-`房间准备 -> 玩家入场并分配Token -> 回合开始 -> 三段移动 -> 单次攻击 -> 伤害结算 -> 回合切换 -> 胜负判定`
+`房间准备 -> DM部署与玩家入场 -> 回合开始 -> 三段移动 -> 单次攻击 -> 伤害结算 -> 回合切换 -> 持续叙事`
 
 每一步都要求：
 - 有清晰的用户交互入口；
@@ -44,6 +44,7 @@
 2. 所有权校验：owner 可移动，DM 可覆盖。
 3. 错误闭环：非法移动回滚本地位置 + UI toast。
 4. 状态源统一：地图 Token 状态以 room snapshot 为准。
+5. 引入 DM 部署动作：`request(map.token.deploy)` 仅在 deployment phase 生效。
 
 ### Path 输出
 - 可演示“多人拖拽同图一致同步”。
@@ -56,6 +57,7 @@
 
 ### Milestone
 - 单位在自己行动时可完整执行三段移动并被服务器裁定。
+- DM 可以推进阶段（deployment -> planning -> movement -> action -> resolution）。
 
 ### Action
 

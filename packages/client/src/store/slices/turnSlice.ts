@@ -33,7 +33,7 @@ const turnSlice = createSlice({
 				phase?: TurnPhase;
 			}>
 		) => {
-			const { units, roundNumber = 1, phase = "planning" } = action.payload;
+			const { units, roundNumber = 1, phase = "deployment" } = action.payload;
 			// 按先攻值排序
 			const sortedUnits = [...units].sort((a, b) => b.initiative - a.initiative);
 			state.order = {
@@ -76,7 +76,7 @@ const turnSlice = createSlice({
 					currentIndex: 0,
 					units: sortedUnits,
 					roundNumber: roundNumber ?? 1,
-					phase: phase ?? "planning",
+					phase: phase ?? "deployment",
 					isComplete: false,
 				};
 			}
@@ -152,7 +152,7 @@ const turnSlice = createSlice({
 			if (state.order) {
 				state.order.roundNumber += 1;
 				state.order.currentIndex = 0;
-				state.order.phase = "planning";
+				state.order.phase = "deployment";
 				// 重置所有单位状态
 				state.order.units.forEach((unit) => {
 					unit.state = "waiting";
@@ -194,7 +194,7 @@ const turnSlice = createSlice({
 					currentIndex: 0,
 					units: [action.payload],
 					roundNumber: 1,
-					phase: "planning",
+					phase: "deployment",
 					isComplete: false,
 				};
 				state.isInitialized = true;

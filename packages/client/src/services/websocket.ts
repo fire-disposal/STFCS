@@ -267,6 +267,67 @@ export class WebSocketService {
 		return this.sendRequest("map.token.move", { roomId, tokenId, position, heading });
 	}
 
+	public async deployMapToken(
+		tokenId: string,
+		position: { x: number; y: number },
+		heading: number,
+		roomId?: string,
+		ownerId?: string,
+		options?: {
+			shipAssetId?: string;
+			dockedShipId?: string;
+			customization?: Record<string, unknown>;
+		}
+	): Promise<ResponseForOperation<"map.token.deploy">> {
+		return this.sendRequest("map.token.deploy", {
+			roomId,
+			tokenId,
+			position,
+			heading,
+			ownerId,
+			shipAssetId: options?.shipAssetId,
+			dockedShipId: options?.dockedShipId,
+			customization: options?.customization,
+		});
+	}
+
+	public async moveMapTokenStep(
+		tokenId: string,
+		step: { stepIndex: 1 | 2 | 3; forward?: number; strafe?: number; rotation?: number },
+		roomId?: string
+	): Promise<ResponseForOperation<"map.token.move.step">> {
+		return this.sendRequest("map.token.move.step", { roomId, tokenId, ...step });
+	}
+
+	public async initializeTurn(roomId?: string): Promise<ResponseForOperation<"turn.initialize">> {
+		return this.sendRequest("turn.initialize", { roomId });
+	}
+
+	public async advanceTurn(roomId?: string): Promise<ResponseForOperation<"turn.advance">> {
+		return this.sendRequest("turn.advance", { roomId });
+	}
+
+	public async setTurnPhase(
+		phase: "deployment" | "planning" | "movement" | "action" | "resolution",
+		roomId?: string
+	): Promise<ResponseForOperation<"turn.setPhase">> {
+		return this.sendRequest("turn.setPhase", { roomId, phase });
+	}
+
+	public async listShipAssets(): Promise<ResponseForOperation<"ship.assets.list">> {
+		return this.sendRequest("ship.assets.list", {});
+	}
+
+	public async getPlayerHangar(playerId?: string): Promise<ResponseForOperation<"player.hangar.get">> {
+		return this.sendRequest("player.hangar.get", { playerId });
+	}
+
+	public async setActiveDockedShip(
+		dockedShipId: string
+	): Promise<ResponseForOperation<"player.hangar.setActiveShip">> {
+		return this.sendRequest("player.hangar.setActiveShip", { dockedShipId });
+	}
+
 	public async getRoomState(roomId?: string): Promise<ResponseForOperation<"room.state.get">> {
 		return this.sendRequest("room.state.get", { roomId });
 	}

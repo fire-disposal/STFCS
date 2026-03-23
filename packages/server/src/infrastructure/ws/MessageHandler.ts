@@ -21,10 +21,13 @@ import type {
 	WSMessage,
 } from "@vt/shared/ws";
 import { MapSnapshotSchema } from "@vt/shared/core-types";
+import type { TurnPhase } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES, isRequestMessage, isShipMovedMessage } from "@vt/shared/ws";
 import type { PlayerService } from "../../application/player/PlayerService";
 import type { SelectionService } from "../../application/selection/SelectionService";
 import type { ShipService } from "../../application/ship/ShipService";
+import { MovementStepEngine } from "../../application/turn/MovementStepEngine";
+import { RoomTurnCoordinator } from "../../application/turn/RoomTurnCoordinator";
 import type { RoomManager } from "../../infrastructure/ws/RoomManager";
 
 interface WSSender {
@@ -47,6 +50,7 @@ export class MessageHandler {
 	private _roomDrawings: Map<string, DrawingElement[]>;
 	private _requestHandlers: RequestHandlers;
 	private _wsServer?: WSSender;
+	private _turnCoordinator: RoomTurnCoordinator;
 
 	constructor(options: MessageHandlerOptions) {
 		this._roomManager = options.roomManager;
@@ -55,6 +59,7 @@ export class MessageHandler {
 		this._selectionService = options.selectionService;
 		this._wsServer = options.wsServer;
 		this._roomDrawings = new Map();
+		this._turnCoordinator = new RoomTurnCoordinator(this._playerService, this._roomManager);
 		this._requestHandlers = this._createRequestHandlers();
 	}
 
@@ -75,6 +80,15 @@ export class MessageHandler {
 			"map.snapshot.get": this._handleMapSnapshotGet.bind(this),
 			"map.snapshot.save": this._handleMapSnapshotSave.bind(this),
 			"map.token.move": this._handleMapTokenMove.bind(this),
+			"map.token.move.step": this._handleMapTokenMoveStep.bind(this),
+			"map.token.deploy": this._handleMapTokenDeploy.bind(this),
+			"turn.initialize": this._handleTurnInitialize.bind(this),
+			"turn.advance": this._handleTurnAdvance.bind(this),
+			"turn.setPhase": this._handleTurnSetPhase.bind(this),
+			"turn.state.get": this._handleTurnStateGet.bind(this),
+			"ship.assets.list": this._handleShipAssetsList.bind(this),
+			"player.hangar.get": this._handlePlayerHangarGet.bind(this),
+			"player.hangar.setActiveShip": this._handlePlayerHangarSetActiveShip.bind(this),
 			"room.state.get": this._handleRoomStateGet.bind(this),
 		};
 	}
@@ -731,10 +745,21 @@ export class MessageHandler {
 		if (!this._canControlToken(roomId, clientId, data.tokenId)) {
 			throw new Error("You are not allowed to control this token");
 		}
+		const snapshot = this._roomManager.getMapSnapshot(roomId);
+		const existing = snapshot.tokens.find((token) => token.id === data.tokenId);
+		const movementDistance = existing
+			? Math.hypot(data.position.x - existing.position.x, data.position.y - existing.position.y)
+			: 0;
+		const movementValidation = this._turnCoordinator.validateMovement(
+			roomId,
+			clientId,
+			existing,
+			movementDistance
+		);
+		if (!movementValidation.ok) {
+			throw new Error(movementValidation.reason ?? "Invalid movement");
+		}
 
-		const existing = this._roomManager
-			.getMapSnapshot(roomId)
-			.tokens.find((token) => token.id === data.tokenId);
 		const previousPosition = existing?.position ?? data.position;
 		const previousHeading = existing?.heading ?? data.heading;
 
@@ -759,8 +784,143 @@ export class MessageHandler {
 				timestamp: Date.now(),
 			},
 		});
+		this._turnCoordinator.consumeMovementBudget(roomId, data.tokenId, movementDistance);
 
 		return { roomId, token };
+	}
+
+	private async _handleMapTokenMoveStep(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "map.token.move.step" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const snapshot = this._roomManager.getMapSnapshot(roomId);
+		const token = snapshot.tokens.find((item) => item.id === data.tokenId);
+		if (!token) {
+			throw new Error("Token not found");
+		}
+		if (!this._canControlToken(roomId, clientId, data.tokenId)) {
+			throw new Error("You are not allowed to control this token");
+		}
+
+		const stepResult = MovementStepEngine.applyStep(
+			{ position: token.position, heading: token.heading },
+			{
+				stepIndex: data.stepIndex,
+				forward: data.forward,
+				strafe: data.strafe,
+				rotation: data.rotation,
+			}
+		);
+
+		const movementValidation = this._turnCoordinator.validateMovement(
+			roomId,
+			clientId,
+			token,
+			stepResult.consumedDistance
+		);
+		if (!movementValidation.ok) {
+			throw new Error(movementValidation.reason ?? "Invalid movement step");
+		}
+		const previousPosition = token.position;
+		const previousHeading = token.heading;
+
+		const updatedToken = this._roomManager.upsertTokenPosition(
+			roomId,
+			token.id,
+			stepResult.nextPosition,
+			stepResult.nextHeading,
+			token.ownerId,
+			token.type,
+			token.size
+		);
+		this._turnCoordinator.consumeMovementBudget(roomId, token.id, stepResult.consumedDistance);
+
+		this._roomManager.broadcastToRoom(roomId, {
+			type: WS_MESSAGE_TYPES.TOKEN_MOVED,
+			payload: {
+				tokenId: token.id,
+				previousPosition,
+				newPosition: stepResult.nextPosition,
+				previousHeading,
+				newHeading: stepResult.nextHeading,
+				timestamp: Date.now(),
+			},
+		});
+
+		return {
+			roomId,
+			token: updatedToken,
+			appliedStep: {
+				stepIndex: data.stepIndex,
+				forward: data.forward,
+				strafe: data.strafe,
+				rotation: data.rotation,
+			},
+		};
+	}
+
+	private async _handleMapTokenDeploy(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "map.token.deploy" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		const state = this._turnCoordinator.getState(roomId);
+		if (state.phase !== "deployment") {
+			throw new Error("Deploy operation only allowed in deployment phase");
+		}
+
+		const ownerId = data.ownerId ?? clientId;
+		const player = this._playerService.getPlayer(clientId);
+		const isDM = Boolean(player?.isDMMode);
+		if (!isDM && ownerId !== clientId) {
+			throw new Error("Only DM can deploy token for another player");
+		}
+
+		const validation = this._turnCoordinator.validateDeployment(roomId, ownerId, data.position);
+		if (!validation.ok) {
+			throw new Error(validation.reason ?? "Invalid deployment position");
+		}
+
+		const token = this._roomManager.upsertTokenPosition(
+			roomId,
+			data.tokenId,
+			data.position,
+			data.heading,
+			ownerId,
+			data.type ?? "ship",
+			data.size ?? 56
+		);
+		if (data.dockedShipId) {
+			const hangar = this._playerService.getPlayerHangar(ownerId);
+			const docked = hangar?.dockedShips.find((ship) => ship.id === data.dockedShipId);
+			if (docked) {
+				docked.assignedTokenId = token.id;
+				if (data.customization) {
+					docked.customization = {
+						...docked.customization,
+						...(data.customization as Record<string, unknown>),
+					} as typeof docked.customization;
+				}
+				token.maxMovement = this._playerService
+					.getShipAssets()
+					.find((asset) => asset.id === docked.assetId)?.baseStats.maxMovement ?? token.maxMovement;
+				token.remainingMovement = token.maxMovement;
+				token.metadata = {
+					...token.metadata,
+					dockedShipId: docked.id,
+					assetId: docked.assetId,
+					customization: docked.customization,
+				};
+			}
+		}
+
+		this._roomManager.broadcastToRoom(roomId, {
+			type: WS_MESSAGE_TYPES.TOKEN_PLACED,
+			payload: token,
+		});
+
+		return { roomId, token, phase: state.phase };
 	}
 
 	private async _handleRoomStateGet(
@@ -784,7 +944,82 @@ export class MessageHandler {
 				players: dmPlayers,
 			},
 			snapshot: this._roomManager.getMapSnapshot(roomId),
+			turn: this._turnCoordinator.getState(roomId),
+			hangar: this._playerService.getPlayerHangar(clientId),
 		};
+	}
+
+	private async _handleShipAssetsList(_clientId: string, _data: Extract<RequestPayload, { operation: "ship.assets.list" }>["data"]) {
+		return {
+			assets: this._playerService.getShipAssets(),
+		};
+	}
+
+	private async _handlePlayerHangarGet(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "player.hangar.get" }>["data"]
+	) {
+		const playerId = data.playerId ?? clientId;
+		if (playerId !== clientId && !this._playerService.getPlayer(clientId)?.isDMMode) {
+			throw new Error("Only DM can query another player's hangar");
+		}
+		const hangar = this._playerService.getPlayerHangar(playerId);
+		if (!hangar) {
+			throw new Error("Hangar not found");
+		}
+		return hangar;
+	}
+
+	private async _handlePlayerHangarSetActiveShip(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "player.hangar.setActiveShip" }>["data"]
+	) {
+		const hangar = this._playerService.setActiveDockedShip(clientId, data.dockedShipId);
+		if (!hangar) {
+			throw new Error("Failed to set active docked ship");
+		}
+		return hangar;
+	}
+
+	private async _handleTurnInitialize(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "turn.initialize" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		this._requireDM(clientId);
+		const state = this._turnCoordinator.initialize(roomId);
+		this._broadcastTurnState(roomId, state, WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED);
+		return state;
+	}
+
+	private async _handleTurnAdvance(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "turn.advance" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		this._requireDM(clientId);
+		const state = this._turnCoordinator.advanceTurn(roomId);
+		this._broadcastTurnState(roomId, state, WS_MESSAGE_TYPES.TURN_ORDER_UPDATED);
+		return state;
+	}
+
+	private async _handleTurnSetPhase(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "turn.setPhase" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		this._requireDM(clientId);
+		const state = this._turnCoordinator.setPhase(roomId, data.phase as TurnPhase);
+		this._broadcastTurnState(roomId, state, WS_MESSAGE_TYPES.TURN_ORDER_UPDATED);
+		return state;
+	}
+
+	private async _handleTurnStateGet(
+		clientId: string,
+		data: Extract<RequestPayload, { operation: "turn.state.get" }>["data"]
+	) {
+		const roomId = data.roomId ?? this._roomManager.getPlayerRoom(clientId)?.id ?? "default";
+		return this._turnCoordinator.getState(roomId);
 	}
 
 	private async _handleCameraUpdate(
@@ -938,6 +1173,38 @@ export class MessageHandler {
 		if (token.ownerId === clientId) return true;
 		const player = this._playerService.getPlayer(clientId);
 		return Boolean(player?.isDMMode);
+	}
+
+	private _requireDM(clientId: string): void {
+		const player = this._playerService.getPlayer(clientId);
+		if (!player?.isDMMode) {
+			throw new Error("DM permission required");
+		}
+	}
+
+	private _broadcastTurnState(
+		roomId: string,
+		state: { round: number; phase: TurnPhase; currentIndex: number },
+		type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED | typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED
+	): void {
+		const room = this._roomManager.getRoom(roomId);
+		const units = Array.from(room?.players.values() ?? []).map((player, index) => ({
+			id: player.id,
+			name: player.name,
+			ownerId: player.id,
+			ownerName: player.name,
+			unitType: "ship" as const,
+			state: index === state.currentIndex ? "active" as const : "waiting" as const,
+			initiative: 10,
+		}));
+		this._roomManager.broadcastToRoom(roomId, {
+			type,
+			payload: {
+				units,
+				roundNumber: state.round,
+				phase: state.phase,
+			},
+		});
 	}
 
 	private _createSpawnPosition(roomId: string, playerId: string): { x: number; y: number } {

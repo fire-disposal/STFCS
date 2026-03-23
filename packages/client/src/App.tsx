@@ -7,6 +7,7 @@ import GameView from "@/features/game/GameView";
 import { websocketService } from "@/services/websocket";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { loadMapSnapshot } from "@/store/slices/mapSlice";
+import { setCurrentPlayerHangar, setShipAssets } from "@/store/slices/hangarSlice";
 import { addPlayer, clearPlayers, setCurrentPlayer } from "@/store/slices/playerSlice";
 import {
 	setConnected,
@@ -218,6 +219,13 @@ const App: React.FC = () => {
 			dispatch(loadMapSnapshot(roomState.snapshot));
 			dispatch(setDMMode(roomState.dm.isDMMode));
 			dispatch(updateDMPlayers(roomState.dm.players));
+			dispatch(setCurrentPlayerHangar(roomState.hangar));
+
+			const assets = await websocketService.listShipAssets();
+			dispatch(setShipAssets(assets.assets));
+
+			const hangar = await websocketService.getPlayerHangar();
+			dispatch(setCurrentPlayerHangar(hangar));
 
 			roomState.players.forEach((player, index) => {
 				dispatch(

@@ -209,6 +209,51 @@ export const TokenInfoSchema = z.object({
   metadata: z.record(z.string(), z.unknown()),
 });
 
+export const ShipCustomizationSchema = z.object({
+  paint: z.string().default('default'),
+  decal: z.string().default('none'),
+  nickname: z.string().optional(),
+  modules: z.array(z.string()).default([]),
+});
+
+export const ShipAssetDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  hullClass: z.enum(['frigate', 'destroyer', 'cruiser', 'capital']),
+  manufacturer: z.string().min(1),
+  baseStats: z.object({
+    maxMovement: z.number().min(0),
+    actionsPerTurn: z.number().min(0),
+    size: z.number().min(0),
+  }),
+  defaultCustomization: ShipCustomizationSchema,
+});
+
+export const InventoryItemSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  category: z.enum(['module', 'consumable', 'cosmetic', 'resource']),
+  quantity: z.number().int().min(0),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const DockedShipSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  displayName: z.string(),
+  customization: ShipCustomizationSchema,
+  cargoSlots: z.number().int().min(0).default(0),
+  assignedTokenId: z.string().nullable().default(null),
+});
+
+export const PlayerHangarSchema = z.object({
+  playerId: z.string(),
+  dockedShips: z.array(DockedShipSchema),
+  inventory: z.array(InventoryItemSchema),
+  activeShipId: z.string().nullable(),
+  updatedAt: z.number(),
+});
+
 
 export const StarNodeSchema = z.object({
   id: z.string(),
@@ -283,7 +328,7 @@ export const CameraConfigSchema = z.object({
 });
 
 // ==================== 回合系统 Schema ====================
-export const TurnPhaseSchema = z.enum(['planning', 'movement', 'action', 'resolution']);
+export const TurnPhaseSchema = z.enum(['deployment', 'planning', 'movement', 'action', 'resolution']);
 
 export const TurnUnitSchema = z.object({
   id: z.string(),
@@ -334,6 +379,11 @@ export type MapConfig = z.infer<typeof MapConfigSchema>;
 export type TokenType = z.infer<typeof TokenTypeSchema>;
 export type UnitTurnState = z.infer<typeof UnitTurnStateSchema>;
 export type TokenInfo = z.infer<typeof TokenInfoSchema>;
+export type ShipCustomization = z.infer<typeof ShipCustomizationSchema>;
+export type ShipAssetDefinition = z.infer<typeof ShipAssetDefinitionSchema>;
+export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+export type DockedShip = z.infer<typeof DockedShipSchema>;
+export type PlayerHangar = z.infer<typeof PlayerHangarSchema>;
 export type StarNode = z.infer<typeof StarNodeSchema>;
 export type PlanetNode = z.infer<typeof PlanetNodeSchema>;
 export type StarSystem = z.infer<typeof StarSystemSchema>;

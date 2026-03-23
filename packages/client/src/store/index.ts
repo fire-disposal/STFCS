@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import cameraReducer from "./slices/cameraSlice";
 import combatReducer from "./slices/combatSlice";
 import interactionReducer from "./slices/interactionSlice";
+import hangarReducer from "./slices/hangarSlice";
 import layerReducer from "./slices/layerSlice";
 import mapReducer from "./slices/mapSlice";
 import playerReducer from "./slices/playerSlice";
@@ -24,6 +25,7 @@ export const store = configureStore({
 		ui: uiReducer,
 		selection: selectionReducer,
 		interaction: interactionReducer,
+		hangar: hangarReducer,
 	},
 	middleware: (getDefaultMiddleware) =>
 		getDefaultMiddleware({

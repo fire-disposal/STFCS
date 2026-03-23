@@ -14,6 +14,8 @@ import { z } from 'zod';
 // @ts-ignore - 类型在 WSMessage 联合类型中使用
 import type {
   PlayerInfo,
+  PlayerHangar,
+  ShipAssetDefinition,
   ShipStatus,
   ShipMovement,
   PlayerCamera,
@@ -114,6 +116,15 @@ export const RequestOperationSchema = z.enum([
   'map.snapshot.get',
   'map.snapshot.save',
   'map.token.move',
+  'map.token.deploy',
+  'turn.initialize',
+  'turn.advance',
+  'turn.setPhase',
+  'turn.state.get',
+  'ship.assets.list',
+  'player.hangar.get',
+  'player.hangar.setActiveShip',
+  'map.token.move.step',
   'room.state.get',
 ]);
 
@@ -194,6 +205,55 @@ export const MapTokenMoveRequestSchema = z.object({
   size: z.number().optional(),
 });
 
+export const MapTokenDeployRequestSchema = z.object({
+  roomId: z.string().optional(),
+  tokenId: z.string(),
+  ownerId: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }),
+  heading: z.number().default(0),
+  type: z.enum(['ship', 'station', 'asteroid']).optional(),
+  size: z.number().optional(),
+  shipAssetId: z.string().optional(),
+  dockedShipId: z.string().optional(),
+  customization: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const MapTokenMoveStepRequestSchema = z.object({
+  roomId: z.string().optional(),
+  tokenId: z.string(),
+  stepIndex: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  forward: z.number().optional(),
+  strafe: z.number().optional(),
+  rotation: z.number().optional(),
+});
+
+export const TurnInitializeRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
+export const TurnAdvanceRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
+export const TurnSetPhaseRequestSchema = z.object({
+  roomId: z.string().optional(),
+  phase: z.enum(['deployment', 'planning', 'movement', 'action', 'resolution']),
+});
+
+export const TurnStateGetRequestSchema = z.object({
+  roomId: z.string().optional(),
+});
+
+export const ShipAssetsListRequestSchema = z.object({});
+
+export const PlayerHangarGetRequestSchema = z.object({
+  playerId: z.string().optional(),
+});
+
+export const PlayerHangarSetActiveShipRequestSchema = z.object({
+  dockedShipId: z.string(),
+});
+
 export const RoomStateGetRequestSchema = z.object({
   roomId: z.string().optional(),
 });
@@ -215,6 +275,15 @@ export const RequestPayloadSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('map.snapshot.get'), data: MapSnapshotGetRequestSchema }),
   z.object({ operation: z.literal('map.snapshot.save'), data: MapSnapshotSaveRequestSchema }),
   z.object({ operation: z.literal('map.token.move'), data: MapTokenMoveRequestSchema }),
+  z.object({ operation: z.literal('map.token.deploy'), data: MapTokenDeployRequestSchema }),
+  z.object({ operation: z.literal('map.token.move.step'), data: MapTokenMoveStepRequestSchema }),
+  z.object({ operation: z.literal('turn.initialize'), data: TurnInitializeRequestSchema }),
+  z.object({ operation: z.literal('turn.advance'), data: TurnAdvanceRequestSchema }),
+  z.object({ operation: z.literal('turn.setPhase'), data: TurnSetPhaseRequestSchema }),
+  z.object({ operation: z.literal('turn.state.get'), data: TurnStateGetRequestSchema }),
+  z.object({ operation: z.literal('ship.assets.list'), data: ShipAssetsListRequestSchema }),
+  z.object({ operation: z.literal('player.hangar.get'), data: PlayerHangarGetRequestSchema }),
+  z.object({ operation: z.literal('player.hangar.setActiveShip'), data: PlayerHangarSetActiveShipRequestSchema }),
   z.object({ operation: z.literal('room.state.get'), data: RoomStateGetRequestSchema }),
 ]);
 
@@ -276,6 +345,15 @@ export type CameraUpdateRequestPayload = z.infer<typeof CameraUpdateRequestSchem
 export type MapSnapshotGetRequestPayload = z.infer<typeof MapSnapshotGetRequestSchema>;
 export type MapSnapshotSaveRequestPayload = z.infer<typeof MapSnapshotSaveRequestSchema>;
 export type MapTokenMoveRequestPayload = z.infer<typeof MapTokenMoveRequestSchema>;
+export type MapTokenDeployRequestPayload = z.infer<typeof MapTokenDeployRequestSchema>;
+export type MapTokenMoveStepRequestPayload = z.infer<typeof MapTokenMoveStepRequestSchema>;
+export type TurnInitializeRequestPayload = z.infer<typeof TurnInitializeRequestSchema>;
+export type TurnAdvanceRequestPayload = z.infer<typeof TurnAdvanceRequestSchema>;
+export type TurnSetPhaseRequestPayload = z.infer<typeof TurnSetPhaseRequestSchema>;
+export type TurnStateGetRequestPayload = z.infer<typeof TurnStateGetRequestSchema>;
+export type ShipAssetsListRequestPayload = z.infer<typeof ShipAssetsListRequestSchema>;
+export type PlayerHangarGetRequestPayload = z.infer<typeof PlayerHangarGetRequestSchema>;
+export type PlayerHangarSetActiveShipRequestPayload = z.infer<typeof PlayerHangarSetActiveShipRequestSchema>;
 export type RoomStateGetRequestPayload = z.infer<typeof RoomStateGetRequestSchema>;
 
 // 响应负载类型
@@ -296,11 +374,18 @@ export type CameraUpdateResponsePayload = void;
 export type MapSnapshotGetResponsePayload = { roomId: string; snapshot: MapSnapshot };
 export type MapSnapshotSaveResponsePayload = { roomId: string; snapshot: MapSnapshot };
 export type MapTokenMoveResponsePayload = { roomId: string; token: TokenInfo };
+export type MapTokenDeployResponsePayload = { roomId: string; token: TokenInfo; phase: 'deployment' | 'planning' | 'movement' | 'action' | 'resolution' };
+export type MapTokenMoveStepResponsePayload = { roomId: string; token: TokenInfo; appliedStep: { stepIndex: 1 | 2 | 3; forward?: number; strafe?: number; rotation?: number } };
+export type TurnStateResponsePayload = { roomId: string; phase: 'deployment' | 'planning' | 'movement' | 'action' | 'resolution'; round: number; order: string[]; currentIndex: number };
+export type ShipAssetsListResponsePayload = { assets: ShipAssetDefinition[] };
+export type PlayerHangarGetResponsePayload = PlayerHangar;
 export type RoomStateGetResponsePayload = {
   roomId: string;
   players: PlayerInfo[];
   dm: { isDMMode: boolean; players: Array<{ id: string; name: string; isDMMode: boolean }> };
   snapshot: MapSnapshot;
+  turn: TurnStateResponsePayload;
+  hangar: PlayerHangar | null;
 };
 
 // 响应数据联合类型
@@ -320,6 +405,15 @@ export type ResponseData =
   | { operation: 'map.snapshot.get'; data: MapSnapshotGetResponsePayload }
   | { operation: 'map.snapshot.save'; data: MapSnapshotSaveResponsePayload }
   | { operation: 'map.token.move'; data: MapTokenMoveResponsePayload }
+  | { operation: 'map.token.deploy'; data: MapTokenDeployResponsePayload }
+  | { operation: 'map.token.move.step'; data: MapTokenMoveStepResponsePayload }
+  | { operation: 'turn.initialize'; data: TurnStateResponsePayload }
+  | { operation: 'turn.advance'; data: TurnStateResponsePayload }
+  | { operation: 'turn.setPhase'; data: TurnStateResponsePayload }
+  | { operation: 'turn.state.get'; data: TurnStateResponsePayload }
+  | { operation: 'ship.assets.list'; data: ShipAssetsListResponsePayload }
+  | { operation: 'player.hangar.get'; data: PlayerHangarGetResponsePayload }
+  | { operation: 'player.hangar.setActiveShip'; data: PlayerHangarGetResponsePayload }
   | { operation: 'room.state.get'; data: RoomStateGetResponsePayload };
 
 export type ResponsePayload<T extends RequestOperation = RequestOperation> =
@@ -400,8 +494,8 @@ export type WSMessage =
   | { type: typeof WS_MESSAGE_TYPES.TOKEN_DRAG_END; payload: { tokenId: string; playerId: string; finalPosition: { x: number; y: number }; finalHeading: number; timestamp: number; committed: boolean } }
   | { type: typeof WS_MESSAGE_TYPES.DM_STATUS_UPDATE; payload: { players: Array<{ id: string; name: string; isDMMode: boolean }> } }
   | { type: typeof WS_MESSAGE_TYPES.DM_TOGGLE; payload: { playerId: string; playerName: string; enable: boolean; timestamp: number } }
-  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
-  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'planning' | 'movement' | 'action' | 'resolution' } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_INITIALIZED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'deployment' | 'planning' | 'movement' | 'action' | 'resolution' } }
+  | { type: typeof WS_MESSAGE_TYPES.TURN_ORDER_UPDATED; payload: { units: Array<{ id: string; name: string; ownerId: string; ownerName: string; unitType: 'ship' | 'station' | 'npc'; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended'; initiative: number }>; roundNumber: number; phase: 'deployment' | 'planning' | 'movement' | 'action' | 'resolution' } }
   | { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED; payload: { currentIndex: number; previousIndex: number; roundNumber: number } }
   | { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED; payload: { unitId: string; state: 'waiting' | 'active' | 'moved' | 'acted' | 'ended' } }
   | { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED; payload: { roundNumber: number } }

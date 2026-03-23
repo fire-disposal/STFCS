@@ -96,7 +96,7 @@ export class TurnService implements ITurnService {
 			currentIndex: 0,
 			units: sortedUnits,
 			roundNumber: config.roundNumber ?? 1,
-			phase: config.phase ?? "planning",
+			phase: config.phase ?? "deployment",
 			isComplete: false,
 		};
 
