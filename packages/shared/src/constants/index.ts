@@ -31,3 +31,5 @@ export function getDefaultWsUrl(): string {
 }
 
 export const DEFAULT_WS_URL = getDefaultWsUrl();
+
+export const GLOBAL_ROOM_ID = "global";

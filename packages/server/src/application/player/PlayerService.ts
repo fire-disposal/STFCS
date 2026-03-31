@@ -7,6 +7,7 @@ import type {
 	ShipAssetDefinition,
 } from "@vt/shared/types";
 import { WS_MESSAGE_TYPES } from "@vt/shared/ws";
+import { GLOBAL_ROOM_ID } from "@vt/shared/constants";
 import type { IWSServer } from "@vt/shared/ws";
 import type { RoomManager } from "../../infrastructure/ws/RoomManager";
 import { BaseService } from "../common/BaseService";
@@ -55,7 +56,7 @@ export class PlayerService extends BaseService implements IPlayerService {
 		this._ensurePlayerHangar(player.id);
 
 		if (this._roomManager) {
-			const targetRoom = roomId ?? "default";
+			const targetRoom = roomId ?? GLOBAL_ROOM_ID;
 			this._roomManager.joinRoom(targetRoom, completePlayer);
 		}
 
