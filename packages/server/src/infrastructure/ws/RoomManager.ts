@@ -1,5 +1,6 @@
 import type { MapSnapshot, PlayerCamera, PlayerInfo, Point, TokenInfo } from "@vt/shared/types";
 import type { IWSServer, WSMessage } from "@vt/shared/ws";
+import { GLOBAL_ROOM_ID } from "@vt/shared/constants";
 import { RoomMapStore } from "../map/RoomMapStore";
 
 export interface Room {
@@ -7,10 +8,31 @@ export interface Room {
 	players: Map<string, PlayerInfo>;
 	createdAt: number;
 	maxPlayers: number;
-	/** 存储房间内玩家的相机状态 */
 	playerCameras: Map<string, PlayerCamera>;
-	/** 房间地图快照（MVP 持久化基线） */
 	mapSnapshot: MapSnapshot;
+}
+
+export interface GlobalObjectState {
+	id: string;
+	kind: "marker" | "token" | "note";
+	position: { x: number; y: number };
+	meta?: Record<string, unknown>;
+	updatedAt: number;
+}
+
+export interface GlobalChatMessage {
+	id: string;
+	from: string;
+	text: string;
+	at: number;
+}
+
+export interface GlobalSessionState {
+	revision: number;
+	players: Record<string, PlayerInfo & { online: boolean; lastSeenAt: number; role: "host" | "member" }>;
+	objects: Record<string, GlobalObjectState>;
+	chat: GlobalChatMessage[];
+	sessions: Record<string, { playerId: string; expiresAt: number }>;
 }
 
 export interface IRoomManager {
@@ -25,168 +47,137 @@ export interface IRoomManager {
 }
 
 export class RoomManager implements IRoomManager {
-	private _rooms: Map<string, Room>;
-	private _playerRooms: Map<string, string>;
-	private _maxPlayersPerRoom: number;
+	private readonly _globalRoom: Room;
+	private readonly _playerRooms: Map<string, string>;
 	private _wsServer: IWSServer | undefined;
-	private _mapStore: RoomMapStore;
+	private readonly _mapStore: RoomMapStore;
+	private _globalState: GlobalSessionState;
 
 	constructor(maxPlayersPerRoom: number = 8) {
-		this._rooms = new Map();
 		this._playerRooms = new Map();
-		this._maxPlayersPerRoom = maxPlayersPerRoom;
 		this._mapStore = new RoomMapStore();
+		this._globalRoom = {
+			id: GLOBAL_ROOM_ID,
+			players: new Map(),
+			createdAt: Date.now(),
+			maxPlayers: maxPlayersPerRoom,
+			playerCameras: new Map(),
+			mapSnapshot: this._mapStore.getSnapshot(GLOBAL_ROOM_ID),
+		};
+		this._globalState = {
+			revision: 0,
+			players: {},
+			objects: {},
+			chat: [],
+			sessions: {},
+		};
 	}
 
 	setWSServer(wsServer: IWSServer): void {
 		this._wsServer = wsServer;
 	}
 
-	createRoom(roomId: string, maxPlayers?: number): Room {
-		const existingRoom = this._rooms.get(roomId);
-		if (existingRoom) {
-			return existingRoom;
+	createRoom(_roomId: string, maxPlayers?: number): Room {
+		if (typeof maxPlayers === "number") {
+			this._globalRoom.maxPlayers = maxPlayers;
 		}
-
-		const room: Room = {
-			id: roomId,
-			players: new Map(),
-			createdAt: Date.now(),
-			maxPlayers: maxPlayers ?? this._maxPlayersPerRoom,
-			playerCameras: new Map(),
-			mapSnapshot: this._mapStore.getSnapshot(roomId),
-		};
-
-		this._rooms.set(roomId, room);
-		return room;
+		return this._globalRoom;
 	}
 
-	joinRoom(roomId: string, player: PlayerInfo): boolean {
-		let room = this._rooms.get(roomId);
-		if (!room) {
-			room = this.createRoom(roomId);
-		}
-
-		if (room.players.size >= room.maxPlayers) {
+	joinRoom(_roomId: string, player: PlayerInfo): boolean {
+		if (this._globalRoom.players.size >= this._globalRoom.maxPlayers) {
 			return false;
 		}
 
-		if (room.players.has(player.id)) {
+		if (this._globalRoom.players.has(player.id)) {
 			return true;
 		}
 
-		room.players.set(player.id, player);
-		this._playerRooms.set(player.id, roomId);
+		this._globalRoom.players.set(player.id, player);
+		this._playerRooms.set(player.id, GLOBAL_ROOM_ID);
+		const role: "host" | "member" = Object.keys(this._globalState.players).length === 0 ? "host" : "member";
+		this._globalState.players[player.id] = {
+			...player,
+			online: true,
+			lastSeenAt: Date.now(),
+			role,
+		};
 		return true;
 	}
 
-	leaveRoom(roomId: string, playerId: string): boolean {
-		const room = this._rooms.get(roomId);
-		if (!room) {
-			return false;
-		}
-
-		const removed = room.players.delete(playerId);
+	leaveRoom(_roomId: string, playerId: string): boolean {
+		const removed = this._globalRoom.players.delete(playerId);
 		this._playerRooms.delete(playerId);
-		// 同时移除玩家的相机状态
-		room.playerCameras.delete(playerId);
-
-		if (room.players.size === 0) {
-			this._rooms.delete(roomId);
+		this._globalRoom.playerCameras.delete(playerId);
+		if (this._globalState.players[playerId]) {
+			this._globalState.players[playerId].online = false;
+			this._globalState.players[playerId].lastSeenAt = Date.now();
 		}
-
 		return removed;
 	}
 
-	getRoom(roomId: string): Room | undefined {
-		return this._rooms.get(roomId);
+	getRoom(_roomId: string): Room | undefined {
+		return this._globalRoom;
 	}
 
 	getPlayerRoom(playerId: string): Room | undefined {
-		const roomId = this._playerRooms.get(playerId);
-		if (roomId === undefined) {
-			return undefined;
-		}
-		return this._rooms.get(roomId);
+		return this._playerRooms.has(playerId) ? this._globalRoom : undefined;
 	}
 
-	broadcastToRoom(roomId: string, message: WSMessage, excludePlayerId?: string): void {
-		const room = this._rooms.get(roomId);
-		if (!room || !this._wsServer) {
+	broadcastToRoom(_roomId: string, message: WSMessage, excludePlayerId?: string): void {
+		if (!this._wsServer) {
 			return;
 		}
 
-		for (const [playerId] of room.players.entries()) {
+		for (const [playerId] of this._globalRoom.players.entries()) {
 			if (playerId !== excludePlayerId) {
 				this._wsServer.sendTo(playerId, message);
 			}
 		}
 	}
 
-	deleteRoom(roomId: string): void {
-		const room = this._rooms.get(roomId);
-		if (!room) {
-			return;
-		}
-
-		for (const [playerId] of room.players.entries()) {
-			this._playerRooms.delete(playerId);
-		}
-
-		this._rooms.delete(roomId);
+	deleteRoom(_roomId: string): void {
+		this._globalRoom.players.clear();
+		this._globalRoom.playerCameras.clear();
+		this._playerRooms.clear();
 	}
 
 	listRooms(): Room[] {
-		return Array.from(this._rooms.values());
+		return [this._globalRoom];
 	}
 
 	getRoomCount(): number {
-		return this._rooms.size;
+		return 1;
 	}
 
-	// ===== 玩家相机管理方法 =====
-
-	/** 更新玩家相机状态 */
-	updatePlayerCamera(roomId: string, playerId: string, camera: PlayerCamera): void {
-		const room = this._rooms.get(roomId);
-		if (!room) return;
-		room.playerCameras.set(playerId, camera);
+	updatePlayerCamera(_roomId: string, playerId: string, camera: PlayerCamera): void {
+		this._globalRoom.playerCameras.set(playerId, camera);
 	}
 
-	/** 获取房间内所有玩家的相机状态 */
-	getRoomPlayerCameras(roomId: string): PlayerCamera[] {
-		const room = this._rooms.get(roomId);
-		if (!room) return [];
-		return Array.from(room.playerCameras.values());
+	getRoomPlayerCameras(_roomId: string): PlayerCamera[] {
+		return Array.from(this._globalRoom.playerCameras.values());
 	}
 
-	/** 获取指定玩家的相机状态 */
-	getPlayerCamera(roomId: string, playerId: string): PlayerCamera | undefined {
-		const room = this._rooms.get(roomId);
-		if (!room) return undefined;
-		return room.playerCameras.get(playerId);
+	getPlayerCamera(_roomId: string, playerId: string): PlayerCamera | undefined {
+		return this._globalRoom.playerCameras.get(playerId);
 	}
 
-	/** 移除玩家相机状态 */
-	removePlayerCamera(roomId: string, playerId: string): void {
-		const room = this._rooms.get(roomId);
-		if (!room) return;
-		room.playerCameras.delete(playerId);
+	removePlayerCamera(_roomId: string, playerId: string): void {
+		this._globalRoom.playerCameras.delete(playerId);
 	}
 
-	getMapSnapshot(roomId: string): MapSnapshot {
-		return this._mapStore.getSnapshot(roomId);
+	getMapSnapshot(_roomId: string): MapSnapshot {
+		return this._mapStore.getSnapshot(GLOBAL_ROOM_ID);
 	}
 
-	saveMapSnapshot(roomId: string, snapshot: MapSnapshot): MapSnapshot {
-		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
-		const saved = this._mapStore.saveSnapshot(roomId, snapshot);
-		room.mapSnapshot = saved;
+	saveMapSnapshot(_roomId: string, snapshot: MapSnapshot): MapSnapshot {
+		const saved = this._mapStore.saveSnapshot(GLOBAL_ROOM_ID, snapshot);
+		this._globalRoom.mapSnapshot = saved;
 		return saved;
 	}
 
 	upsertTokenPosition(
-		roomId: string,
+		_roomId: string,
 		tokenId: string,
 		position: Point,
 		heading: number,
@@ -195,19 +186,50 @@ export class RoomManager implements IRoomManager {
 		size = 50,
 		metadata: Record<string, unknown> = {},
 	): TokenInfo {
-		const room = this._rooms.get(roomId) ?? this.createRoom(roomId);
 		const updated = this._mapStore.upsertToken(
-			roomId,
+			GLOBAL_ROOM_ID,
 			tokenId,
 			position,
 			heading,
 			ownerId,
 			type,
 			size,
-			metadata
+			metadata,
 		);
-		room.mapSnapshot = this._mapStore.getSnapshot(roomId);
+		this._globalRoom.mapSnapshot = this._mapStore.getSnapshot(GLOBAL_ROOM_ID);
 		return updated;
+	}
+
+	nextRevision(): number {
+		this._globalState.revision += 1;
+		return this._globalState.revision;
+	}
+
+	getGlobalState(): GlobalSessionState {
+		return structuredClone(this._globalState);
+	}
+
+	setSession(token: string, playerId: string, expiresAt: number): void {
+		this._globalState.sessions[token] = { playerId, expiresAt };
+	}
+
+	getSession(token: string): { playerId: string; expiresAt: number } | undefined {
+		return this._globalState.sessions[token];
+	}
+
+	upsertObject(object: GlobalObjectState): void {
+		this._globalState.objects[object.id] = object;
+	}
+
+	removeObject(objectId: string): void {
+		delete this._globalState.objects[objectId];
+	}
+
+	appendChat(message: GlobalChatMessage): void {
+		this._globalState.chat.push(message);
+		if (this._globalState.chat.length > 100) {
+			this._globalState.chat = this._globalState.chat.slice(-100);
+		}
 	}
 }
 

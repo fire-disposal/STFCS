@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import type { AckEnvelope, CommandEnvelope, PatchEnvelope } from './comm-core.js';
 // @ts-ignore - 类型在 WSMessage 联合类型中使用
 import type {
   PlayerInfo,
@@ -472,6 +473,10 @@ export type DrawingElement = z.infer<typeof DrawingElementSchema>;
  * 2. 事件消息（简化，使用 payload 类型）
  */
 export type WSMessage =
+  // 新通讯内核
+  | CommandEnvelope
+  | PatchEnvelope
+  | AckEnvelope
   // 请求 - 响应
   | RequestMessage
   | ResponseMessage
@@ -620,3 +625,6 @@ export type TurnOrderUpdatedMessage = Extract<WSMessage, { type: typeof WS_MESSA
 export type TurnIndexChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.TURN_INDEX_CHANGED }>;
 export type UnitStateChangedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.UNIT_STATE_CHANGED }>;
 export type RoundIncrementedMessage = Extract<WSMessage, { type: typeof WS_MESSAGE_TYPES.ROUND_INCREMENTED }>;
+
+
+export type { CommandEnvelope, PatchEnvelope, AckEnvelope } from './comm-core.js';
