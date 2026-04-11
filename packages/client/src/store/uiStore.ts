@@ -6,11 +6,17 @@ import { GameRoomState, ShipState } from "@vt/shared/schema";
  * 注意：这里只存储客户端本地UI状态，不涉及游戏逻辑状态
  */
 // 交互模式枚举
-export type InteractionMode = 
+export type InteractionMode =
   | 'IDLE'
   | 'DRAWING_MOVE'
   | 'SELECTING_TARGET'
   | 'DM_OVERRIDING';
+
+// 坐标精度类型
+export type CoordinatePrecision = 'exact' | 'rounded10' | 'rounded100';
+
+// 角度模式类型
+export type AngleMode = 'degrees' | 'radians' | 'nav';
 
 interface UIState {
   // 连接状态
@@ -34,6 +40,18 @@ interface UIState {
   zoom: number;
   showGrid: boolean;
   showRangeIndicator: boolean;
+
+  // 坐标精度设置（用于太空环境）
+  coordinatePrecision: 'exact' | 'rounded10' | 'rounded100';
+  gridSnap: boolean;
+  gridSize: number;
+
+  // 角度显示模式
+  angleMode: 'degrees' | 'radians' | 'nav'; // nav: 航海角度（0-360，北为 0）
+  
+  // 地图视图旋转
+  viewRotation: number; // 视图旋转角度（度）
+  isViewRotating: boolean; // 是否正在旋转视图
 
   // UI面板状态
   isSidebarOpen: boolean;
@@ -61,6 +79,17 @@ interface UIActions {
   setZoom: (zoom: number) => void;
   toggleGrid: () => void;
   toggleRangeIndicator: () => void;
+  
+  // 坐标精度相关
+  setCoordinatePrecision: (precision: CoordinatePrecision) => void;
+  toggleGridSnap: () => void;
+  setGridSize: (size: number) => void;
+  setAngleMode: (mode: AngleMode) => void;
+
+  // 视图旋转相关
+  setViewRotation: (rotation: number) => void;
+  rotateViewToAngle: (angle: number) => void;
+  resetViewRotation: () => void;
 
   // 面板相关
   toggleSidebar: () => void;
@@ -86,6 +115,18 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   zoom: 1,
   showGrid: true,
   showRangeIndicator: true,
+  
+  // 坐标精度默认为 10 的倍数（适合太空环境）
+  coordinatePrecision: 'rounded10',
+  gridSnap: false,
+  gridSize: 100,
+  
+  // 角度使用度数模式（0-360）
+  angleMode: 'degrees',
+  
+  // 视图旋转默认 0（无旋转）
+  viewRotation: 0,
+  isViewRotating: false,
 
   isSidebarOpen: true,
   activePanel: "ships",
@@ -118,6 +159,17 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   toggleRangeIndicator: () =>
     set((state) => ({ showRangeIndicator: !state.showRangeIndicator })),
+  
+  // 坐标精度设置
+  setCoordinatePrecision: (precision: CoordinatePrecision) => set({ coordinatePrecision: precision }),
+  toggleGridSnap: () => set((state) => ({ gridSnap: !state.gridSnap })),
+  setGridSize: (size: number) => set({ gridSize: size }),
+  setAngleMode: (mode: AngleMode) => set({ angleMode: mode }),
+  
+  // 视图旋转
+  setViewRotation: (rotation) => set({ viewRotation: rotation }),
+  rotateViewToAngle: (angle) => set({ viewRotation: angle, isViewRotating: false }),
+  resetViewRotation: () => set({ viewRotation: 0, isViewRotating: false }),
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setActivePanel: (panel) => set({ activePanel: panel }),

@@ -87,6 +87,7 @@ export class ShipState extends Schema {
   
   // 护盾与辐能
   @type("number") fluxMax: number = 0;
+  @type("number") fluxDissipation: number = 0; // 辐能消散率
   @type("number") fluxHard: number = 0; // 硬辐能
   @type("number") fluxSoft: number = 0; // 软辐能
   @type("boolean") isShieldUp: boolean = false;

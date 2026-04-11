@@ -1,139 +1,266 @@
+/**
+ * 战斗房间 - Colyseus 多人游戏房间
+ * 
+ * 遵循 Colyseus 最佳实践：
+ * - 使用泛型声明状态类型
+ * - 实现 onAuth 进行认证
+ * - 正确处理 onLeave 和重连
+ * - 使用 setMetadata 更新房间元数据
+ */
+
 import { Room, Client } from "@colyseus/core";
-import { GameRoomState, ShipState, GamePhase, WeaponSlot, ArraySchema, PlayerState } from "@vt/shared";
-import { ClientCommand, MovementPlan } from "@vt/shared";
+import { GameRoomState, ShipState, PlayerState } from "@vt/shared";
+import { ClientCommand, getShipHullSpec, getWeaponSpec } from "@vt/shared";
 import { CommandDispatcher } from "../commands/CommandDispatcher";
+
+// ==================== 消息 Payload 类型定义 ====================
 
 interface NetPingPayload {
   seq: number;
   clientSentAt: number;
 }
 
-export interface MoveTokenPayload {
+interface MoveTokenPayload {
   shipId: string;
   x: number;
   y: number;
   heading: number;
-  movementPlan?: MovementPlan;
+  movementPlan?: {
+    phaseAForward: number;
+    phaseAStrafe: number;
+    turnAngle: number;
+    phaseBForward: number;
+    phaseBStrafe: number;
+  };
 }
 
-export interface ToggleShieldPayload {
+interface ToggleShieldPayload {
   shipId: string;
   isActive: boolean;
   orientation?: number;
 }
 
-export interface FireWeaponPayload {
+interface FireWeaponPayload {
   attackerId: string;
   weaponId: string;
   targetId: string;
 }
 
-export interface VentFluxPayload {
+interface VentFluxPayload {
   shipId: string;
 }
 
-export interface DMClearOverloadPayload {
+interface DMClearOverloadPayload {
   shipId: string;
 }
 
-export interface DMSetArmorPayload {
+interface DMSetArmorPayload {
   shipId: string;
   section: number;
   value: number;
 }
 
-export class BattleRoom extends Room {
-  declare state: GameRoomState;
+interface CreateObjectPayload {
+  type: 'ship' | 'station' | 'asteroid';
+  hullId?: string;
+  x: number;
+  y: number;
+  heading: number;
+  faction: 'player' | 'dm';
+  ownerId?: string;
+}
+
+// ==================== 战斗房间类 ====================
+
+export class BattleRoom extends Room<GameRoomState> {
   maxClients = 8;
   private commandDispatcher!: CommandDispatcher;
   private readonly pingEwma = new Map<string, number>();
   private readonly jitterEwma = new Map<string, number>();
 
-  onCreate(options: Record<string, unknown>) {
-    console.log("BattleRoom created!", options);
-    
-    // 初始化房间状态
-    this.setState(new GameRoomState());
-    
+  /**
+   * 房间创建初始化
+   * Colyseus 在第一个客户端加入时自动调用
+   */
+  onCreate(options: { playerName?: string }) {
+    console.log(`[BattleRoom] Room created - ID: ${this.roomId}, PlayerName: ${options.playerName || 'default'}`);
+
+    // 初始化状态
+    this.state = new GameRoomState();
+
     // 初始化命令分发器
     this.commandDispatcher = new CommandDispatcher(this.state);
 
-    // 设置阶段
+    // 设置初始游戏阶段
     this.state.currentPhase = "DEPLOYMENT";
+    this.state.turnCount = 1;
 
-    // 注册消息处理器
+    // 注册所有消息处理器
     this.registerMessageHandlers();
 
-    // 设置游戏循环
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime));
+    // 设置游戏循环 (60 FPS)
+    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 16);
+
+    // 设置房间元数据（用于大厅显示）
+    this.setMetadata({
+      name: `Battle - ${this.roomId.substring(0, 6)}`,
+      phase: this.state.currentPhase,
+      turnCount: 1,
+      playerCount: 0,
+      maxPlayers: this.maxClients,
+    });
+
+    console.log(`[BattleRoom] Initialization complete, metadata set`);
+    console.log(`[BattleRoom] Room state type: ${this.state.constructor.name}`);
   }
 
-  onJoin(client: Client, options: { name?: string }) {
-    console.log(`Client ${client.sessionId} joined!`);
+  /**
+   * 客户端认证 - 简化版，仅验证玩家名称
+   * 在 onJoin 之前调用
+   */
+  async onAuth(client: Client, options: { playerName?: string }) {
+    const playerName = options?.playerName?.trim() || `Player_${client.sessionId.substring(0, 4)}`;
     
+    // 保存到 client 对象供 onJoin 使用
+    (client as any).playerName = playerName;
+    
+    console.log(`[BattleRoom] Auth: ${playerName} (${client.sessionId})`);
+    return true; // 总是允许加入
+  }
+
+  /**
+   * 客户端加入房间
+   * 在 onAuth 成功后调用
+   */
+  onJoin(client: Client) {
+    // 从 onAuth 传递的名称
+    const playerName = (client as Client & { playerName: string }).playerName || `Player_${client.sessionId.substring(0, 4)}`;
+    console.log(`[BattleRoom] Player joined: ${playerName} (${client.sessionId})`);
+
+    // 创建玩家状态
     const player = new PlayerState();
     player.sessionId = client.sessionId;
-    player.name = options.name || `Player_${client.sessionId.substring(0, 4)}`;
+    player.name = playerName;
+    player.role = "player";
+    player.connected = true;
+    player.isReady = false;
+    player.pingMs = -1;
+    player.jitterMs = 0;
+    player.connectionQuality = "excellent";
 
-    // 如果是第一个玩家，设为DM
+    // 第一个玩家自动成为 DM
     if (this.clients.length === 1) {
       player.role = "dm";
-      client.send("role", { role: "dm" });
-    } else {
-      player.role = "player";
-      client.send("role", { role: "player" });
+      console.log(`[BattleRoom] First player is DM`);
     }
 
+    // 发送角色信息
+    client.send("role", { role: player.role });
+
+    // 添加到状态
     this.state.players.set(client.sessionId, player);
     this.pingEwma.set(client.sessionId, -1);
     this.jitterEwma.set(client.sessionId, 0);
+
+    // 更新元数据
+    this.updateMetadata();
+
+    console.log(`[BattleRoom] Total players: ${this.clients.length}/${this.maxClients}`);
   }
 
-  async onLeave(client: Client, code?: number) {
-    console.log(`Client ${client.sessionId} left!`);
-    const player = this.state.players.get(client.sessionId);
+  /**
+   * 客户端离开房间
+   * Colyseus v0.17 使用 code 和 data 参数
+   */
+  async onLeave(client: Client, code?: number, data?: unknown) {
+    const sessionId = client.sessionId;
+    console.log(`[BattleRoom] Player leaving: ${sessionId}, code: ${code}`);
+
+    const player = this.state.players.get(sessionId);
     if (player) {
       player.connected = false;
       player.connectionQuality = "offline";
     }
 
-    try {
-      // 1000 为正常主动断开，其他情况允许重连
-      if (code === 1000) {
-        throw new Error("consented leave");
-      }
+    // 判断是否允许重连 (code 1000 表示正常关闭)
+    const allowReconnect = code !== 1000;
 
-      // 允许断线重连，超时时间 3600 秒
-      await this.allowReconnection(client, 3600);
-      
-      // 玩家重连成功
-      console.log(`Client ${client.sessionId} reconnected!`);
-      if (player) {
-        player.connected = true;
-        if (player.pingMs >= 0) {
-          player.connectionQuality = this.toQuality(player.pingMs);
+    if (allowReconnect) {
+      try {
+        // 允许 1 小时内重连
+        await this.allowReconnection(client, 3600);
+        console.log(`[BattleRoom] Player reconnected: ${sessionId}`);
+
+        if (player) {
+          player.connected = true;
+          if (player.pingMs >= 0) {
+            player.connectionQuality = this.toQuality(player.pingMs);
+          }
         }
-      }
-    } catch (e) {
-      // 玩家彻底离开或超时
-      console.log(`Client ${client.sessionId} permanently removed!`);
-      this.state.players.delete(client.sessionId);
-      this.pingEwma.delete(client.sessionId);
-      this.jitterEwma.delete(client.sessionId);
-    }
-    console.log("BattleRoom disposed!");
-  }
 
-  private toQuality(pingMs: number): "excellent" | "good" | "fair" | "poor" | "offline" {
-    if (pingMs < 0) return "offline";
-    if (pingMs <= 80) return "excellent";
-    if (pingMs <= 140) return "good";
-    if (pingMs <= 220) return "fair";
-    return "poor";
+        this.updateMetadata();
+        return;
+      } catch (e) {
+        console.log(`[BattleRoom] Reconnection timeout for ${sessionId}`);
+      }
+    }
+
+    // 彻底离开 - 清理玩家数据
+    console.log(`[BattleRoom] Player permanently removed: ${sessionId}`);
+    this.state.players.delete(sessionId);
+    this.pingEwma.delete(sessionId);
+    this.jitterEwma.delete(sessionId);
+
+    // 清除该玩家对舰船的所有权
+    this.state.ships.forEach((ship) => {
+      if (ship.ownerId === sessionId) {
+        ship.ownerId = '';
+      }
+    });
+
+    // 检查是否需要销毁房间
+    if (this.state.players.size === 0) {
+      console.log('[BattleRoom] No players left, room will be destroyed');
+    }
+
+    this.updateMetadata();
   }
 
   /**
-   * 注册所有客户端消息处理器
+   * 房间销毁时的清理
+   */
+  onDispose() {
+    console.log(`[BattleRoom] Room ${this.roomId} is being disposed`);
+    this.pingEwma.clear();
+    this.jitterEwma.clear();
+  }
+
+  /**
+   * 更新房间元数据（用于大厅显示）
+   */
+  private updateMetadata() {
+    let dmCount = 0;
+    let playerCount = 0;
+    
+    this.state.players.forEach((p) => {
+      if (p.connected) {
+        if (p.role === 'dm') dmCount++;
+        else playerCount++;
+      }
+    });
+
+    this.setMetadata({
+      name: this.roomId,
+      phase: this.state.currentPhase,
+      turnCount: this.state.turnCount,
+      playerCount: this.clients.length,
+      dmCount,
+      maxPlayers: this.maxClients,
+    });
+  }
+
+  /**
+   * 注册所有消息处理器
    */
   private registerMessageHandlers() {
     // 移动指令
@@ -181,7 +308,7 @@ export class BattleRoom extends Room {
       }
     });
 
-    // 切换准备状态指令
+    // 切换准备状态
     this.onMessage(ClientCommand.CMD_TOGGLE_READY, (client, payload: { isReady: boolean }) => {
       try {
         const player = this.state.players.get(client.sessionId);
@@ -198,7 +325,7 @@ export class BattleRoom extends Room {
     this.onMessage(ClientCommand.CMD_NEXT_PHASE, (client) => {
       try {
         const player = this.state.players.get(client.sessionId);
-        if (player && player.role === 'dm') {
+        if (player?.role === 'dm') {
           this.advancePhase();
         } else {
           throw new Error("只有 DM 可以强制进入下一阶段");
@@ -208,17 +335,27 @@ export class BattleRoom extends Room {
       }
     });
 
-    // 创建测试舰船（临时）
+    // 创建测试舰船（旧接口，保留兼容性）
     this.onMessage("CREATE_TEST_SHIP", (client, payload: { faction: "player" | "dm"; x: number; y: number }) => {
       const player = this.state.players.get(client.sessionId);
-      if (player && player.role === 'dm') {
+      if (player?.role === 'dm') {
         this.createTestShip(payload.faction, payload.x, payload.y);
       } else {
         client.send("error", { message: "只有 DM 可以创建测试舰船" });
       }
     });
 
-    // DM指令：清除过载
+    // DM 创建对象（新接口）
+    this.onMessage("DM_CREATE_OBJECT", (client, payload: CreateObjectPayload) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player?.role === 'dm') {
+        this.createObject(payload);
+      } else {
+        client.send("error", { message: "只有 DM 可以创建对象" });
+      }
+    });
+
+    // DM 清除过载
     this.onMessage("DM_CLEAR_OVERLOAD", (client, payload: DMClearOverloadPayload) => {
       try {
         this.commandDispatcher.dispatchClearOverload(client, payload.shipId);
@@ -227,7 +364,7 @@ export class BattleRoom extends Room {
       }
     });
 
-    // DM指令：修改护甲
+    // DM 修改护甲
     this.onMessage("DM_SET_ARMOR", (client, payload: DMSetArmorPayload) => {
       try {
         this.commandDispatcher.dispatchSetArmor(client, payload.shipId, payload.section, payload.value);
@@ -236,12 +373,10 @@ export class BattleRoom extends Room {
       }
     });
 
-    // 连接质量采样：客户端主动上报 ping 探针
+    // 网络质量探测
     this.onMessage("NET_PING", (client, payload: NetPingPayload) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || !player.connected) {
-        return;
-      }
+      if (!player || !player.connected) return;
 
       const now = Date.now();
       const sampleRtt = Math.max(0, now - payload.clientSentAt);
@@ -271,13 +406,13 @@ export class BattleRoom extends Room {
   }
 
   /**
-   * 游戏主循环更新
+   * 游戏主循环
    */
   private update(deltaTime: number) {
-    // 更新所有舰船的冷却、过载时间等
-    this.state.ships.forEach((ship: ShipState) => {
+    // 更新所有舰船的状态
+    this.state.ships.forEach((ship) => {
       // 更新武器冷却
-      ship.weapons.forEach((weapon: WeaponSlot) => {
+      ship.weapons.forEach((weapon) => {
         if (weapon.cooldown > 0) {
           weapon.cooldown = Math.max(0, weapon.cooldown - deltaTime / 1000);
         }
@@ -295,7 +430,7 @@ export class BattleRoom extends Room {
   }
 
   /**
-   * 检查是否需要自动进入下一阶段
+   * 检查是否自动进入下一阶段
    */
   private checkAutoAdvancePhase() {
     if (this.state.currentPhase !== "PLAYER_TURN") return;
@@ -303,8 +438,7 @@ export class BattleRoom extends Room {
     let allReady = true;
     let hasPlayers = false;
 
-    this.state.players.forEach((player: PlayerState) => {
-      // 只有在线的非DM玩家才需要准备
+    this.state.players.forEach((player) => {
       if (player.role === "player" && player.connected) {
         hasPlayers = true;
         if (!player.isReady) {
@@ -314,7 +448,7 @@ export class BattleRoom extends Room {
     });
 
     if (hasPlayers && allReady) {
-      console.log("All players are ready, advancing to next phase.");
+      console.log("[BattleRoom] All players ready, advancing phase");
       this.advancePhase();
     }
   }
@@ -322,107 +456,215 @@ export class BattleRoom extends Room {
   /**
    * 推进游戏阶段
    */
-  private advancePhase(): void {
+  private advancePhase() {
     const phases: GamePhase[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
     const currentIndex = phases.indexOf(this.state.currentPhase);
     let nextIndex = currentIndex + 1;
 
-    // 如果当前已经是 END_PHASE 或者超越了，进入 PLAYER_TURN 循环
     if (nextIndex >= phases.length) {
       nextIndex = phases.indexOf("PLAYER_TURN");
     }
 
+    const oldPhase = this.state.currentPhase;
     this.state.currentPhase = phases[nextIndex];
 
     // 重置所有玩家的 ready 状态
-    this.state.players.forEach((p: PlayerState) => p.isReady = false);
+    this.state.players.forEach((p) => (p.isReady = false));
 
-    // 进入END_PHASE时的处理
+    // 处理阶段转换
     if (this.state.currentPhase === "END_PHASE") {
       this.handleEndPhase();
-      console.log("End Phase processed, advancing to PLAYER_TURN");
       return this.advancePhase();
     }
 
-    // 切换活跃派系
-    if (this.state.currentPhase === "PLAYER_TURN") {
-      this.state.activeFaction = "player";
-    } else if (this.state.currentPhase === "DM_TURN") {
-      this.state.activeFaction = "dm";
-    }
+    // 设置活跃阵营
+    this.state.activeFaction = this.state.currentPhase === "PLAYER_TURN" ? "player" : "dm";
 
     // 广播阶段变更
-    this.broadcast("phase_change", { phase: this.state.currentPhase });
+    this.broadcast("phase_change", { 
+      phase: this.state.currentPhase,
+      oldPhase,
+      turnCount: this.state.turnCount,
+    });
+
+    this.updateMetadata();
+    console.log(`[BattleRoom] Phase changed: ${oldPhase} -> ${this.state.currentPhase}`);
   }
 
   /**
-   * 处理结束阶段逻辑
+   * 处理结束阶段
    */
   private handleEndPhase() {
-    this.state.ships.forEach((ship: ShipState) => {
+    this.state.ships.forEach((ship) => {
       // 清空软辐能
       ship.fluxSoft = 0;
-      
-      // 重置回合行动标记
+
+      // 重置行动标记
       ship.hasMoved = false;
       ship.hasFired = false;
-      
-      // 护盾维持消耗软辐能
+
+      // 护盾维持消耗
       if (ship.isShieldUp) {
-        ship.fluxSoft += 2; // SHIELD_MAINTAIN_FLUX
+        ship.fluxSoft += 2;
       }
-      
-      // 检查是否因护盾维持而过载
+
+      // 检查过载
       if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
         ship.isOverloaded = true;
-        ship.overloadTime = 10; // 基础过载时间
+        ship.overloadTime = 10;
         ship.isShieldUp = false;
       }
     });
 
-    // 增加回合数
     this.state.turnCount++;
   }
 
   /**
-   * 创建测试舰船（开发用）
+   * 创建测试舰船
    */
   private createTestShip(faction: "player" | "dm", x: number, y: number) {
     const ship = new ShipState();
     ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     ship.faction = faction;
     ship.hullType = "frigate";
-    
-    // 设置位置
     ship.transform.x = x;
     ship.transform.y = y;
     ship.transform.heading = faction === "player" ? 0 : 180;
-    
-    // 设置基础属性
+
     ship.hullMax = 1000;
     ship.hullCurrent = 1000;
-    ship.armorMax = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
-    ship.armorCurrent = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
-    
+    ship.armorMax = [150, 150, 150, 100, 150, 150];
+    ship.armorCurrent = [150, 150, 150, 100, 150, 150];
     ship.fluxMax = 200;
     ship.fluxHard = 0;
     ship.fluxSoft = 0;
-    
     ship.maxSpeed = 100;
     ship.maxTurnRate = 45;
     ship.acceleration = 50;
-    
-    // 添加测试武器
-    const weapon = new WeaponSlot();
-    weapon.weaponId = `weapon_${Date.now()}`;
-    weapon.type = "kinetic";
-    weapon.damage = 50;
-    weapon.range = 300;
-    weapon.arc = 90;
-    weapon.angle = 0;
+
+    const weapon = {
+      weaponId: `weapon_${Date.now()}`,
+      type: "kinetic" as const,
+      damage: 50,
+      range: 300,
+      arc: 90,
+      angle: 0,
+      cooldown: 0,
+    };
     ship.weapons.set(weapon.weaponId, weapon);
-    
+
     this.state.ships.set(ship.id, ship);
-    console.log(`Created test ship: ${ship.id} at (${x}, ${y})`);
+    console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
+  }
+
+  /**
+   * DM 创建对象（舰船/空间站/小行星）
+   */
+  createObject(payload: CreateObjectPayload) {
+    const { type, hullId, x, y, heading, faction, ownerId } = payload;
+
+    if (type === 'ship' && hullId) {
+      const shipSpec = getShipHullSpec(hullId);
+      if (!shipSpec) {
+        console.error(`[BattleRoom] Ship hull not found: ${hullId}`);
+        return;
+      }
+
+      const ship = new ShipState();
+      ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      ship.faction = faction;
+      ship.hullType = hullId;
+      ship.ownerId = ownerId || '';
+      ship.transform.x = x;
+      ship.transform.y = y;
+      ship.transform.heading = heading;
+
+      ship.hullMax = shipSpec.hullPoints;
+      ship.hullCurrent = shipSpec.hullPoints;
+
+      const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
+      ship.armorMax = armorDist;
+      ship.armorCurrent = [...armorDist];
+
+      ship.fluxMax = shipSpec.fluxCapacity;
+      ship.fluxDissipation = shipSpec.fluxDissipation || 10;
+      ship.fluxHard = 0;
+      ship.fluxSoft = 0;
+
+      ship.maxSpeed = shipSpec.maxSpeed;
+      ship.maxTurnRate = shipSpec.maxTurnRate;
+      ship.acceleration = shipSpec.acceleration;
+
+      if (shipSpec.hasShield) {
+        ship.isShieldUp = false;
+        ship.shieldOrientation = heading;
+        ship.shieldArc = shipSpec.shieldArc || 120;
+      }
+
+      // 添加武器
+      for (const mount of shipSpec.weaponMounts) {
+        const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
+        if (weaponSpec) {
+          ship.weapons.set(mount.id, {
+            weaponId: mount.id,
+            type: this.mapDamageType(weaponSpec.damageType),
+            damage: weaponSpec.damage,
+            range: weaponSpec.range,
+            arc: weaponSpec.arc,
+            angle: mount.facing,
+            cooldown: 0,
+          });
+        }
+      }
+
+      this.state.ships.set(ship.id, ship);
+      console.log(`[BattleRoom] Created ${hullId} for ${faction} at (${x}, ${y})`);
+    } else if (type === 'station' || type === 'asteroid') {
+      const ship = new ShipState();
+      ship.id = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      ship.faction = faction;
+      ship.hullType = type;
+      ship.ownerId = ownerId || '';
+      ship.transform.x = x;
+      ship.transform.y = y;
+      ship.transform.heading = heading;
+
+      ship.hullMax = type === 'station' ? 5000 : 2000;
+      ship.hullCurrent = ship.hullMax;
+      ship.armorMax = [300, 300, 300, 200, 300, 300];
+      ship.armorCurrent = [300, 300, 300, 200, 300, 300];
+      ship.fluxMax = 0;
+      ship.fluxHard = 0;
+      ship.fluxSoft = 0;
+      ship.maxSpeed = 0;
+      ship.maxTurnRate = 0;
+      ship.acceleration = 0;
+
+      this.state.ships.set(ship.id, ship);
+      console.log(`[BattleRoom] Created ${type} at (${x}, ${y})`);
+    }
+  }
+
+  /**
+   * 映射伤害类型
+   */
+  private mapDamageType(type: string): "kinetic" | "high_explosive" | "energy" | "fragmentation" {
+    switch (type) {
+      case 'kinetic': return 'kinetic';
+      case 'high_explosive': return 'high_explosive';
+      case 'energy': return 'energy';
+      default: return 'fragmentation';
+    }
+  }
+
+  /**
+   * 将 Ping 值转换为连接质量
+   */
+  private toQuality(pingMs: number): "excellent" | "good" | "fair" | "poor" | "offline" {
+    if (pingMs < 0) return "offline";
+    if (pingMs <= 80) return "excellent";
+    if (pingMs <= 140) return "good";
+    if (pingMs <= 220) return "fair";
+    return "poor";
   }
 }

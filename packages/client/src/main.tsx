@@ -10,6 +10,8 @@ import i18n from "./locales"; // i18n 配置
 import App from "./App";
 import "./styles/fonts.css"; // 字体样式
 import "./styles.css";
+import { MagneticPointerProvider } from "@/components/ui/MagneticPointer";
+import { NotificationContainer } from "@/components/ui/Notification";
 
 // 创建React Query客户端
 const queryClient = new QueryClient({
@@ -39,7 +41,10 @@ root.render(
 							v7_relativeSplatPath: true,
 						}}
 					>
-						<App />
+						<MagneticPointerProvider>
+							<App />
+							<NotificationContainer />
+						</MagneticPointerProvider>
 					</BrowserRouter>
 				</QueryClientProvider>
 			</I18nextProvider>

@@ -14,3 +14,6 @@ export * from './components';
 
 // 增强版回合指示器
 export { EnhancedTurnIndicator } from './EnhancedTurnIndicator';
+
+// 回合状态指示器
+export { TurnIndicator } from './TurnIndicator';

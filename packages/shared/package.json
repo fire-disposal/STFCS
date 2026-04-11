@@ -18,6 +18,9 @@
     "build": "tsup src/index.ts --format esm --dts --clean --sourcemap --treeshake",
     "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --coverage",
     "lint": "biome lint src --diagnostic-level=error",
     "lint:fix": "biome lint --write src --diagnostic-level=error",
     "format": "biome format --write src",
@@ -25,8 +28,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/node": "^25.4.0",
     "tsup": "^8.5.1",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@colyseus/schema": "^4.0.19",

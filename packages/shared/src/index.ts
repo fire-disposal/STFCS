@@ -15,11 +15,47 @@ export {
   ArraySchema,
   type GamePhase,
   type ConnectionQuality,
-  type WeaponDamageType,
   ClientCommand,
-  DAMAGE_MULTIPLIERS,
   GAME_CONFIG,
 } from './schema/GameSchema.js';
+
+// ==================== 武器系统 ====================
+export {
+  WeaponSpec,
+  WeaponMount,
+  type WeaponDamageType,
+  type WeaponCategory,
+  type WeaponMountType,
+  type FireCommand,
+  type FireResult,
+  DAMAGE_MULTIPLIERS,
+  PRESET_WEAPONS,
+  getWeaponSpec,
+  getAvailableWeapons,
+} from './schema/WeaponSchema.js';
+
+// ==================== 舰船数据 ====================
+export {
+  type ShipHullSpec,
+  type ShipSize,
+  type ShipClass,
+  type WeaponMountDef,
+  PRESET_SHIPS,
+  getShipHullSpec,
+  getAvailableShips,
+  importShipHullFromJson,
+  exportShipHullToJson,
+} from './schema/ShipHullSchema.js';
+
+// ==================== 战斗日志 ====================
+export {
+  type CombatLogEntry,
+  type LogType,
+  type LogLevel,
+  type LogFilter,
+  CombatLogManager,
+  combatLog,
+} from './schema/CombatLogSchema.js';
 
 export {
   type MovementPlan,

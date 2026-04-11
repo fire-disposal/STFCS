@@ -1,269 +1,234 @@
 /**
- * 护甲象限显示组件
- *
- * 显示舰船的6象限护甲状态
+ * 6 象限护甲可视化组件
+ * 
+ * 以六边形形式直观显示各象限护甲值
  */
 
 import React from 'react';
-import type { ArmorInstanceState, ArmorQuadrant } from '@vt/shared/types';
+import type { ShipState } from '@vt/shared';
 
-// 样式
 const styles = {
   container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '8px',
+    padding: '12px',
+    backgroundColor: 'rgba(10, 30, 50, 0.8)',
+    borderRadius: '6px',
+    border: '1px solid #2b4261',
   },
   header: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  diagram: {
-    position: 'relative' as const,
-    width: '180px',
-    height: '200px',
-    margin: '0 auto',
-  },
-  quadrant: {
-    position: 'absolute' as const,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    color: 'white',
-    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-    transition: 'all 0.2s ease',
-  },
-  centerIcon: {
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '36px',
-    height: '48px',
-    backgroundColor: 'var(--color-surface-dark)',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    pointerEvents: 'none' as const,
-  },
-  legend: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '12px',
-    fontSize: '10px',
-    marginTop: '8px',
-  },
-  legendItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  legendColor: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '2px',
-  },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '4px',
-    marginTop: '8px',
     fontSize: '11px',
-  },
-  statItem: {
+    fontWeight: 'bold',
+    color: '#ffa500',
+    marginBottom: '10px',
     display: 'flex',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '4px 8px',
-    backgroundColor: 'var(--color-background)',
+  },
+  armorHexContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  quadrantList: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '6px',
+  },
+  quadrantItem: {
+    padding: '6px',
+    backgroundColor: 'rgba(6, 16, 26, 0.6)',
     borderRadius: '4px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '3px',
+  },
+  quadrantName: {
+    fontSize: '9px',
+    color: '#8ba4c7',
+  },
+  quadrantValue: {
+    fontSize: '11px',
+    fontWeight: 'bold',
+    color: '#cfe8ff',
+  },
+  armorBar: {
+    height: '4px',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: '2px',
+    overflow: 'hidden',
+  },
+  armorBarFill: {
+    height: '100%',
+    borderRadius: '2px',
+    transition: 'width 0.3s ease',
+  },
+  hint: {
+    fontSize: '9px',
+    color: '#6b7280',
+    marginTop: '8px',
+    fontStyle: 'italic',
   },
 };
 
-// 象限位置配置
-const quadrantPositions: Record<ArmorQuadrant, {
-  top: string;
-  left: string;
-  width: string;
-  height: string;
-  clipPath: string;
-}> = {
-  FRONT_TOP: {
-    top: '0',
-    left: '40px',
-    width: '100px',
-    height: '70px',
-    clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
-  },
-  FRONT_BOTTOM: {
-    top: '50px',
-    left: '40px',
-    width: '100px',
-    height: '50px',
-    clipPath: 'polygon(0% 0%, 100% 0%, 80% 100%, 20% 100%)',
-  },
-  LEFT_TOP: {
-    top: '15px',
-    left: '0',
-    width: '50px',
-    height: '70px',
-    clipPath: 'polygon(100% 0%, 100% 100%, 0% 70%, 0% 30%)',
-  },
-  LEFT_BOTTOM: {
-    top: '65px',
-    left: '0',
-    width: '50px',
-    height: '70px',
-    clipPath: 'polygon(100% 0%, 80% 100%, 0% 100%, 0% 0%)',
-  },
-  RIGHT_TOP: {
-    top: '15px',
-    left: '130px',
-    width: '50px',
-    height: '70px',
-    clipPath: 'polygon(0% 0%, 100% 30%, 100% 70%, 0% 100%)',
-  },
-  RIGHT_BOTTOM: {
-    top: '65px',
-    left: '130px',
-    width: '50px',
-    height: '70px',
-    clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)',
-  },
-};
-
-// 象限名称
-const quadrantNames: Record<ArmorQuadrant, string> = {
-  FRONT_TOP: '前上',
-  FRONT_BOTTOM: '前下',
-  LEFT_TOP: '左上',
-  LEFT_BOTTOM: '左下',
-  RIGHT_TOP: '右上',
-  RIGHT_BOTTOM: '右下',
-};
+const QUADRANT_NAMES = ['前', '前右', '后右', '后', '后左', '前左'];
+const QUADRANT_COLORS = ['#4a9eff', '#4affa5', '#a5ff4a', '#ffa54a', '#ff4aa5', '#a54aff'];
 
 interface ArmorQuadrantDisplayProps {
-  armor: ArmorInstanceState;
-  showStats?: boolean;
-  compact?: boolean;
-  highlightQuadrant?: ArmorQuadrant;
-  onQuadrantClick?: (quadrant: ArmorQuadrant) => void;
+  ship: ShipState | null;
 }
 
-export const ArmorQuadrantDisplay: React.FC<ArmorQuadrantDisplayProps> = ({
-  armor,
-  showStats = true,
-  compact = false,
-  highlightQuadrant,
-  onQuadrantClick,
-}) => {
-  // 获取护甲颜色
-  const getArmorColor = (value: number, max: number): string => {
-    const percent = value / max;
-    if (percent > 0.75) return '#2ecc71';
-    if (percent > 0.5) return '#f1c40f';
-    if (percent > 0.25) return '#e67e22';
-    return '#e74c3c';
-  };
-
-  // 计算总护甲
-  const totalArmor = Object.values(armor.quadrants).reduce((a, b) => a + b, 0);
-  const maxTotalArmor = armor.maxPerQuadrant * 6;
-  const overallPercent = Math.round((totalArmor / maxTotalArmor) * 100);
-
-  if (compact) {
+export const ArmorQuadrantDisplay: React.FC<ArmorQuadrantDisplayProps> = ({ ship }) => {
+  if (!ship) {
     return (
-      <div style={{ ...styles.container, flexDirection: 'row', alignItems: 'center' }}>
-        <div style={{ fontSize: '24px', marginRight: '8px' }}>🛡️</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>护甲</div>
-          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{overallPercent}%</div>
+      <div style={styles.container}>
+        <div style={styles.header}>🛡️ 装甲系统</div>
+        <div style={{ color: '#8ba4c7', fontSize: '10px', textAlign: 'center' }}>
+          未选择舰船
         </div>
       </div>
     );
   }
 
+  const armorCurrent = Array.from(ship.armorCurrent);
+  const armorMax = Array.from(ship.armorMax);
+  const totalArmor = armorCurrent.reduce((sum, val) => sum + val, 0);
+  const maxTotalArmor = armorMax.reduce((sum, val) => sum + val, 0);
+  const averagePercent = maxTotalArmor > 0 ? (totalArmor / maxTotalArmor) * 100 : 0;
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <span>🛡️ 护甲状态</span>
-        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-          {overallPercent}%
+        <span>🛡️ 装甲系统</span>
+        <span style={{ fontSize: '9px', color: '#8ba4c7' }}>
+          平均 {averagePercent.toFixed(0)}%
         </span>
       </div>
 
-      {/* 护甲图 */}
-      <div style={styles.diagram}>
-        {Object.entries(quadrantPositions).map(([quadrant, position]) => {
-          const q = quadrant as ArmorQuadrant;
-          const value = armor.quadrants[q];
-          const percent = Math.round((value / armor.maxPerQuadrant) * 100);
-          const isHighlighted = highlightQuadrant === q;
+      {/* 六边形可视化 */}
+      <div style={styles.armorHexContainer}>
+        <svg width="140" height="160" viewBox="0 0 140 160">
+          {/* 六边形布局：从上顺时针编号 0-5 */}
+          {/* 象限 0: 前 (顶部) */}
+          <polygon
+            points="70,10 100,35 70,60 40,35"
+            fill={getArmorColor(armorCurrent[0], armorMax[0], 0.3)}
+            stroke={QUADRANT_COLORS[0]}
+            strokeWidth="2"
+          />
+          <text x="70" y="42" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[0]}
+          </text>
+
+          {/* 象限 1: 前右 (右上) */}
+          <polygon
+            points="100,35 130,80 100,125 70,80"
+            fill={getArmorColor(armorCurrent[1], armorMax[1], 0.3)}
+            stroke={QUADRANT_COLORS[1]}
+            strokeWidth="2"
+          />
+          <text x="105" y="87" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[1]}
+          </text>
+
+          {/* 象限 2: 后右 (右下) */}
+          <polygon
+            points="100,125 70,150 40,125 70,100"
+            fill={getArmorColor(armorCurrent[2], armorMax[2], 0.3)}
+            stroke={QUADRANT_COLORS[2]}
+            strokeWidth="2"
+          />
+          <text x="70" y="132" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[2]}
+          </text>
+
+          {/* 象限 3: 后 (底部) */}
+          <polygon
+            points="40,125 70,100 100,125 70,150"
+            fill={getArmorColor(armorCurrent[3], armorMax[3], 0.3)}
+            stroke={QUADRANT_COLORS[3]}
+            strokeWidth="2"
+          />
+          <text x="70" y="132" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[3]}
+          </text>
+
+          {/* 象限 4: 后左 (左下) - 修正 */}
+          <polygon
+            points="40,125 10,80 40,35 70,80"
+            fill={getArmorColor(armorCurrent[4], armorMax[4], 0.3)}
+            stroke={QUADRANT_COLORS[4]}
+            strokeWidth="2"
+          />
+          <text x="35" y="87" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[4]}
+          </text>
+
+          {/* 象限 5: 前左 (左上) */}
+          <polygon
+            points="40,35 70,60 40,85 10,80"
+            fill={getArmorColor(armorCurrent[5], armorMax[5], 0.3)}
+            stroke={QUADRANT_COLORS[5]}
+            strokeWidth="2"
+          />
+          <text x="35" y="67" textAnchor="middle" fill="#ffffff" fontSize="10">
+            {armorCurrent[5]}
+          </text>
+
+          {/* 中心标注 */}
+          <circle cx="70" cy="80" r="15" fill="rgba(10, 30, 50, 0.8)" stroke="#2b4261" strokeWidth="2" />
+          <text x="70" y="84" textAnchor="middle" fill="#8ba4c7" fontSize="8">
+            舰船
+          </text>
+        </svg>
+      </div>
+
+      {/* 详细列表 */}
+      <div style={styles.quadrantList}>
+        {QUADRANT_NAMES.map((name, index) => {
+          const current = armorCurrent[index] ?? 0;
+          const max = armorMax[index] ?? 0;
+          const percent = max > 0 ? (current / max) * 100 : 0;
 
           return (
-            <div
-              key={quadrant}
-              style={{
-                ...styles.quadrant,
-                ...position,
-                backgroundColor: getArmorColor(value, armor.maxPerQuadrant),
-                cursor: onQuadrantClick ? 'pointer' : 'default',
-                outline: isHighlighted ? '2px solid white' : 'none',
-                outlineOffset: '-2px',
-              }}
-              onClick={() => onQuadrantClick?.(q)}
-              title={`${quadrantNames[q]}: ${value}/${armor.maxPerQuadrant}`}
-            >
-              {percent}%
+            <div key={index} style={styles.quadrantItem}>
+              <div style={styles.quadrantName}>
+                {name}
+              </div>
+              <div style={{
+                ...styles.quadrantValue,
+                color: percent < 30 ? '#ff6f8f' : '#cfe8ff',
+              }}>
+                {current} / {max}
+              </div>
+              <div style={styles.armorBar}>
+                <div
+                  style={{
+                    ...styles.armorBarFill,
+                    width: `${percent}%`,
+                    backgroundColor: QUADRANT_COLORS[index],
+                  }}
+                />
+              </div>
             </div>
           );
         })}
-
-        {/* 中心图标 */}
-        <div style={styles.centerIcon}>
-          🚀
-        </div>
       </div>
 
-      {/* 图例 */}
-      <div style={styles.legend}>
-        <div style={styles.legendItem}>
-          <div style={{ ...styles.legendColor, backgroundColor: '#2ecc71' }} />
-          <span>&gt;75%</span>
-        </div>
-        <div style={styles.legendItem}>
-          <div style={{ ...styles.legendColor, backgroundColor: '#f1c40f' }} />
-          <span>50%</span>
-        </div>
-        <div style={styles.legendItem}>
-          <div style={{ ...styles.legendColor, backgroundColor: '#e74c3c' }} />
-          <span>&lt;25%</span>
-        </div>
+      {/* 提示信息 */}
+      <div style={styles.hint}>
+        💡 护甲值影响伤害减免，优先保护高威胁方向
       </div>
-
-      {/* 详细统计 */}
-      {showStats && (
-        <div style={styles.stats}>
-          {Object.entries(armor.quadrants).map(([quadrant, value]) => (
-            <div key={quadrant} style={styles.statItem}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>
-                {quadrantNames[quadrant as ArmorQuadrant]}
-              </span>
-              <span style={{ fontWeight: 'bold' }}>
-                {value}/{armor.maxPerQuadrant}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
+
+/**
+ * 根据护甲百分比获取填充颜色透明度
+ */
+function getArmorColor(current: number, max: number, baseAlpha: number): string {
+  const percent = max > 0 ? current / max : 0;
+  const alpha = baseAlpha + percent * 0.5;
+  return `rgba(100, 150, 200, ${alpha})`;
+}
 
 export default ArmorQuadrantDisplay;
