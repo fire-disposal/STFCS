@@ -3,9 +3,9 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "experimentalDecorators": true,
     "lib": [
-      "ES2022",
-      "DOM"
+      "ES2022"
     ],
     "strict": true,
     "esModuleInterop": true,
@@ -31,7 +31,9 @@
     }
   },
   "include": [
-    "src/**/*",
+    "src/index.ts",
+    "src/rooms/**/*.ts",
+    "src/commands/**/*.ts",
     "../shared/src/**/*.ts"
   ],
   "exclude": [

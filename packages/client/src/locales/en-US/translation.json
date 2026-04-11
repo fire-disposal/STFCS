@@ -28,7 +28,7 @@
   "connectionInfo": {
     "title": "Server Information",
     "autoConnect": "Auto-connected to: {{url}}",
-    "serverRunning": "Server running on localhost:3001",
+    "serverRunning": "Server running on localhost:2567",
     "uniqueName": "Player names must be unique in each room",
     "selectOrCreateRoom": "Select an existing room or create a new one"
   },

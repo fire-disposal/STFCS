@@ -4,11 +4,3 @@
 
 export { ThreePhaseMovementController } from './ThreePhaseMovementController';
 export { MovementPhaseIndicator } from './MovementPhaseIndicator';
-export { MovementInteractionService } from './MovementInteractionService';
-export { MovementControlPanel } from './MovementControlPanel';
-export type {
-  MovementInputType,
-  MovementInputEvent,
-  MovementPreviewResult,
-  MovementInteractionConfig,
-} from './MovementInteractionService';

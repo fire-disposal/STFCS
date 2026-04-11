@@ -8,11 +8,9 @@
   "exports": {
     ".": "./dist/index.js",
     "./*": "./dist/*.js",
-    "./ws": "./dist/ws/index.js",
     "./types": "./dist/types/index.js",
     "./schemas": "./dist/schemas/index.js",
     "./constants": "./dist/constants/index.js",
-    "./events": "./dist/events/index.js",
     "./protocol": "./dist/protocol/index.js",
     "./core-types": "./dist/core-types.js"
   },
@@ -31,8 +29,9 @@
     "typescript": "~5.9.3"
   },
   "dependencies": {
-    "immer": "^10.1.1",
-    "superjson": "^2.2.2",
+    "@colyseus/schema": "^4.0.19",
+    "gl-matrix": "^3.4.4",
+    "sat": "^0.9.0",
     "zod": "^4.3.6"
   }
 }

@@ -1,171 +1,47 @@
 /**
- * 共享包主导出文件
+ * 共享包主导出（主线）
  *
- * 新架构：
- * - room/     声明式房间框架（核心）
- * - types/    领域类型定义
- * - config/   数据驱动配置
- * - events/   事件总线
+ * 仅保留 Colyseus 战斗主线常用导出。
+ * 其他扩展能力请使用子路径导入（如 `@vt/shared/types`、`@vt/shared/config`）。
  */
 
-// ==================== 房间框架（核心） ====================
-export * from './room/index.js';
-
-// ==================== 领域类型 ====================
-export type {
-  // 基础类型
-  Point,
-  // 玩家相关
-  PlayerInfo,
-  PlayerGameState,
-  // 舰船相关
-  ShipStatus,
-  ArmorQuadrant,
-  ArmorState,
-  FluxState,
-  FluxType,
-  FluxOverloadState,
-  ShieldSpec,
-  ShipMovement,
-  // 武器相关
-  WeaponType,
-  WeaponMountType,
-  WeaponSpec,
-  WeaponMount,
-  // 战斗相关
-  ExplosionData,
-  AttackCommand,
-  CombatResult,
-  // 地图与 Token
-  MapConfig,
-  TokenInfo,
-  TokenType,
-  UnitTurnState,
-  StarNode,
-  PlanetNode,
-  StarSystem,
-  StarMap,
-  MapSnapshot,
-  // 相机
-  CameraState,
-  PlayerCamera,
-  CameraUpdateCommand,
-  CameraConfig,
-  // 阵营系统
-  FactionId,
-  FactionDefinition,
-  PlayerFactionInfo,
-  FactionTurnPhase,
-  TurnHistoryEntry,
-  FactionTurnState,
-  FactionTurnInitParams,
-  // 房间系统（旧版，保留兼容）
-  RoomPhase as LegacyRoomPhase,
-  RoomInfo as LegacyRoomInfo,
-  RoomState as LegacyRoomState,
-} from './types/index.js';
-
-// 导出结果类型工具函数
-export { ok, fail } from './types/index.js';
-
-// ==================== 配置系统 ====================
+// ==================== Colyseus 战斗状态（主线） ====================
 export {
-  // schemas
-  DamageTypeSchema,
-  WeaponCategorySchema,
-  MountTypeSchema,
-  ShieldTypeSchema,
-  HullSizeSchema,
-  ArmorQuadrantConfigSchema,
-  WeaponDefinitionSchema,
-  ShieldConfigSchema,
-  FluxConfigSchema,
-  ArmorConfigSchema,
-  HullDefinitionSchema,
-  ShipDefinitionSchema,
-  AssetManifestSchema,
-  // types
-  type DamageModifiers,
-  type WeaponSlotSize,
-  type CreateShipInstanceParams,
-  type ShipInstanceState,
-  type IConfigLoader,
-  type ConfigValidationResult,
-  type ConfigValidationError,
-  type AssetRef,
-  DAMAGE_MODIFIERS,
-  WEAPON_SIZE_COMPATIBILITY,
-  DEFAULT_SHIP_STATS,
-  DEFAULT_WEAPON_STATS,
-  DEFAULT_FLUX_STATS,
-  // validation
-  validateWeaponDefinition,
-  validateHullDefinition,
-  validateShipDefinition,
-} from './config/index.js';
+  Transform,
+  WeaponSlot,
+  PlayerState,
+  ShipState,
+  GameRoomState,
+  ArraySchema,
+  type GamePhase,
+  type ConnectionQuality,
+  type WeaponDamageType,
+  ClientCommand,
+  DAMAGE_MULTIPLIERS,
+  GAME_CONFIG,
+} from './schema/GameSchema.js';
 
-export type {
-  DamageType,
-  WeaponCategory,
-  MountType,
-  ShieldType,
-  HullSize,
-  WeaponDefinition,
-  HullDefinition,
-  ShipDefinition,
-  ShieldConfig,
-  FluxConfig,
-  ArmorConfig,
-  AssetManifest,
-} from './config/schemas.js';
-
-// ==================== Zod Schemas ====================
-export * from './schemas/index.js';
-
-// ==================== 常量 ====================
-export * from './constants/index.js';
-
-// ==================== 事件总线 ====================
 export {
-  EventBus,
-  createDomainEvent,
-  publishEvent,
-} from './events/index.js';
+  type MovementPlan,
+  isMoveValid,
+  isTurnValid,
+  distance,
+  angleBetween,
+  angleDifference,
+  createShipPolygon,
+  checkCollision,
+  isPointInArc,
+  calculateThreePhaseMove,
+  validateThreePhaseMove,
+} from './math/index.js';
 
-export type {
-  EventHandler,
-  Unsubscribe,
-  IEventBus,
-  EventContext,
-} from './events/index.js';
-
-// ==================== 协议类型 ====================
-export type {
-  TurnPhase,
-  GamePhase,
-  ShipActionState,
-  AttackPreviewResult,
-  CombatResultPayload,
-  AttackResult,
-  WeaponSelected,
-  TargetSelected,
-  QuadrantSelected,
-  DomainEvent,
-  DomainEventType,
-  DomainEventPayloadMap,
-} from './protocol/index.js';
-
-export { createDomainEvent as createDomainEventFromProtocol } from './protocol/index.js';
-
-// ==================== WS 消息类型 ====================
+// ==================== 主线常量 ====================
 export {
-  WS_MESSAGE_TYPES,
-} from './ws/index.js';
-
-export type {
-  WSMessageType,
-  WSMessage,
-} from './ws/index.js';
+  FACTIONS,
+  DEFAULT_FACTION_IDS,
+  getFactionColor,
+  getFactionLocalizedName,
+} from './constants/index.js';
 
 // ==================== 协议版本 ====================
 export { PROTOCOL_VERSION } from './core-types.js';

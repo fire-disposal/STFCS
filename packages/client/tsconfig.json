@@ -19,7 +19,9 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@vt/shared": ["../shared/src/index.ts"],
+      "@vt/shared/*": ["../shared/src/*"]
     }
   },
   "include": ["src"]

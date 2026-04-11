@@ -28,7 +28,7 @@
   "connectionInfo": {
     "title": "服务器信息",
     "autoConnect": "自动连接到：{{url}}",
-    "serverRunning": "服务器运行在 localhost:3001",
+    "serverRunning": "服务器运行在 localhost:2567",
     "uniqueName": "玩家名称在每个房间中必须唯一",
     "selectOrCreateRoom": "选择现有房间或创建新房间"
   },

@@ -9,7 +9,7 @@
  */
 
 import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { FactionId } from '@vt/shared';
+import type { FactionId } from '@vt/shared/types';
 import type {
 	GamePhase,
 	TurnPhase,

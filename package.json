@@ -1,8 +1,8 @@
 {
   "name": "virtual-tabletop",
+  "private": true,
   "version": "1.0.0",
   "description": "STFCS - Tactical Space Fleet Combat System",
-  "main": "index.js",
   "scripts": {
     "lint": "turbo run lint --continue",
     "lint:fix": "turbo run lint:fix --continue",
@@ -11,6 +11,9 @@
     "test": "turbo run test --continue",
     "build": "turbo run build --continue",
     "dev": "turbo run dev --parallel",
+    "dev:server": "pnpm --filter server dev",
+    "dev:client": "pnpm --filter client dev",
+    "dev:shared": "pnpm --filter @vt/shared dev",
     "typecheck": "turbo run typecheck --continue",
     "check": "pnpm lint && pnpm typecheck"
   },
@@ -33,10 +36,5 @@
     "turbo": "^2.8.17",
     "typescript": "^5.9.3",
     "vue-eslint-parser": "^9.4.3"
-  },
-  "dependencies": {
-    "@fastify/cors": "^11.2.0",
-    "ws": "^8.19.0",
-    "zod": "^4.3.6"
   }
 }

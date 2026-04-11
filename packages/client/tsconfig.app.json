@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": false,
+    "experimentalDecorators": true,
     "types": ["node", "vite/client"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -25,6 +26,6 @@
     "**/*.test.tsx",
     "**/*.spec.ts",
     "**/*.spec.tsx",
-    "**/*.backup.ts",
+    "**/*.backup.ts"
   ],
 }

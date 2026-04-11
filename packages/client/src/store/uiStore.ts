@@ -1,0 +1,157 @@
+import { create } from "zustand";
+import { GameRoomState, ShipState } from "@vt/shared/schema";
+
+/**
+ * 本地UI状态存储
+ * 注意：这里只存储客户端本地UI状态，不涉及游戏逻辑状态
+ */
+// 交互模式枚举
+export type InteractionMode = 
+  | 'IDLE'
+  | 'DRAWING_MOVE'
+  | 'SELECTING_TARGET'
+  | 'DM_OVERRIDING';
+
+interface UIState {
+  // 连接状态
+  isConnected: boolean;
+  connectionError: string | null;
+  playerRole: "player" | "dm" | null;
+  roomId: string | null;
+
+  // 选中的舰船及交互模式
+  selectedShipId: string | null;
+  interactionMode: InteractionMode;
+  activeWeaponId: string | null;
+  actionPanelPosition: { x: number; y: number } | null;
+
+  // 鼠标状态
+  isMouseDown: boolean;
+  mousePosition: { x: number; y: number };
+
+  // 视图状态
+  cameraPosition: { x: number; y: number };
+  zoom: number;
+  showGrid: boolean;
+  showRangeIndicator: boolean;
+
+  // UI面板状态
+  isSidebarOpen: boolean;
+  activePanel: "ships" | "combat" | "dm" | "settings" | null;
+}
+
+interface UIActions {
+  // 连接相关
+  setConnected: (connected: boolean) => void;
+  setConnectionError: (error: string | null) => void;
+  setPlayerRole: (role: "player" | "dm" | null) => void;
+  setRoomId: (roomId: string | null) => void;
+
+  // 选择相关
+  selectShip: (shipId: string | null, position?: { x: number; y: number }) => void;
+  setInteractionMode: (mode: InteractionMode, weaponId?: string | null) => void;
+  closeActionPanel: () => void;
+
+  // 鼠标相关
+  setMouseDown: (isDown: boolean) => void;
+  setMousePosition: (x: number, y: number) => void;
+
+  // 视图相关
+  setCameraPosition: (x: number, y: number) => void;
+  setZoom: (zoom: number) => void;
+  toggleGrid: () => void;
+  toggleRangeIndicator: () => void;
+
+  // 面板相关
+  toggleSidebar: () => void;
+  setActivePanel: (panel: "ships" | "combat" | "dm" | "settings" | null) => void;
+}
+
+export const useUIStore = create<UIState & UIActions>((set) => ({
+  // 初始状态
+  isConnected: false,
+  connectionError: null,
+  playerRole: null,
+  roomId: null,
+
+  selectedShipId: null,
+  interactionMode: 'IDLE',
+  activeWeaponId: null,
+  actionPanelPosition: null,
+
+  isMouseDown: false,
+  mousePosition: { x: 0, y: 0 },
+
+  cameraPosition: { x: 0, y: 0 },
+  zoom: 1,
+  showGrid: true,
+  showRangeIndicator: true,
+
+  isSidebarOpen: true,
+  activePanel: "ships",
+
+  // Actions
+  setConnected: (connected) => set({ isConnected: connected }),
+  setConnectionError: (error) => set({ connectionError: error }),
+  setPlayerRole: (role) => set({ playerRole: role }),
+  setRoomId: (roomId) => set({ roomId }),
+
+  selectShip: (shipId, position) => 
+    set({ 
+      selectedShipId: shipId, 
+      actionPanelPosition: position || null,
+      interactionMode: 'IDLE',
+      activeWeaponId: null
+    }),
+    
+  setInteractionMode: (mode, weaponId = null) => 
+    set({ interactionMode: mode, activeWeaponId: weaponId }),
+
+  closeActionPanel: () => 
+    set({ selectedShipId: null, actionPanelPosition: null, interactionMode: 'IDLE', activeWeaponId: null }),
+
+  setMouseDown: (isDown) => set({ isMouseDown: isDown }),
+  setMousePosition: (x, y) => set({ mousePosition: { x, y } }),
+
+  setCameraPosition: (x, y) => set({ cameraPosition: { x, y } }),
+  setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(3, zoom)) }),
+  toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
+  toggleRangeIndicator: () =>
+    set((state) => ({ showRangeIndicator: !state.showRangeIndicator })),
+
+  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  setActivePanel: (panel) => set({ activePanel: panel }),
+}));
+
+/**
+ * 游戏状态引用存储
+ * 用于在React组件外访问同步的游戏状态
+ */
+interface GameStateRef {
+  state: GameRoomState | null;
+  ships: Map<string, ShipState>;
+  currentPhase: string;
+  turnCount: number;
+}
+
+export const gameStateRef: GameStateRef = {
+  state: null,
+  ships: new Map(),
+  currentPhase: "DEPLOYMENT",
+  turnCount: 1,
+};
+
+/**
+ * 更新游戏状态引用
+ */
+export function updateGameStateRef(state: GameRoomState): void {
+  gameStateRef.state = state;
+  gameStateRef.currentPhase = state.currentPhase;
+  gameStateRef.turnCount = state.turnCount;
+
+  // 同步舰船数据
+  gameStateRef.ships.clear();
+  state.ships.forEach((ship, key) => {
+    gameStateRef.ships.set(key, ship);
+  });
+}

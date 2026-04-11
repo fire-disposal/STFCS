@@ -8,7 +8,6 @@ export default defineConfig({
 		alias: {
 			"@": resolve(__dirname, "src"),
 			"@vt/shared": resolve(__dirname, "../shared/src"),
-			"@vt/shared/ws": resolve(__dirname, "../shared/src/ws/index.ts"),
 			"@vt/shared/types": resolve(__dirname, "../shared/src/types/index.ts"),
 			"@vt/shared/constants": resolve(__dirname, "../shared/src/constants/index.ts"),
 		},
@@ -16,19 +15,6 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		host: true,
-		proxy: {
-			"/api": {
-				target: "http://localhost:3000",
-				changeOrigin: true,
-				secure: false,
-			},
-			"/ws": {
-				target: "ws://localhost:3001",
-				ws: true,
-				changeOrigin: true,
-				secure: false,
-			},
-		},
 	},
 	build: {
 		outDir: "dist",

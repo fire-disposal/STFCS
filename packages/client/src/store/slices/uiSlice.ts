@@ -103,7 +103,7 @@ const initialState: UIState = {
 	drawingElements: [],
 	connection: {
 		isConnected: false,
-		serverUrl: "ws://localhost:3001",
+		serverUrl: "ws://localhost:2567",
 		playerId: null,
 		roomId: null,
 		playerName: "",

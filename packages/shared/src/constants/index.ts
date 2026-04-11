@@ -31,18 +31,16 @@ export {
 
 /**
  * 获取默认 WebSocket URL
- * - 浏览器环境：使用当前 host 的 /ws 路径（通过 Vite 代理）
- * - Node.js 环境：使用 localhost:3001
+ * - 浏览器环境：使用当前 host
+ * - Node.js 环境：使用 localhost:2567
  */
 export function getDefaultWsUrl(): string {
 	// 使用类型断言避免 DOM 依赖
 	const globalObj = globalThis as typeof globalThis & { window?: { location?: { host: string } } };
 	if (globalObj.window?.location?.host) {
-		// 浏览器环境：使用代理路径
-		return `ws://${globalObj.window.location.host}/ws`;
+		return `ws://${globalObj.window.location.host}`;
 	}
-	// Node.js 环境：直接连接 WebSocket 服务器
-	return "ws://localhost:3001";
+	return "ws://localhost:2567";
 }
 
 export const DEFAULT_WS_URL = getDefaultWsUrl();

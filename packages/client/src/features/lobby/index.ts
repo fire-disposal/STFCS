@@ -5,4 +5,3 @@
 export { LobbyView } from './LobbyView';
 export { RoomCard } from './RoomCard';
 export { CreateRoomModal } from './CreateRoomModal';
-export { RoomLobbyView } from './RoomLobbyView';

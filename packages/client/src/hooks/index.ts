@@ -7,12 +7,6 @@ export type { UseCameraReturn } from "./useCamera";
 
 export { useTokenSelection } from "./useTokenSelection";
 
-export { useWebSocketStatus, useRoomClient } from "./useWebSocket";
-export type { UseWebSocketStatusReturn } from "./useWebSocket";
-
-export { useFactionTurn } from "./useFactionTurn";
-export type { UseFactionTurnReturn } from "./useFactionTurn";
-
 export { usePixiApp } from "./usePixiApp";
 export type { UsePixiAppOptions, UsePixiAppReturn } from "./usePixiApp";
 
