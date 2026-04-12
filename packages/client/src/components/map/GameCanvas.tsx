@@ -682,47 +682,61 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         onInit={(app) => {
           const world = new Container();
           world.sortableChildren = true;
+          world.eventMode = 'static';
+          world.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
 
           // 背景层（星空）
           const background = new Container();
           background.zIndex = 0;
+          background.eventMode = 'none';
 
           // 星空各层（按深度排序，最远的先绘制）
           const starfieldNebula = new Container();     // 银河星云（最远）
           starfieldNebula.zIndex = 0;
-          
+          starfieldNebula.eventMode = 'none';
+
           const starfieldDeep = new Container();       // 深层星空
           starfieldDeep.zIndex = 1;
-          
+          starfieldDeep.eventMode = 'none';
+
           const starfieldMid = new Container();        // 中层星空
           starfieldMid.zIndex = 2;
-          
+          starfieldMid.eventMode = 'none';
+
           const starfieldNear = new Container();       // 浅层星空（最近）
           starfieldNear.zIndex = 3;
+          starfieldNear.eventMode = 'none';
 
           // 网格层
           const grid = new Container();
           grid.zIndex = 4;
+          grid.eventMode = 'none';
 
           // 舰船层
           const shipsLayer = new Container();
           shipsLayer.zIndex = 5;
+          shipsLayer.eventMode = 'static';
+          shipsLayer.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
 
           // 标签层
           const labels = new Container();
           labels.zIndex = 6;
+          labels.eventMode = 'none';
 
           // 效果层
           const effects = new Container();
           effects.zIndex = 7;
+          effects.eventMode = 'none';
 
           // 武器射界层（在舰船之上）
           const weaponArcsLayer = new Container();
           weaponArcsLayer.zIndex = 8;
+          weaponArcsLayer.eventMode = 'none';
 
           // 移动可视化图层
           const movementVisualsLayer = new Container();
           movementVisualsLayer.zIndex = 9;
+          movementVisualsLayer.eventMode = 'none';
 
           // 添加到世界容器
           world.addChild(
