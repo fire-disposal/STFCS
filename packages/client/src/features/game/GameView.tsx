@@ -4,8 +4,7 @@
  * 战术终端风格布局：
  * - 顶部固定状态栏
  * - 中央地图区域
- * - 右侧功能面板（可折叠）
- * - 底部操作栏
+ * - 右侧功能面板（集成地图控制、Tab 系统、舰船信息、DM 工具）
  */
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
@@ -48,11 +47,11 @@ const layoutStyles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     height: '48px',
+    minHeight: '48px',
     padding: '0 16px',
     backgroundColor: 'rgba(13, 40, 71, 0.95)',
     borderBottom: '2px solid rgba(74, 158, 255, 0.3)',
     flexShrink: 0,
-    zIndex: 1000,
   },
 
   topBarLeft: {
@@ -66,19 +65,21 @@ const layoutStyles = {
     fontWeight: 'bold',
     letterSpacing: '2px',
     color: '#4a9eff',
-    textShadow: '0 0 8px rgba(74, 158, 255, 0.5)',
+    whiteSpace: 'nowrap' as const,
   },
 
   topBarCenter: {
     flex: 1,
     display: 'flex',
     justifyContent: 'center',
+    minWidth: 0,
   },
 
   topBarRight: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    flexShrink: 0,
   },
 
   // 主内容区
@@ -104,47 +105,38 @@ const layoutStyles = {
 
   // 右侧面板容器
   sidePanelContainer: {
-    width: '400px',
+    width: '420px',
     display: 'flex',
     flexDirection: 'column' as const,
-    backgroundColor: 'rgba(13, 40, 71, 0.9)',
+    backgroundColor: 'rgba(13, 40, 71, 0.95)',
     borderLeft: '2px solid rgba(74, 158, 255, 0.2)',
     flexShrink: 0,
+    overflow: 'hidden',
   },
 
   // 右侧面板内容区（滚动）
   sidePanelContent: {
     flex: 1,
     overflowY: 'auto' as const,
+    overflowX: 'hidden' as const,
     padding: '12px',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '12px',
   },
 
-  // 底部操作栏
-  bottomBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '72px',
-    padding: '0 16px',
-    backgroundColor: 'rgba(13, 40, 71, 0.95)',
-    borderTop: '2px solid rgba(74, 158, 255, 0.3)',
-    flexShrink: 0,
-  },
-
   // 按钮样式
   button: {
-    padding: '8px 16px',
+    padding: '6px 12px',
     backgroundColor: 'rgba(26, 45, 66, 0.8)',
     border: '1px solid rgba(74, 158, 255, 0.3)',
     color: '#cfe8ff',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer',
     transition: 'all 0.2s',
     letterSpacing: '1px',
+    whiteSpace: 'nowrap' as const,
   },
 
   buttonPrimary: {
@@ -368,7 +360,7 @@ export const GameView: React.FC<GameViewProps> = ({
     console.log('[GameView] Save room');
   }, []);
 
-  // 地图控制指令
+  // 地图控制指令（紧凑布局，用于右侧面板）
   const mapActionGroups: ActionCommandGroup[] = useMemo(() => [
     {
       id: 'view_control',
@@ -507,6 +499,16 @@ export const GameView: React.FC<GameViewProps> = ({
 
         {/* 右侧面板 */}
         <div style={layoutStyles.sidePanelContainer}>
+          {/* 视图控制（集成到右侧面板顶部） */}
+          <div style={{ padding: '12px', borderBottom: '1px solid rgba(74, 158, 255, 0.2)' }}>
+            <div style={layoutStyles.panelTitle}>🎮 地图控制</div>
+            <ActionCommandDock
+              title=""
+              subtitle=""
+              groups={mapActionGroups}
+            />
+          </div>
+          
           {/* Tab 切换 */}
           <RightPanelTabs
             room={room}
@@ -516,7 +518,7 @@ export const GameView: React.FC<GameViewProps> = ({
             playerCount={players.length}
             unreadChatCount={0}
           />
-          
+
           {/* 可滚动内容区 */}
           <div style={layoutStyles.sidePanelContent}>
             {/* 舰船信息面板（选中时显示） */}
@@ -591,15 +593,6 @@ export const GameView: React.FC<GameViewProps> = ({
             )}
           </div>
         </div>
-      </div>
-
-      {/* 底部操作栏 */}
-      <div style={layoutStyles.bottomBar}>
-        <ActionCommandDock
-          title=""
-          subtitle=""
-          groups={mapActionGroups}
-        />
       </div>
 
       {/* 弹窗 */}
