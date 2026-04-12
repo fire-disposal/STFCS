@@ -23,14 +23,13 @@ export interface RoomInfo {
 	maxPlayers: number;
 	createdAt: number;
 	isPrivate: boolean;
-	hasPassword: boolean;
 	phase: 'lobby' | 'deployment' | 'playing' | 'paused' | 'ended';
 	ownerId: string | null;
 }
 
 interface RoomSelectorProps {
 	selectedRoomId: string | null;
-	onRoomSelect: (roomId: string, password?: string) => void;
+	onRoomSelect: (roomId: string) => void;
 	onRoomCreate: (options: RoomCreateOptions) => Promise<void>;
 	disabled?: boolean;
 	rooms?: RoomInfo[];
@@ -41,7 +40,6 @@ export interface RoomCreateOptions {
 	name?: string;
 	maxPlayers: number;
 	isPrivate: boolean;
-	password?: string;
 }
 
 type SelectionMode = "quick" | "select" | "create";
@@ -58,14 +56,10 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 	const [rooms, setRooms] = useState<RoomInfo[]>(externalRooms || []);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showCreateForm, setShowCreateForm] = useState(false);
-	const [showPasswordModal, setShowPasswordModal] = useState(false);
-	const [selectedPrivateRoom, setSelectedPrivateRoom] = useState<RoomInfo | null>(null);
-	const [passwordInput, setPasswordInput] = useState("");
 	const [newRoomId, setNewRoomId] = useState("");
 	const [newRoomName, setNewRoomName] = useState("");
 	const [newRoomMaxPlayers, setNewRoomMaxPlayers] = useState(8);
 	const [newRoomIsPrivate, setNewRoomIsPrivate] = useState(false);
-	const [newRoomPassword, setNewRoomPassword] = useState("");
 	const [error, setError] = useState("");
 
 	// 使用外部传入的房间列表
@@ -77,23 +71,8 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 
 	// 处理房间选择
 	const handleRoomSelect = useCallback((room: RoomInfo) => {
-		if (room.hasPassword) {
-			setSelectedPrivateRoom(room);
-			setShowPasswordModal(true);
-		} else {
-			onRoomSelect(room.roomId);
-		}
+		onRoomSelect(room.roomId);
 	}, [onRoomSelect]);
-
-	// 处理密码提交
-	const handlePasswordSubmit = useCallback(() => {
-		if (selectedPrivateRoom && passwordInput) {
-			onRoomSelect(selectedPrivateRoom.roomId, passwordInput);
-			setShowPasswordModal(false);
-			setSelectedPrivateRoom(null);
-			setPasswordInput("");
-		}
-	}, [selectedPrivateRoom, passwordInput, onRoomSelect]);
 
 	// 处理创建房间
 	const handleCreateRoom = useCallback(async () => {
@@ -111,7 +90,6 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 				name: newRoomName.trim() || undefined,
 				maxPlayers: newRoomMaxPlayers,
 				isPrivate: newRoomIsPrivate,
-				password: newRoomIsPrivate ? newRoomPassword : undefined,
 			});
 
 			// 重置表单
@@ -119,14 +97,13 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 			setNewRoomName("");
 			setNewRoomMaxPlayers(8);
 			setNewRoomIsPrivate(false);
-			setNewRoomPassword("");
 			setShowCreateForm(false);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to create room');
 		} finally {
 			setIsLoading(false);
 		}
-	}, [newRoomId, newRoomName, newRoomMaxPlayers, newRoomIsPrivate, newRoomPassword, onRoomCreate, t]);
+	}, [newRoomId, newRoomName, newRoomMaxPlayers, newRoomIsPrivate, onRoomCreate, t]);
 
 	// 获取阶段图标
 	const getPhaseIcon = useCallback((phase: string) => {
@@ -256,14 +233,7 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 
 			{newRoomIsPrivate && (
 				<div className="form-group">
-					<label>{t('room.password')}</label>
-					<input
-						type="password"
-						value={newRoomPassword}
-						onChange={(e) => setNewRoomPassword(e.target.value)}
-						placeholder={t('room.placeholder.password')}
-						disabled={disabled || isLoading}
-					/>
+					<p>{t('room.privateRoom')}</p>
 				</div>
 			)}
 
@@ -286,44 +256,6 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 				</button>
 			</div>
 		</div>
-	);
-
-	// 渲染密码模态框
-	const renderPasswordModal = () => (
-		showPasswordModal && selectedPrivateRoom && (
-			<div className="password-modal-overlay">
-				<div className="password-modal">
-					<h3>{t('room.enterPassword')}</h3>
-					<p>{t('room.privateRoomPasswordRequired', { roomName: selectedPrivateRoom.name })}</p>
-					<input
-						type="password"
-						value={passwordInput}
-						onChange={(e) => setPasswordInput(e.target.value)}
-						placeholder={t('room.placeholder.password')}
-						autoFocus
-					/>
-					<div className="modal-actions">
-						<button
-							className="btn-secondary"
-							onClick={() => {
-								setShowPasswordModal(false);
-								setSelectedPrivateRoom(null);
-								setPasswordInput("");
-							}}
-						>
-							{t('common.cancel')}
-						</button>
-						<button
-							className="btn-primary"
-							onClick={handlePasswordSubmit}
-							disabled={!passwordInput}
-						>
-							{t('room.join')}
-						</button>
-					</div>
-				</div>
-			</div>
-		)
 	);
 
 	return (
@@ -387,9 +319,6 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 					</div>
 				))}
 			</div>
-
-			{/* 密码模态框 */}
-			{renderPasswordModal()}
 
 			{/* 样式 */}
 			<style>{`
@@ -550,47 +479,6 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
 					display: flex;
 					gap: 8px;
 					justify-content: flex-end;
-				}
-
-				.password-modal-overlay {
-					position: fixed;
-					top: 0;
-					left: 0;
-					right: 0;
-					bottom: 0;
-					background: rgba(0, 0, 0, 0.5);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					z-index: 1000;
-				}
-
-				.password-modal {
-					background: var(--color-surface);
-					padding: 24px;
-					border-radius: 8px;
-					max-width: 400px;
-					width: 90%;
-				}
-
-				.password-modal h3 {
-					margin: 0 0 8px;
-				}
-
-				.password-modal p {
-					margin: 0 0 16px;
-					color: var(--color-text-secondary);
-					font-size: 14px;
-				}
-
-				.password-modal input {
-					width: 100%;
-					padding: 10px;
-					margin-bottom: 16px;
-					background: var(--color-background);
-					border: 1px solid var(--color-border);
-					border-radius: 4px;
-					color: var(--color-text);
 				}
 
 				.modal-actions {

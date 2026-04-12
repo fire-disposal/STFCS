@@ -15,3 +15,5 @@ export type { UseCanvasInteractionOptions } from "./useCanvasInteraction";
 
 export { useInteraction } from "./useInteraction";
 export type { UseInteractionReturn } from "./useInteraction";
+
+export { useCurrentGameRoom } from "./useCurrentGameRoom";

@@ -1,0 +1,621 @@
+/**
+ * STFCS 认证和大厅页面样式
+ * Auth & Lobby Pages v1.0
+ * 
+ * 包含：
+ * - 登录面板样式
+ * - 大厅面板样式
+ * - 房间卡片样式
+ * - 创建房间模态框样式
+ */
+
+@import './design-system.css';
+@import './components.css';
+
+/* ====== 登录页面容器 ====== */
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: var(--space-6);
+}
+
+/* ====== 登录卡片 ====== */
+.login-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  max-width: 480px;
+  width: 100%;
+}
+
+.login-card__header {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.login-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+  text-shadow: 0 0 16px var(--color-primary-glow);
+}
+
+.login-card__subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-normal);
+}
+
+/* ====== 表单组 ====== */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  width: 100%;
+}
+
+.form-group__label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.form-group__input {
+  width: 100%;
+  height: var(--height-md);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  transition: var(--transition-fast);
+  outline: none;
+}
+
+.form-group__input:focus {
+  border-color: var(--border-color-active);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.form-group__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-group__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ====== 按钮组 ====== */
+.button-group {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.button-group--vertical {
+  flex-direction: column;
+}
+
+.button-group--full {
+  width: 100%;
+}
+
+/* ====== 错误提示 ====== */
+.form-error-banner {
+  padding: var(--space-3);
+  background: rgba(255, 68, 68, 0.15);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ====== 进度提示 ====== */
+.form-progress {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  text-align: center;
+  margin-top: var(--space-3);
+  font-style: italic;
+}
+
+/* ====== 服务器状态 ====== */
+.server-status {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-color);
+}
+
+.server-status__url {
+  color: var(--text-secondary);
+}
+
+.server-status__hint {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+/* ====== 大厅页面 ====== */
+.lobby-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.lobby-page__header {
+  padding: var(--space-5) var(--space-10);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lobby-page__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  text-shadow: 0 0 12px var(--color-primary-glow);
+}
+
+.lobby-page__player-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.lobby-page__name-input {
+  padding: var(--space-2) var(--space-4);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  transition: var(--transition-fast);
+  outline: none;
+}
+
+.lobby-page__name-input:focus {
+  border-color: var(--border-color-active);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* ====== 大厅主内容 ====== */
+.lobby-page__main {
+  flex: 1;
+  display: flex;
+  padding: var(--space-10);
+  gap: var(--space-10);
+}
+
+.lobby-page__sidebar {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex-shrink: 0;
+}
+
+.lobby-page__content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ====== 区域面板 ====== */
+.section-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+
+.section-panel__header {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-panel__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ====== 游戏指南 ====== */
+.game-guide {
+  background: rgba(74, 158, 255, 0.08);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.game-guide__title {
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+}
+
+.game-guide__list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-secondary);
+}
+
+.game-guide__list li {
+  margin-bottom: var(--space-2);
+}
+
+/* ====== 统计信息 ====== */
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.stats-list__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stats-list__label {
+  color: var(--text-tertiary);
+}
+
+.stats-list__value {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* ====== 房间列表 ====== */
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* ====== 房间卡片 ====== */
+.room-card {
+  background: rgba(20, 25, 35, 0.6);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.room-card:hover {
+  background: rgba(30, 35, 45, 0.7);
+  border-color: rgba(74, 158, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.room-card--selected {
+  border-color: var(--color-primary);
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.room-card--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.room-card:hover.room-card--disabled {
+  transform: none;
+  box-shadow: none;
+}
+
+.room-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.room-card__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.room-card__owner-icon {
+  color: var(--color-warning);
+}
+
+.room-card__status {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.room-card__status--lobby {
+  background: rgba(100, 100, 150, 0.2);
+  color: var(--text-secondary);
+}
+
+.room-card__status--deployment {
+  background: rgba(255, 170, 0, 0.2);
+  color: var(--color-warning);
+}
+
+.room-card__status--playing {
+  background: rgba(0, 255, 136, 0.2);
+  color: var(--color-success);
+}
+
+.room-card__status--paused {
+  background: rgba(100, 100, 150, 0.2);
+  color: var(--text-tertiary);
+}
+
+.room-card__status--ended {
+  background: rgba(255, 68, 68, 0.2);
+  color: var(--color-danger);
+}
+
+.room-card__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.room-card__info {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.room-card__info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.room-card__join-btn {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.room-card__join-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.room-card__join-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-neutral-700);
+}
+
+/* ====== 空状态 ====== */
+.empty-state {
+  padding: var(--space-10);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.empty-state__text {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+
+.empty-state__hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  opacity: 0.8;
+}
+
+/* ====== 加载状态 ====== */
+.loading-state {
+  padding: var(--space-10);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ====== 创建房间模态框 ====== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  min-width: 500px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.modal__close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xl);
+  cursor: pointer;
+  padding: var(--space-1);
+  transition: var(--transition-fast);
+}
+
+.modal__close-btn:hover {
+  color: var(--text-primary);
+}
+
+.modal__content {
+  padding: var(--space-6);
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.modal__footer {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border-color);
+  background: rgba(20, 25, 35, 0.6);
+}
+
+/* ====== 复选框样式 ====== */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.checkbox-group__input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.checkbox-group__label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* ====== 响应式设计 ====== */
+@media (max-width: 1024px) {
+  .lobby-page__main {
+    padding: var(--space-6);
+    gap: var(--space-6);
+  }
+
+  .lobby-page__sidebar {
+    width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-card {
+    padding: var(--space-6);
+    max-width: 100%;
+  }
+
+  .lobby-page__main {
+    flex-direction: column;
+    padding: var(--space-4);
+  }
+
+  .lobby-page__sidebar {
+    width: 100%;
+  }
+
+  .modal {
+    min-width: auto;
+    width: 90%;
+    max-width: 480px;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+}
+
+/* ====== 工具类 ====== */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.tracking-wide {
+  letter-spacing: var(--tracking-wide);
+}

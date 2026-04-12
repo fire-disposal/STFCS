@@ -2,6 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import type { TypedUseSelectorHook } from "react-redux";
 import { useDispatch, useSelector } from "react-redux";
 import cameraReducer from "./slices/cameraSlice";
+import chatReducer from "./slices/chatSlice";
 import combatReducer from "./slices/combatSlice";
 import combatUIReducer from "./slices/combatUISlice";
 import deploymentReducer from "./slices/deploymentSlice";
@@ -11,6 +12,7 @@ import gameFlowReducer from "./slices/gameFlowSlice";
 import interactionReducer from "./slices/interactionSlice";
 import layerReducer from "./slices/layerSlice";
 import mapReducer from "./slices/mapSlice";
+import movementReducer from "./slices/movementSlice";
 import playerReducer from "./slices/playerSlice";
 import shipReducer from "./slices/shipSlice";
 import uiReducer from "./slices/uiSlice";
@@ -19,6 +21,7 @@ import selectionReducer from "./slices/selectionSlice";
 export const store = configureStore({
 	reducer: {
 		camera: cameraReducer,
+		chat: chatReducer,
 		combat: combatReducer,
 		combatUI: combatUIReducer,
 		deployment: deploymentReducer,
@@ -28,6 +31,7 @@ export const store = configureStore({
 		interaction: interactionReducer,
 		layers: layerReducer,
 		map: mapReducer,
+		movement: movementReducer,
 		player: playerReducer,
 		selection: selectionReducer,
 		ship: shipReducer,

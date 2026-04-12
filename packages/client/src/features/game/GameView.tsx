@@ -5,8 +5,7 @@
  */
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import type { Room } from "@colyseus/sdk";
-import type { GameRoomState, ShipState, PlayerState, ClientCommand } from "@vt/contracts";
+import type { ShipState, PlayerState, ClientCommand } from "@vt/contracts";
 import { ClientCommand as CC } from "@vt/contracts";
 import { NetworkManager } from "@/network/NetworkManager";
 import { GameCanvas } from "@/components/map/GameCanvas";
@@ -18,6 +17,10 @@ import { PlayerRosterModal } from "@/features/lobby";
 import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { ActionCommandDock, type ActionCommandGroup } from "@/features/ui/ActionCommandDock";
+import { ThreePhaseMovementController } from "@/features/movement";
+import { ChatPanel } from "@/features/ui/ChatPanel";
+import { RightPanelTabs } from "@/features/ui/RightPanelTabs";
+import { useCurrentGameRoom } from "@/hooks";
 import { notify } from "@/components/ui/Notification";
 
 const layoutStyles = {
@@ -141,14 +144,15 @@ const layoutStyles = {
 interface GameViewProps {
   networkManager: NetworkManager;
   onLeaveRoom: () => void;
+  playerName?: string;
 }
 
 export const GameView: React.FC<GameViewProps> = ({
   networkManager,
   onLeaveRoom,
+  playerName,
 }) => {
-  const roomRef = useRef<Room<GameRoomState> | null>(null);
-  const [room, setRoom] = useState<Room<GameRoomState> | null>(null);
+  const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
   const [showObjectCreator, setShowObjectCreator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPlayerRoster, setShowPlayerRoster] = useState(false);
@@ -164,30 +168,6 @@ export const GameView: React.FC<GameViewProps> = ({
     faction: 'player' | 'dm';
     ownerId?: string;
   } | null>(null);
-  const [, setForceUpdate] = useState(0);
-
-  // 获取当前房间
-  useEffect(() => {
-    const currentRoom = networkManager.getCurrentRoom();
-    if (currentRoom) {
-      roomRef.current = currentRoom;
-      setRoom(currentRoom);
-
-      // 订阅状态变更 - Colyseus 会自动触发
-      currentRoom.onStateChange(() => {
-        setForceUpdate(v => v + 1);
-      });
-
-      // 房间离开处理
-      currentRoom.onLeave(() => {
-        onLeaveRoom();
-      });
-
-      return () => {
-        // 清理
-      };
-    }
-  }, [networkManager, onLeaveRoom]);
 
   // 玩家列表 - 直接使用 room.state.players，Colyseus 会处理响应式
   const players = useMemo(() => {
@@ -619,11 +599,34 @@ export const GameView: React.FC<GameViewProps> = ({
           groups={mapActionGroups}
         />
 
+        {/* 右侧功能面板（带 Tab） */}
+        <div style={{ height: '400px', marginBottom: '12px' }}>
+          <RightPanelTabs
+            room={room}
+            playerName={playerName || 'Player'}
+            onShowPlayerRoster={() => setShowPlayerRoster(true)}
+            onShowSettings={() => setShowSettings(true)}
+            playerCount={players.length}
+            unreadChatCount={0}
+          />
+        </div>
+
         {selectedShip && (
           <>
             <ShipDetailPanel ship={selectedShip} currentPhase={room.state.currentPhase} />
             <FluxSystemDisplay ship={selectedShip} currentPhase={room.state.currentPhase} />
             <ArmorQuadrantDisplay ship={selectedShip} />
+            
+            {/* 三阶段移动控制器 */}
+            <ThreePhaseMovementController
+              ship={selectedShip}
+              networkManager={networkManager}
+              onClose={() => {}}
+              onOpenAttack={() => {
+                notify.info('请选择武器和目标进行攻击');
+                // 这里可以打开武器选择面板
+              }}
+            />
           </>
         )}
 

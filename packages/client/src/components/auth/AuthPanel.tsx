@@ -1,11 +1,10 @@
 /**
- * 认证面板组件 - 简化版（保留原设计风格）
+ * 认证面板组件 - 简化版
  *
- * 只需输入用户名即可进入大厅，保留原有视觉风格
+ * 只需输入用户名即可进入大厅
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { User } from '@/types/auth';
 
 type AuthMode = 'login' | 'register';
 
@@ -70,7 +69,7 @@ const styles = {
   },
   title: {
     fontSize: '32px',
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: '#ffffff',
     textAlign: 'center' as const,
     marginBottom: '8px',
@@ -81,7 +80,7 @@ const styles = {
     color: '#6cb4cc',
     textAlign: 'center' as const,
     letterSpacing: '4px',
-    fontWeight: '500',
+    fontWeight: '500' as const,
   },
   statusBlock: {
     padding: '20px',
@@ -155,7 +154,7 @@ const styles = {
     background: 'rgba(74, 158, 255, 0.15)',
     color: '#ffffff',
     fontSize: '16px',
-    fontWeight: '700',
+    fontWeight: '700' as const,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -202,12 +201,10 @@ const styles = {
 };
 
 interface AuthPanelProps {
-  serverUrl: string;
-  onAuthenticated: (user: User, token: string) => void;
+  onAuthenticated: (username: string) => void;
 }
 
 export const AuthPanel: React.FC<AuthPanelProps> = ({
-  serverUrl,
   onAuthenticated,
 }) => {
   const [username, setUsername] = useState('');
@@ -215,7 +212,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [buttonHovered, setButtonHovered] = useState(false);
-  const [serverStatus, setServerStatus] = useState({ online: true, port: '2567', secure: false });
+  const [serverStatus] = useState({ online: true, port: '2567', secure: false });
 
   // 恢复上次用户名
   useEffect(() => {
@@ -234,16 +231,9 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({
     setError(null);
 
     try {
-      // 简化：直接返回用户，不需要密码
-      const user: User = { username: trimmed };
-      const token = 'simple-token-' + Date.now();
-      
-      // 保存用户名
+      // 简化：直接保存用户名，无需 token
       localStorage.setItem('stfcs_username', trimmed);
-      
-      setTimeout(() => {
-        onAuthenticated(user, token);
-      }, 300);
+      onAuthenticated(trimmed);
     } catch (e) {
       console.error('[AuthPanel] Error:', e);
       setError(e instanceof Error ? e.message : '连接失败');
@@ -345,7 +335,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({
 
           {isLoading && (
             <div style={styles.progress}>
-              正在验证身份...
+              正在连接...
             </div>
           )}
 

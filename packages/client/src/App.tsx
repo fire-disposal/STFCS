@@ -1,7 +1,7 @@
 /**
  * STFCS 主应用
  *
- * 简化版 - 去除 OAuth 认证
+ * 优化版 - 直接使用用户名认证，合理的 localStorage 使用
  */
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -10,7 +10,6 @@ import { DEFAULT_WS_URL } from "@/config";
 import { AuthPanel } from "@/components/auth/AuthPanel";
 import { LobbyPanel } from "@/components/lobby/LobbyPanel";
 import { GameView } from "@/features/game/GameView";
-import type { User } from "@/types/auth";
 import { notify } from "@/components/ui/Notification";
 
 type AppState = 'auth' | 'lobby' | 'game';
@@ -19,6 +18,7 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('auth');
   const [networkManager, setNetworkManager] = useState<NetworkManager | null>(null);
   const networkManagerRef = useRef<NetworkManager | null>(null);
+  const roomsUnsubscribeRef = useRef<(() => void) | null>(null);
   const [userName, setUserName] = useState<string>('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,16 +29,15 @@ const App: React.FC = () => {
     setNetworkManager(manager);
     networkManagerRef.current = manager;
 
-    // 尝试恢复用户名
-    const restored = manager.restoreUser();
-    if (restored && manager.userName) {
-      setUserName(manager.userName);
+    // 恢复上次用户名（仅从 localStorage，不自动登录）
+    const restoredUser = localStorage.getItem('stfcs_username');
+
+    if (restoredUser) {
+      manager.setUser(restoredUser);
+      setUserName(restoredUser);
       setAppState('lobby');
-
-      manager.subscribeRooms(setRooms);
-      manager.startRoomsPolling();
-
-      console.log('[App] Restored user:', manager.userName);
+      console.log('[App] Restored user:', restoredUser);
+      notify.success(`欢迎回来，${restoredUser}！`);
     }
 
     return () => {
@@ -46,32 +45,47 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 认证成功处理（简化版）
-  const handleAuthenticated = useCallback((user: User) => {
-    setUserName(user.username);
-    
+  useEffect(() => {
+    if (!networkManager || appState !== 'lobby' || !userName) {
+      return;
+    }
+
+    roomsUnsubscribeRef.current?.();
+    roomsUnsubscribeRef.current = networkManager.subscribeRooms(setRooms);
+
+    return () => {
+      roomsUnsubscribeRef.current?.();
+      roomsUnsubscribeRef.current = null;
+    };
+  }, [appState, networkManager, userName]);
+
+  // 认证成功处理
+  const handleAuthenticated = useCallback((username: string) => {
+    setUserName(username);
+
     // 设置到 NetworkManager
     if (networkManagerRef.current) {
-      networkManagerRef.current.setUser(user.username);
+      networkManagerRef.current.setUser(username);
     }
 
     setAppState('lobby');
-    notify.success(`欢迎，${user.username}！`);
-
-    // 开始房间列表轮询
-    if (networkManagerRef.current) {
-      networkManagerRef.current.subscribeRooms(setRooms);
-      networkManagerRef.current.startRoomsPolling();
-    }
+    notify.success(`欢迎，${username}！`);
   }, []);
 
   // 登出处理
   const handleLogout = useCallback(async () => {
     setIsLoading(true);
+    roomsUnsubscribeRef.current?.();
+    roomsUnsubscribeRef.current = null;
+
     if (networkManagerRef.current) {
       networkManagerRef.current.logout();
     }
+    
+    // 清除用户名，但保留 shortId（可复用）
+    localStorage.removeItem('stfcs_username');
     setUserName('');
+    setRooms([]);
     setAppState('auth');
     setIsLoading(false);
     notify.info('已退出');
@@ -103,7 +117,7 @@ const App: React.FC = () => {
 
     try {
       await networkManagerRef.current.joinRoom(roomId);
-      notify.success('正在加入房间...');
+      notify.success('加入房间成功');
       setAppState('game');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : '加入房间失败';
@@ -113,26 +127,24 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // 离开房间返回大厅
-  const handleLeaveRoom = useCallback(async () => {
+  // 返回大厅
+  const handleBackToLobby = useCallback(async () => {
     if (networkManagerRef.current) {
       await networkManagerRef.current.leaveRoom();
     }
     setAppState('lobby');
+    notify.info('已返回大厅');
   }, []);
 
   // 渲染
   if (!networkManager) {
-    return <div style={{ padding: 40, color: '#cfe8ff' }}>初始化中...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#fff' }}>初始化中...</div>;
   }
 
   return (
-    <>
+    <div style={{ width: '100%', height: '100vh', overflow: 'hidden' }}>
       {appState === 'auth' && (
-        <AuthPanel
-          serverUrl={DEFAULT_WS_URL}
-          onAuthenticated={handleAuthenticated}
-        />
+        <AuthPanel onAuthenticated={handleAuthenticated} />
       )}
 
       {appState === 'lobby' && (
@@ -144,32 +156,20 @@ const App: React.FC = () => {
           isLoading={isLoading}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
-          onDeleteRoom={async (roomId: string) => {
-            if (!networkManagerRef.current) return;
-
-            setIsLoading(true);
-            try {
-              await networkManagerRef.current.deleteRoom(roomId);
-              notify.success('房间已删除');
-            } catch (e) {
-              const errorMsg = e instanceof Error ? e.message : '删除房间失败';
-              notify.error(errorMsg);
-            } finally {
-              setIsLoading(false);
-            }
-          }}
-          onRefresh={() => networkManagerRef.current?.getRooms() || Promise.resolve()}
+          onDeleteRoom={(roomId) => networkManagerRef.current?.deleteRoom(roomId)}
+          onRefresh={() => networkManagerRef.current?.getRooms()}
           onLogout={handleLogout}
         />
       )}
 
-      {appState === 'game' && (
+      {appState === 'game' && networkManager.getCurrentRoom() && (
         <GameView
           networkManager={networkManager}
-          onLeaveRoom={handleLeaveRoom}
+          onLeaveRoom={handleBackToLobby}
+          playerName={userName}
         />
       )}
-    </>
+    </div>
   );
 };
 

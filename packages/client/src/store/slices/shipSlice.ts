@@ -233,4 +233,6 @@ export const {
 	clearShips,
 } = shipSlice.actions;
 
+export const selectCurrentShip = (state: any) => state.ship.selectedShipId;
+
 export default shipSlice.reducer;

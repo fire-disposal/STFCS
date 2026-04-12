@@ -115,7 +115,6 @@ interface CreateRoomModalProps {
     name: string;
     maxPlayers: number;
     isPrivate: boolean;
-    password?: string;
   }) => void;
 }
 
@@ -126,7 +125,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   const [name, setName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [password, setPassword] = useState('');
 
   // 处理创建
   const handleCreate = () => {
@@ -134,7 +132,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       name: name.trim() || '新房间',
       maxPlayers,
       isPrivate,
-      password: isPrivate ? password : undefined,
     });
   };
 
@@ -202,15 +199,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 🔒 私密房间
               </label>
             </div>
-            {isPrivate && (
-              <input
-                type="password"
-                style={{ ...styles.input, marginTop: '8px' }}
-                placeholder="设置房间密码"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            )}
           </div>
 
           {/* 按钮 */}
@@ -224,7 +212,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             <button
               style={{ ...styles.button, ...styles.createButton }}
               onClick={handleCreate}
-              disabled={isPrivate && !password}
             >
               创建
             </button>

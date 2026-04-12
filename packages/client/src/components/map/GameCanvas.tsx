@@ -5,6 +5,8 @@ import type { ShipState } from "@vt/contracts";
 import { StarfieldGenerator } from "@/features/game/rendering/StarfieldBackground";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
+import { useAppSelector } from "@/store";
+import { drawMovementRange, drawTurnArc, drawMovementPath } from "@/features/movement/MovementVisuals";
 
 interface GameCanvasProps {
   ships: ShipState[];
@@ -37,6 +39,7 @@ type LayerRegistry = {
   labels: Container;
   effects: Container;
   weaponArcs: Container;
+  movementVisuals: Container;    // 移动可视化
 };
 
 const labelStyle = new TextStyle({
@@ -566,7 +569,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 从预设获取武器数据
       const weaponArc = 90; // 默认射界
       const weaponRange = weaponSlot.range || 300;
-      
+
       const arcGraphics = new Graphics();
       const arcRad = (weaponArc * Math.PI) / 180;
       const baseAngle = ((selectedShip.transform.heading - 90) * Math.PI) / 180;
@@ -595,7 +598,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     });
 
     // 绘制机动范围（如果启用）
-    if (showMovementRange) {
+    if (showMovementRange && selectedShip) {
       const moveGraphics = new Graphics();
       const maxSpeed = selectedShip.maxSpeed || 100;
       const maxMoveDistance = maxSpeed * 4; // 两阶段各最大 2X
@@ -607,6 +610,55 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       layers.weaponArcs.addChild(moveGraphics);
     }
   }, [layers, ships, selectedShipId, showWeaponArcs, showMovementRange]);
+
+  // 绘制移动可视化（范围圈、转向弧、路径）
+  const movementState = useAppSelector((state: any) => state.movement);
+  
+  useEffect(() => {
+    if (!layers || !selectedShipId) {
+      layers?.movementVisuals?.removeChildren();
+      return;
+    }
+
+    const movementGraphics = new Graphics();
+    layers.movementVisuals.removeChildren();
+    layers.movementVisuals.addChild(movementGraphics);
+
+    const selectedShip = ships.find(s => s.id === selectedShipId);
+    if (!selectedShip) return;
+
+    const maxSpeed = selectedShip.maxSpeed || 100;
+    const maxTurnRate = selectedShip.maxTurnRate || 45;
+
+    // 绘制机动范围圈
+    drawMovementRange(movementGraphics, selectedShip, maxSpeed, {
+      showRange: true,
+      showTurnArc: true,
+      showPath: true,
+      rangeOpacity: 0.15,
+    });
+
+    // 绘制转向弧（如果有移动计划）
+    if (movementState.currentPlan) {
+      drawTurnArc(
+        movementGraphics,
+        selectedShip,
+        movementState.currentPlan.turnAngle,
+        maxTurnRate,
+        { showRange: true, showTurnArc: true, showPath: true, rangeOpacity: 0.15 }
+      );
+
+      // 绘制移动路径
+      drawMovementPath(
+        movementGraphics,
+        selectedShip,
+        movementState.currentPlan,
+        maxSpeed,
+        maxTurnRate,
+        { showRange: true, showTurnArc: true, showPath: true, rangeOpacity: 0.15 }
+      );
+    }
+  }, [layers, ships, selectedShipId, movementState]);
 
   return (
     <div
@@ -668,6 +720,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           const weaponArcsLayer = new Container();
           weaponArcsLayer.zIndex = 8;
 
+          // 移动可视化图层
+          const movementVisualsLayer = new Container();
+          movementVisualsLayer.zIndex = 9;
+
           // 添加到世界容器
           world.addChild(
             background,
@@ -679,22 +735,24 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             shipsLayer,
             labels,
             effects,
-            weaponArcsLayer
+            weaponArcsLayer,
+            movementVisualsLayer
           );
           app.stage.addChild(world);
 
-          setLayers({ 
-            world, 
-            background, 
+          setLayers({
+            world,
+            background,
             starfieldNebula,
-            starfieldDeep, 
-            starfieldMid, 
+            starfieldDeep,
+            starfieldMid,
             starfieldNear,
-            grid, 
-            ships: shipsLayer, 
-            labels, 
-            effects, 
-            weaponArcs: weaponArcsLayer 
+            grid,
+            ships: shipsLayer,
+            labels,
+            effects,
+            weaponArcs: weaponArcsLayer,
+            movementVisuals: movementVisualsLayer,
           });
 
           app.stage.eventMode = 'static';
