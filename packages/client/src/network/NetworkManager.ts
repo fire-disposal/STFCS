@@ -473,30 +473,46 @@ export class NetworkManager {
 
   private async leaveCurrentRoomIfNeeded(): Promise<void> {
     if (this.roomLeaveOperation) {
+      console.log('[NetworkManager] leaveCurrentRoomIfNeeded: already in progress');
       await this.roomLeaveOperation;
       return;
     }
 
     if (!this.currentRoom) {
+      console.log('[NetworkManager] leaveCurrentRoomIfNeeded: no current room');
       return;
     }
 
     const roomToLeave = this.currentRoom;
+    console.log('[NetworkManager] leaveCurrentRoomIfNeeded: leaving room', roomToLeave.roomId);
 
     this.roomLeaveOperation = (async () => {
       try {
-        await roomToLeave.leave();
+        console.log('[NetworkManager] Calling room.leave()...');
+        
+        // 添加超时保护，防止永远等待
+        const leavePromise = roomToLeave.leave();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('离开房间超时')), 5000);
+        });
+        
+        await Promise.race([leavePromise, timeoutPromise]);
+        console.log('[NetworkManager] room.leave() completed');
       } catch (error) {
         console.warn('[NetworkManager] Failed to leave previous room:', error);
-      } finally {
+        // 即使失败也清理状态
         if (this.currentRoom === roomToLeave) {
+          console.log('[NetworkManager] Clearing current room after error');
           this.currentRoom = null;
         }
+      } finally {
         this.roomLeaveOperation = null;
+        console.log('[NetworkManager] Clearing roomLeaveOperation');
       }
     })();
 
     await this.roomLeaveOperation;
+    console.log('[NetworkManager] leaveCurrentRoomIfNeeded completed');
   }
 
   private bindRoomLifecycle(room: Room<GameRoomState>): void {
