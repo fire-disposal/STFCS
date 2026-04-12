@@ -17,7 +17,7 @@ const styles = {
     width: 'min(1180px, calc(100vw - 32px))',
     maxHeight: 'calc(100vh - 32px)',
     backgroundColor: 'rgba(6, 16, 26, 0.98)',
-    borderRadius: '14px',
+    borderRadius: '0',
     border: '1px solid rgba(74, 158, 255, 0.28)',
     boxShadow: '0 18px 60px rgba(0, 0, 0, 0.58)',
     display: 'flex',
@@ -58,7 +58,7 @@ const styles = {
   },
   headerBadge: {
     padding: '6px 10px',
-    borderRadius: '999px',
+    borderRadius: '0',
     border: '1px solid rgba(43, 66, 97, 0.9)',
     background: 'rgba(26, 45, 66, 0.92)',
     color: '#cfe8ff',
@@ -100,7 +100,7 @@ const styles = {
   section: {
     background: 'rgba(12, 26, 40, 0.88)',
     border: '1px solid rgba(43, 66, 97, 0.85)',
-    borderRadius: '12px',
+    borderRadius: '0',
     padding: '14px',
     minWidth: 0,
   },
@@ -127,7 +127,7 @@ const styles = {
   statCard: {
     background: 'rgba(26, 45, 66, 0.92)',
     border: '1px solid rgba(43, 66, 97, 0.9)',
-    borderRadius: '10px',
+    borderRadius: '0',
     padding: '12px',
     minWidth: 0,
   },
@@ -160,7 +160,7 @@ const styles = {
     padding: '20px 14px',
     fontSize: '12px',
     border: '1px dashed rgba(43, 66, 97, 0.9)',
-    borderRadius: '10px',
+    borderRadius: '0',
     background: 'rgba(26, 45, 66, 0.5)',
   },
   playerItem: {
@@ -170,7 +170,7 @@ const styles = {
     alignItems: 'center',
     padding: '12px',
     backgroundColor: '#1a2d42',
-    borderRadius: '10px',
+    borderRadius: '0',
     border: '1px solid transparent',
   },
   playerItemCurrent: {
@@ -183,7 +183,7 @@ const styles = {
   playerAvatar: {
     width: '40px',
     height: '40px',
-    borderRadius: '50%',
+    borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -220,7 +220,7 @@ const styles = {
   },
   metaChip: {
     padding: '4px 8px',
-    borderRadius: '999px',
+    borderRadius: '0',
     fontSize: '10px',
     fontWeight: 700,
     border: '1px solid transparent',
@@ -240,7 +240,7 @@ const styles = {
   },
   rowButton: {
     padding: '6px 10px',
-    borderRadius: '8px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     background: '#132235',
     color: '#cfe8ff',
@@ -260,7 +260,7 @@ const styles = {
   actionCard: {
     background: 'rgba(26, 45, 66, 0.9)',
     border: '1px solid rgba(43, 66, 97, 0.9)',
-    borderRadius: '10px',
+    borderRadius: '0',
     padding: '12px',
   },
   actionRow: {
@@ -273,7 +273,7 @@ const styles = {
     flex: 1,
     minWidth: '120px',
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     background: '#132235',
     color: '#cfe8ff',
@@ -305,7 +305,7 @@ const styles = {
   },
   readyButton: {
     padding: '10px 16px',
-    borderRadius: '8px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -331,7 +331,7 @@ const styles = {
   },
   roomActionButton: {
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     background: '#132235',
     color: '#cfe8ff',
@@ -342,6 +342,17 @@ const styles = {
   roomActionButtonDisabled: {
     opacity: 0.45,
     cursor: 'not-allowed',
+  },
+  leaveRoomButton: {
+    padding: '10px 12px',
+    borderRadius: '0',
+    border: '1px solid rgba(248, 113, 113, 0.5)',
+    background: 'rgba(248, 113, 113, 0.12)',
+    color: '#ff9cb2',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    gridColumn: '1 / -1' as const,
   },
 };
 
@@ -374,6 +385,7 @@ interface PlayerRosterModalProps {
   onInvitePlayer?: () => void;
   onCloseRoom?: () => void;
   onSaveRoom?: () => void;
+  onLeaveRoom?: () => void;
 }
 
 export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
@@ -389,6 +401,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
   onInvitePlayer,
   onCloseRoom,
   onSaveRoom,
+  onLeaveRoom,
 }) => {
   const playerShipCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -671,6 +684,17 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
                   title="后续可扩展房主专用权限管理"
                 >
                   权限管理
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.leaveRoomButton,
+                    ...(!onLeaveRoom ? styles.roomActionButtonDisabled : {}),
+                  }}
+                  onClick={() => onLeaveRoom?.()}
+                  disabled={!onLeaveRoom}
+                >
+                  离开房间
                 </button>
               </div>
               <div style={{ fontSize: '11px', color: '#8ba4c7', lineHeight: 1.7, marginTop: '10px' }}>

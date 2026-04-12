@@ -349,13 +349,6 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({
             </div>
           )}
 
-          {/* 底部状态 */}
-          <div style={styles.footer}>
-            <div>服务器：{serverUrl}</div>
-            <div style={{ marginTop: '6px' }}>
-              [{isLoading ? '认证中' : '就绪'}]
-            </div>
-          </div>
         </div>
       </div>
     </div>

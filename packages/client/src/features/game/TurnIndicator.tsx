@@ -20,6 +20,9 @@ const styles = {
     border: '1px solid rgba(74, 158, 255, 0.22)',
     display: 'flex',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
+    minWidth: 0,
+    maxWidth: '100%',
     gap: '8px',
     backdropFilter: 'blur(10px)',
   },
@@ -27,6 +30,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    minWidth: 0,
   },
   phaseDot: {
     width: '12px',
@@ -95,6 +99,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '4px',
+    minWidth: 0,
+    flex: '1 1 auto',
   },
   compactProgress: {
     width: '100%',
