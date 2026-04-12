@@ -156,12 +156,14 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	) {
 		// 简化认证：直接使用用户名，无需 token
 		const playerName = options?.playerName?.trim();
-		
+
 		if (!playerName || playerName.length === 0) {
+			console.warn(`[BattleRoom] Auth failed: empty player name from ${client.sessionId}`);
 			throw new Error("请输入玩家名称");
 		}
 
 		if (playerName.length > 32) {
+			console.warn(`[BattleRoom] Auth failed: name too long (${playerName.length}) from ${client.sessionId}`);
 			throw new Error("玩家名称不能超过 32 个字符");
 		}
 
@@ -274,7 +276,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		const existingPlayerByShortId = this.findPlayerByShortId(shortId);
 		if (existingPlayerByShortId && existingPlayerByShortId.connected && existingPlayerByShortId.sessionId !== client.sessionId) {
 			// 旧玩家已断开，清理旧数据，允许新玩家加入
-			console.log(`[BattleRoom] Cleaning up disconnected player with same shortId`);
+			console.log(`[BattleRoom] Cleaning up disconnected player with same shortId: ${existingPlayerByShortId.sessionId}`);
 			this.state.players.delete(existingPlayerByShortId.sessionId);
 			this.playerIdentity.delete(existingPlayerByShortId.sessionId);
 			this.pingEwma.delete(existingPlayerByShortId.sessionId);
@@ -284,6 +286,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 检查是否有同名的玩家已连接（用户名独占性）
 		const existingPlayerByName = this.findPlayerByName(playerName);
 		if (existingPlayerByName && existingPlayerByName.connected && existingPlayerByName.sessionId !== client.sessionId) {
+			console.warn(`[BattleRoom] Username "${playerName}" already in use by ${existingPlayerByName.sessionId}`);
 			throw new Error(`用户名 "${playerName}" 已被使用，请选择其他用户名`);
 		}
 

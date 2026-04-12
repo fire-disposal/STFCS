@@ -103,6 +103,7 @@ const App: React.FC = () => {
       setAppState('game');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : '创建房间失败';
+      console.error('[App] Create room error:', e);
       notify.error(errorMsg);
     } finally {
       setIsLoading(false);
@@ -121,6 +122,7 @@ const App: React.FC = () => {
       setAppState('game');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : '加入房间失败';
+      console.error('[App] Join room error:', e);
       notify.error(errorMsg);
     } finally {
       setIsLoading(false);

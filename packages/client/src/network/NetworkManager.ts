@@ -332,24 +332,30 @@ export class NetworkManager {
 
     console.log('[NetworkManager] Creating room...', {
       playerName,
+      shortId,
       serverUrl: this.serverUrl,
+      options,
     });
 
     this.activeRoomOperation = (async () => {
       await this.leaveCurrentRoomIfNeeded();
 
+      // 确保有默认值
+      const createOptions = {
+        playerName,
+        shortId,
+        roomName: options.roomName?.trim() || undefined,
+        maxPlayers: options.maxPlayers || 8,
+      };
+
+      console.log('[NetworkManager] Calling client.create with:', createOptions);
+
       const room = await this.withRoomOperationTimeout(
-        this.client.create<GameRoomState>(
-          'battle',
-          {
-            playerName,
-            shortId,
-            roomName: options.roomName?.trim(),
-            maxPlayers: options.maxPlayers,
-          },
-        ),
+        this.client.create<GameRoomState>('battle', createOptions),
         '创建房间',
       );
+
+      console.log('[NetworkManager] Room created:', room?.roomId);
 
       if (!room?.roomId) {
         console.error('[NetworkManager] Server returned invalid room object:', room);
@@ -357,11 +363,19 @@ export class NetworkManager {
       }
 
       this.bindRoomLifecycle(room);
-      console.log('[NetworkManager] Room created:', room.roomId);
       return room;
     })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to create room:', error);
-      throw new Error(`创建房间失败：${this.toErrorMessage(error, '未知错误')}`);
+      
+      // 提取详细的错误信息
+      let errorMessage = '创建房间失败';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      throw new Error(errorMessage);
     }).finally(() => {
       this.activeRoomOperation = null;
     });
@@ -377,34 +391,42 @@ export class NetworkManager {
       return this.activeRoomOperation;
     }
 
-    console.log('[NetworkManager] Joining room:', roomId);
+    const playerName = this.getValidatedPlayerName();
+    const shortId = this.getValidatedShortId();
+
+    console.log('[NetworkManager] Joining room:', roomId, { playerName, shortId });
 
     this.activeRoomOperation = (async () => {
-      const playerName = this.getValidatedPlayerName();
-      const shortId = this.getValidatedShortId();
       await this.leaveCurrentRoomIfNeeded();
 
       const room = await this.withRoomOperationTimeout(
         this.client.joinById<GameRoomState>(
           roomId,
-          {
-            playerName,
-            shortId,
-          },
+          { playerName, shortId },
         ),
         '加入房间',
       );
+
+      console.log('[NetworkManager] Joined room:', room.roomId);
 
       if (!room?.roomId) {
         throw new Error('服务器返回无效的房间对象');
       }
 
       this.bindRoomLifecycle(room);
-      console.log('[NetworkManager] Joined room:', room.roomId);
       return room;
     })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to join room:', error);
-      throw new Error(`加入房间失败：${this.toErrorMessage(error, '未知错误')}`);
+      
+      // 提取详细的错误信息
+      let errorMessage = '加入房间失败';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      throw new Error(errorMessage);
     }).finally(() => {
       this.activeRoomOperation = null;
     });
@@ -538,25 +560,6 @@ export class NetworkManager {
 
   private toHttpBaseUrl(wsUrl: string): string {
     return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
-  }
-
-  private toErrorMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error) {
-      return error.message || fallback;
-    }
-
-    if (typeof error === 'string') {
-      return error;
-    }
-
-    if (error && typeof error === 'object' && 'message' in error) {
-      const message = (error as Record<string, unknown>).message;
-      if (typeof message === 'string' && message.length > 0) {
-        return message;
-      }
-    }
-
-    return fallback;
   }
 
   private async withRoomOperationTimeout<T>(operation: Promise<T>, actionName: string): Promise<T> {
