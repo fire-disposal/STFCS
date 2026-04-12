@@ -449,20 +449,23 @@ export const GameView: React.FC<GameViewProps> = ({
 
         <div style={layoutStyles.topBarRight}>
           <button
-            style={layoutStyles.button}
+            style={{ ...layoutStyles.button, cursor: 'pointer' }}
             onClick={() => setShowPlayerRoster(true)}
           >
             👥 玩家
           </button>
           <button
-            style={layoutStyles.button}
+            style={{ ...layoutStyles.button, cursor: 'pointer' }}
             onClick={() => setShowSettings(true)}
           >
             ⚙️ 设置
           </button>
           <button
-            style={{ ...layoutStyles.button, ...layoutStyles.buttonDanger }}
-            onClick={onLeaveRoom}
+            style={{ ...layoutStyles.button, ...layoutStyles.buttonDanger, cursor: 'pointer' }}
+            onClick={() => {
+              console.log('[GameView] Leave button clicked');
+              onLeaveRoom();
+            }}
           >
             离开
           </button>
