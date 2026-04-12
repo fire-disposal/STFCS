@@ -1,12 +1,16 @@
 /**
  * 游戏视图组件
- * 
- * 使用原生 Colyseus SDK 管理游戏状态
+ *
+ * 战术终端风格布局：
+ * - 顶部固定状态栏
+ * - 中央地图区域
+ * - 右侧功能面板（可折叠）
+ * - 底部操作栏
  */
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import type { ShipState, PlayerState, ClientCommand } from "@vt/contracts";
-import { ClientCommand as CC } from "@vt/contracts";
+import type { ShipState, PlayerState } from "@vt/contracts";
+import { ClientCommand } from "@vt/contracts";
 import { NetworkManager } from "@/network/NetworkManager";
 import { GameCanvas } from "@/components/map/GameCanvas";
 import { useUIStore } from "@/store/uiStore";
@@ -23,123 +27,156 @@ import { RightPanelTabs } from "@/features/ui/RightPanelTabs";
 import { useCurrentGameRoom } from "@/hooks";
 import { notify } from "@/components/ui/Notification";
 
+// ==================== 布局样式 ====================
+
 const layoutStyles = {
+  // 主容器 - 占满全屏
   gameView: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 2.15fr) minmax(320px, 380px)',
-    gridTemplateRows: 'auto 1fr',
-    gap: '18px',
-    padding: '20px',
-    minHeight: '100vh' as const,
-    background: 'linear-gradient(135deg, #00050a 0%, #001020 50%, #00050a 100%)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    width: '100%',
+    height: '100vh',
+    backgroundColor: '#00050a',
     color: '#cfe8ff',
     fontFamily: 'Arial, sans-serif',
-    alignItems: 'start',
+    overflow: 'hidden',
   },
+
+  // 顶部状态栏
   topBar: {
-    gridColumn: '1 / -1',
-    position: 'relative' as const,
-    zIndex: 3,
-    display: 'grid',
-    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+    display: 'flex',
     alignItems: 'center',
-    columnGap: '16px',
-    padding: '14px 18px',
-    background: 'rgba(13, 40, 71, 0.82)',
-    borderRadius: '14px',
-    border: '2px solid rgba(74, 158, 255, 0.35)',
-    boxShadow: '0 0 30px rgba(74, 158, 255, 0.18)',
+    justifyContent: 'space-between',
+    height: '48px',
+    padding: '0 16px',
+    backgroundColor: 'rgba(13, 40, 71, 0.95)',
+    borderBottom: '2px solid rgba(74, 158, 255, 0.3)',
+    flexShrink: 0,
+    zIndex: 1000,
   },
+
+  topBarLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+
   topBarTitle: {
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 'bold',
     letterSpacing: '2px',
-    color: '#ffffff',
-    whiteSpace: 'nowrap' as const,
+    color: '#4a9eff',
+    textShadow: '0 0 8px rgba(74, 158, 255, 0.5)',
   },
+
   topBarCenter: {
+    flex: 1,
     display: 'flex',
     justifyContent: 'center',
-    minWidth: 0,
   },
-  topBarInfo: {
+
+  topBarRight: {
     display: 'flex',
     alignItems: 'center',
-    flexWrap: 'wrap' as const,
-    gap: '12px',
-    fontSize: '12px',
-    color: '#8ba4c7',
-    justifySelf: 'end' as const,
-    maxWidth: '100%',
+    gap: '8px',
   },
+
+  // 主内容区
   mainContent: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0',
-    minWidth: 0,
-    minHeight: 0,
+    flex: 1,
+    overflow: 'hidden',
   },
-  mapSection: {
+
+  // 地图区域
+  mapContainer: {
+    flex: 1,
     position: 'relative' as const,
+    backgroundColor: 'rgba(6, 16, 26, 0.8)',
+    overflow: 'hidden',
+  },
+
+  mapSection: {
+    width: '100%',
+    height: '100%',
+    position: 'relative' as const,
+  },
+
+  // 右侧面板容器
+  sidePanelContainer: {
+    width: '400px',
     display: 'flex',
     flexDirection: 'column' as const,
-    minHeight: 'calc(100vh - 118px)',
-    background: 'rgba(13, 40, 71, 0.72)',
-    borderRadius: '14px',
-    border: '2px solid rgba(74, 158, 255, 0.3)',
-    padding: '12px',
-    overflow: 'hidden',
-    minWidth: 0,
-    boxShadow: '0 0 28px rgba(74, 158, 255, 0.14)',
+    backgroundColor: 'rgba(13, 40, 71, 0.9)',
+    borderLeft: '2px solid rgba(74, 158, 255, 0.2)',
+    flexShrink: 0,
   },
-  sidePanel: {
+
+  // 右侧面板内容区（滚动）
+  sidePanelContent: {
+    flex: 1,
+    overflowY: 'auto' as const,
+    padding: '12px',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '12px',
-    maxHeight: 'calc(100vh - 24px)',
-    overflow: 'auto' as const,
-    position: 'sticky' as const,
-    top: '20px',
-    zIndex: 1,
-    padding: '12px',
-    paddingRight: '12px',
-    borderRadius: '14px',
-    border: '2px solid rgba(74, 158, 255, 0.3)',
-    background: 'rgba(13, 40, 71, 0.72)',
-    boxShadow: '0 0 28px rgba(74, 158, 255, 0.14)',
-    minWidth: 0,
   },
-  leaveButton: {
-    padding: '10px 16px',
-    borderRadius: '8px',
-    border: '2px solid rgba(248, 113, 113, 0.45)',
-    background: 'rgba(248, 113, 113, 0.12)',
-    color: '#ff6f8f',
-    fontSize: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
+
+  // 底部操作栏
+  bottomBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '72px',
+    padding: '0 16px',
+    backgroundColor: 'rgba(13, 40, 71, 0.95)',
+    borderTop: '2px solid rgba(74, 158, 255, 0.3)',
+    flexShrink: 0,
   },
-  settingsButton: {
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '2px solid rgba(74, 158, 255, 0.35)',
-    background: 'rgba(74, 158, 255, 0.14)',
+
+  // 按钮样式
+  button: {
+    padding: '8px 16px',
+    backgroundColor: 'rgba(26, 45, 66, 0.8)',
+    border: '1px solid rgba(74, 158, 255, 0.3)',
     color: '#cfe8ff',
-    fontSize: '11px',
-    fontWeight: 700,
+    fontSize: '12px',
+    fontWeight: 'bold',
     cursor: 'pointer',
+    transition: 'all 0.2s',
+    letterSpacing: '1px',
   },
-  rosterButton: {
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '2px solid rgba(67, 193, 255, 0.32)',
-    background: 'rgba(26, 58, 90, 0.78)',
-    color: '#d8ecff',
+
+  buttonPrimary: {
+    backgroundColor: 'rgba(26, 74, 122, 0.9)',
+    borderColor: 'rgba(74, 158, 255, 0.5)',
+    color: '#4a9eff',
+  },
+
+  buttonDanger: {
+    backgroundColor: 'rgba(90, 42, 58, 0.9)',
+    borderColor: 'rgba(255, 111, 143, 0.5)',
+    color: '#ff6f8f',
+  },
+
+  // 面板样式
+  panel: {
+    backgroundColor: 'rgba(6, 16, 26, 0.95)',
+    border: '1px solid rgba(74, 158, 255, 0.2)',
+    padding: '12px',
+  },
+
+  panelTitle: {
     fontSize: '11px',
-    fontWeight: 700,
-    cursor: 'pointer',
+    fontWeight: 'bold',
+    color: '#7aa2d4',
+    marginBottom: '8px',
+    letterSpacing: '1px',
+    textTransform: 'uppercase' as const,
   },
 };
+
+// ==================== 组件 ====================
 
 interface GameViewProps {
   networkManager: NetworkManager;
@@ -169,7 +206,7 @@ export const GameView: React.FC<GameViewProps> = ({
     ownerId?: string;
   } | null>(null);
 
-  // 玩家列表 - 直接使用 room.state.players，Colyseus 会处理响应式
+  // 玩家列表
   const players = useMemo(() => {
     const rosterByIdentity = new Map<string, PlayerState>();
 
@@ -193,7 +230,12 @@ export const GameView: React.FC<GameViewProps> = ({
     });
 
     return Array.from(rosterByIdentity.values());
-  }, [room?.state.players]);
+  }, [room?.state.players, room?.sessionId]);
+
+  // 当前玩家
+  const currentPlayer = useMemo(() => {
+    return players.find(p => p.sessionId === room?.sessionId) || null;
+  }, [players, room?.sessionId]);
 
   // 舰船列表
   const ships = useMemo(() => {
@@ -202,67 +244,72 @@ export const GameView: React.FC<GameViewProps> = ({
     return result;
   }, [room?.state.ships]);
 
-  // 当前玩家
-  const currentPlayer = useMemo(() => {
-    return players.find((p) => p.sessionId === room?.sessionId);
-  }, [players, room?.sessionId]);
+  // 选中的舰船
+  const selectedShipId = useMemo(() => {
+    const selected = ships.find(s => {
+      const owner = players.find(p => p.sessionId === room?.sessionId);
+      return s.ownerId === owner?.sessionId;
+    });
+    return selected?.id || null;
+  }, [ships, players, room?.sessionId]);
 
-  // UI Store
+  const selectShip = useCallback((shipId: string | null) => {
+    console.log('[GameView] Select ship:', shipId);
+  }, []);
+
+  // UI 状态
   const {
     zoom,
+    setZoom,
     cameraPosition,
+    setCameraPosition,
     viewRotation,
+    setViewRotation,
+    resetViewRotation,
     showGrid,
     showBackground,
     showWeaponArcs,
     showMovementRange,
-    selectedShipId,
-    setCameraPosition,
-    setViewRotation,
-    resetViewRotation,
-    setZoom,
-    toggleGrid,
-    toggleBackground,
-    toggleWeaponArcs,
-    toggleMovementRange,
-    selectShip,
   } = useUIStore();
 
-  // 选中的舰船
-  const selectedShip = useMemo(() => {
-    return ships.find((s) => s.id === selectedShipId);
-  }, [ships, selectedShipId]);
+  // 地图控制
+  const handleMapPan = useCallback((deltaX: number, deltaY: number) => {
+    setCameraPosition(cameraPosition.x + deltaX, cameraPosition.y + deltaY);
+  }, [cameraPosition.x, cameraPosition.y, setCameraPosition]);
 
-  // 发送命令
-  const sendCommand = useCallback((command: ClientCommand, payload: Record<string, unknown>) => {
-    room?.send(command, payload);
+  const handleMapRotate = useCallback((delta: number) => {
+    setViewRotation(normalizeRotation(viewRotation + delta));
+  }, [viewRotation, setViewRotation]);
+
+  const handleMapClick = useCallback((x: number, y: number) => {
+    if (pendingPlacement) {
+      createObject({
+        type: pendingPlacement.type,
+        hullId: pendingPlacement.hullId,
+        x,
+        y,
+        heading: pendingPlacement.heading,
+        faction: pendingPlacement.faction,
+        ownerId: pendingPlacement.ownerId,
+      });
+      setPendingPlacement(null);
+    }
+  }, [pendingPlacement]);
+
+  // 命令发送
+  const sendCommand = useCallback(async (command: ClientCommand, payload: unknown) => {
+    if (!room) return;
+
+    try {
+      await room.send(command, payload);
+    } catch (error) {
+      console.error('[GameView] Send command error:', error);
+      notify.error('命令发送失败');
+    }
   }, [room]);
 
-  const toggleReady = useCallback((isReady: boolean) => {
-    sendCommand(CC.CMD_TOGGLE_READY, { isReady });
-  }, [sendCommand]);
-
-  const nextPhase = useCallback(() => {
-    sendCommand(CC.CMD_NEXT_PHASE, {});
-  }, [sendCommand]);
-
-  const createTestShip = useCallback((faction: 'player' | 'dm', x: number, y: number) => {
-    room?.send("CREATE_TEST_SHIP", { faction, x, y });
-  }, [room]);
-
-  const clearOverload = useCallback((shipId: string) => {
-    room?.send("DM_CLEAR_OVERLOAD", { shipId });
-  }, [room]);
-
-  const setArmor = useCallback((shipId: string, section: number, value: number) => {
-    room?.send("DM_SET_ARMOR", { shipId, section, value });
-  }, [room]);
-
-  const assignShip = useCallback((shipId: string, targetSessionId: string) => {
-    sendCommand(CC.CMD_ASSIGN_SHIP, { shipId, targetSessionId });
-  }, [sendCommand]);
-
-  const createObject = useCallback((params: {
+  // DM 操作
+  const createObject = useCallback((payload: {
     type: 'ship' | 'station' | 'asteroid';
     hullId?: string;
     x: number;
@@ -271,347 +318,196 @@ export const GameView: React.FC<GameViewProps> = ({
     faction: 'player' | 'dm';
     ownerId?: string;
   }) => {
-    room?.send("DM_CREATE_OBJECT", params);
-    setShowObjectCreator(false);
-    setPendingPlacement(null);
+    if (!room) return;
+    room.send('DM_CREATE_OBJECT', payload);
   }, [room]);
 
-  const closeRoom = useCallback(async () => {
-    const currentRoomId = room?.roomId;
-    if (!currentRoomId) {
-      return;
-    }
+  const createTestShip = useCallback(() => {
+    if (!room) return;
+    room.send('CREATE_TEST_SHIP', { faction: 'dm', x: 500, y: 500 });
+  }, [room]);
 
-    try {
-      await networkManager.deleteRoom(currentRoomId);
-      setShowPlayerRoster(false);
-      onLeaveRoom();
-      notify.success('房间已关闭');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '关闭房间失败';
-      notify.error(message);
-    }
-  }, [networkManager, onLeaveRoom, room?.roomId]);
+  const clearOverload = useCallback((shipId: string) => {
+    if (!room) return;
+    room.send('DM_CLEAR_OVERLOAD', { shipId });
+  }, [room]);
+
+  const setArmor = useCallback((shipId: string, section: number, value: number) => {
+    if (!room) return;
+    room.send('DM_SET_ARMOR', { shipId, section, value });
+  }, [room]);
+
+  const assignShip = useCallback((shipId: string, targetSessionId: string) => {
+    if (!room) return;
+    room.send(ClientCommand.CMD_ASSIGN_SHIP, { shipId, targetSessionId });
+  }, [room]);
+
+  const nextPhase = useCallback(() => {
+    if (!room) return;
+    room.send(ClientCommand.CMD_NEXT_PHASE, {});
+  }, [room]);
+
+  const toggleReady = useCallback(() => {
+    if (!room) return;
+    room.send(ClientCommand.CMD_TOGGLE_READY, { isReady: !currentPlayer?.isReady });
+  }, [room, currentPlayer?.isReady]);
+
+  const kickPlayer = useCallback((sessionId: string) => {
+    console.log('[GameView] Kick player:', sessionId);
+  }, []);
+
+  const invitePlayer = useCallback((sessionId: string) => {
+    console.log('[GameView] Invite player:', sessionId);
+  }, []);
+
+  const closeRoom = useCallback(() => {
+    console.log('[GameView] Close room');
+  }, []);
 
   const saveRoom = useCallback(() => {
-    notify.info('保存房间功能已预留，等待后端接口接入。');
+    console.log('[GameView] Save room');
   }, []);
 
-  const invitePlayer = useCallback(() => {
-    notify.info('邀请玩家功能已预留，等待邀请流程接入。');
-  }, []);
-
-  const kickPlayer = useCallback((playerSessionId: string) => {
-    notify.info(`踢出玩家功能已预留：${playerSessionId}`);
-  }, []);
-
-  const handleMapClick = useCallback((x: number, y: number) => {
-    if (pendingPlacement && currentPlayer?.role === 'dm') {
-      createObject({ ...pendingPlacement, x, y });
-    }
-  }, [pendingPlacement, currentPlayer, createObject]);
-
-  const applyScreenPanDelta = useCallback((deltaX: number, deltaY: number) => {
-    const theta = (viewRotation * Math.PI) / 180;
-    const cos = Math.cos(-theta);
-    const sin = Math.sin(-theta);
-    const worldDeltaX = deltaX * cos - deltaY * sin;
-    const worldDeltaY = deltaX * sin + deltaY * cos;
-
-    setCameraPosition(cameraPosition.x + worldDeltaX, cameraPosition.y + worldDeltaY);
-  }, [cameraPosition.x, cameraPosition.y, setCameraPosition, viewRotation]);
-
-  const handleMapPan = useCallback((deltaX: number, deltaY: number) => {
-    applyScreenPanDelta(deltaX, deltaY);
-  }, [applyScreenPanDelta]);
-
-  const handleMapRotate = useCallback((delta: number) => {
-    setViewRotation(normalizeRotation(viewRotation + delta));
-  }, [setViewRotation, viewRotation]);
-
-  const mapActionGroups = useMemo<ActionCommandGroup[]>(() => {
-    const panStep = 240;
-    const zoomStep = 0.15;
-
-    return [
-      {
-        id: 'view',
-        title: '视图控制',
-        description: '缩放 / 旋转 / 复位',
-        actions: [
-          {
-            id: 'zoom-out',
-            label: '缩小',
-            icon: '−',
-            shortcut: '滚轮↓',
-            hint: '缩小地图视图',
-            onActivate: () => setZoom(zoom - zoomStep),
+  // 地图控制指令
+  const mapActionGroups: ActionCommandGroup[] = useMemo(() => [
+    {
+      id: 'view_control',
+      title: '视图控制',
+      actions: [
+        {
+          id: 'zoom_in',
+          label: '放大',
+          icon: '🔍',
+          shortcut: '+',
+          onActivate: () => setZoom(Math.min(3, zoom + 0.2)),
+        },
+        {
+          id: 'zoom_out',
+          label: '缩小',
+          icon: '🔍',
+          shortcut: '-',
+          onActivate: () => setZoom(Math.max(0.5, zoom - 0.2)),
+        },
+        {
+          id: 'reset_view',
+          label: '重置',
+          icon: '🔄',
+          shortcut: 'R',
+          onActivate: () => {
+            setZoom(1);
+            setCameraPosition(0, 0);
+            resetViewRotation();
           },
-          {
-            id: 'zoom-reset',
-            label: '重置缩放',
-            icon: '◎',
-            shortcut: 'Z',
-            hint: '将缩放恢复到默认值',
-            onActivate: () => setZoom(1),
-          },
-          {
-            id: 'zoom-in',
-            label: '放大',
-            icon: '+',
-            shortcut: '滚轮↑',
-            hint: '放大地图视图',
-            onActivate: () => setZoom(zoom + zoomStep),
-          },
-          {
-            id: 'rotate-left',
-            label: '左旋',
-            icon: '↺',
-            shortcut: 'Alt+Q',
-            hint: '逆时针旋转视图',
-            onActivate: () => handleMapRotate(-15),
-          },
-          {
-            id: 'rotate-reset',
-            label: '归正',
-            icon: '▣',
-            shortcut: 'R',
-            hint: '重置视图旋转',
-            onActivate: resetViewRotation,
-          },
-          {
-            id: 'rotate-right',
-            label: '右旋',
-            icon: '↻',
-            shortcut: 'Alt+E',
-            hint: '顺时针旋转视图',
-            onActivate: () => handleMapRotate(15),
-          },
-        ],
-      },
-      {
-        id: 'camera',
-        title: '地图导航',
-        description: '空格拖动 / 微调平移',
-        actions: [
-          {
-            id: 'pan-up',
-            label: '上移',
-            icon: '↑',
-            shortcut: 'W',
-            onActivate: () => applyScreenPanDelta(0, -panStep),
-          },
-          {
-            id: 'pan-center',
-            label: '回中',
-            icon: '◎',
-            shortcut: 'C',
-            onActivate: () => setCameraPosition(0, 0),
-          },
-          {
-            id: 'pan-down',
-            label: '下移',
-            icon: '↓',
-            shortcut: 'S',
-            onActivate: () => applyScreenPanDelta(0, panStep),
-          },
-          {
-            id: 'pan-left',
-            label: '左移',
-            icon: '←',
-            shortcut: 'A',
-            onActivate: () => applyScreenPanDelta(-panStep, 0),
-          },
-          {
-            id: 'pan-basis',
-            label: '对齐舰向',
-            icon: '⇢',
-            shortcut: 'Ship',
-            disabled: !selectedShip,
-            hint: '将视角对齐到选中舰船朝向',
-            onActivate: () => selectedShip && setViewRotation(normalizeRotation(90 - selectedShip.transform.heading)),
-          },
-          {
-            id: 'pan-right',
-            label: '右移',
-            icon: '→',
-            shortcut: 'D',
-            onActivate: () => applyScreenPanDelta(panStep, 0),
-          },
-        ],
-      },
-      {
-        id: 'layers',
-        title: '图层开关',
-        description: '战术可视化层',
-        actions: [
-          {
-            id: 'grid',
-            label: '网格',
-            icon: '▦',
-            active: showGrid,
-            shortcut: 'G',
-            onActivate: toggleGrid,
-          },
-          {
-            id: 'background',
-            label: '星图',
-            icon: '✦',
-            active: showBackground,
-            shortcut: 'B',
-            onActivate: toggleBackground,
-          },
-          {
-            id: 'weapon-arcs',
-            label: '射界',
-            icon: '◜',
-            active: showWeaponArcs,
-            shortcut: 'V',
-            onActivate: toggleWeaponArcs,
-          },
-          {
-            id: 'movement-range',
-            label: '机动',
-            icon: '◌',
-            active: showMovementRange,
-            shortcut: 'M',
-            onActivate: toggleMovementRange,
-          },
-        ],
-      },
-    ];
-  }, [
-    cameraPosition.x,
-    cameraPosition.y,
-    handleMapRotate,
-    resetViewRotation,
-    selectedShip,
-    setCameraPosition,
-    setViewRotation,
-    setZoom,
-    showBackground,
-    showGrid,
-    showMovementRange,
-    showWeaponArcs,
-    toggleBackground,
-    toggleGrid,
-    toggleMovementRange,
-    toggleWeaponArcs,
-    zoom,
-  ]);
-
-  useEffect(() => {
-    const element = mapSectionRef.current;
-    if (!element || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      const nextWidth = Math.floor(rect?.width ?? 980);
-      if (Number.isFinite(nextWidth) && nextWidth > 0) {
-        setMapSize((current) => ({ ...current, width: nextWidth }));
-      }
-    });
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const updateHeight = () => {
-      setMapSize((current) => ({
-        ...current,
-        height: Math.max(680, window.innerHeight - 200),
-      }));
-    };
-
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, []);
+        },
+      ],
+    },
+    {
+      id: 'display_control',
+      title: '显示控制',
+      actions: [
+        {
+          id: 'toggle_grid',
+          label: '网格',
+          icon: '▦',
+          active: showGrid,
+          onActivate: () => {},
+        },
+        {
+          id: 'toggle_arcs',
+          label: '射界',
+          icon: '🎯',
+          active: showWeaponArcs,
+          onActivate: () => {},
+        },
+      ],
+    },
+  ], [zoom, showGrid, showWeaponArcs, setZoom, setCameraPosition, resetViewRotation]);
 
   if (!room) {
-    return <div style={{ padding: 40, color: '#cfe8ff' }}>加载游戏状态...</div>;
+    return (
+      <div style={layoutStyles.gameView}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          <div style={{ fontSize: '16px', color: '#6b7280' }}>连接中...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={layoutStyles.gameView}>
-      {/* 顶部栏 */}
-      <div style={{
-        ...layoutStyles.topBar,
-        position: 'fixed' as const,
-        top: '0',
-        left: '0',
-        right: '0',
-        zIndex: 1000,
-        marginBottom: '0',
-      }}>
-        <div style={layoutStyles.topBarTitle}>
-          🚀 STFCS · {room.state.currentPhase || '加载中'}
+      {/* 顶部状态栏 */}
+      <div style={layoutStyles.topBar}>
+        <div style={layoutStyles.topBarLeft}>
+          <div style={layoutStyles.topBarTitle}>
+            🚀 STFCS
+          </div>
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
+            {room.state.currentPhase || '加载中'}
+          </div>
         </div>
-        <div style={layoutStyles.topBarCenter}>
-          {room.state && (
-            <TurnIndicator
-              currentPhase={room.state.currentPhase}
-              turnCount={room.state.turnCount}
-              activeFaction={room.state.activeFaction}
-              playerRole={currentPlayer?.role || 'player'}
-              onNextPhase={currentPlayer?.role === 'dm' ? nextPhase : undefined}
-              compact
-            />
-          )}
-        </div>
-        <div style={layoutStyles.topBarInfo}>
-          <button style={layoutStyles.rosterButton} onClick={() => setShowPlayerRoster(true)}>
-            👥 玩家
-          </button>
-          <button style={layoutStyles.settingsButton} onClick={() => setShowSettings(true)}>
-            ⚙️ 设置
-          </button>
-          <button style={layoutStyles.leaveButton} onClick={onLeaveRoom}>
-            离开房间
-          </button>
-        </div>
-      </div>
 
-      {/* 主内容区 - 添加顶部 padding 避免被顶栏遮挡 */}
-      <div style={{
-        ...layoutStyles.mainContent,
-        paddingTop: '80px', // 为顶栏留出空间
-      }}>
-        <div ref={mapSectionRef} style={layoutStyles.mapSection}>
-          <GameCanvas
-            ships={ships}
-            width={mapSize.width}
-            height={mapSize.height}
-            zoom={zoom}
-            cameraX={cameraPosition.x}
-            cameraY={cameraPosition.y}
-            viewRotation={viewRotation}
-            showGrid={showGrid}
-            showBackground={showBackground}
-            showWeaponArcs={showWeaponArcs}
-            showMovementRange={showMovementRange}
-            selectedShipId={selectedShipId}
-            onSelectShip={(shipId) => selectShip(shipId)}
-            onPanDelta={handleMapPan}
-            onRotateDelta={handleMapRotate}
-            onClick={pendingPlacement && currentPlayer?.role === 'dm' ? handleMapClick : undefined}
+        <div style={layoutStyles.topBarCenter}>
+          <TurnIndicator
+            currentPhase={room.state.currentPhase}
+            turnCount={room.state.turnCount}
+            activeFaction={room.state.activeFaction}
+            playerRole={currentPlayer?.role || 'player'}
+            onNextPhase={currentPlayer?.role === 'dm' ? nextPhase : undefined}
+            compact
           />
         </div>
+
+        <div style={layoutStyles.topBarRight}>
+          <button
+            style={layoutStyles.button}
+            onClick={() => setShowPlayerRoster(true)}
+          >
+            👥 玩家
+          </button>
+          <button
+            style={layoutStyles.button}
+            onClick={() => setShowSettings(true)}
+          >
+            ⚙️ 设置
+          </button>
+          <button
+            style={{ ...layoutStyles.button, ...layoutStyles.buttonDanger }}
+            onClick={onLeaveRoom}
+          >
+            离开
+          </button>
+        </div>
       </div>
 
-      {/* 侧边面板 */}
-      <div style={layoutStyles.sidePanel}>
-        <ActionCommandDock
-          title="🎮 指令技能区"
-          subtitle="地图控制已并入操作区"
-          groups={mapActionGroups}
-        />
+      {/* 主内容区 */}
+      <div style={layoutStyles.mainContent}>
+        {/* 地图区域 */}
+        <div style={layoutStyles.mapContainer}>
+          <div ref={mapSectionRef} style={layoutStyles.mapSection}>
+            <GameCanvas
+              ships={ships}
+              width={mapSize.width}
+              height={mapSize.height}
+              zoom={zoom}
+              cameraX={cameraPosition.x}
+              cameraY={cameraPosition.y}
+              viewRotation={viewRotation}
+              showGrid={showGrid}
+              showBackground={showBackground}
+              showWeaponArcs={showWeaponArcs}
+              showMovementRange={showMovementRange}
+              selectedShipId={selectedShipId}
+              onSelectShip={(shipId) => selectShip(shipId)}
+              onPanDelta={handleMapPan}
+              onRotateDelta={handleMapRotate}
+              onClick={pendingPlacement && currentPlayer?.role === 'dm' ? handleMapClick : undefined}
+            />
+          </div>
+        </div>
 
-        {/* 右侧功能面板（带 Tab） */}
-        <div style={{ height: '400px', marginBottom: '12px' }}>
+        {/* 右侧面板 */}
+        <div style={layoutStyles.sidePanelContainer}>
+          {/* Tab 切换 */}
           <RightPanelTabs
             room={room}
             playerName={playerName || 'Player'}
@@ -620,79 +516,93 @@ export const GameView: React.FC<GameViewProps> = ({
             playerCount={players.length}
             unreadChatCount={0}
           />
+          
+          {/* 可滚动内容区 */}
+          <div style={layoutStyles.sidePanelContent}>
+            {/* 舰船信息面板（选中时显示） */}
+            {selectedShipId && ships.find(s => s.id === selectedShipId) && (
+              <>
+                <ShipDetailPanel
+                  ship={ships.find(s => s.id === selectedShipId)!}
+                  currentPhase={room.state.currentPhase}
+                />
+                <FluxSystemDisplay
+                  ship={ships.find(s => s.id === selectedShipId)!}
+                  currentPhase={room.state.currentPhase}
+                />
+                <ArmorQuadrantDisplay
+                  ship={ships.find(s => s.id === selectedShipId)!}
+                />
+                <ThreePhaseMovementController
+                  ship={ships.find(s => s.id === selectedShipId)!}
+                  networkManager={networkManager}
+                  onClose={() => {}}
+                  onOpenAttack={() => {
+                    notify.info('请选择武器和目标进行攻击');
+                  }}
+                />
+                <ShipActionPanel
+                  ship={ships.find(s => s.id === selectedShipId)!}
+                  allShips={ships}
+                  currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
+                  activeFaction={room.state.activeFaction || 'player'}
+                  playerRole={currentPlayer?.role || 'player'}
+                  playerSessionId={room.sessionId || ''}
+                  onSendCommand={sendCommand}
+                />
+              </>
+            )}
+
+            {/* DM 控制面板 */}
+            {currentPlayer?.role === 'dm' && (
+              <div style={layoutStyles.panel}>
+                <div style={layoutStyles.panelTitle}>🎨 DM 工具</div>
+                <button
+                  style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%', marginBottom: '12px' }}
+                  onClick={() => setShowObjectCreator(!showObjectCreator)}
+                >
+                  {showObjectCreator ? '关闭' : '打开'} 对象创建工具
+                </button>
+
+                {showObjectCreator && (
+                  <DMObjectCreator
+                    isOpen={showObjectCreator}
+                    onClose={() => setShowObjectCreator(false)}
+                    onCreateObject={createObject}
+                    players={players.filter(p => p.role !== 'dm').map(p => ({
+                      sessionId: p.sessionId,
+                      name: p.name,
+                      role: p.role,
+                    }))}
+                  />
+                )}
+
+                <DMControlPanel
+                  ships={ships}
+                  players={players}
+                  isDM={true}
+                  onCreateTestShip={createTestShip}
+                  onClearOverload={clearOverload}
+                  onSetArmor={setArmor}
+                  onAssignShip={assignShip}
+                  onNextPhase={nextPhase}
+                />
+              </div>
+            )}
+          </div>
         </div>
-
-        {selectedShip && (
-          <>
-            <ShipDetailPanel ship={selectedShip} currentPhase={room.state.currentPhase} />
-            <FluxSystemDisplay ship={selectedShip} currentPhase={room.state.currentPhase} />
-            <ArmorQuadrantDisplay ship={selectedShip} />
-            
-            {/* 三阶段移动控制器 */}
-            <ThreePhaseMovementController
-              ship={selectedShip}
-              networkManager={networkManager}
-              onClose={() => {}}
-              onOpenAttack={() => {
-                notify.info('请选择武器和目标进行攻击');
-                // 这里可以打开武器选择面板
-              }}
-            />
-          </>
-        )}
-
-        <ShipActionPanel
-          ship={selectedShip ?? null}
-          allShips={ships}
-          currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
-          activeFaction={room.state.activeFaction || 'player'}
-          playerRole={currentPlayer?.role || 'player'}
-          playerSessionId={room.sessionId || ''}
-          onSendCommand={sendCommand}
-        />
-
-        {currentPlayer?.role === 'dm' && (
-          <>
-            <button
-              style={{
-                padding: '8px 12px',
-                borderRadius: '4px',
-                border: '1px solid #a78bfa',
-                backgroundColor: '#5a2a3a',
-                color: '#a78bfa',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-              onClick={() => setShowObjectCreator(!showObjectCreator)}
-            >
-              🎨 {showObjectCreator ? '关闭' : '打开'} 对象创建工具
-            </button>
-
-            <DMObjectCreator
-              isOpen={showObjectCreator}
-              onClose={() => setShowObjectCreator(false)}
-              onCreateObject={createObject}
-              players={players.filter(p => p.role !== 'dm').map(p => ({
-                sessionId: p.sessionId,
-                name: p.name,
-                role: p.role,
-              }))}
-            />
-
-            <DMControlPanel
-              ships={ships}
-              players={players}
-              isDM={true}
-              onCreateTestShip={createTestShip}
-              onClearOverload={clearOverload}
-              onSetArmor={setArmor}
-              onAssignShip={assignShip}
-              onNextPhase={nextPhase}
-            />
-          </>
-        )}
       </div>
 
+      {/* 底部操作栏 */}
+      <div style={layoutStyles.bottomBar}>
+        <ActionCommandDock
+          title=""
+          subtitle=""
+          groups={mapActionGroups}
+        />
+      </div>
+
+      {/* 弹窗 */}
       <PlayerRosterModal
         isOpen={showPlayerRoster}
         onClose={() => setShowPlayerRoster(false)}
@@ -702,10 +612,10 @@ export const GameView: React.FC<GameViewProps> = ({
         currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
         onToggleReady={toggleReady}
         canManagePlayers={currentPlayer?.role === 'dm'}
-        onKickPlayer={currentPlayer?.role === 'dm' ? kickPlayer : undefined}
-        onInvitePlayer={currentPlayer?.role === 'dm' ? invitePlayer : undefined}
-        onCloseRoom={currentPlayer?.role === 'dm' ? closeRoom : undefined}
-        onSaveRoom={currentPlayer?.role === 'dm' ? saveRoom : undefined}
+        onKickPlayer={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        onInvitePlayer={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        onCloseRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        onSaveRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
       />
 
       <SettingsMenu isOpen={showSettings} onClose={() => setShowSettings(false)} />
