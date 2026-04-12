@@ -4,7 +4,7 @@
  * 管理视图状态的变更和更新调度
  */
 
-import type { CameraState } from '@vt/shared/types';
+import type { CameraState } from '@vt/contracts/types';
 import type { ViewState, ViewChange, ViewUpdatePlan, LayerId } from './types';
 import { ViewMode, LAYER_DEPENDENCY_GRAPH, getAffectedLayers, VIEW_MODE_CONFIGS } from './LayerGraph';
 

@@ -4,7 +4,7 @@
  */
 
 import { Container, Graphics } from "pixi.js";
-import type { TokenInfo } from "@vt/shared/types";
+import type { TokenInfo } from "@vt/contracts/types";
 import { ScalableText } from "@/features/game/utils/TextRenderer";
 
 /**

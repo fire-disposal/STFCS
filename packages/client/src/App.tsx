@@ -22,7 +22,6 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState<string>('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // 初始化 NetworkManager
   useEffect(() => {
@@ -83,7 +82,6 @@ const App: React.FC = () => {
     if (!networkManagerRef.current) return;
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await networkManagerRef.current.createRoom();
@@ -92,7 +90,6 @@ const App: React.FC = () => {
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : '创建房间失败';
       notify.error(errorMsg);
-      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +100,6 @@ const App: React.FC = () => {
     if (!networkManagerRef.current) return;
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await networkManagerRef.current.joinRoom(roomId);
@@ -112,16 +108,15 @@ const App: React.FC = () => {
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : '加入房间失败';
       notify.error(errorMsg);
-      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   // 离开房间返回大厅
-  const handleLeaveRoom = useCallback(() => {
+  const handleLeaveRoom = useCallback(async () => {
     if (networkManagerRef.current) {
-      networkManagerRef.current.leaveRoom();
+      await networkManagerRef.current.leaveRoom();
     }
     setAppState('lobby');
   }, []);
@@ -143,10 +138,26 @@ const App: React.FC = () => {
       {appState === 'lobby' && (
         <LobbyPanel
           playerName={userName}
+          currentShortId={networkManager.getShortId()}
+          currentRoomId={networkManager.getCurrentRoomId()}
           rooms={rooms}
           isLoading={isLoading}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
+          onDeleteRoom={async (roomId: string) => {
+            if (!networkManagerRef.current) return;
+
+            setIsLoading(true);
+            try {
+              await networkManagerRef.current.deleteRoom(roomId);
+              notify.success('房间已删除');
+            } catch (e) {
+              const errorMsg = e instanceof Error ? e.message : '删除房间失败';
+              notify.error(errorMsg);
+            } finally {
+              setIsLoading(false);
+            }
+          }}
           onRefresh={() => networkManagerRef.current?.getRooms() || Promise.resolve()}
           onLogout={handleLogout}
         />

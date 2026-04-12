@@ -8,8 +8,8 @@
  */
 
 import React from 'react';
-import type { WeaponInstanceState } from '@vt/shared/types';
-import type { DamageType } from '@vt/shared/config';
+import type { WeaponInstanceState } from '@vt/contracts/types';
+import type { DamageType } from '@vt/contracts/config';
 
 // 样式
 const styles = {
@@ -32,7 +32,7 @@ const styles = {
     alignItems: 'center',
     padding: '10px',
     backgroundColor: 'var(--color-background)',
-    borderRadius: '6px',
+    borderRadius: '0',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     border: '2px solid transparent',
@@ -49,7 +49,7 @@ const styles = {
   weaponIcon: {
     width: '36px',
     height: '36px',
-    borderRadius: '4px',
+    borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -78,7 +78,7 @@ const styles = {
   },
   statusBadge: {
     padding: '2px 6px',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '10px',
     fontWeight: 'bold',
   },

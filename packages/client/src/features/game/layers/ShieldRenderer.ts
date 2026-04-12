@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import type { ShieldSpec } from "@vt/shared/types";
+import type { ShieldSpec } from "@vt/contracts/types";
 
 /**
  * 护盾渲染器配置

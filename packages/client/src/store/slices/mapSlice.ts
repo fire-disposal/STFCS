@@ -7,7 +7,7 @@ import type {
 	StarNode,
 	StarSystem,
 	TokenInfo,
-} from "@vt/shared/types";
+} from "@vt/contracts/types";
 
 export interface MapTile {
 	x: number;

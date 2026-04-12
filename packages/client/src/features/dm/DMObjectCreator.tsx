@@ -5,8 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { ShipHullSpec } from '@vt/shared';
-import { PRESET_SHIPS, getAvailableShips, getShipHullSpec } from '@vt/shared';
+import { getAvailableShips } from '@vt/rules';
 
 type TokenType = 'ship' | 'station' | 'asteroid';
 
@@ -233,10 +232,6 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 
   // 可用舰船列表
   const availableShips = useMemo(() => getAvailableShips(), []);
-  const selectedShip = useMemo(() => 
-    objectType === 'ship' ? getShipHullSpec(selectedHullId) : null,
-    [objectType, selectedHullId]
-  );
 
   // 重置状态
   const resetState = useCallback(() => {
@@ -265,15 +260,6 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
   const enableClickPlacement = useCallback(() => {
     setPlacementMode('click');
   }, []);
-
-  // 处理地图点击
-  const handleMapClick = useCallback((x: number, y: number) => {
-    if (placementMode === 'click') {
-      setPositionX(Math.round(x));
-      setPositionY(Math.round(y));
-      setPlacementMode('manual');
-    }
-  }, [placementMode]);
 
   if (!isOpen) return null;
 

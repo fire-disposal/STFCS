@@ -4,7 +4,7 @@
  */
 
 import { Container } from "pixi.js";
-import type { TokenInfo } from "@vt/shared/types";
+import type { TokenInfo } from "@vt/contracts/types";
 import type { SelectionRecord } from "@/store/slices/selectionSlice";
 import { createControlLock } from "@/features/game/components/TokenAddons";
 

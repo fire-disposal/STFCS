@@ -1,1 +1,1 @@
-export * from "./CommandDispatcher";
+export * from "./CommandDispatcher.js";

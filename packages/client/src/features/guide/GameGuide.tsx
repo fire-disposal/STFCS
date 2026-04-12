@@ -10,8 +10,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { GamePhase, TurnPhase } from '@vt/shared/protocol';
-import type { FactionId } from '@vt/shared/types';
+import type { GamePhase, TurnPhase } from '@vt/contracts/protocol';
 import {
   Info,
   AlertTriangle,

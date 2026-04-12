@@ -10,7 +10,7 @@
  */
 
 import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { FactionId, FactionTurnState, PlayerFactionInfo, FactionTurnPhase } from '@vt/shared/types';
+import type { FactionId, FactionTurnState, PlayerFactionInfo, FactionTurnPhase } from '@vt/contracts/types';
 
 interface FactionTurnSliceState extends FactionTurnState {
   isInitialized: boolean;

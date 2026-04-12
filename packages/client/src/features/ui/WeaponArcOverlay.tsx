@@ -1,13 +1,13 @@
 /**
  * 武器射界可视化组件
- * 
  * 显示武器的攻击范围和射界区域
  */
 
 import React, { useEffect, useMemo } from 'react';
 import { Container, Graphics } from 'pixi.js';
-import type { ShipState, WeaponMount } from '@vt/shared';
-import { PRESET_WEAPONS, getWeaponSpec } from '@vt/shared';
+import type { ShipState } from '@vt/contracts';
+import type { WeaponMount } from '@vt/contracts/types';
+import { PRESET_WEAPONS, getWeaponSpec, distance } from '@vt/rules';
 
 interface WeaponArcOverlayProps {
   ships: ShipState[];
@@ -42,7 +42,7 @@ export const WeaponArcOverlay: React.FC<WeaponArcOverlayProps> = ({
         const mountY = ship.transform.y;
         
         // 计算武器绝对朝向
-        const weaponAbsoluteAngle = ship.transform.heading + weaponSpec.mountType === 'turret' ? 0 : weaponSlot.angle || 0;
+        const weaponAbsoluteAngle = ship.transform.heading + (weaponSpec.mountType === 'turret' ? 0 : (weaponSlot.angle || 0));
 
         // 绘制射程范围（虚线圆）
         if (showRanges) {
@@ -85,7 +85,6 @@ export const WeaponArcOverlay: React.FC<WeaponArcOverlayProps> = ({
       if (ship.isShieldUp) {
         const shieldGraphics = new Graphics();
         const shieldRadius = ship.transform.heading; // 使用朝向作为临时半径参考
-        
         // 护盾弧
         const arcRad = (ship.shieldArc * Math.PI) / 180;
         const baseAngle = ((ship.shieldOrientation - 90) * Math.PI) / 180;
@@ -109,7 +108,7 @@ export const WeaponArcOverlay: React.FC<WeaponArcOverlayProps> = ({
 };
 
 /**
- * 绘制武器射界到指定 Graphics
+ * 绘制武器射界到指向 Graphics
  */
 export function drawWeaponArc(
   graphics: Graphics,
@@ -147,7 +146,7 @@ export function drawWeaponArc(
 }
 
 /**
- * 绘制射程范围圈
+ * 绘制射程范围
  */
 export function drawRangeCircle(
   graphics: Graphics,
@@ -175,8 +174,6 @@ export function isTargetInWeaponArc(
   targetX: number,
   targetY: number
 ): boolean {
-  const { distance, angleBetween, angleDifference } = require('@vt/shared');
-
   // 检查距离
   const dist = distance(attackerX, attackerY, targetX, targetY);
   if (dist > weaponRange) return false;

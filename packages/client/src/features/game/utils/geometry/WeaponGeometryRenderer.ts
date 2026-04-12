@@ -5,8 +5,8 @@
  */
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import type { DamageType } from '@vt/shared/config';
-import type { WeaponInstanceState, WeaponMountInstance } from '@vt/shared/types';
+import type { DamageType } from '@vt/contracts/config';
+import type { WeaponInstanceState, WeaponMountInstance } from '@vt/contracts/types';
 import {
   drawWeaponArcGeometry,
   drawWaveform,

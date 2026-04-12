@@ -9,8 +9,7 @@
  */
 
 import React from 'react';
-import type { AttackPreviewResult } from '@vt/shared/protocol';
-import type { DamageType } from '@vt/shared/config';
+import type { AttackPreviewResult, DamageType } from '@vt/contracts';
 
 // 样式
 const styles = {
@@ -191,7 +190,9 @@ export const AttackPreview: React.FC<AttackPreviewProps> = ({
         ...styles.header,
         ...(canAttack ? styles.canAttack : styles.cannotAttack),
       }}>
-        <span>攻击预览</span>
+        <span style={{ color: damageTypeColors[damageType] }}>
+          攻击预览
+        </span>
         <span>{canAttack ? '✓ 可攻击' : '✗ 不可攻击'}</span>
       </div>
 

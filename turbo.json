@@ -1,5 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "tsconfig.base.json",
+    "turbo.json"
+  ],
+  "globalEnv": [
+    "CI",
+    "NODE_ENV",
+    "PORT",
+    "WS_PORT",
+    "CORS_ORIGINS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

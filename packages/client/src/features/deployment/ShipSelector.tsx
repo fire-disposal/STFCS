@@ -5,8 +5,7 @@
  */
 
 import React, { useMemo } from 'react';
-import type { ShipDefinition, HullSize } from '@vt/shared/config';
-import type { FactionId } from '@vt/shared/types';
+import type { ShipDefinition, HullSize, FactionId } from '@vt/contracts';
 
 // 样式
 const styles = {

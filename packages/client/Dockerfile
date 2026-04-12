@@ -12,7 +12,8 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Copy only package files for dependency installation
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared/package.json ./packages/shared/
+COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/rules/package.json ./packages/rules/
 COPY packages/client/package.json ./packages/client/
 
 RUN pnpm fetch --frozen-lockfile
@@ -30,18 +31,21 @@ COPY --from=deps /app/pnpm-store ./pnpm-store
 
 # Copy workspace configuration
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared/package.json ./packages/shared/
+COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/rules/package.json ./packages/rules/
 COPY packages/client/package.json ./packages/client/
 
 # Install from store (fast)
 RUN pnpm install --frozen-lockfile --offline
 
 # Copy source code
-COPY packages/shared ./packages/shared
+COPY packages/contracts ./packages/contracts
+COPY packages/rules ./packages/rules
 COPY packages/client ./packages/client
 
-# Build shared package first (uses tsup, fast)
-RUN pnpm --filter @vt/shared build
+# Build dependency packages first
+RUN pnpm --filter @vt/contracts build
+RUN pnpm --filter @vt/rules build
 
 # Build client (Vite build)
 RUN pnpm --filter client build

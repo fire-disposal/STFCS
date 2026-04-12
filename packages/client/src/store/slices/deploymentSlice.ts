@@ -9,7 +9,7 @@
  */
 
 import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { FactionId, ShipTokenV2 } from '@vt/shared/types';
+import type { FactionId, ShipTokenV2 } from '@vt/contracts/types';
 
 // 部署区域类型
 interface DeploymentZone {

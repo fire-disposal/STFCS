@@ -10,12 +10,12 @@ import type {
 	HullDefinition,
 	ShipDefinition,
 	AssetManifest,
-} from '@vt/shared/config';
+} from '@vt/contracts/config';
 import {
 	DEFAULT_WEAPONS,
 	DEFAULT_HULLS,
 	DEFAULT_SHIPS,
-} from '@vt/shared/config';
+} from '@vt/contracts/config';
 
 export interface AssetRegistryOptions {
 	/** 资源基础URL */

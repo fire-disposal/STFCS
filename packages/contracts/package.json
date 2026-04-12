@@ -1,0 +1,29 @@
+{
+  "name": "@vt/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/index.js",
+    "./protocol": "./dist/index.js",
+    "./constants": "./dist/index.js",
+    "./core-types": "./dist/index.js",
+    "./config": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap",
+    "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3"
+  }
+}

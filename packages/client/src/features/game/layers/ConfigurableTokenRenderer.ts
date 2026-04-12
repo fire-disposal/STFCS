@@ -10,8 +10,8 @@ import {
 	Sprite,
 	Texture,
 } from 'pixi.js';
-import type { TokenInfo } from '@vt/shared/types';
-import type { HullDefinition, ShipDefinition } from '@vt/shared/config';
+import type { TokenInfo } from '@vt/contracts/types';
+import type { HullDefinition, ShipDefinition } from '@vt/contracts/config';
 import { getAssetRegistry } from '@/services/AssetRegistry';
 
 export interface ConfigurableTokenConfig {

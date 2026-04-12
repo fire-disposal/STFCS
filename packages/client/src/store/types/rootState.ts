@@ -7,7 +7,7 @@
  * 3. Cache - 缓存状态（本地计算）
  */
 
-import type { PlayerInfo, TokenInfo, ShipStatus } from '@vt/shared/types';
+import type { PlayerInfo, TokenInfo, ShipStatus } from '@vt/contracts/types';
 import type { SelectionRecord } from '@/store/slices/selectionSlice';
 
 /**

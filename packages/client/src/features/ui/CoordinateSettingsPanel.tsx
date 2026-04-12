@@ -1,6 +1,5 @@
 /**
  * 坐标与导航设置面板
- * 
  * 提供坐标精度、网格吸附、角度模式等设置
  */
 
@@ -11,7 +10,7 @@ import type { CoordinatePrecision, AngleMode } from '@/store/uiStore';
 const styles = {
   panel: {
     backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '12px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
     border: '1px solid #2b4261',
@@ -36,7 +35,7 @@ const styles = {
   },
   optionButton: {
     padding: '6px 10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: 'rgba(10, 30, 50, 0.5)',
     color: '#cfe8ff',
@@ -63,7 +62,7 @@ const styles = {
   toggle: {
     width: '36px',
     height: '20px',
-    borderRadius: '10px',
+    borderRadius: '0',
     border: 'none',
     backgroundColor: '#2b4261',
     cursor: 'pointer',
@@ -79,7 +78,7 @@ const styles = {
     left: '2px',
     width: '16px',
     height: '16px',
-    borderRadius: '50%',
+    borderRadius: '0',
     backgroundColor: '#cfe8ff',
     transition: 'all 0.2s',
   },
@@ -90,7 +89,7 @@ const styles = {
   input: {
     width: '100%',
     padding: '6px 10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -114,6 +113,8 @@ export const CoordinateSettingsPanel: React.FC = () => {
     setGridSize,
     angleMode,
     setAngleMode,
+    hideNativeCursor,
+    setHideNativeCursor,
   } = useUIStore();
 
   return (
@@ -138,7 +139,7 @@ export const CoordinateSettingsPanel: React.FC = () => {
             }}
             onClick={() => setCoordinatePrecision('rounded10')}
           >
-            舍入到 10 (推荐)
+            舍入 10 (推荐)
           </button>
           <button
             style={{
@@ -147,11 +148,11 @@ export const CoordinateSettingsPanel: React.FC = () => {
             }}
             onClick={() => setCoordinatePrecision('rounded100')}
           >
-            舍入到 100
+            舍入 100
           </button>
         </div>
         <div style={styles.hint}>
-          太空环境推荐使用舍入到 10，减少不必要的精度
+          太空环境推荐使用舍入 10，减少不必要的精度
         </div>
       </div>
 
@@ -223,6 +224,31 @@ export const CoordinateSettingsPanel: React.FC = () => {
         </div>
         <div style={styles.hint}>
           航海角度：北=0°，东=90°，南=180°，西=270°
+        </div>
+      </div>
+
+      {/* 指针设置 */}
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>🖱️ 指针设置</div>
+        <div style={styles.toggleRow}>
+          <span style={styles.toggleLabel}>隐藏原生指针</span>
+          <button
+            style={{
+              ...styles.toggle,
+              ...(hideNativeCursor ? styles.toggleActive : {}),
+            }}
+            onClick={() => setHideNativeCursor(!hideNativeCursor)}
+          >
+            <div
+              style={{
+                ...styles.toggleKnob,
+                ...(hideNativeCursor ? styles.toggleKnobActive : {}),
+              }}
+            />
+          </button>
+        </div>
+        <div style={styles.hint}>
+          开启后，磁性指针显示时会隐藏系统原生光标；默认关闭
         </div>
       </div>
     </div>

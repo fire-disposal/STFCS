@@ -3,7 +3,7 @@ import type {
 	ExplosionData,
 	AttackCommand,
 	CombatResult,
-} from "@vt/shared/types";
+} from "@vt/contracts/types";
 
 export interface DamageNumber {
 	id: string;

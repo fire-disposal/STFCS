@@ -9,7 +9,7 @@
  */
 
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
-import type { CameraState, PlayerCamera } from "@vt/shared/types";
+import type { CameraState, PlayerCamera } from "@vt/contracts/types";
 import { clampZoom } from "@/utils/cameraBounds";
 
 interface CameraSliceState {

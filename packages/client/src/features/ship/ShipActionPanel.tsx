@@ -10,8 +10,8 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { ShipState, WeaponSlot, ClientCommand } from '@vt/shared';
-import { ClientCommand as CC } from '@vt/shared';
+import type { ShipState, WeaponSlot, ClientCommand } from '@vt/contracts';
+import { ClientCommand as CC } from '@vt/contracts';
 
 // 样式定义
 const styles = {
@@ -49,7 +49,7 @@ const styles = {
   button: {
     flex: 1,
     padding: '10px 12px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -102,7 +102,7 @@ const styles = {
   slider: {
     width: '100%',
     height: '6px',
-    borderRadius: '3px',
+    borderRadius: '0',
     backgroundColor: '#1a2d42',
     outline: 'none',
     cursor: 'pointer',
@@ -116,7 +116,7 @@ const styles = {
     alignItems: 'center',
     padding: '6px 8px',
     backgroundColor: '#1a2d42',
-    borderRadius: '4px',
+    borderRadius: '0',
     marginBottom: '4px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -138,12 +138,12 @@ const styles = {
   targetSelect: {
     padding: '8px',
     backgroundColor: '#1a2d42',
-    borderRadius: '4px',
+    borderRadius: '0',
     marginBottom: '8px',
   },
   targetItem: {
     padding: '6px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     cursor: 'pointer',
     fontSize: '11px',
     display: 'flex',
@@ -159,7 +159,7 @@ const styles = {
   },
   statusMessage: {
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '11px',
     textAlign: 'center' as const,
     marginBottom: '8px',

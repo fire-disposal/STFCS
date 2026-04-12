@@ -10,15 +10,23 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@vt/shared": ["../shared/src/index.ts"],
-      "@vt/shared/*": ["../shared/src/*"]
+      "@vt/contracts": ["../contracts/src/index.ts"],
+      "@vt/contracts/types": ["../contracts/src/types/index.ts"],
+      "@vt/contracts/protocol": ["../contracts/src/protocol/index.ts"],
+      "@vt/contracts/constants": ["../contracts/src/constants/index.ts"],
+      "@vt/contracts/core-types": ["../contracts/src/core-types.ts"],
+      "@vt/contracts/config": ["../contracts/src/config/index.ts"],
+      "@vt/rules": ["../rules/src/index.ts"],
+      "@vt/rules/math": ["../rules/src/math/index.ts"],
+      "@vt/rules/data/ShipHullSchema": ["../rules/src/data/ShipHullSchema.ts"],
+      "@vt/rules/data/WeaponSchema": ["../rules/src/data/WeaponSchema.ts"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "declaration": false,
     "declarationMap": false,
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts", "../shared/src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts", "../contracts/src/**/*.ts", "../rules/src/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",

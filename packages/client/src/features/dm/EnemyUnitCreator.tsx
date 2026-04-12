@@ -8,15 +8,15 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { ShipDefinition, HullSize } from '@vt/shared/config';
-import type { FactionId } from '@vt/shared/types';
-import type { Point } from '@vt/shared/core-types';
+import type { ShipDefinition, HullSize } from '@vt/contracts/config';
+import type { FactionId } from '@vt/contracts/types';
+import type { Point } from '@vt/contracts/core-types';
 
 // 样式
 const styles = {
   container: {
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '16px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
   },
@@ -50,7 +50,7 @@ const styles = {
     alignItems: 'center',
     padding: '8px',
     backgroundColor: 'var(--color-background)',
-    borderRadius: '4px',
+    borderRadius: '0',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     border: '2px solid transparent',
@@ -62,7 +62,7 @@ const styles = {
   shipIcon: {
     width: '32px',
     height: '32px',
-    borderRadius: '4px',
+    borderRadius: '0',
     backgroundColor: 'var(--color-surface-dark)',
     display: 'flex',
     alignItems: 'center',
@@ -90,7 +90,7 @@ const styles = {
   },
   input: {
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     color: 'var(--color-text)',
@@ -98,7 +98,7 @@ const styles = {
   },
   select: {
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     color: 'var(--color-text)',
@@ -112,7 +112,7 @@ const styles = {
   factionButton: {
     flex: 1,
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     cursor: 'pointer',
@@ -132,7 +132,7 @@ const styles = {
   button: {
     flex: 1,
     padding: '10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '14px',

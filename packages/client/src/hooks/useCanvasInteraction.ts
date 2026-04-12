@@ -8,6 +8,7 @@ import { useState, useCallback, useRef } from "react";
 interface UseCanvasInteractionOptions {
 	minZoom: number;
 	maxZoom: number;
+	rotation?: number;
 	onCameraChange?: (camera: { x: number; y: number; zoom: number }) => void;
 }
 
@@ -20,12 +21,28 @@ interface CameraState {
 }
 
 export function useCanvasInteraction(options: UseCanvasInteractionOptions) {
-	const { minZoom, maxZoom, onCameraChange } = options;
+	const { minZoom, maxZoom, rotation = 0, onCameraChange } = options;
 
 	const [camera, setCamera] = useState<CameraState>({ x: 0, y: 0, zoom: 1 });
 	const [isDragging, setIsDragging] = useState(false);
 	const dragStartRef = useRef({ x: 0, y: 0 });
 	const lastCameraRef = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
+
+	const screenDeltaToWorldDelta = useCallback(
+		(deltaX: number, deltaY: number) => {
+			const theta = (rotation * Math.PI) / 180;
+			const cos = Math.cos(-theta);
+			const sin = Math.sin(-theta);
+			const scaledX = -deltaX / camera.zoom;
+			const scaledY = -deltaY / camera.zoom;
+
+			return {
+				x: scaledX * cos - scaledY * sin,
+				y: scaledX * sin + scaledY * cos,
+			};
+		},
+		[rotation, camera.zoom]
+	);
 
 	// 更新相机并触发回调
 	const updateCamera = useCallback(
@@ -89,13 +106,14 @@ export function useCanvasInteraction(options: UseCanvasInteractionOptions) {
 
 			const dx = event.clientX - dragStartRef.current.x;
 			const dy = event.clientY - dragStartRef.current.y;
+			const delta = screenDeltaToWorldDelta(dx, dy);
 
 			updateCamera({
-				x: lastCameraRef.current.x + dx,
-				y: lastCameraRef.current.y + dy,
+				x: lastCameraRef.current.x + delta.x,
+				y: lastCameraRef.current.y + delta.y,
 			});
 		},
-		[isDragging, updateCamera]
+		[isDragging, screenDeltaToWorldDelta, updateCamera]
 	);
 
 	// 鼠标释放停止拖拽

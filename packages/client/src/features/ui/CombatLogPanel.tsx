@@ -5,8 +5,8 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import type { CombatLogEntry, LogLevel, LogType } from '@vt/shared';
-import { combatLog, type LogFilter } from '@vt/shared';
+import type { CombatLogEntry, LogLevel, LogType } from '@vt/contracts';
+import { combatLog, type LogFilter } from '@vt/contracts';
 
 interface CombatLogPanelProps {
   isOpen?: boolean;

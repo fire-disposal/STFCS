@@ -5,7 +5,7 @@
  */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { FactionId, PlayerFactionInfo } from '@vt/shared/types';
+import type { FactionId, PlayerFactionInfo } from '@vt/contracts/types';
 
 interface FactionState {
 	/** 当前玩家选择的阵营 */

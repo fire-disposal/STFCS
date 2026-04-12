@@ -5,13 +5,13 @@
  */
 
 import React, { useState } from 'react';
-import type { RoomInfo } from '@vt/shared/types';
+import type { RoomInfo } from '@vt/contracts';
 
 // 样式
 const styles = {
   card: {
     backgroundColor: 'var(--color-background)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '16px',
     border: '1px solid var(--color-border)',
     transition: 'all 0.2s ease',
@@ -36,7 +36,7 @@ const styles = {
   },
   status: {
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '11px',
     fontWeight: 'bold',
   },
@@ -70,7 +70,7 @@ const styles = {
   },
   button: {
     padding: '8px 16px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '13px',
@@ -103,7 +103,7 @@ const styles = {
   },
   passwordModal: {
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '24px',
     width: '300px',
   },
@@ -115,7 +115,7 @@ const styles = {
   passwordInput: {
     width: '100%',
     padding: '10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     color: 'var(--color-text)',

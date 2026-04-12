@@ -5,13 +5,13 @@
  */
 
 import React from 'react';
-import type { ShipState } from '@vt/shared';
+import type { ShipState } from '@vt/contracts';
 
 const styles = {
   container: {
     padding: '12px',
     backgroundColor: 'rgba(10, 30, 50, 0.8)',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
   },
   header: {
@@ -32,7 +32,7 @@ const styles = {
   statBox: {
     padding: '6px',
     backgroundColor: 'rgba(6, 16, 26, 0.6)',
-    borderRadius: '4px',
+    borderRadius: '0',
   },
   statLabel: {
     fontSize: '9px',
@@ -47,14 +47,14 @@ const styles = {
   barContainer: {
     height: '16px',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: '8px',
+    borderRadius: '0',
     overflow: 'hidden',
     position: 'relative' as const,
     marginBottom: '4px',
   },
   barFill: {
     height: '100%',
-    borderRadius: '8px',
+    borderRadius: '0',
     transition: 'width 0.3s ease',
   },
   barText: {
@@ -70,7 +70,7 @@ const styles = {
   ventButton: {
     width: '100%',
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #4a9eff',
     backgroundColor: '#1a4a7a',
     color: '#4a9eff',
@@ -92,7 +92,7 @@ const styles = {
   },
   overloadWarning: {
     padding: '8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     backgroundColor: 'rgba(255, 74, 74, 0.2)',
     border: '1px solid #ff4a4a',
     color: '#ff6f8f',

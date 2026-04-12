@@ -4,7 +4,7 @@
  */
 
 import { Container, Graphics } from "pixi.js";
-import type { PlayerCamera } from "@vt/shared/types";
+import type { PlayerCamera } from "@vt/contracts/types";
 import { ScalableText } from "@/features/game/utils/TextRenderer";
 
 /**

@@ -9,8 +9,8 @@
  */
 
 import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { ArmorQuadrant } from '@vt/shared/types';
-import type { AttackPreviewResult } from '@vt/shared/protocol';
+import type { ArmorQuadrant } from '@vt/contracts/types';
+import type { AttackPreviewResult } from '@vt/contracts/protocol';
 
 // ==================== 类型定义 ====================
 

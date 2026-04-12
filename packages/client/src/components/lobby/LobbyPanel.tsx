@@ -4,7 +4,7 @@
  * 与登录页面风格统一：深蓝背景、蓝色霓虹边框、发光效果
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import type { RoomInfo } from '@/network/NetworkManager';
 
 const styles = {
@@ -115,7 +115,7 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   roomCardHover: {
-    borderColor: '#4a9eff',
+    border: '2px solid #4a9eff',
     backgroundColor: 'rgba(13, 40, 71, 0.8)',
     boxShadow: '0 0 20px rgba(74, 158, 255, 0.3)',
   },
@@ -162,7 +162,7 @@ const styles = {
   buttonDisabled: {
     opacity: 0.3,
     cursor: 'not-allowed',
-    borderColor: '#2a3a4a',
+    border: '2px solid #2a3a4a',
     color: '#3a4a5a',
   },
   refreshButton: {
@@ -205,20 +205,26 @@ const styles = {
 
 interface LobbyPanelProps {
   playerName: string;
+  currentShortId: number | null;
+  currentRoomId: string | null;
   rooms: RoomInfo[];
   isLoading: boolean;
   onCreateRoom: () => void;
   onJoinRoom: (roomId: string) => void;
+  onDeleteRoom: (roomId: string) => void;
   onRefresh: () => void;
   onLogout: () => void;
 }
 
 export const LobbyPanel: React.FC<LobbyPanelProps> = ({
   playerName,
+  currentShortId,
+  currentRoomId,
   rooms,
   isLoading,
   onCreateRoom,
   onJoinRoom,
+  onDeleteRoom,
   onRefresh,
   onLogout,
 }) => {
@@ -230,6 +236,35 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
     const fullRooms = rooms.filter(r => r.clients >= r.maxClients).length;
     return { totalPlayers, totalRooms, fullRooms };
   }, [rooms]);
+
+  const isOwnRoom = useCallback((room: RoomInfo) => {
+    if (currentShortId === null) {
+      return false;
+    }
+
+    return room.ownerShortId === currentShortId;
+  }, [currentShortId]);
+
+  const handleJoinRoom = useCallback((room: RoomInfo) => {
+    if (currentRoomId === room.id) {
+      return;
+    }
+
+    onJoinRoom(room.id);
+  }, [currentRoomId, onJoinRoom]);
+
+  const handleDeleteRoom = useCallback((room: RoomInfo) => {
+    if (!isOwnRoom(room)) {
+      return;
+    }
+
+    const confirmed = window.confirm(`确定要删除房间「${room.name}」吗？此操作不可撤销。`);
+    if (!confirmed) {
+      return;
+    }
+
+    onDeleteRoom(room.id);
+  }, [isOwnRoom, onDeleteRoom]);
 
   return (
     <div style={styles.container}>
@@ -278,33 +313,80 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
             </div>
           ) : (
             <div style={styles.roomList}>
-              {rooms.map((room) => (
-                <div
-                  key={room.id}
-                  data-magnetic
-                  style={{
-                    ...styles.roomCard,
-                    ...(hoveredRoomId === room.id ? styles.roomCardHover : {}),
-                  }}
-                  onMouseEnter={() => setHoveredRoomId(room.id)}
-                  onMouseLeave={() => setHoveredRoomId(null)}
-                  onClick={() => onJoinRoom(room.id)}
-                >
-                  <div style={styles.roomName}>
-                    {room.name}
-                    {(room.metadata as any)?.isPrivate && ' 🔒'}
-                  </div>
-                  <div style={styles.roomMeta}>
-                    <div style={styles.roomStatus}>
-                      <div style={styles.statusDot} />
-                      <span>{room.clients}/{room.maxClients} 玩家</span>
+              {rooms.map((room) => {
+                const ownRoom = isOwnRoom(room);
+                const inCurrentRoom = currentRoomId === room.id;
+                const canJoin = !inCurrentRoom;
+
+                return (
+                  <div
+                    key={room.id}
+                    data-magnetic
+                    style={{
+                      ...styles.roomCard,
+                      ...(hoveredRoomId === room.id && canJoin ? styles.roomCardHover : {}),
+                      ...(inCurrentRoom ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
+                    }}
+                    onMouseEnter={() => setHoveredRoomId(room.id)}
+                    onMouseLeave={() => setHoveredRoomId(null)}
+                    onClick={() => handleJoinRoom(room)}
+                  >
+                    <div style={styles.roomName}>
+                      {room.name}
+                      {(room.metadata as any)?.isPrivate && ' 🔒'}
+                      {ownRoom && ' 👑'}
                     </div>
-                    {(room.metadata as any)?.phase && (
-                      <span>阶段：{(room.metadata as any).phase}</span>
-                    )}
+                    <div style={styles.roomMeta}>
+                      <div style={styles.roomStatus}>
+                        <div style={styles.statusDot} />
+                        <span>{room.clients}/{room.maxClients} 玩家</span>
+                      </div>
+                      {(room.metadata as any)?.phase && (
+                        <span>阶段：{(room.metadata as any).phase}</span>
+                      )}
+                      {inCurrentRoom ? (
+                        <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>当前所在房间</span>
+                      ) : ownRoom ? (
+                        <span style={{ color: '#4ade80', fontWeight: 'bold' }}>你的房间</span>
+                      ) : null}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                      <button
+                        data-magnetic
+                        style={{
+                          ...styles.refreshButton,
+                          padding: '8px 12px',
+                          opacity: canJoin ? 1 : 0.5,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleJoinRoom(room);
+                        }}
+                        disabled={!canJoin}
+                      >
+                        {ownRoom ? '重新进入' : '进入房间'}
+                      </button>
+                      {ownRoom && (
+                        <button
+                          data-magnetic
+                          style={{
+                            ...styles.logoutButton,
+                            padding: '8px 12px',
+                            borderColor: 'rgba(248, 113, 113, 0.4)',
+                            fontSize: '12px',
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRoom(room);
+                          }}
+                        >
+                          删除房间
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

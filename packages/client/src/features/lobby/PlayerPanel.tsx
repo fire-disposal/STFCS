@@ -1,6 +1,5 @@
 /**
  * 玩家状态面板
- *
  * 显示房间内玩家列表：
  * - 玩家名称和角色
  * - 连接状态和质量
@@ -9,14 +8,13 @@
  */
 
 import React, { useMemo } from 'react';
-import type { PlayerState, ShipState, ClientCommand } from '@vt/shared';
-import { ClientCommand as CC } from '@vt/shared';
+import type { PlayerState, ShipState } from '@vt/contracts';
 
 // 样式定义
 const styles = {
   panel: {
     backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '16px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
     border: '1px solid #2b4261',
@@ -43,7 +41,7 @@ const styles = {
     alignItems: 'center',
     padding: '10px 12px',
     backgroundColor: '#1a2d42',
-    borderRadius: '6px',
+    borderRadius: '0',
     marginBottom: '8px',
     transition: 'all 0.2s ease',
     border: '1px solid transparent',
@@ -58,7 +56,7 @@ const styles = {
   playerAvatar: {
     width: '32px',
     height: '32px',
-    borderRadius: '50%',
+    borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -86,7 +84,7 @@ const styles = {
   },
   statusBadge: {
     padding: '3px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '10px',
     fontWeight: 'bold',
   },
@@ -101,7 +99,7 @@ const styles = {
   },
   readyButton: {
     padding: '8px 16px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',

@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { Point } from '@vt/shared/core-types';
+import type { Point } from '@vt/contracts/core-types';
 
 // 样式
 const styles = {
@@ -30,12 +30,12 @@ const styles = {
     pointerEvents: 'auto' as const,
     backgroundColor: 'var(--color-surface)',
     padding: '12px 20px',
-    borderRadius: '8px',
+    borderRadius: '0',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
   },
   button: {
     padding: '8px 24px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '14px',
@@ -57,7 +57,7 @@ const styles = {
     transform: 'translateX(-50%)',
     backgroundColor: 'var(--color-surface)',
     padding: '12px 20px',
-    borderRadius: '8px',
+    borderRadius: '0',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
     pointerEvents: 'auto' as const,
     display: 'flex',
@@ -72,7 +72,7 @@ const styles = {
   headingInput: {
     width: '60px',
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     color: 'var(--color-text)',
@@ -182,7 +182,7 @@ export const ShipPlacementPreview: React.FC<ShipPlacementPreviewProps> = ({
           height: '80px',
           backgroundColor: 'rgba(100, 200, 255, 0.3)',
           border: '2px solid rgba(100, 200, 255, 0.8)',
-          borderRadius: '4px',
+          borderRadius: '0',
           pointerEvents: 'none',
         }}
       />

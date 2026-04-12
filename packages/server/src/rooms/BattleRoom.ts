@@ -9,9 +9,9 @@
  */
 
 import { Room, Client } from "@colyseus/core";
-import { GameRoomState, ShipState, PlayerState } from "@vt/shared";
-import { ClientCommand, getShipHullSpec, getWeaponSpec } from "@vt/shared";
-import { CommandDispatcher } from "../commands/CommandDispatcher";
+import { ArraySchema, ClientCommand, GamePhase, GameRoomState, PlayerState, ShipState, WeaponSlot } from "../schema/GameSchema.js";
+import { getShipHullSpec, getWeaponSpec } from "@vt/rules";
+import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 
 // ==================== 消息 Payload 类型定义 ====================
 
@@ -20,7 +20,7 @@ interface NetPingPayload {
   clientSentAt: number;
 }
 
-interface MoveTokenPayload {
+export interface MoveTokenPayload {
   shipId: string;
   x: number;
   y: number;
@@ -34,19 +34,19 @@ interface MoveTokenPayload {
   };
 }
 
-interface ToggleShieldPayload {
+export interface ToggleShieldPayload {
   shipId: string;
   isActive: boolean;
   orientation?: number;
 }
 
-interface FireWeaponPayload {
+export interface FireWeaponPayload {
   attackerId: string;
   weaponId: string;
   targetId: string;
 }
 
-interface VentFluxPayload {
+export interface VentFluxPayload {
   shipId: string;
 }
 
@@ -72,21 +72,34 @@ interface CreateObjectPayload {
 
 // ==================== 战斗房间类 ====================
 
-export class BattleRoom extends Room<GameRoomState> {
+export class BattleRoom extends Room<{ state: GameRoomState }> {
   maxClients = 8;
   private commandDispatcher!: CommandDispatcher;
   private readonly pingEwma = new Map<string, number>();
   private readonly jitterEwma = new Map<string, number>();
+  private readonly playerIdentity = new Map<string, { userName: string; shortId: number }>();
+  private roomDisplayName = '';
+  private roomOwnerId: string | null = null;
+  private isPrivateRoom = false;
 
   /**
    * 房间创建初始化
    * Colyseus 在第一个客户端加入时自动调用
    */
-  onCreate(options: { playerName?: string }) {
+  onCreate(options: { playerName?: string; roomName?: string; maxPlayers?: number; isPrivate?: boolean }) {
     console.log(`[BattleRoom] Room created - ID: ${this.roomId}, PlayerName: ${options.playerName || 'default'}`);
+
+    const normalizedMaxPlayers = Number(options.maxPlayers);
+    if (Number.isFinite(normalizedMaxPlayers)) {
+      this.maxClients = Math.min(16, Math.max(2, Math.floor(normalizedMaxPlayers)));
+    }
+
+    this.roomDisplayName = options.roomName?.trim() || `Battle - ${this.roomId.substring(0, 6)}`;
+    this.isPrivateRoom = Boolean(options.isPrivate);
 
     // 初始化状态
     this.state = new GameRoomState();
+    this.assertSchemaMetadataSafe();
 
     // 初始化命令分发器
     this.commandDispatcher = new CommandDispatcher(this.state);
@@ -103,10 +116,13 @@ export class BattleRoom extends Room<GameRoomState> {
 
     // 设置房间元数据（用于大厅显示）
     this.setMetadata({
-      name: `Battle - ${this.roomId.substring(0, 6)}`,
+      roomType: 'battle',
+      name: this.roomDisplayName,
       phase: this.state.currentPhase,
       turnCount: 1,
       playerCount: 0,
+      ownerId: this.roomOwnerId,
+      isPrivate: this.isPrivateRoom,
       maxPlayers: this.maxClients,
     });
 
@@ -118,13 +134,15 @@ export class BattleRoom extends Room<GameRoomState> {
    * 客户端认证 - 简化版，仅验证玩家名称
    * 在 onJoin 之前调用
    */
-  async onAuth(client: Client, options: { playerName?: string }) {
+  async onAuth(client: Client, options: { playerName?: string; shortId?: number }) {
     const playerName = options?.playerName?.trim() || `Player_${client.sessionId.substring(0, 4)}`;
+    const shortId = this.resolveShortId(options?.shortId);
     
     // 保存到 client 对象供 onJoin 使用
     (client as any).playerName = playerName;
+    (client as any).shortId = shortId;
     
-    console.log(`[BattleRoom] Auth: ${playerName} (${client.sessionId})`);
+    console.log(`[BattleRoom] Auth: ${playerName} (${client.sessionId}) [${shortId}]`);
     return true; // 总是允许加入
   }
 
@@ -135,30 +153,54 @@ export class BattleRoom extends Room<GameRoomState> {
   onJoin(client: Client) {
     // 从 onAuth 传递的名称
     const playerName = (client as Client & { playerName: string }).playerName || `Player_${client.sessionId.substring(0, 4)}`;
-    console.log(`[BattleRoom] Player joined: ${playerName} (${client.sessionId})`);
+    const shortId = (client as Client & { shortId?: number }).shortId || this.resolveShortId(undefined);
+    console.log(`[BattleRoom] Player joined: ${playerName} (${client.sessionId}) [${shortId}]`);
+
+    const existingSessionId = this.findPlayerSessionByShortId(shortId);
+    const existingPlayer = existingSessionId ? this.state.players.get(existingSessionId) : undefined;
+
+    if (existingSessionId && existingSessionId !== client.sessionId) {
+      this.transferPlayerOwnership(existingSessionId, client.sessionId);
+      this.state.players.delete(existingSessionId);
+      this.playerIdentity.delete(existingSessionId);
+      this.pingEwma.delete(existingSessionId);
+      this.jitterEwma.delete(existingSessionId);
+    }
 
     // 创建玩家状态
-    const player = new PlayerState();
+    this.assertSchemaMetadataSafe();
+    const player = existingPlayer ?? new PlayerState();
     player.sessionId = client.sessionId;
+    player.shortId = shortId;
     player.name = playerName;
-    player.role = "player";
     player.connected = true;
-    player.isReady = false;
-    player.pingMs = -1;
-    player.jitterMs = 0;
-    player.connectionQuality = "excellent";
+
+    if (!existingPlayer) {
+      player.role = "player";
+      player.isReady = false;
+      player.pingMs = -1;
+      player.jitterMs = 0;
+      player.connectionQuality = "excellent";
+    }
 
     // 第一个玩家自动成为 DM
-    if (this.clients.length === 1) {
+    if (!existingPlayer && this.clients.length === 1) {
       player.role = "dm";
+      this.roomOwnerId = client.sessionId;
       console.log(`[BattleRoom] First player is DM`);
+    }
+
+    if (existingPlayer && existingPlayer.role === 'dm') {
+      this.roomOwnerId = client.sessionId;
     }
 
     // 发送角色信息
     client.send("role", { role: player.role });
+    client.send("identity", { userName: playerName, shortId });
 
     // 添加到状态
     this.state.players.set(client.sessionId, player);
+    this.playerIdentity.set(client.sessionId, { userName: playerName, shortId });
     this.pingEwma.set(client.sessionId, -1);
     this.jitterEwma.set(client.sessionId, 0);
 
@@ -166,6 +208,80 @@ export class BattleRoom extends Room<GameRoomState> {
     this.updateMetadata();
 
     console.log(`[BattleRoom] Total players: ${this.clients.length}/${this.maxClients}`);
+  }
+
+  private assertSchemaMetadataSafe(): void {
+    const classes: Array<[string, unknown]> = [
+      ['GameRoomState', GameRoomState],
+      ['PlayerState', PlayerState],
+      ['ShipState', ShipState],
+      ['WeaponSlot', WeaponSlot],
+    ];
+
+    for (const [name, klass] of classes) {
+      const metadata = (klass as { [Symbol.metadata]?: Record<string, { name?: string; type?: unknown }> })[Symbol.metadata];
+      if (!metadata) {
+        throw new Error(`[SchemaCheck] ${name} metadata missing`);
+      }
+
+      for (const [index, field] of Object.entries(metadata)) {
+        if (!field || typeof field !== 'object') {
+          continue;
+        }
+
+        if ('type' in field && field.type === undefined) {
+          const fieldName = 'name' in field ? String(field.name) : `#${index}`;
+          throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined type`);
+        }
+
+        if ('type' in field && typeof field.type === 'object' && field.type !== null) {
+          const fieldName = 'name' in field ? String(field.name) : `#${index}`;
+          const complexType = field.type as Record<string, unknown>;
+
+          if ('map' in complexType && complexType.map === undefined) {
+            throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined map child type`);
+          }
+
+          if ('array' in complexType && complexType.array === undefined) {
+            throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined array child type`);
+          }
+
+          if ('set' in complexType && complexType.set === undefined) {
+            throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined set child type`);
+          }
+        }
+      }
+    }
+  }
+
+  private resolveShortId(shortId: number | undefined): number {
+    if (typeof shortId === 'number' && Number.isInteger(shortId) && shortId >= 100000 && shortId <= 999999) {
+      return shortId;
+    }
+
+    return Math.floor(100000 + Math.random() * 900000);
+  }
+
+  private findPlayerSessionByShortId(shortId: number): string | null {
+    for (const [sessionId, identity] of this.playerIdentity.entries()) {
+      if (identity.shortId === shortId) {
+        return sessionId;
+      }
+    }
+
+    return null;
+  }
+
+  private transferPlayerOwnership(fromSessionId: string, toSessionId: string): void {
+    if (this.roomOwnerId === fromSessionId) {
+      this.roomOwnerId = toSessionId;
+    }
+
+    this.state.ships.forEach((ship: ShipState) => {
+      if (ship.ownerId === fromSessionId) {
+        ship.ownerId = toSessionId;
+      }
+    });
   }
 
   /**
@@ -208,11 +324,12 @@ export class BattleRoom extends Room<GameRoomState> {
     // 彻底离开 - 清理玩家数据
     console.log(`[BattleRoom] Player permanently removed: ${sessionId}`);
     this.state.players.delete(sessionId);
+    this.playerIdentity.delete(sessionId);
     this.pingEwma.delete(sessionId);
     this.jitterEwma.delete(sessionId);
 
     // 清除该玩家对舰船的所有权
-    this.state.ships.forEach((ship) => {
+    this.state.ships.forEach((ship: ShipState) => {
       if (ship.ownerId === sessionId) {
         ship.ownerId = '';
       }
@@ -238,11 +355,12 @@ export class BattleRoom extends Room<GameRoomState> {
   /**
    * 更新房间元数据（用于大厅显示）
    */
-  private updateMetadata() {
+  private updateMetadata(): void {
     let dmCount = 0;
     let playerCount = 0;
+    const ownerShortId = this.roomOwnerId ? this.playerIdentity.get(this.roomOwnerId)?.shortId ?? null : null;
     
-    this.state.players.forEach((p) => {
+    this.state.players.forEach((p: PlayerState) => {
       if (p.connected) {
         if (p.role === 'dm') dmCount++;
         else playerCount++;
@@ -250,10 +368,14 @@ export class BattleRoom extends Room<GameRoomState> {
     });
 
     this.setMetadata({
-      name: this.roomId,
+      roomType: 'battle',
+      name: this.roomDisplayName,
       phase: this.state.currentPhase,
       turnCount: this.state.turnCount,
       playerCount: this.clients.length,
+      ownerId: this.roomOwnerId,
+      ownerShortId,
+      isPrivate: this.isPrivateRoom,
       dmCount,
       maxPlayers: this.maxClients,
     });
@@ -410,9 +532,9 @@ export class BattleRoom extends Room<GameRoomState> {
    */
   private update(deltaTime: number) {
     // 更新所有舰船的状态
-    this.state.ships.forEach((ship) => {
+    this.state.ships.forEach((ship: ShipState) => {
       // 更新武器冷却
-      ship.weapons.forEach((weapon) => {
+      ship.weapons.forEach((weapon: WeaponSlot) => {
         if (weapon.cooldown > 0) {
           weapon.cooldown = Math.max(0, weapon.cooldown - deltaTime / 1000);
         }
@@ -432,13 +554,13 @@ export class BattleRoom extends Room<GameRoomState> {
   /**
    * 检查是否自动进入下一阶段
    */
-  private checkAutoAdvancePhase() {
+  private checkAutoAdvancePhase(): void {
     if (this.state.currentPhase !== "PLAYER_TURN") return;
 
     let allReady = true;
     let hasPlayers = false;
 
-    this.state.players.forEach((player) => {
+    this.state.players.forEach((player: PlayerState) => {
       if (player.role === "player" && player.connected) {
         hasPlayers = true;
         if (!player.isReady) {
@@ -456,7 +578,7 @@ export class BattleRoom extends Room<GameRoomState> {
   /**
    * 推进游戏阶段
    */
-  private advancePhase() {
+  private advancePhase(): void {
     const phases: GamePhase[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
     const currentIndex = phases.indexOf(this.state.currentPhase);
     let nextIndex = currentIndex + 1;
@@ -469,7 +591,7 @@ export class BattleRoom extends Room<GameRoomState> {
     this.state.currentPhase = phases[nextIndex];
 
     // 重置所有玩家的 ready 状态
-    this.state.players.forEach((p) => (p.isReady = false));
+    this.state.players.forEach((p: PlayerState) => (p.isReady = false));
 
     // 处理阶段转换
     if (this.state.currentPhase === "END_PHASE") {
@@ -494,8 +616,8 @@ export class BattleRoom extends Room<GameRoomState> {
   /**
    * 处理结束阶段
    */
-  private handleEndPhase() {
-    this.state.ships.forEach((ship) => {
+  private handleEndPhase(): void {
+    this.state.ships.forEach((ship: ShipState) => {
       // 清空软辐能
       ship.fluxSoft = 0;
 
@@ -533,8 +655,8 @@ export class BattleRoom extends Room<GameRoomState> {
 
     ship.hullMax = 1000;
     ship.hullCurrent = 1000;
-    ship.armorMax = [150, 150, 150, 100, 150, 150];
-    ship.armorCurrent = [150, 150, 150, 100, 150, 150];
+    ship.armorMax = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
+    ship.armorCurrent = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
     ship.fluxMax = 200;
     ship.fluxHard = 0;
     ship.fluxSoft = 0;
@@ -542,15 +664,15 @@ export class BattleRoom extends Room<GameRoomState> {
     ship.maxTurnRate = 45;
     ship.acceleration = 50;
 
-    const weapon = {
-      weaponId: `weapon_${Date.now()}`,
-      type: "kinetic" as const,
-      damage: 50,
-      range: 300,
-      arc: 90,
-      angle: 0,
-      cooldown: 0,
-    };
+    const weapon = this.createWeaponSlot(
+      `weapon_${Date.now()}`,
+      "kinetic",
+      50,
+      300,
+      90,
+      0,
+      0,
+    );
     ship.weapons.set(weapon.weaponId, weapon);
 
     this.state.ships.set(ship.id, ship);
@@ -560,7 +682,7 @@ export class BattleRoom extends Room<GameRoomState> {
   /**
    * DM 创建对象（舰船/空间站/小行星）
    */
-  createObject(payload: CreateObjectPayload) {
+  createObject(payload: CreateObjectPayload): void {
     const { type, hullId, x, y, heading, faction, ownerId } = payload;
 
     if (type === 'ship' && hullId) {
@@ -583,8 +705,8 @@ export class BattleRoom extends Room<GameRoomState> {
       ship.hullCurrent = shipSpec.hullPoints;
 
       const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-      ship.armorMax = armorDist;
-      ship.armorCurrent = [...armorDist];
+      ship.armorMax = new ArraySchema<number>(...armorDist);
+      ship.armorCurrent = new ArraySchema<number>(...armorDist);
 
       ship.fluxMax = shipSpec.fluxCapacity;
       ship.fluxDissipation = shipSpec.fluxDissipation || 10;
@@ -605,15 +727,18 @@ export class BattleRoom extends Room<GameRoomState> {
       for (const mount of shipSpec.weaponMounts) {
         const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
         if (weaponSpec) {
-          ship.weapons.set(mount.id, {
-            weaponId: mount.id,
-            type: this.mapDamageType(weaponSpec.damageType),
-            damage: weaponSpec.damage,
-            range: weaponSpec.range,
-            arc: weaponSpec.arc,
-            angle: mount.facing,
-            cooldown: 0,
-          });
+          ship.weapons.set(
+            mount.id,
+            this.createWeaponSlot(
+              mount.id,
+              this.mapDamageType(weaponSpec.damageType),
+              weaponSpec.damage,
+              weaponSpec.range,
+              weaponSpec.arc,
+              mount.facing,
+              0,
+            ),
+          );
         }
       }
 
@@ -631,8 +756,8 @@ export class BattleRoom extends Room<GameRoomState> {
 
       ship.hullMax = type === 'station' ? 5000 : 2000;
       ship.hullCurrent = ship.hullMax;
-      ship.armorMax = [300, 300, 300, 200, 300, 300];
-      ship.armorCurrent = [300, 300, 300, 200, 300, 300];
+      ship.armorMax = new ArraySchema<number>(300, 300, 300, 200, 300, 300);
+      ship.armorCurrent = new ArraySchema<number>(300, 300, 300, 200, 300, 300);
       ship.fluxMax = 0;
       ship.fluxHard = 0;
       ship.fluxSoft = 0;
@@ -655,6 +780,26 @@ export class BattleRoom extends Room<GameRoomState> {
       case 'energy': return 'energy';
       default: return 'fragmentation';
     }
+  }
+
+  private createWeaponSlot(
+    weaponId: string,
+    type: "kinetic" | "high_explosive" | "energy" | "fragmentation",
+    damage: number,
+    range: number,
+    arc: number,
+    angle: number,
+    cooldown: number,
+  ): WeaponSlot {
+    const weapon = new WeaponSlot();
+    weapon.weaponId = weaponId;
+    weapon.type = type;
+    weapon.damage = damage;
+    weapon.range = range;
+    weapon.arc = arc;
+    weapon.angle = angle;
+    weapon.cooldown = cooldown;
+    return weapon;
   }
 
   /**

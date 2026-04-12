@@ -26,7 +26,7 @@ import {
 	type CursorType,
 } from "@/store/slices/interactionSlice";
 import { updateCamera } from "@/store/slices/cameraSlice";
-import type { CameraState } from "@vt/shared/types";
+import type { CameraState } from "@vt/contracts/types";
 import { clampCameraCenter, calculateCameraBounds } from "@/utils/cameraBounds";
 
 export interface UseInteractionReturn {

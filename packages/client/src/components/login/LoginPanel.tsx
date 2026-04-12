@@ -18,7 +18,7 @@ const styles = {
   },
   card: {
     backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '12px',
+    borderRadius: '0',
     padding: '32px',
     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
     border: '1px solid #2b4261',
@@ -52,7 +52,7 @@ const styles = {
   input: {
     width: '100%',
     padding: '12px 16px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -63,7 +63,7 @@ const styles = {
   button: {
     width: '100%',
     padding: '14px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: 'none',
     backgroundColor: '#1a4a7a',
     color: '#4a9eff',
@@ -91,7 +91,7 @@ const styles = {
   },
   error: {
     padding: '12px',
-    borderRadius: '6px',
+    borderRadius: '0',
     backgroundColor: 'rgba(255, 74, 74, 0.2)',
     border: '1px solid #ff4a4a',
     color: '#ff6f8f',

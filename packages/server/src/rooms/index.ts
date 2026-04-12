@@ -1,1 +1,1 @@
-export * from "./BattleRoom";
+export * from "./BattleRoom.js";

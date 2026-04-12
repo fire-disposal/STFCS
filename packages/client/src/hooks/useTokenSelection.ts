@@ -11,7 +11,7 @@ import {
 	removeToken as removeTokenAction,
 } from "@/store/slices/mapSlice";
 import { selectShip } from "@/store/slices/shipSlice";
-import type { TokenInfo, TokenType } from "@vt/shared/types";
+import type { TokenInfo, TokenType } from "@vt/contracts/types";
 
 export function useTokenSelection() {
 	const dispatch = useAppDispatch();

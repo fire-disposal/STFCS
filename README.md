@@ -181,7 +181,7 @@ STFCS/
 
 ### 添加新武器
 
-1. 在 `packages/shared/src/schema/WeaponSchema.ts` 的 `PRESET_WEAPONS` 中添加：
+1. 在 `packages/rules/src/data/WeaponSchema.ts` 的 `PRESET_WEAPONS` 中添加：
 
 ```typescript
 "new_weapon": {
@@ -207,7 +207,7 @@ STFCS/
 
 ### 添加新舰船
 
-1. 在 `packages/shared/src/schema/ShipHullSchema.ts` 的 `PRESET_SHIPS` 中添加：
+1. 在 `packages/rules/src/data/ShipHullSchema.ts` 的 `PRESET_SHIPS` 中添加：
 
 ```typescript
 "new_ship": {
@@ -238,7 +238,9 @@ STFCS/
 pnpm test
 
 # 运行特定包的测试
-pnpm --filter @vt/shared test
+pnpm --filter @vt/contracts test
+pnpm --filter @vt/rules test
+pnpm --filter @vt/server-schema test
 pnpm --filter client test
 pnpm --filter server test
 

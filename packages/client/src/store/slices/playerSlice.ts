@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { PlayerInfo } from "@vt/shared/types";
+import type { PlayerInfo } from "@vt/contracts/types";
 
 // 扩展PlayerInfo接口以包含游戏状态
 export interface ExtendedPlayerInfo extends PlayerInfo {

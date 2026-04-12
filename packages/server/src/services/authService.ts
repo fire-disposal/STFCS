@@ -28,7 +28,7 @@ export class InMemoryUserStore {
   /**
    * 注册用户
    */
-  async register(request: RegisterRequest): Promise<{ success: boolean; user?: User; message?: string }> {
+  async register(request: RegisterRequest): Promise<{ success: boolean; user?: Omit<User, 'password'>; message?: string }> {
     // 验证密码匹配
     if (request.password !== request.confirmPassword) {
       return { success: false, message: '两次输入的密码不一致' };
@@ -73,7 +73,7 @@ export class InMemoryUserStore {
   /**
    * 登录
    */
-  async login(request: LoginRequest): Promise<{ success: boolean; user?: User; token?: string; message?: string }> {
+  async login(request: LoginRequest): Promise<{ success: boolean; user?: Omit<User, 'password'>; token?: string; message?: string }> {
     // 查找用户
     const user = Array.from(this.users.values()).find(
       u => u.username.toLowerCase() === request.username.toLowerCase()
@@ -108,7 +108,7 @@ export class InMemoryUserStore {
   /**
    * 验证 token
    */
-  async validateToken(token: string): Promise<{ valid: boolean; user?: User }> {
+  async validateToken(token: string): Promise<{ valid: boolean; user?: Omit<User, 'password'> }> {
     const userId = this.tokens.get(token);
     if (!userId) {
       return { valid: false };
@@ -136,7 +136,7 @@ export class InMemoryUserStore {
   /**
    * 获取用户信息
    */
-  async getUserById(userId: string): Promise<User | null> {
+  async getUserById(userId: string): Promise<Omit<User, 'password'> | null> {
     const user = this.users.get(userId);
     return user ? this.sanitizeUser(user) : null;
   }

@@ -6,7 +6,7 @@
  */
 
 import { Graphics, Point, Container } from 'pixi.js';
-import type { HullSize, DamageType, ShieldType } from '@vt/shared/config';
+import type { HullSize, DamageType, ShieldType } from '@vt/contracts/config';
 
 // ==================== 颜色配置 ====================
 

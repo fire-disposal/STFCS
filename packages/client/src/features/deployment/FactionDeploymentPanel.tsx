@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import type { FactionId, ShipTokenV2 } from '@vt/shared/types';
+import type { FactionId, ShipTokenV2 } from '@vt/contracts/types';
 
 // 样式
 const styles = {
@@ -43,7 +43,7 @@ const styles = {
     padding: '8px',
     marginBottom: '4px',
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '13px',
   },
   shipName: {
@@ -58,7 +58,7 @@ const styles = {
     marginLeft: '8px',
     backgroundColor: 'var(--color-error-light)',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '0',
     cursor: 'pointer',
     fontSize: '11px',
     color: 'var(--color-error)',
@@ -72,7 +72,7 @@ const styles = {
   readyButton: {
     width: '100%',
     padding: '12px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '14px',

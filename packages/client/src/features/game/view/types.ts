@@ -7,7 +7,7 @@
  * 3. 渲染管道配置
  */
 
-import type { CameraState } from '@vt/shared/types';
+import type { CameraState } from '@vt/contracts/types';
 
 /**
  * 图层 ID 枚举

@@ -1,17 +1,17 @@
 /**
  * 6 象限护甲可视化组件
  * 
- * 以六边形形式直观显示各象限护甲值
+ * 以六边形形式直观显示各象限护甲状态
  */
 
 import React from 'react';
-import type { ShipState } from '@vt/shared';
+import type { ShipState } from '@vt/contracts';
 
 const styles = {
   container: {
     padding: '12px',
     backgroundColor: 'rgba(10, 30, 50, 0.8)',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
   },
   header: {
@@ -37,7 +37,7 @@ const styles = {
   quadrantItem: {
     padding: '6px',
     backgroundColor: 'rgba(6, 16, 26, 0.6)',
-    borderRadius: '4px',
+    borderRadius: '0',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '3px',
@@ -54,12 +54,12 @@ const styles = {
   armorBar: {
     height: '4px',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: '2px',
+    borderRadius: '0',
     overflow: 'hidden',
   },
   armorBarFill: {
     height: '100%',
-    borderRadius: '2px',
+    borderRadius: '0',
     transition: 'width 0.3s ease',
   },
   hint: {

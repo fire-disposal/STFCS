@@ -1,7 +1,7 @@
 /**
  * 设置菜单组件
  * 
- * 提供游戏设置选项：
+ * 提供游戏设置选项
  * - 坐标精度设置
  * - 视角设置
  * - 游戏设置
@@ -27,7 +27,7 @@ const styles = {
   },
   modal: {
     backgroundColor: 'rgba(6, 16, 26, 0.98)',
-    borderRadius: '12px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     minWidth: '500px',
     maxWidth: '600px',
@@ -70,7 +70,7 @@ const styles = {
   },
   tab: {
     padding: '8px 16px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: 'transparent',
     color: '#8ba4c7',
@@ -113,7 +113,7 @@ const styles = {
   },
   select: {
     padding: '6px 12px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -123,7 +123,7 @@ const styles = {
   toggle: {
     width: '44px',
     height: '22px',
-    borderRadius: '11px',
+    borderRadius: '0',
     border: 'none',
     backgroundColor: '#2b4261',
     cursor: 'pointer',
@@ -139,7 +139,7 @@ const styles = {
     left: '3px',
     width: '16px',
     height: '16px',
-    borderRadius: '50%',
+    borderRadius: '0',
     backgroundColor: '#cfe8ff',
     transition: 'all 0.2s',
   },
@@ -155,7 +155,7 @@ const styles = {
   button: {
     flex: 1,
     padding: '10px 16px',
-    borderRadius: '6px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -259,7 +259,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                   <div>
                     <div style={styles.settingLabel}>坐标显示精度</div>
                     <div style={styles.settingHint}>
-                      太空环境推荐使用舍入到 10
+                      太空环境推荐使用舍入 10
                     </div>
                   </div>
                   <select
@@ -268,8 +268,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     onChange={(e) => setCoordinatePrecision(e.target.value as CoordinatePrecision)}
                   >
                     <option value="exact">精确 (1 单位)</option>
-                    <option value="rounded10">舍入到 10</option>
-                    <option value="rounded100">舍入到 100</option>
+                    <option value="rounded10">舍入 10</option>
+                    <option value="rounded100">舍入 100</option>
                   </select>
                 </div>
               </div>
@@ -280,7 +280,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                   <div>
                     <div style={styles.settingLabel}>角度显示格式</div>
                     <div style={styles.settingHint}>
-                      航海角度：北为 0°，顺时针
+                      航海角度：北=0°，顺时针
                     </div>
                   </div>
                   <select

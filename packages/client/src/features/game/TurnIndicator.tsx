@@ -2,7 +2,7 @@
  * 回合状态指示器
  *
  * 显示当前游戏状态：
- * - 当前阶段（部署/玩家回合/DM回合/结算）
+ * - 当前阶段（部署 / 玩家回合 / DM回合 / 结算）
  * - 回合数
  * - 活跃阵营
  * - 阶段进度指示
@@ -13,14 +13,15 @@ import React, { useMemo } from 'react';
 // 样式定义
 const styles = {
   container: {
-    backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '8px',
-    padding: '12px 16px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-    border: '1px solid #2b4261',
+    backgroundColor: 'rgba(6, 16, 26, 0.84)',
+    borderRadius: '0',
+    padding: '8px 10px',
+    boxShadow: '0 10px 24px rgba(0, 0, 0, 0.26)',
+    border: '1px solid rgba(74, 158, 255, 0.22)',
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '8px',
+    backdropFilter: 'blur(10px)',
   },
   phaseIndicator: {
     display: 'flex',
@@ -30,34 +31,36 @@ const styles = {
   phaseDot: {
     width: '12px',
     height: '12px',
-    borderRadius: '50%',
+    borderRadius: '0',
     transition: 'all 0.3s ease',
   },
   phaseDotActive: {
     boxShadow: '0 0 8px currentColor',
   },
   phaseLabel: {
-    fontSize: '14px',
+    fontSize: '11px',
     fontWeight: 'bold',
     color: '#cfe8ff',
+    letterSpacing: '0.04em',
   },
   turnCounter: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    backgroundColor: '#1a2d42',
-    borderRadius: '4px',
+    gap: '5px',
+    padding: '4px 8px',
+    backgroundColor: 'rgba(26, 45, 66, 0.8)',
+    borderRadius: '0',
+    border: '1px solid rgba(74, 158, 255, 0.16)',
   },
   turnNumber: {
-    fontSize: '16px',
+    fontSize: '13px',
     fontWeight: 'bold',
     color: '#43c1ff',
   },
   factionBadge: {
-    padding: '6px 12px',
-    borderRadius: '4px',
-    fontSize: '12px',
+    padding: '4px 8px',
+    borderRadius: '0',
+    fontSize: '10px',
     fontWeight: 'bold',
     display: 'flex',
     alignItems: 'center',
@@ -67,13 +70,13 @@ const styles = {
     width: '100%',
     height: '4px',
     backgroundColor: '#1a2d42',
-    borderRadius: '2px',
+    borderRadius: '0',
     overflow: 'hidden',
     marginTop: '8px',
   },
   progressFill: {
     height: '100%',
-    borderRadius: '2px',
+    borderRadius: '0',
     transition: 'width 0.3s ease',
   },
   phaseList: {
@@ -82,10 +85,33 @@ const styles = {
     marginTop: '8px',
   },
   phaseItem: {
+    padding: '3px 7px',
+    borderRadius: '0',
+    fontSize: '9px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s ease',
+  },
+  compactWrap: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  compactProgress: {
+    width: '100%',
+    height: '2px',
+    backgroundColor: 'rgba(26, 45, 66, 0.72)',
+    borderRadius: '0',
+    overflow: 'hidden',
+  },
+  compactAction: {
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
+    border: '1px solid rgba(255, 111, 143, 0.5)',
+    backgroundColor: 'rgba(90, 42, 58, 0.82)',
+    color: '#ffb3c0',
     fontSize: '10px',
     fontWeight: 'bold',
+    cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
 };
@@ -148,27 +174,46 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
   if (compact) {
     return (
       <div style={styles.container}>
-        <div style={styles.phaseIndicator}>
-          <div style={{
-            ...styles.phaseDot,
-            backgroundColor: currentPhaseConfig.color,
-            ...styles.phaseDotActive,
-          }} />
-          <span style={styles.phaseLabel}>
-            {currentPhaseConfig.icon} {currentPhaseConfig.name}
-          </span>
+        <div style={styles.compactWrap}>
+          <div style={styles.phaseIndicator}>
+            <div style={{
+              ...styles.phaseDot,
+              width: '10px',
+              height: '10px',
+              backgroundColor: currentPhaseConfig.color,
+              ...styles.phaseDotActive,
+            }} />
+            <span style={styles.phaseLabel}>
+              {currentPhaseConfig.icon} {currentPhaseConfig.name}
+            </span>
+          </div>
+          <div style={styles.compactProgress}>
+            <div style={{
+              ...styles.progressFill,
+              width: `${progressPercent}%`,
+              backgroundColor: currentPhaseConfig.color,
+            }} />
+          </div>
         </div>
+
         <div style={styles.turnCounter}>
-          <span style={{ color: '#8ba4c7', fontSize: '12px' }}>回合</span>
+          <span style={{ color: '#8ba4c7', fontSize: '11px' }}>回合</span>
           <span style={styles.turnNumber}>{turnCount}</span>
         </div>
+
         <div style={{
           ...styles.factionBadge,
           backgroundColor: factionStyle.bg,
           color: factionStyle.text,
         }}>
-          {factionStyle.icon} {activeFaction === 'player' ? '玩家行动' : 'DM行动'}
+          {factionStyle.icon} {activeFaction === 'player' ? '玩家' : 'DM'}
         </div>
+
+        {playerRole === 'dm' && onNextPhase && (
+          <button style={styles.compactAction} onClick={onNextPhase}>
+            下一阶段
+          </button>
+        )}
       </div>
     );
   }

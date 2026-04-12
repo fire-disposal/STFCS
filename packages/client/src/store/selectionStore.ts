@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import type { ShipState } from '@vt/shared';
+import type { ShipState } from '@vt/contracts';
 
 /**
  * 交互模式枚举

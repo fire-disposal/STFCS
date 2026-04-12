@@ -1,6 +1,6 @@
 import { useAppSelector } from "@/store";
 import { updateToken } from "@/store/slices/mapSlice";
-import type { TokenInfo } from "@vt/shared/types";
+import type { TokenInfo } from "@vt/contracts/types";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Rocket, Satellite, MapPin, RotateCcw, RotateCw, Check, Zap, SkipForward } from "lucide-react";

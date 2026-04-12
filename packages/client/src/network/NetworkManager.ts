@@ -4,15 +4,18 @@
  * 简化版 - 去除 OAuth 认证，直接使用用户名
  */
 
-import { Client, Room } from "colyseus.js";
-import type { GameRoomState } from "@vt/shared";
-import { DEFAULT_WS_URL } from "@/config";
+import { Client, Room } from "@colyseus/sdk";
+import type { GameRoomState } from "@vt/contracts";
 
 export interface RoomInfo {
   id: string;
   name: string;
   clients: number;
   maxClients: number;
+  ownerId: string | null;
+  ownerShortId: number | null;
+  phase: string;
+  isPrivate: boolean;
   metadata?: Record<string, unknown>;
 }
 
@@ -21,19 +24,42 @@ export interface User {
 }
 
 export class NetworkManager {
+  private static readonly USERNAME_STORAGE_KEY = 'stfcs_username';
+  private static readonly SHORT_ID_STORAGE_KEY = 'stfcs_short_id';
+  private readonly serverUrl: string;
+  private readonly httpBaseUrl: string;
   private client: Client;
   private currentRoom: Room<GameRoomState> | null = null;
   public userName: string | null = null;
+  private shortId: number | null = null;
   private roomsCache: RoomInfo[] = [];
   private roomsListeners: Set<(rooms: RoomInfo[]) => void> = new Set();
   private roomsInterval: number | null = null;
+  private roomsPollingIntervalMs: number = 5000;
+  private hasVisibilityListener: boolean = false;
+  private activeRoomOperation: Promise<Room<GameRoomState>> | null = null;
+  private roomLeaveOperation: Promise<void> | null = null;
+  private roomsRequestInFlight: Promise<RoomInfo[]> | null = null;
+  private roomsRequestAbortController: AbortController | null = null;
+  private static readonly ROOM_OPERATION_TIMEOUT_MS = 12000;
+  private readonly handleVisibilityChange = (): void => {
+    if (typeof document === 'undefined') {
+      return;
+    }
 
-  // 时序安全保护
-  private isCreatingRoom: boolean = false;
-  private isJoiningRoom: boolean = false;
-  private isLeavingRoom: boolean = false;
+    if (document.visibilityState === 'visible') {
+      this.enableRoomsInterval();
+      this.getRooms();
+      return;
+    }
+
+    this.disableRoomsInterval();
+    this.roomsRequestAbortController?.abort();
+  };
 
   constructor(serverUrl: string) {
+    this.serverUrl = serverUrl;
+    this.httpBaseUrl = this.toHttpBaseUrl(serverUrl);
     this.client = new Client(serverUrl);
   }
 
@@ -44,17 +70,23 @@ export class NetworkManager {
    */
   setUser(username: string): void {
     this.userName = username.trim() || 'Player';
-    localStorage.setItem('stfcs_username', this.userName);
+    localStorage.setItem(NetworkManager.USERNAME_STORAGE_KEY, this.userName);
+    this.shortId = this.shortId ?? this.restoreOrCreateShortId();
+    localStorage.setItem(NetworkManager.SHORT_ID_STORAGE_KEY, String(this.shortId));
+
     console.log('[NetworkManager] User set:', this.userName);
+    console.log('[NetworkManager] Short id:', this.shortId);
   }
 
   /**
    * 从本地存储恢复用户名
    */
   restoreUser(): boolean {
-    const username = localStorage.getItem('stfcs_username');
+    const username = localStorage.getItem(NetworkManager.USERNAME_STORAGE_KEY);
     if (username) {
       this.userName = username;
+      this.shortId = this.restoreOrCreateShortId();
+      localStorage.setItem(NetworkManager.SHORT_ID_STORAGE_KEY, String(this.shortId));
       return true;
     }
     return false;
@@ -65,7 +97,7 @@ export class NetworkManager {
    */
   logout(): void {
     this.userName = null;
-    localStorage.removeItem('stfcs_username');
+    localStorage.removeItem(NetworkManager.USERNAME_STORAGE_KEY);
 
     if (this.currentRoom) {
       this.currentRoom.leave();
@@ -78,6 +110,14 @@ export class NetworkManager {
    */
   getUserName(): string | null {
     return this.userName;
+  }
+
+  getShortId(): number | null {
+    return this.shortId;
+  }
+
+  getCurrentRoomId(): string | null {
+    return this.currentRoom?.roomId ?? null;
   }
 
   /**
@@ -93,54 +133,94 @@ export class NetworkManager {
    * 获取房间列表
    */
   async getRooms(): Promise<RoomInfo[]> {
-    try {
-      const httpUrl = DEFAULT_WS_URL.replace('ws://', 'http://').replace('wss://', 'https://');
-      const response = await fetch(`${httpUrl}/matchmake`);
+    if (this.roomsRequestInFlight) {
+      return this.roomsRequestInFlight;
+    }
+
+    this.roomsRequestAbortController = new AbortController();
+    const currentController = this.roomsRequestAbortController;
+
+    this.roomsRequestInFlight = (async () => {
+      try {
+      const response = await fetch(`${this.httpBaseUrl}/matchmake`, {
+        signal: currentController.signal,
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch rooms');
       }
 
       const data = await response.json();
-      const battleRooms = data
-        .filter((r: any) => r.name === 'battle')
-        .map((r: any) => ({
-          id: r.roomId,
-          name: r.metadata?.name || `Room ${r.roomId.substring(0, 6)}`,
-          clients: r.clients,
-          maxClients: r.maxClients,
-          metadata: r.metadata || {},
-        }));
+      const rooms = Array.isArray(data) ? data : [];
+      const battleRooms = rooms
+        .filter((r: Record<string, unknown>) => {
+          const roomType = String(r.name || '');
+          const metadata = (r.metadata as Record<string, unknown> | undefined) || {};
+          const metadataRoomType = String(metadata.roomType || '');
+          return roomType === 'battle' || metadataRoomType === 'battle';
+        })
+        .map((r: Record<string, unknown>) => {
+          const roomId = String(r.roomId || '');
+          const metadata = (r.metadata as Record<string, unknown> | undefined) || {};
+          const displayName = String(metadata.name || `Room ${roomId.substring(0, 6)}`);
+          const ownerShortId = this.normalizeShortId(metadata.ownerShortId);
+          return {
+            id: roomId,
+            name: displayName,
+            clients: Number(r.clients || 0),
+            maxClients: Number(r.maxClients || metadata.maxPlayers || 8),
+            ownerId: typeof metadata.ownerId === 'string' ? metadata.ownerId : null,
+            ownerShortId,
+            phase: String(metadata.phase || 'lobby'),
+            isPrivate: Boolean(metadata.isPrivate),
+            metadata,
+          };
+        })
+        .filter((r) => r.id.length > 0);
 
       this.roomsCache = battleRooms;
       this.notifyRoomsListeners();
       return battleRooms;
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return this.roomsCache;
+      }
+
       console.error('[NetworkManager] Failed to get rooms:', error);
       return [];
+    } finally {
+      if (this.roomsRequestAbortController === currentController) {
+        this.roomsRequestAbortController = null;
+      }
+      this.roomsRequestInFlight = null;
     }
+    })();
+
+    return this.roomsRequestInFlight;
   }
 
   /**
    * 开始定期更新房间列表
    */
   startRoomsPolling(intervalMs: number = 5000): void {
-    this.stopRoomsPolling();
-    this.getRooms();
+    this.roomsPollingIntervalMs = intervalMs;
+    this.enableVisibilityListener();
 
-    this.roomsInterval = window.setInterval(() => {
-      this.getRooms();
-    }, intervalMs);
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return;
+    }
+
+    this.enableRoomsInterval();
+    this.getRooms();
   }
 
   /**
    * 停止定期更新房间列表
    */
   stopRoomsPolling(): void {
-    if (this.roomsInterval !== null) {
-      window.clearInterval(this.roomsInterval);
-      this.roomsInterval = null;
-    }
+    this.disableRoomsInterval();
+    this.disableVisibilityListener();
+    this.roomsRequestAbortController?.abort();
   }
 
   /**
@@ -156,29 +236,74 @@ export class NetworkManager {
     this.roomsListeners.forEach(listener => listener(this.roomsCache));
   }
 
+  private enableRoomsInterval(): void {
+    if (this.roomsInterval !== null) {
+      return;
+    }
+
+    this.roomsInterval = window.setInterval(() => {
+      this.getRooms();
+    }, this.roomsPollingIntervalMs);
+  }
+
+  private disableRoomsInterval(): void {
+    if (this.roomsInterval !== null) {
+      window.clearInterval(this.roomsInterval);
+      this.roomsInterval = null;
+    }
+  }
+
+  private enableVisibilityListener(): void {
+    if (this.hasVisibilityListener || typeof document === 'undefined') {
+      return;
+    }
+
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    this.hasVisibilityListener = true;
+  }
+
+  private disableVisibilityListener(): void {
+    if (!this.hasVisibilityListener || typeof document === 'undefined') {
+      return;
+    }
+
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    this.hasVisibilityListener = false;
+  }
+
   /**
    * 创建房间
    */
   async createRoom(options: { roomName?: string; maxPlayers?: number } = {}): Promise<Room<GameRoomState>> {
-    const playerName = this.userName || 'Player';
+    if (this.activeRoomOperation) {
+      return this.activeRoomOperation;
+    }
+
+    const playerName = this.getValidatedPlayerName();
 
     console.log('[NetworkManager] Creating room...', {
       playerName,
-      serverUrl: DEFAULT_WS_URL,
+      serverUrl: this.serverUrl,
     });
 
-    try {
+    this.activeRoomOperation = (async () => {
       // 添加更详细的日志
       console.log('[NetworkManager] Calling client.create with room name: battle');
 
-      // 检查是否有用户名
-      if (!this.userName) {
-        throw new Error('请先设置用户名');
-      }
+      await this.leaveCurrentRoomIfNeeded();
 
-      const room = await this.client.create<GameRoomState>('battle', {
-        playerName,
-      });
+      const room = await this.withRoomOperationTimeout(
+        this.client.create<GameRoomState>(
+          'battle',
+          {
+            playerName,
+            shortId: this.getValidatedShortId(),
+            roomName: options.roomName?.trim(),
+            maxPlayers: options.maxPlayers,
+          },
+        ),
+        '创建房间',
+      );
 
       console.log('[NetworkManager] client.create returned:', room);
       console.log('[NetworkManager] room.roomId:', room?.roomId);
@@ -189,82 +314,294 @@ export class NetworkManager {
         throw new Error('服务器返回无效的房间对象');
       }
 
-      this.currentRoom = room;
+      this.bindRoomLifecycle(room);
       console.log('[NetworkManager] Room created:', room.roomId);
       return room;
-    } catch (error: unknown) {
+    })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to create room:', error);
-      
-      // 改进错误处理
-      let errorMessage = '创建房间失败：未知错误';
-      
-      if (error instanceof Error) {
-        errorMessage = `创建房间失败：${error.message || '未知错误'}`;
-      } else if (typeof error === 'string') {
-        errorMessage = `创建房间失败：${error}`;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = `创建房间失败：${String((error as Record<string, unknown>).message)}`;
-      }
+      const errorMessage = `创建房间失败：${this.toErrorMessage(error, '未知错误')}`;
 
       console.error('[NetworkManager] Error details:', {
         message: errorMessage,
         errorType: typeof error,
         errorName: error instanceof Error ? error.name : 'Unknown',
       });
-      
+
       throw new Error(errorMessage);
-    }
+    }).finally(() => {
+      this.activeRoomOperation = null;
+    });
+
+    return this.activeRoomOperation;
   }
 
   /**
    * 加入房间
    */
   async joinRoom(roomId: string): Promise<Room<GameRoomState>> {
+    if (this.activeRoomOperation) {
+      return this.activeRoomOperation;
+    }
+
     console.log('[NetworkManager] Joining room:', roomId);
 
-    try {
-      const room = await this.client.joinById<GameRoomState>(roomId, {
-        playerName: this.userName || 'Player',
-      });
+    this.activeRoomOperation = (async () => {
+      const playerName = this.getValidatedPlayerName();
+      await this.leaveCurrentRoomIfNeeded();
+
+      const room = await this.withRoomOperationTimeout(
+        this.client.joinById<GameRoomState>(
+          roomId,
+          {
+            playerName,
+            shortId: this.getValidatedShortId(),
+          },
+        ),
+        '加入房间',
+      );
 
       if (!room?.roomId) {
         throw new Error('服务器返回无效的房间对象');
       }
 
-      this.currentRoom = room;
+      this.bindRoomLifecycle(room);
       console.log('[NetworkManager] Joined room:', room.roomId);
       return room;
-    } catch (error: any) {
+    })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to join room:', error);
-      throw new Error(`加入房间失败：${error.message}`);
-    }
+      throw new Error(`加入房间失败：${this.toErrorMessage(error, '未知错误')}`);
+    }).finally(() => {
+      this.activeRoomOperation = null;
+    });
+
+    return this.activeRoomOperation;
   }
 
   /**
    * 加入或创建房间
    */
   async joinOrCreateRoom(): Promise<Room<GameRoomState>> {
-    try {
-      const room = await this.client.joinOrCreate<GameRoomState>('battle', {
-        playerName: this.userName || 'Player',
-      });
+    if (this.activeRoomOperation) {
+      return this.activeRoomOperation;
+    }
 
-      this.currentRoom = room;
+    this.activeRoomOperation = (async () => {
+      const playerName = this.getValidatedPlayerName();
+      await this.leaveCurrentRoomIfNeeded();
+
+      const room = await this.withRoomOperationTimeout(
+        this.client.joinOrCreate<GameRoomState>(
+          'battle',
+          {
+            playerName,
+            shortId: this.getValidatedShortId(),
+          },
+        ),
+        '加入/创建房间',
+      );
+
+      this.bindRoomLifecycle(room);
       console.log('[NetworkManager] Joined/created room:', room.roomId);
       return room;
-    } catch (error: any) {
+    })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to join/create room:', error);
-      throw new Error(`加入/创建房间失败：${error.message}`);
-    }
+      throw new Error(`加入/创建房间失败：${this.toErrorMessage(error, '未知错误')}`);
+    }).finally(() => {
+      this.activeRoomOperation = null;
+    });
+
+    return this.activeRoomOperation;
   }
 
   /**
    * 离开房间
    */
   async leaveRoom(): Promise<void> {
-    if (this.currentRoom) {
-      await this.currentRoom.leave();
+    await this.leaveCurrentRoomIfNeeded();
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    const shortId = this.getValidatedShortId();
+    const response = await fetch(`${this.httpBaseUrl}/api/rooms/${encodeURIComponent(roomId)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-short-id': String(shortId),
+      },
+    });
+
+    if (!response.ok) {
+      let message = '删除房间失败';
+      try {
+        const data = await response.json();
+        if (typeof data?.message === 'string' && data.message.trim()) {
+          message = data.message;
+        }
+      } catch {
+        // ignore
+      }
+
+      throw new Error(message);
+    }
+
+    if (this.currentRoom?.roomId === roomId) {
       this.currentRoom = null;
+    }
+    await this.getRooms();
+  }
+
+  private async leaveCurrentRoomIfNeeded(): Promise<void> {
+    if (this.roomLeaveOperation) {
+      await this.roomLeaveOperation;
+      return;
+    }
+
+    if (!this.currentRoom) {
+      return;
+    }
+
+    const roomToLeave = this.currentRoom;
+
+    this.roomLeaveOperation = (async () => {
+      try {
+        await roomToLeave.leave();
+      } catch (error) {
+        console.warn('[NetworkManager] Failed to leave previous room:', error);
+      } finally {
+        if (this.currentRoom === roomToLeave) {
+          this.currentRoom = null;
+        }
+        this.roomLeaveOperation = null;
+      }
+    })();
+
+    await this.roomLeaveOperation;
+  }
+
+  private bindRoomLifecycle(room: Room<GameRoomState>): void {
+    this.currentRoom = room;
+
+    room.onMessage('identity', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+
+      const shortId = this.normalizeShortId((payload as Record<string, unknown>).shortId);
+      if (shortId === null) {
+        return;
+      }
+
+      this.shortId = shortId;
+      localStorage.setItem(NetworkManager.SHORT_ID_STORAGE_KEY, String(shortId));
+      console.log('[NetworkManager] Identity synced from server, short id:', shortId);
+    });
+
+    room.onLeave(() => {
+      if (this.currentRoom === room) {
+        this.currentRoom = null;
+      }
+    });
+
+    room.onError(() => {
+      if (this.currentRoom === room) {
+        this.currentRoom = null;
+      }
+    });
+
+    room.onDrop(() => {
+      if (this.currentRoom === room) {
+        this.currentRoom = null;
+      }
+    });
+  }
+
+  private getValidatedPlayerName(): string {
+    const playerName = this.userName?.trim();
+    if (!playerName) {
+      throw new Error('请先设置用户名');
+    }
+    return playerName;
+  }
+
+  private getValidatedShortId(): number {
+    const normalized = this.normalizeShortId(this.shortId);
+    if (normalized !== null) {
+      this.shortId = normalized;
+      localStorage.setItem(NetworkManager.SHORT_ID_STORAGE_KEY, String(normalized));
+      return normalized;
+    }
+
+    const generated = this.generateShortId();
+    this.shortId = generated;
+    localStorage.setItem(NetworkManager.SHORT_ID_STORAGE_KEY, String(generated));
+    return generated;
+  }
+
+  private normalizeShortId(value: unknown): number | null {
+    const num = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN;
+    if (!Number.isInteger(num)) {
+      return null;
+    }
+
+    if (num < 100000 || num > 999999) {
+      return null;
+    }
+
+    return num;
+  }
+
+  private generateShortId(): number {
+    return Math.floor(100000 + Math.random() * 900000);
+  }
+
+  private restoreOrCreateShortId(): number {
+    const stored = localStorage.getItem(NetworkManager.SHORT_ID_STORAGE_KEY);
+    const normalized = this.normalizeShortId(stored);
+    if (normalized !== null) {
+      return normalized;
+    }
+
+    return this.generateShortId();
+  }
+
+  private toHttpBaseUrl(wsUrl: string): string {
+    return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+  }
+
+  private toErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error) {
+      return error.message || fallback;
+    }
+
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (error && typeof error === 'object' && 'message' in error) {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === 'string' && message.length > 0) {
+        return message;
+      }
+    }
+
+    return fallback;
+  }
+
+  private async withRoomOperationTimeout<T>(operation: Promise<T>, actionName: string): Promise<T> {
+    let timer: number | null = null;
+
+    try {
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        timer = window.setTimeout(() => {
+          reject(new Error(`${actionName}超时，请检查服务器连接后重试`));
+        }, NetworkManager.ROOM_OPERATION_TIMEOUT_MS);
+      });
+
+      return await Promise.race([operation, timeoutPromise]);
+    } finally {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
     }
   }
 
@@ -280,6 +617,10 @@ export class NetworkManager {
    */
   dispose(): void {
     this.stopRoomsPolling();
+    this.roomsRequestAbortController?.abort();
+    this.roomsRequestAbortController = null;
+    this.roomsRequestInFlight = null;
+    this.roomLeaveOperation = null;
     this.roomsListeners.clear();
     this.roomsCache = [];
   }

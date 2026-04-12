@@ -54,15 +54,15 @@ jobs:
       - name: Run typecheck
         run: pnpm typecheck
       
-      # 验证 shared 包构建
-      - name: Build shared package
-        run: pnpm --filter @vt/shared build
+      # 验证新架构基础包构建
+      - name: Build core workspace packages
+        run: pnpm --filter @vt/contracts build ; pnpm --filter @vt/rules build
       
-      - name: Verify shared build output
+      - name: Verify core package build output
         run: |
-          test -f packages/shared/dist/index.js || exit 1
-          test -f packages/shared/dist/index.d.ts || exit 1
-          echo "✓ Shared package build verified"
+          test -f packages/contracts/dist/index.js || exit 1
+          test -f packages/rules/dist/index.js || exit 1
+          echo "✓ Core packages build verified"
 
   # ==================== 测试阶段 ====================
   test:
@@ -85,8 +85,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Build shared package
-        run: pnpm --filter @vt/shared build
+      - name: Build core workspace packages
+        run: pnpm --filter @vt/contracts build ; pnpm --filter @vt/rules build
       
       - name: Run tests
         run: pnpm test || true  # 允许测试失败但会通知

@@ -1,7 +1,7 @@
 /**
  * 视图旋转控制面板
  * 
- * 提供地图视图旋转控制功能：
+ * 提供地图视图旋转控制功能
  * - 手动旋转视图
  * - 对齐到选中舰船的朝向
  * - 重置视图旋转
@@ -9,13 +9,13 @@
 
 import React, { useState, useCallback } from 'react';
 import { useUIStore } from '@/store/uiStore';
-import type { ShipState } from '@vt/shared';
+import type { ShipState } from '@vt/contracts';
 import { calculateViewRotationForAlignment, formatAngle } from '@/utils/angleSystem';
 
 const styles = {
   panel: {
     backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '12px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
     border: '1px solid #2b4261',
@@ -42,7 +42,7 @@ const styles = {
   button: {
     flex: 1,
     padding: '6px 10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -58,7 +58,7 @@ const styles = {
   input: {
     width: '60px',
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -69,7 +69,7 @@ const styles = {
     color: '#8ba4c7',
     padding: '4px 8px',
     backgroundColor: 'rgba(10, 30, 50, 0.5)',
-    borderRadius: '4px',
+    borderRadius: '0',
     minWidth: '80px',
     textAlign: 'center' as const,
   },

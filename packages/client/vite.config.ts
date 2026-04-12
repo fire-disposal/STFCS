@@ -7,14 +7,28 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "src"),
-			"@vt/shared": resolve(__dirname, "../shared/src"),
-			"@vt/shared/types": resolve(__dirname, "../shared/src/types/index.ts"),
-			"@vt/shared/constants": resolve(__dirname, "../shared/src/constants/index.ts"),
+			"@vt/contracts": resolve(__dirname, "../contracts/src/index.ts"),
+			"@vt/contracts/types": resolve(__dirname, "../contracts/src/types/index.ts"),
+			"@vt/contracts/constants": resolve(__dirname, "../contracts/src/constants/index.ts"),
+			"@vt/contracts/protocol": resolve(__dirname, "../contracts/src/protocol/index.ts"),
+			"@vt/contracts/core-types": resolve(__dirname, "../contracts/src/core-types.ts"),
+			"@vt/contracts/config": resolve(__dirname, "../contracts/src/config/index.ts"),
+			"@vt/rules": resolve(__dirname, "../rules/src/index.ts"),
+			"@vt/rules/math": resolve(__dirname, "../rules/src/math/index.ts"),
+			"@vt/rules/data/ShipHullSchema": resolve(__dirname, "../rules/src/data/ShipHullSchema.ts"),
+			"@vt/rules/data/WeaponSchema": resolve(__dirname, "../rules/src/data/WeaponSchema.ts"),
 		},
 	},
 	server: {
 		port: 5173,
+		strictPort: true,
 		host: true,
+		hmr: {
+			protocol: "ws",
+			host: "localhost",
+			port: 5173,
+			clientPort: 5173,
+		},
 	},
 	build: {
 		outDir: "dist",

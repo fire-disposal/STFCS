@@ -9,7 +9,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@vt/shared': path.resolve(__dirname, '../shared/src'),
+      '@vt/contracts': path.resolve(__dirname, '../contracts/src'),
+      '@vt/rules': path.resolve(__dirname, '../rules/src'),
     },
   },
 });

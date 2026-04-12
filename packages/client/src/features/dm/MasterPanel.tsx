@@ -9,7 +9,7 @@ import React, { useState, useCallback } from 'react';
 const styles = {
   panel: {
     backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '12px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
     border: '1px solid #7c3aed',
@@ -28,7 +28,7 @@ const styles = {
     marginBottom: '10px',
     padding: '8px',
     backgroundColor: 'rgba(10, 30, 50, 0.5)',
-    borderRadius: '4px',
+    borderRadius: '0',
   },
   sectionTitle: {
     fontSize: '10px',
@@ -49,7 +49,7 @@ const styles = {
   input: {
     width: '70px',
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#cfe8ff',
@@ -67,7 +67,7 @@ const styles = {
   resetButton: {
     width: '100%',
     padding: '6px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid #2b4261',
     backgroundColor: '#1a2d42',
     color: '#8ba4c7',

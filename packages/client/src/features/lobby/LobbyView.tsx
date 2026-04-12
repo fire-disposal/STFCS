@@ -13,7 +13,7 @@ import { useAppSelector } from '@/store';
 import { selectCurrentPlayerId } from '@/store/slices/playerSlice';
 import { RoomCard } from './RoomCard';
 import { CreateRoomModal } from './CreateRoomModal';
-import type { RoomInfo } from '@vt/shared/types';
+import type { RoomInfo } from '@vt/contracts/types';
 
 // 样式
 const styles = {
@@ -44,7 +44,7 @@ const styles = {
   },
   nameInput: {
     padding: '8px 16px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     color: 'var(--color-text)',
@@ -67,7 +67,7 @@ const styles = {
   },
   section: {
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '20px',
     marginBottom: '20px',
   },
@@ -81,7 +81,7 @@ const styles = {
   },
   button: {
     padding: '10px 20px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '14px',
@@ -108,7 +108,7 @@ const styles = {
   },
   guide: {
     backgroundColor: 'var(--color-info-light)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '16px',
     fontSize: '13px',
     lineHeight: '1.6',
@@ -223,7 +223,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <li>输入你的名称</li>
               <li>创建房间或加入已有房间</li>
               <li>在房间中选择角色和阵营</li>
-              <li>等待DM开始游戏</li>
+              <li>等待 DM 开始游戏</li>
             </ol>
           </div>
 

@@ -9,12 +9,12 @@
  */
 
 import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { FactionId } from '@vt/shared/types';
+import type { FactionId } from '@vt/contracts/types';
 import type {
 	GamePhase,
 	TurnPhase,
 	ShipActionState,
-} from '@vt/shared/protocol';
+} from '@vt/contracts/protocol';
 
 /**
  * 回合结算结果

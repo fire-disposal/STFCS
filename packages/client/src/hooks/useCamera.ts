@@ -16,7 +16,7 @@ import {
 	panCamera,
 	resetCamera as resetCameraAction,
 } from "@/store/slices/cameraSlice";
-import type { CameraState } from "@vt/shared/types";
+import type { CameraState } from "@vt/contracts/types";
 import { clampZoom } from "@/utils/cameraBounds";
 
 export interface UseCameraReturn extends CameraState {

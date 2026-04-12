@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { GameRoomState, ShipState } from "@vt/shared/schema";
+import type { GameRoomState, ShipState } from "@vt/contracts";
 
 /**
  * 本地UI状态存储
@@ -40,6 +40,10 @@ interface UIState {
   zoom: number;
   showGrid: boolean;
   showRangeIndicator: boolean;
+  showBackground: boolean;
+  showWeaponArcs: boolean;
+  showMovementRange: boolean;
+  hideNativeCursor: boolean;
 
   // 坐标精度设置（用于太空环境）
   coordinatePrecision: 'exact' | 'rounded10' | 'rounded100';
@@ -79,6 +83,10 @@ interface UIActions {
   setZoom: (zoom: number) => void;
   toggleGrid: () => void;
   toggleRangeIndicator: () => void;
+  toggleBackground: () => void;
+  toggleWeaponArcs: () => void;
+  toggleMovementRange: () => void;
+  setHideNativeCursor: (hide: boolean) => void;
   
   // 坐标精度相关
   setCoordinatePrecision: (precision: CoordinatePrecision) => void;
@@ -115,6 +123,10 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   zoom: 1,
   showGrid: true,
   showRangeIndicator: true,
+  showBackground: true,
+  showWeaponArcs: true,
+  showMovementRange: true,
+  hideNativeCursor: false,
   
   // 坐标精度默认为 10 的倍数（适合太空环境）
   coordinatePrecision: 'rounded10',
@@ -159,6 +171,10 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   toggleRangeIndicator: () =>
     set((state) => ({ showRangeIndicator: !state.showRangeIndicator })),
+  toggleBackground: () => set((state) => ({ showBackground: !state.showBackground })),
+  toggleWeaponArcs: () => set((state) => ({ showWeaponArcs: !state.showWeaponArcs })),
+  toggleMovementRange: () => set((state) => ({ showMovementRange: !state.showMovementRange })),
+  setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
   
   // 坐标精度设置
   setCoordinatePrecision: (precision: CoordinatePrecision) => set({ coordinatePrecision: precision }),

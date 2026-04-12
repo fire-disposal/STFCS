@@ -5,8 +5,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import type { ShipHullSpec } from '@vt/shared';
-import { PRESET_SHIPS, getShipHullSpec, getAvailableShips } from '@vt/shared';
+import type { ShipHullSpec } from '@vt/rules';
+import { getShipHullSpec, getAvailableShips } from '@vt/rules';
 
 interface DeploymentPanelProps {
   isDM?: boolean;

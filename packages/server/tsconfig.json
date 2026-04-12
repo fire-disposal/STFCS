@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "lib": [
       "ES2022"
     ],
@@ -20,21 +21,20 @@
       "node",
       "vitest/globals"
     ],
-    "baseUrl": ".",
+    "baseUrl": "../..",
     "paths": {
-      "@vt/shared": [
-        "../shared/src/index.ts"
+      "@vt/rules": [
+        "packages/rules/src/index.ts"
       ],
-      "@vt/shared/*": [
-        "../shared/src/*"
+      "@vt/contracts": [
+        "packages/contracts/src/index.ts"
       ]
     }
   },
   "include": [
     "src/index.ts",
     "src/rooms/**/*.ts",
-    "src/commands/**/*.ts",
-    "../shared/src/**/*.ts"
+    "src/commands/**/*.ts"
   ],
   "exclude": [
     "node_modules",

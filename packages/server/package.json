@@ -6,7 +6,7 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build && node --watch --experimental-specifier-resolution=node --loader ts-node/esm src/index.ts",
     "start": "tsx src/index.ts",
     "build": "tsup src/index.ts --format esm --dts",
     "test": "vitest run",
@@ -22,10 +22,12 @@
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "dependencies": {
+    "@colyseus/schema": "^4.0.19",
     "@colyseus/core": "^0.17.41",
     "@colyseus/monitor": "^0.17.8",
     "@colyseus/ws-transport": "^0.17.13",
-    "@vt/shared": "workspace:*",
+    "@vt/contracts": "workspace:*",
+    "@vt/rules": "workspace:*",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "ws": "^8.19.0"

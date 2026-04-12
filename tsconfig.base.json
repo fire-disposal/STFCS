@@ -19,8 +19,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@vt/shared": ["packages/shared/src/index.ts"],
-      "@vt/shared/*": ["packages/shared/src/*"]
+      "@vt/contracts": ["packages/contracts/src/index.ts"],
+      "@vt/rules": ["packages/rules/src/index.ts"]
     },
     "declaration": true,
     "declarationMap": true,

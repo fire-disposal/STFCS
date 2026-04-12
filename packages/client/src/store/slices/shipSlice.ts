@@ -6,7 +6,7 @@ import type {
 	ShipMovement,
 	WeaponSpec,
 	WeaponMount,
-} from "@vt/shared/types";
+} from "@vt/contracts/types";
 
 export type FluxType = "soft" | "hard";
 

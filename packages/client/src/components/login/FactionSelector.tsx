@@ -7,8 +7,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, Swords, Check } from 'lucide-react';
-import type { FactionId } from '@vt/shared/types';
-import { FACTIONS, getFactionList } from '@vt/shared/constants';
+import type { FactionId } from '@vt/contracts/types';
+import { FACTIONS, getFactionList } from '@vt/contracts/constants';
 
 interface FactionSelectorProps {
 	selectedFaction: FactionId | null;

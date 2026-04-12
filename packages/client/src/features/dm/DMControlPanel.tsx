@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { ShipState, PlayerState } from '@vt/shared';
+import type { ShipState, PlayerState } from '@vt/contracts';
 
 // 样式定义
 const styles = {

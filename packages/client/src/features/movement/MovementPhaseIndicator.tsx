@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import type { MovementPhase } from '@vt/shared/types';
+import type { MovementPhase } from '@vt/contracts/types';
 
 // 样式
 const styles = {
@@ -15,7 +15,7 @@ const styles = {
     gap: '8px',
     padding: '8px 12px',
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '12px',
   },
   phaseIndicator: {
@@ -25,7 +25,7 @@ const styles = {
   phaseDot: {
     width: '8px',
     height: '8px',
-    borderRadius: '50%',
+    borderRadius: '0',
     transition: 'all 0.3s ease',
   },
   phaseDotComplete: {

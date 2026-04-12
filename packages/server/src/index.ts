@@ -4,16 +4,16 @@
 
 import express from "express";
 import { createServer } from "http";
-import { Server, ServerOptions } from "@colyseus/core";
+import { Server, ServerOptions, matchMaker } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
 import cors from "cors";
 
 // 房间
-import { BattleRoom } from "./rooms/BattleRoom";
+import { BattleRoom } from "./rooms/BattleRoom.js";
 
 // 认证
-import { userStore } from "./services/authService";
+import { userStore } from "./services/authService.js";
 import type { LoginRequest, RegisterRequest } from "./types/auth";
 
 // ==================== 配置 ====================
@@ -148,25 +148,61 @@ app.get("/health", (req, res) => {
 
 // Colyseus 匹配端点（用于获取房间列表）
 app.get("/matchmake", (req, res) => {
-  try {
-    // Colyseus 标准方式获取房间列表
-    // @ts-ignore - 访问 Colyseus 内部房间列表
-    const rooms = Array.from(gameServer['~rooms'].values());
-    console.log('[Server] getAvailableRooms:', rooms.length, 'rooms found');
-    
-    res.json(rooms.map((room: any) => {
-      const metadata = room.metadata || {};
-      return {
-        roomId: room.roomId,
-        name: metadata.name || room.roomId,
-        clients: room.clients?.length || 0,
-        maxClients: room.maxClients,
-        metadata: metadata,
-      };
-    }));
-  } catch (error) {
+  matchMaker.query({ name: 'battle' })
+    .then((rooms) => {
+      console.log('[Server] getAvailableRooms:', rooms.length, 'rooms found');
+
+      res.json(rooms.map((room) => {
+        const metadata = (room.metadata as Record<string, unknown> | undefined) || {};
+        return {
+          roomId: room.roomId,
+          name: room.name,
+          clients: room.clients,
+          maxClients: room.maxClients,
+          roomType: room.name,
+          metadata,
+        };
+      }));
+    })
+    .catch((error) => {
     console.error('[Server] Error in /matchmake:', error);
     res.json([]);
+  });
+});
+
+app.delete('/api/rooms/:roomId', async (req, res) => {
+  try {
+    const roomId = String(req.params.roomId || '').trim();
+    const shortIdValue = req.header('x-short-id') || req.query.shortId;
+    const shortId = Number(shortIdValue);
+
+    if (!roomId) {
+      return res.status(400).json({ success: false, message: '缺少房间 ID' });
+    }
+
+    if (!Number.isInteger(shortId) || shortId < 100000 || shortId > 999999) {
+      return res.status(400).json({ success: false, message: '缺少有效的房主标识' });
+    }
+
+    const rooms = await matchMaker.query({ name: 'battle' });
+    const room = rooms.find((item) => item.roomId === roomId);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: '房间不存在或已删除' });
+    }
+
+    const metadata = (room.metadata as Record<string, unknown> | undefined) || {};
+    const ownerShortId = Number(metadata.ownerShortId);
+
+    if (!Number.isInteger(ownerShortId) || ownerShortId !== shortId) {
+      return res.status(403).json({ success: false, message: '仅房主可删除房间' });
+    }
+
+    await matchMaker.remoteRoomCall(roomId, 'disconnect', []);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Server] Delete room error:', error);
+    return res.status(500).json({ success: false, message: '删除房间失败' });
   }
 });
 

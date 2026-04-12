@@ -12,7 +12,7 @@
  */
 
 import React, { useMemo } from 'react';
-import type { ShipState, WeaponSlot } from '@vt/shared';
+import type { ShipState, WeaponSlot } from '@vt/contracts';
 
 // 样式定义
 const styles = {

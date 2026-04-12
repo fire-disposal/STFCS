@@ -1,20 +1,20 @@
 /**
  * 三阶段移动控制器
  *
- * 实现基于 Starsector 的三阶段移动系统：
+ * 实现基于 Starsector 的三阶段移动系统
  * - 阶段1 (平移A)：沿当前朝向前进/后退或横移
  * - 阶段2 (转向)：原地旋转
  * - 阶段3 (平移B)：沿新朝向前进/后退或横移
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import type { MovementState, MovementPhase, MovementType } from '@vt/shared/types';
+import type { MovementState, MovementPhase, MovementType } from '@vt/contracts/types';
 
 // 样式
 const styles = {
   container: {
     backgroundColor: 'var(--color-surface)',
-    borderRadius: '8px',
+    borderRadius: '0',
     padding: '16px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
   },
@@ -34,7 +34,7 @@ const styles = {
   phaseDot: {
     width: '32px',
     height: '32px',
-    borderRadius: '50%',
+    borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -82,7 +82,7 @@ const styles = {
   button: {
     flex: 1,
     padding: '10px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: 'none',
     cursor: 'pointer',
     fontSize: '13px',
@@ -111,7 +111,7 @@ const styles = {
   info: {
     padding: '12px',
     backgroundColor: 'var(--color-info-light)',
-    borderRadius: '4px',
+    borderRadius: '0',
     fontSize: '12px',
     marginTop: '12px',
   },
@@ -240,7 +240,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
     </div>
   );
 
-  // 渲染移动控制（阶段1和3）
+  // 渲染移动控制（阶段按钮）
   const renderMovementControls = () => (
     <div style={styles.controls}>
       <div style={styles.controlGroup}>
@@ -268,7 +268,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={handleMoveForward}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          ↑ 前进
+          🚀 前进
         </button>
         <button
           style={{
@@ -278,7 +278,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={handleMoveBackward}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          ↓ 后退
+          ⬅️ 后退
         </button>
       </div>
 
@@ -291,7 +291,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={() => handleStrafe('left')}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          ← 左移
+          ⬅️ 左移
         </button>
         <button
           style={{
@@ -301,13 +301,13 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={() => handleStrafe('right')}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          → 右移
+          ➡️ 右移
         </button>
       </div>
     </div>
   );
 
-  // 渲染旋转控制（阶段2）
+  // 渲染旋转控制（阶段按钮）
   const renderRotationControls = () => (
     <div style={styles.controls}>
       <div style={styles.controlGroup}>
@@ -335,7 +335,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={() => handleRotate('left')}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          ↺ 左转
+          ↶ 左转
         </button>
         <button
           style={{
@@ -345,7 +345,7 @@ export const ThreePhaseMovementController: React.FC<ThreePhaseMovementController
           onClick={() => handleRotate('right')}
           disabled={!canExecutePhase(currentPhase) || disabled}
         >
-          ↻ 右转
+          ↷ 右转
         </button>
       </div>
     </div>

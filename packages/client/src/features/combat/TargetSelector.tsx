@@ -8,8 +8,8 @@
  */
 
 import React, { useMemo } from 'react';
-import type { ShipTokenV2, FactionId } from '@vt/shared/types';
-import type { ArmorQuadrant } from '@vt/shared/core-types';
+import type { ShipTokenV2, FactionId } from '@vt/contracts/types';
+import type { ArmorQuadrant } from '@vt/contracts/core-types';
 
 // 样式
 const styles = {
@@ -32,7 +32,7 @@ const styles = {
     alignItems: 'center',
     padding: '12px',
     backgroundColor: 'var(--color-background)',
-    borderRadius: '8px',
+    borderRadius: '0',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     border: '2px solid transparent',
@@ -48,7 +48,7 @@ const styles = {
   targetIcon: {
     width: '40px',
     height: '40px',
-    borderRadius: '50%',
+    borderRadius: '0',
     backgroundColor: 'var(--color-surface-dark)',
     display: 'flex',
     alignItems: 'center',
@@ -80,7 +80,7 @@ const styles = {
     width: '80px',
     height: '6px',
     backgroundColor: 'var(--color-surface-dark)',
-    borderRadius: '3px',
+    borderRadius: '0',
     overflow: 'hidden',
   },
   healthBarFill: {
@@ -108,7 +108,7 @@ const styles = {
   },
   filterButton: {
     padding: '6px 12px',
-    borderRadius: '4px',
+    borderRadius: '0',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-background)',
     cursor: 'pointer',

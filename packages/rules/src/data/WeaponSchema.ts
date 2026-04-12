@@ -4,8 +4,6 @@
  * 定义完整的武器规格、挂载点和射击规则
  */
 
-import { Schema, type } from "@colyseus/schema";
-
 /**
  * 武器伤害类型
  */
@@ -24,30 +22,24 @@ export type WeaponMountType = "fixed" | "turret" | "hidden";
 /**
  * 武器规格定义 - 从 JSON 导入的静态数据
  */
-export class WeaponSpec extends Schema {
-  @type("string") id: string = "";
-  @type("string") name: string = "";
-  @type("string") description: string = "";
-  
-  // 基础分类
-  @type("string") category: WeaponCategory = "ballistic";
-  @type("string") damageType: WeaponDamageType = "kinetic";
-  @type("string") mountType: WeaponMountType = "fixed";
-  
-  // 战斗参数
-  @type("number") damage: number = 0;        // 基础伤害
-  @type("number") range: number = 0;         // 射程 (单位)
-  @type("number") arc: number = 0;           // 射界角度 (度)
-  @type("number") cooldown: number = 0;      // 装填时间 (秒)
-  @type("number") fluxCost: number = 0;      // 辐能消耗
-  @type("number") ammo: number = 0;          // 弹药量 (0 表示无限)
-  @type("number") reloadTime: number = 0;    // 换弹时间 (秒)
-  
-  // 特殊属性
-  @type("boolean") isBallistic: boolean = false;  // 是否受弹道专精影响
-  @type("boolean") isEnergy: boolean = false;     // 是否受能量专精影响
-  @type("boolean") isMissile: boolean = false;    // 是否受导弹专精影响
-  @type("boolean") ignoresShields: boolean = false; // 是否无视护盾
+export interface WeaponSpec {
+  id: string;
+  name: string;
+  description: string;
+  category: WeaponCategory;
+  damageType: WeaponDamageType;
+  mountType: WeaponMountType;
+  damage: number;
+  range: number;
+  arc: number;
+  cooldown: number;
+  fluxCost: number;
+  ammo: number;
+  reloadTime: number;
+  isBallistic: boolean;
+  isEnergy: boolean;
+  isMissile: boolean;
+  ignoresShields: boolean;
 }
 
 /**
@@ -76,23 +68,17 @@ export interface WeaponSpecData {
 /**
  * 武器挂载点 - 舰船上的武器安装位置
  */
-export class WeaponMount extends Schema {
-  @type("string") id: string = "";
-  @type("string") mountType: WeaponMountType = "fixed";
-  
-  // 位置信息
-  @type("number") offsetX: number = 0;       // 相对舰船中心的 X 偏移
-  @type("number") offsetY: number = 0;       // 相对舰船中心的 Y 偏移
-  @type("number") facing: number = 0;        // 默认朝向 (度)
-  
-  // 射界定义
-  @type("number") arcMin: number = 0;        // 最小角度 (相对于舰体朝向)
-  @type("number") arcMax: number = 0;        // 最大角度 (相对于舰体朝向)
-  
-  // 当前挂载的武器
-  @type("string") weaponId: string = "";
-  @type("number") currentAmmo: number = 0;   // 当前弹药
-  @type("number") cooldownRemaining: number = 0; // 剩余冷却时间
+export interface WeaponMount {
+  id: string;
+  mountType: WeaponMountType;
+  offsetX: number;
+  offsetY: number;
+  facing: number;
+  arcMin: number;
+  arcMax: number;
+  weaponId: string;
+  currentAmmo: number;
+  cooldownRemaining: number;
 }
 
 /**
@@ -361,57 +347,23 @@ export const PRESET_WEAPONS: Record<string, WeaponSpecData> = {
   },
 };
 
+function toWeaponSpec(preset: WeaponSpecData): WeaponSpec {
+  return { ...preset };
+}
+
 /**
  * 获取武器规格
  */
 export function getWeaponSpec(weaponId: string): WeaponSpec | undefined {
   const preset = PRESET_WEAPONS[weaponId];
   if (!preset) return undefined;
-  
-  const spec = new WeaponSpec();
-  spec.id = preset.id;
-  spec.name = preset.name;
-  spec.description = preset.description;
-  spec.category = preset.category;
-  spec.damageType = preset.damageType;
-  spec.mountType = preset.mountType;
-  spec.damage = preset.damage;
-  spec.range = preset.range;
-  spec.arc = preset.arc;
-  spec.cooldown = preset.cooldown;
-  spec.fluxCost = preset.fluxCost;
-  spec.ammo = preset.ammo;
-  spec.reloadTime = preset.reloadTime;
-  spec.isBallistic = preset.isBallistic;
-  spec.isEnergy = preset.isEnergy;
-  spec.isMissile = preset.isMissile;
-  spec.ignoresShields = preset.ignoresShields;
-  return spec;
+
+  return toWeaponSpec(preset);
 }
 
 /**
  * 获取所有可用武器列表
  */
 export function getAvailableWeapons(): WeaponSpec[] {
-  return Object.values(PRESET_WEAPONS).map(preset => {
-    const spec = new WeaponSpec();
-    spec.id = preset.id;
-    spec.name = preset.name;
-    spec.description = preset.description;
-    spec.category = preset.category;
-    spec.damageType = preset.damageType;
-    spec.mountType = preset.mountType;
-    spec.damage = preset.damage;
-    spec.range = preset.range;
-    spec.arc = preset.arc;
-    spec.cooldown = preset.cooldown;
-    spec.fluxCost = preset.fluxCost;
-    spec.ammo = preset.ammo;
-    spec.reloadTime = preset.reloadTime;
-    spec.isBallistic = preset.isBallistic;
-    spec.isEnergy = preset.isEnergy;
-    spec.isMissile = preset.isMissile;
-    spec.ignoresShields = preset.ignoresShields;
-    return spec;
-  });
+  return Object.values(PRESET_WEAPONS).map(toWeaponSpec);
 }

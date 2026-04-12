@@ -5,13 +5,13 @@
  */
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import type { ShieldType } from '@vt/shared/config';
+import type { ShieldType } from '@vt/contracts/config';
 import type {
   ShieldInstanceState,
   ArmorInstanceState,
   FluxInstanceState,
   ArmorQuadrant,
-} from '@vt/shared/types';
+} from '@vt/contracts/types';
 import {
   drawShieldGeometry,
   drawArmorQuadrantGeometry,

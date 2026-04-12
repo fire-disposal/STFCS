@@ -1,8 +1,9 @@
-import type { Room } from "colyseus.js";
-import type { ConnectionQuality, GameRoomState } from "@vt/shared";
+import type { Room } from "@colyseus/sdk";
+import type { ConnectionQuality, GameRoomState } from "@vt/contracts";
 
 export interface PlayerView {
   sessionId: string;
+  shortId: number;
   name: string;
   role: "dm" | "player";
   isReady: boolean;
@@ -47,11 +48,13 @@ export class PlayerRosterManager {
   }
 
   getPlayers(): PlayerView[] {
-    const players: PlayerView[] = [];
+    const playersByIdentity = new Map<string, PlayerView>();
 
     this.room.state.players.forEach((p, id) => {
-      players.push({
+      const shortId = (p as typeof p & { shortId?: number }).shortId ?? 0;
+      const playerView: PlayerView = {
         sessionId: id,
+        shortId,
         name: p.name,
         role: p.role,
         isReady: p.isReady,
@@ -59,10 +62,26 @@ export class PlayerRosterManager {
         pingMs: p.pingMs,
         jitterMs: p.jitterMs,
         quality: p.connectionQuality,
-      });
+      };
+
+      const identityKey = shortId > 0 ? `short:${shortId}` : `session:${id}`;
+      const current = playersByIdentity.get(identityKey);
+
+      if (!current) {
+        playersByIdentity.set(identityKey, playerView);
+        return;
+      }
+
+      const shouldReplace = (playerView.connected && !current.connected)
+        || playerView.sessionId === this.room.sessionId
+        || (current.pingMs < 0 && playerView.pingMs >= 0);
+
+      if (shouldReplace) {
+        playersByIdentity.set(identityKey, playerView);
+      }
     });
 
-    return players.sort((a, b) => {
+    return Array.from(playersByIdentity.values()).sort((a, b) => {
       if (a.role !== b.role) {
         return a.role === "dm" ? -1 : 1;
       }

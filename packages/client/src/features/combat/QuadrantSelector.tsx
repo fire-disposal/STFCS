@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import type { ArmorQuadrant, ArmorInstanceState } from '@vt/shared/types';
+import type { ArmorQuadrant, ArmorInstanceState } from '@vt/contracts/types';
 
 // 样式
 const styles = {
@@ -67,7 +67,7 @@ const styles = {
   legendColor: {
     width: '12px',
     height: '12px',
-    borderRadius: '2px',
+    borderRadius: '0',
   },
 };
 
@@ -212,7 +212,7 @@ export const QuadrantSelector: React.FC<QuadrantSelectorProps> = ({
             width: '40px',
             height: '60px',
             backgroundColor: 'var(--color-surface-dark)',
-            borderRadius: '4px',
+            borderRadius: '0',
             pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',

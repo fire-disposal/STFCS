@@ -23,7 +23,7 @@ export const SciFiLanguageSwitcher: React.FC = () => {
           onClick={() => changeLanguage('zh-CN')}
           type="button"
         >
-          <span className="label-text">中</span>
+          <span className="label-text">中文</span>
         </button>
 
         {/* 胶囊滑块 */}

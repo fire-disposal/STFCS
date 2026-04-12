@@ -12,8 +12,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppSelector, useAppDispatch } from '@/store';
-import type { FactionId } from '@vt/shared/types';
-import type { TurnPhase, ShipActionState } from '@vt/shared/protocol';
+import type { FactionId } from '@vt/contracts/types';
+import type { TurnPhase, ShipActionState } from '@vt/contracts/protocol';
 import {
   ChevronLeft,
   ChevronRight,

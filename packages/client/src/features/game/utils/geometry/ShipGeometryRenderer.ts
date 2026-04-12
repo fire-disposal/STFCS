@@ -6,8 +6,8 @@
  */
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import type { HullSize, DamageType } from '@vt/shared/config';
-import type { ShipTokenV2 } from '@vt/shared/types';
+import type { HullSize, DamageType } from '@vt/contracts/config';
+import type { ShipTokenV2 } from '@vt/contracts/types';
 import {
   drawShipGeometry,
   drawShieldGeometry,

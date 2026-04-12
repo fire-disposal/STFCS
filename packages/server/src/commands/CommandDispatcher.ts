@@ -1,27 +1,18 @@
-import { GameRoomState, ShipState, ClientCommand, WeaponDamageType } from "@vt/shared";
+import { ClientCommand, GAME_CONFIG, GameRoomState, ShipState, type WeaponDamageType, DAMAGE_MULTIPLIERS } from "../schema/GameSchema.js";
 import { Client } from "@colyseus/core";
 import { 
-  isMoveValid, 
-  isTurnValid, 
   distance, 
   angleBetween, 
   angleDifference,
-  createShipPolygon,
-  checkCollision,
-  isPointInArc,
-  calculateThreePhaseMove,
   validateThreePhaseMove,
-  MovementPlan,
-  DAMAGE_MULTIPLIERS,
-  GAME_CONFIG 
-} from "@vt/shared";
-import { MoveTokenPayload, ToggleShieldPayload, FireWeaponPayload, VentFluxPayload } from "../rooms/BattleRoom";
+} from "@vt/rules";
+import type { MoveTokenPayload, ToggleShieldPayload, FireWeaponPayload, VentFluxPayload } from "../rooms/BattleRoom.js";
 
 /**
  * 命令分发器 - 处理所有客户端指令的验证与执行
  */
 export class CommandDispatcher {
-  constructor(private state: GameRoomState) {}
+  constructor(private state: GameRoomState | any) {}
 
   /**
    * 验证客户端对特定舰船的操作权限

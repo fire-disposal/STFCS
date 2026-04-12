@@ -10,10 +10,10 @@
     "format:check": "turbo run format:check --continue",
     "test": "turbo run test --continue",
     "build": "turbo run build --continue",
-    "dev": "turbo run dev --parallel",
+    "dev": "pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build && turbo run dev --parallel --filter=server --filter=client",
+    "dev:legacy": "turbo run dev --parallel",
     "dev:server": "pnpm --filter server dev",
     "dev:client": "pnpm --filter client dev",
-    "dev:shared": "pnpm --filter @vt/shared dev",
     "typecheck": "turbo run typecheck --continue",
     "check": "pnpm lint && pnpm typecheck"
   },

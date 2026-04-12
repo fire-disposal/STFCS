@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Graphics, Text, TextStyle, Rectangle } from "pixi.js";
-import type { ShipState } from "@vt/shared";
+import type { ShipState } from "@vt/contracts";
 import { StarfieldGenerator } from "@/features/game/rendering/StarfieldBackground";
 import { useSelectionStore } from "@/store/selectionStore";
+import { useUIStore } from "@/store/uiStore";
 
 interface GameCanvasProps {
   ships: ShipState[];
@@ -15,8 +16,11 @@ interface GameCanvasProps {
   showGrid: boolean;
   selectedShipId?: string | null;
   onSelectShip?: (shipId: string) => void;
+  onPanDelta?: (deltaX: number, deltaY: number) => void;
+  onRotateDelta?: (delta: number) => void;
   showWeaponArcs?: boolean;
   showMovementRange?: boolean;
+  showBackground?: boolean;
   onClick?: (x: number, y: number) => void;
   viewRotation?: number; // 视图旋转角度
 }
@@ -66,8 +70,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   showGrid,
   selectedShipId,
   onSelectShip,
+  onPanDelta,
+  onRotateDelta,
   showWeaponArcs = false,
   showMovementRange = false,
+  showBackground = true,
   onClick,
   viewRotation = 0,
 }) => {
@@ -79,8 +86,237 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     setMouseWorldPosition,
     handleClick,
   } = useSelectionStore();
+  const { setZoom, setCameraPosition } = useUIStore();
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const cameraRef = useRef({ cameraX, cameraY, zoom, viewRotation });
+  const onClickRef = useRef(onClick);
+  const onPanDeltaRef = useRef(onPanDelta);
+  const onRotateDeltaRef = useRef(onRotateDelta);
+  const spacePressedRef = useRef(false);
+  const zoomAnimationRef = useRef<number | null>(null);
+  const zoomTargetRef = useRef<{ zoom: number; cameraX: number; cameraY: number } | null>(null);
+  const dragStateRef = useRef<{
+    active: boolean;
+    mode: 'pan' | 'rotate' | null;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+    pendingDx: number;
+    pendingDy: number;
+    pendingRotate: number;
+    rafId: number | null;
+  }>({
+    active: false,
+    mode: null,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    moved: false,
+    pendingDx: 0,
+    pendingDy: 0,
+    pendingRotate: 0,
+    rafId: null,
+  });
+
+  const clampZoom = useCallback((value: number) => {
+    return Math.max(0.5, Math.min(3, value));
+  }, []);
+
+  const screenDeltaToWorldDelta = useCallback((deltaX: number, deltaY: number) => {
+    const { zoom: currentZoom, viewRotation: currentRotation } = cameraRef.current;
+    const theta = (currentRotation * Math.PI) / 180;
+    const cos = Math.cos(-theta);
+    const sin = Math.sin(-theta);
+    const scaledX = -deltaX / currentZoom;
+    const scaledY = -deltaY / currentZoom;
+
+    return {
+      x: scaledX * cos - scaledY * sin,
+      y: scaledX * sin + scaledY * cos,
+    };
+  }, []);
+  const canvasWidth = width;
+  const canvasHeight = height;
+
+  const screenToWorldPoint = useCallback((screenX: number, screenY: number, zoomValue: number, cameraXValue: number, cameraYValue: number, rotationValue: number) => {
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+    const relativeX = screenX - centerX;
+    const relativeY = screenY - centerY;
+    const theta = (rotationValue * Math.PI) / 180;
+    const cos = Math.cos(-theta);
+    const sin = Math.sin(-theta);
+    const worldDeltaX = (relativeX * cos - relativeY * sin) / zoomValue;
+    const worldDeltaY = (relativeX * sin + relativeY * cos) / zoomValue;
+
+    return {
+      x: cameraXValue + worldDeltaX,
+      y: cameraYValue + worldDeltaY,
+    };
+  }, [canvasWidth, canvasHeight]);
+
+  const animateZoomToTarget = useCallback(() => {
+    const target = zoomTargetRef.current;
+    if (!target) {
+      zoomAnimationRef.current = null;
+      return;
+    }
+
+    const current = cameraRef.current;
+    const zoomDiff = target.zoom - current.zoom;
+    const cameraXDiff = target.cameraX - current.cameraX;
+    const cameraYDiff = target.cameraY - current.cameraY;
+
+    if (Math.abs(zoomDiff) < 0.001 && Math.abs(cameraXDiff) < 0.05 && Math.abs(cameraYDiff) < 0.05) {
+      setZoom(target.zoom);
+      setCameraPosition(target.cameraX, target.cameraY);
+      zoomTargetRef.current = null;
+      zoomAnimationRef.current = null;
+      return;
+    }
+
+    const nextZoom = clampZoom(current.zoom + zoomDiff * 0.18);
+    const nextCameraX = current.cameraX + cameraXDiff * 0.18;
+    const nextCameraY = current.cameraY + cameraYDiff * 0.18;
+
+    setZoom(nextZoom);
+    setCameraPosition(nextCameraX, nextCameraY);
+    zoomAnimationRef.current = requestAnimationFrame(animateZoomToTarget);
+  }, [clampZoom, setCameraPosition, setZoom]);
+
+  const queueZoom = useCallback((event: WheelEvent) => {
+    event.preventDefault();
+
+    const rect = hostRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+    const wheelStrength = event.deltaMode === 1 ? 0.09 : event.deltaMode === 2 ? 0.18 : 0.0016;
+    const zoomFactor = Math.exp(-event.deltaY * wheelStrength);
+    const current = cameraRef.current;
+    const nextZoom = clampZoom(current.zoom * zoomFactor);
+    const worldPoint = screenToWorldPoint(screenX, screenY, current.zoom, current.cameraX, current.cameraY, current.viewRotation);
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const relativeX = screenX - centerX;
+    const relativeY = screenY - centerY;
+    const theta = (current.viewRotation * Math.PI) / 180;
+    const cos = Math.cos(-theta);
+    const sin = Math.sin(-theta);
+    const newWorldDeltaX = (relativeX * cos - relativeY * sin) / nextZoom;
+    const newWorldDeltaY = (relativeX * sin + relativeY * cos) / nextZoom;
+
+    zoomTargetRef.current = {
+      zoom: nextZoom,
+      cameraX: worldPoint.x - newWorldDeltaX,
+      cameraY: worldPoint.y - newWorldDeltaY,
+    };
+
+    if (zoomAnimationRef.current !== null) {
+      cancelAnimationFrame(zoomAnimationRef.current);
+    }
+    zoomAnimationRef.current = requestAnimationFrame(animateZoomToTarget);
+  }, [animateZoomToTarget, clampZoom, screenToWorldPoint]);
+
+  const flushDragDelta = useCallback(() => {
+    const dragState = dragStateRef.current;
+    if (dragState.rafId !== null) {
+      cancelAnimationFrame(dragState.rafId);
+      dragState.rafId = null;
+    }
+
+    if (dragState.pendingDx === 0 && dragState.pendingDy === 0) {
+      if (dragState.pendingRotate === 0) {
+        return;
+      }
+    }
+
+    const delta = screenDeltaToWorldDelta(dragState.pendingDx, dragState.pendingDy);
+    const rotateDelta = dragState.pendingRotate;
+    dragState.pendingDx = 0;
+    dragState.pendingDy = 0;
+    dragState.pendingRotate = 0;
+    if (delta.x !== 0 || delta.y !== 0) {
+      onPanDeltaRef.current?.(delta.x, delta.y);
+    }
+    if (rotateDelta !== 0) {
+      onRotateDeltaRef.current?.(rotateDelta);
+    }
+  }, [screenDeltaToWorldDelta]);
+
+  useEffect(() => {
+    cameraRef.current = { cameraX, cameraY, zoom, viewRotation };
+  }, [cameraX, cameraY, zoom, viewRotation]);
+
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
+
+  useEffect(() => {
+    onPanDeltaRef.current = onPanDelta;
+  }, [onPanDelta]);
+
+  useEffect(() => {
+    onRotateDeltaRef.current = onRotateDelta;
+  }, [onRotateDelta]);
+
+  useEffect(() => {
+    const node = hostRef.current;
+    if (!node) return;
+
+    node.addEventListener('wheel', queueZoom, { passive: false });
+
+    return () => {
+      node.removeEventListener('wheel', queueZoom);
+    };
+  }, [queueZoom]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        spacePressedRef.current = true;
+        event.preventDefault();
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        spacePressedRef.current = false;
+      }
+    };
+
+    const handleBlur = () => {
+      spacePressedRef.current = false;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  const scheduleDragFlush = useCallback(() => {
+    const dragState = dragStateRef.current;
+    if (dragState.rafId !== null) {
+      return;
+    }
+
+    dragState.rafId = requestAnimationFrame(() => {
+      dragState.rafId = null;
+      flushDragDelta();
+    });
+  }, [flushDragDelta]);
 
   // 动画循环 - 更新星空闪烁
   useEffect(() => {
@@ -129,12 +365,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     layers.world.scale.set(zoom);
     layers.world.position.set(
-      width * 0.5 - cameraX * zoom,
-      height * 0.5 - cameraY * zoom,
+      canvasWidth * 0.5 - cameraX * zoom,
+      canvasHeight * 0.5 - cameraY * zoom,
     );
-    
+          
     // 应用视图旋转
     layers.world.rotation = (viewRotation * Math.PI / 180);
+    layers.background.visible = showBackground;
+    layers.starfieldNebula.visible = showBackground;
+    layers.starfieldDeep.visible = showBackground;
+    layers.starfieldMid.visible = showBackground;
+    layers.starfieldNear.visible = showBackground;
 
     // 更新星空背景的视差效果（不受 zoom 影响）
     const parallaxFactor = 0.5;
@@ -154,7 +395,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       -cameraX * parallaxFactor * 0.2,
       -cameraY * parallaxFactor * 0.2,
     );
-  }, [layers, zoom, cameraX, cameraY, width, height]);
+  }, [layers, zoom, cameraX, cameraY, canvasWidth, canvasHeight, viewRotation, showBackground]);
 
   // 初始渲染星空背景（位置在上面的动画循环中更新）
   useEffect(() => {
@@ -215,6 +456,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   }, [layers, showGrid]);
 
   useEffect(() => {
+    return () => {
+      const dragState = dragStateRef.current;
+      if (dragState.rafId !== null) {
+        cancelAnimationFrame(dragState.rafId);
+      }
+      if (zoomAnimationRef.current !== null) {
+        cancelAnimationFrame(zoomAnimationRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!layers) return;
 
     layers.ships.removeChildren();
@@ -270,8 +523,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       
       // 鼠标移动时更新世界坐标
       token.on("pointermove", (e) => {
-        const worldX = (e.data.global.x - width / 2) / zoom + cameraX;
-        const worldY = (e.data.global.y - height / 2) / zoom + cameraY;
+        const worldX = (e.data.global.x - canvasWidth / 2) / zoom + cameraX;
+        const worldY = (e.data.global.y - canvasHeight / 2) / zoom + cameraY;
         setMouseWorldPosition(worldX, worldY);
       });
 
@@ -356,7 +609,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   }, [layers, ships, selectedShipId, showWeaponArcs, showMovementRange]);
 
   return (
-    <div ref={hostRef} style={{ width, height, border: "1px solid #2b4261", borderRadius: 8, overflow: "hidden" }}>
+    <div
+      ref={hostRef}
+      style={{
+        width: '100%',
+        height: canvasHeight,
+        border: '2px solid rgba(74, 158, 255, 0.3)',
+        borderRadius: 14,
+        overflow: 'hidden',
+        background: 'rgba(6, 16, 26, 0.85)',
+        boxShadow: '0 0 28px rgba(74, 158, 255, 0.12)',
+      }}
+    >
       <Application
         resizeTo={hostRef}
         autoDensity
@@ -433,30 +697,119 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             weaponArcs: weaponArcsLayer 
           });
 
-          // 点击事件处理（用于空白区域点击）
-          if (onClick) {
-            app.stage.eventMode = 'static';
-            app.stage.hitArea = new Rectangle(0, 0, width, height);
-            app.stage.on('pointerdown', (event: any) => {
-              // 将屏幕坐标转换为世界坐标
-              const worldX = (event.clientX - width / 2) / zoom + cameraX;
-              const worldY = (event.clientY - height / 2) / zoom + cameraY;
-              onClick(Math.round(worldX), Math.round(worldY));
-            });
-          }
-          
-          // 画布背景点击清空选择
+          app.stage.eventMode = 'static';
+          app.stage.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
+          app.stage.cursor = 'grab';
+
+          const getWorldPoint = (event: any) => {
+            const { cameraX: currentCameraX, cameraY: currentCameraY, zoom: currentZoom, viewRotation: currentRotation } = cameraRef.current;
+            const screenX = typeof event.global?.x === 'number' ? event.global.x : event.clientX;
+            const screenY = typeof event.global?.y === 'number' ? event.global.y : event.clientY;
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight / 2;
+            const relativeX = screenX - centerX;
+            const relativeY = screenY - centerY;
+            const theta = (currentRotation * Math.PI) / 180;
+            const cos = Math.cos(-theta);
+            const sin = Math.sin(-theta);
+            const worldDeltaX = (relativeX * cos - relativeY * sin) / currentZoom;
+            const worldDeltaY = (relativeX * sin + relativeY * cos) / currentZoom;
+            return {
+              x: currentCameraX + worldDeltaX,
+              y: currentCameraY + worldDeltaY,
+            };
+          };
+
           app.stage.on('pointerdown', (event: any) => {
             const target = event.target;
-            // 如果点击的不是舰船，清空选择
-            if (target === app.stage || target === background) {
-              // 点击空白区域时不处理，由上层组件决定
+            const button = event.button ?? event.data?.button ?? 0;
+            const dragState = dragStateRef.current;
+
+            if (button === 2) {
+              return;
             }
+
+            if (button === 1) {
+              dragState.active = true;
+              dragState.mode = 'rotate';
+              dragState.startX = event.global?.x ?? event.clientX ?? 0;
+              dragState.startY = event.global?.y ?? event.clientY ?? 0;
+              dragState.lastX = dragState.startX;
+              dragState.lastY = dragState.startY;
+              dragState.moved = false;
+              app.stage.cursor = 'grabbing';
+              return;
+            }
+
+            if (!spacePressedRef.current && target !== app.stage) {
+              return;
+            }
+
+            dragState.active = true;
+            dragState.mode = 'pan';
+            dragState.startX = event.global?.x ?? event.clientX ?? 0;
+            dragState.startY = event.global?.y ?? event.clientY ?? 0;
+            dragState.lastX = dragState.startX;
+            dragState.lastY = dragState.startY;
+            dragState.moved = false;
+            app.stage.cursor = 'grabbing';
           });
+
+          app.stage.on('pointermove', (event: any) => {
+            const worldPoint = getWorldPoint(event);
+            setMouseWorldPosition(worldPoint.x, worldPoint.y);
+
+            app.stage.cursor = spacePressedRef.current ? 'grab' : 'default';
+
+            const dragState = dragStateRef.current;
+            if (!dragState.active) {
+              return;
+            }
+
+            const currentX = event.global?.x ?? event.clientX ?? dragState.lastX;
+            const currentY = event.global?.y ?? event.clientY ?? dragState.lastY;
+            const dx = currentX - dragState.lastX;
+            const dy = currentY - dragState.lastY;
+
+            if (Math.abs(currentX - dragState.startX) > 3 || Math.abs(currentY - dragState.startY) > 3) {
+              dragState.moved = true;
+            }
+
+            dragState.lastX = currentX;
+            dragState.lastY = currentY;
+            if (dragState.mode === 'rotate') {
+              dragState.pendingRotate += dx * 0.25;
+            } else {
+              dragState.pendingDx += dx;
+              dragState.pendingDy += dy;
+            }
+            scheduleDragFlush();
+          });
+
+          const finishDrag = (event: any) => {
+            const dragState = dragStateRef.current;
+
+            if (dragState.active && dragState.mode === 'pan' && !dragState.moved) {
+              const worldPoint = getWorldPoint(event);
+              onClickRef.current?.(Math.round(worldPoint.x), Math.round(worldPoint.y));
+            }
+
+            dragState.active = false;
+            dragState.mode = null;
+            dragState.moved = false;
+            dragState.pendingDx = 0;
+            dragState.pendingDy = 0;
+            dragState.pendingRotate = 0;
+            flushDragDelta();
+            app.stage.cursor = spacePressedRef.current ? 'grab' : 'default';
+          };
+
+          app.stage.on('pointerup', finishDrag);
+          app.stage.on('pointerupoutside', finishDrag);
         }}
       />
     </div>
   );
 };
 
-export default GameCanvas;
+  export default GameCanvas;

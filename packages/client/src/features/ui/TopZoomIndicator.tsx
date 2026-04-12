@@ -62,7 +62,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 						))}
 					</div>
 
-					{/* 填充条 */}
+					  {/* 填充条 */}
 					<div
 						className="zoom-bar-fill"
 						style={{ width: `${zoomPercent}%` }}
@@ -112,7 +112,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 					gap: 16px;
 					padding: 8px 16px;
 					background: rgba(20, 20, 40, 0.9);
-					border-radius: 8px;
+					border-radius: 0;
 					border: 1px solid rgba(74, 158, 255, 0.3);
 					box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 				}
@@ -154,7 +154,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 					position: relative;
 					height: 24px;
 					background: rgba(10, 10, 30, 0.6);
-					border-radius: 4px;
+					border-radius: 0;
 					border: 1px solid rgba(74, 158, 255, 0.25);
 					overflow: visible;
 				}
@@ -192,7 +192,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 						rgba(74, 158, 255, 0.6) 50%,
 						rgba(74, 158, 255, 0.4) 100%
 					);
-					border-radius: 4px;
+					border-radius: 0;
 					transition: width 0.15s ease-out;
 					box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
 				}
@@ -219,7 +219,7 @@ export const TopZoomIndicator: React.FC<TopZoomIndicatorProps> = ({
 					border: 1px solid rgba(74, 158, 255, 0.3);
 					background: rgba(20, 40, 80, 0.6);
 					color: #4a9eff;
-					border-radius: 6px;
+					border-radius: 0;
 					cursor: pointer;
 					display: flex;
 					align-items: center;
