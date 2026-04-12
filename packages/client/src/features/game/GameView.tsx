@@ -538,7 +538,15 @@ export const GameView: React.FC<GameViewProps> = ({
   return (
     <div style={layoutStyles.gameView}>
       {/* 顶部栏 */}
-      <div style={layoutStyles.topBar}>
+      <div style={{
+        ...layoutStyles.topBar,
+        position: 'fixed' as const,
+        top: '0',
+        left: '0',
+        right: '0',
+        zIndex: 1000,
+        marginBottom: '0',
+      }}>
         <div style={layoutStyles.topBarTitle}>
           🚀 STFCS · {room.state.currentPhase || '加载中'}
         </div>
@@ -567,8 +575,11 @@ export const GameView: React.FC<GameViewProps> = ({
         </div>
       </div>
 
-      {/* 主内容区 */}
-      <div style={layoutStyles.mainContent}>
+      {/* 主内容区 - 添加顶部 padding 避免被顶栏遮挡 */}
+      <div style={{
+        ...layoutStyles.mainContent,
+        paddingTop: '80px', // 为顶栏留出空间
+      }}>
         <div ref={mapSectionRef} style={layoutStyles.mapSection}>
           <GameCanvas
             ships={ships}
