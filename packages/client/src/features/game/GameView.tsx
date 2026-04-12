@@ -546,37 +546,57 @@ export const GameView: React.FC<GameViewProps> = ({
             {/* DM 控制面板 */}
             {currentPlayer?.role === 'dm' && (
               <div style={layoutStyles.panel}>
-                <div style={layoutStyles.panelTitle}>🎨 DM 工具</div>
-                <button
-                  style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%', marginBottom: '12px' }}
-                  onClick={() => setShowObjectCreator(!showObjectCreator)}
-                >
-                  {showObjectCreator ? '关闭' : '打开'} 对象创建工具
-                </button>
+                <div style={layoutStyles.panelTitle}>🎨 DM 控制中心</div>
+                
+                {/* 阶段控制 */}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>📊 阶段控制</div>
+                  <button
+                    style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%' }}
+                    onClick={nextPhase}
+                  >
+                    ⏭️ 进入下一阶段
+                  </button>
+                </div>
 
-                {showObjectCreator && (
-                  <DMObjectCreator
-                    isOpen={showObjectCreator}
-                    onClose={() => setShowObjectCreator(false)}
-                    onCreateObject={createObject}
-                    players={players.filter(p => p.role !== 'dm').map(p => ({
-                      sessionId: p.sessionId,
-                      name: p.name,
-                      role: p.role,
-                    }))}
+                {/* 对象创建 */}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>✨ 对象创建</div>
+                  <button
+                    style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%', marginBottom: '8px' }}
+                    onClick={() => setShowObjectCreator(!showObjectCreator)}
+                  >
+                    {showObjectCreator ? '❌ 关闭' : '➕ 打开'} 创建工具
+                  </button>
+                  
+                  {showObjectCreator && (
+                    <DMObjectCreator
+                      isOpen={showObjectCreator}
+                      onClose={() => setShowObjectCreator(false)}
+                      onCreateObject={createObject}
+                      players={players.filter(p => p.role !== 'dm').map(p => ({
+                        sessionId: p.sessionId,
+                        name: p.name,
+                        role: p.role,
+                      }))}
+                    />
+                  )}
+                </div>
+
+                {/* 舰船管理 */}
+                <div>
+                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>🚀 舰船管理</div>
+                  <DMControlPanel
+                    ships={ships}
+                    players={players}
+                    isDM={true}
+                    onCreateTestShip={createTestShip}
+                    onClearOverload={clearOverload}
+                    onSetArmor={setArmor}
+                    onAssignShip={assignShip}
+                    onNextPhase={nextPhase}
                   />
-                )}
-
-                <DMControlPanel
-                  ships={ships}
-                  players={players}
-                  isDM={true}
-                  onCreateTestShip={createTestShip}
-                  onClearOverload={clearOverload}
-                  onSetArmor={setArmor}
-                  onAssignShip={assignShip}
-                  onNextPhase={nextPhase}
-                />
+                </div>
               </div>
             )}
           </div>
