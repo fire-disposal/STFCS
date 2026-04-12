@@ -21,8 +21,6 @@ import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { ActionCommandDock, type ActionCommandGroup } from "@/features/ui/ActionCommandDock";
 import { ThreePhaseMovementController } from "@/features/movement";
-import { ChatPanel } from "@/features/ui/ChatPanel";
-import { RightPanelTabs } from "@/features/ui/RightPanelTabs";
 import { useCurrentGameRoom } from "@/hooks";
 import { notify } from "@/components/ui/Notification";
 
@@ -105,7 +103,7 @@ const layoutStyles = {
 
   // 右侧面板容器
   sidePanelContainer: {
-    width: '420px',
+    width: '380px',
     display: 'flex',
     flexDirection: 'column' as const,
     backgroundColor: 'rgba(13, 40, 71, 0.95)',
@@ -499,28 +497,18 @@ export const GameView: React.FC<GameViewProps> = ({
 
         {/* 右侧面板 */}
         <div style={layoutStyles.sidePanelContainer}>
-          {/* 视图控制（集成到右侧面板顶部） */}
-          <div style={{ padding: '12px', borderBottom: '1px solid rgba(74, 158, 255, 0.2)' }}>
-            <div style={layoutStyles.panelTitle}>🎮 地图控制</div>
-            <ActionCommandDock
-              title=""
-              subtitle=""
-              groups={mapActionGroups}
-            />
-          </div>
-          
-          {/* Tab 切换 */}
-          <RightPanelTabs
-            room={room}
-            playerName={playerName || 'Player'}
-            onShowPlayerRoster={() => setShowPlayerRoster(true)}
-            onShowSettings={() => setShowSettings(true)}
-            playerCount={players.length}
-            unreadChatCount={0}
-          />
-
           {/* 可滚动内容区 */}
           <div style={layoutStyles.sidePanelContent}>
+            {/* 地图控制 */}
+            <div style={layoutStyles.panel}>
+              <div style={layoutStyles.panelTitle}>🎮 地图控制</div>
+              <ActionCommandDock
+                title=""
+                subtitle=""
+                groups={mapActionGroups}
+              />
+            </div>
+
             {/* 舰船信息面板（选中时显示） */}
             {selectedShipId && ships.find(s => s.id === selectedShipId) && (
               <>
