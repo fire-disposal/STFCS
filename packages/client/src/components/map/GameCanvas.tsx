@@ -783,34 +783,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             const button = event.button ?? event.data?.button ?? 0;
             const dragState = dragStateRef.current;
 
+            // 右键禁用
             if (button === 2) {
               return;
             }
 
+            // 鼠标中键 - 旋转模式
             if (button === 1) {
               dragState.active = true;
               dragState.mode = 'rotate';
               dragState.startX = event.global?.x ?? event.clientX ?? 0;
               dragState.startY = event.global?.y ?? event.clientY ?? 0;
               dragState.lastX = dragState.startX;
-              dragState.lastY = dragState.startY;
+              dragState.lastY = dragState.lastY;
               dragState.moved = false;
               app.stage.cursor = 'grabbing';
               return;
             }
 
-            if (!spacePressedRef.current && target !== app.stage) {
-              return;
+            // 鼠标左键 - 只有在点击舞台空白区域或按空格键时才平移
+            if (button === 0) {
+              // 如果点击的不是舞台空白区域，且没有按空格键，则不处理
+              if (!spacePressedRef.current && target !== app.stage) {
+                return;
+              }
+              
+              dragState.active = true;
+              dragState.mode = 'pan';
+              dragState.startX = event.global?.x ?? event.clientX ?? 0;
+              dragState.startY = event.global?.y ?? event.clientY ?? 0;
+              dragState.lastX = dragState.startX;
+              dragState.lastY = dragState.startY;
+              dragState.moved = false;
+              app.stage.cursor = 'grabbing';
             }
-
-            dragState.active = true;
-            dragState.mode = 'pan';
-            dragState.startX = event.global?.x ?? event.clientX ?? 0;
-            dragState.startY = event.global?.y ?? event.clientY ?? 0;
-            dragState.lastX = dragState.startX;
-            dragState.lastY = dragState.startY;
-            dragState.moved = false;
-            app.stage.cursor = 'grabbing';
           });
 
           app.stage.on('pointermove', (event: any) => {
