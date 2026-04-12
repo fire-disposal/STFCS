@@ -14,15 +14,16 @@ import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
 import { ShipDetailPanel, ShipActionPanel, FluxSystemDisplay, ArmorQuadrantDisplay } from "@/features/ship";
 import { TurnIndicator } from "@/features/game";
-import { PlayerPanel } from "@/features/lobby";
+import { PlayerRosterModal } from "@/features/lobby";
 import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { ActionCommandDock, type ActionCommandGroup } from "@/features/ui/ActionCommandDock";
+import { notify } from "@/components/ui/Notification";
 
 const layoutStyles = {
   gameView: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 2.15fr) 260px',
+    gridTemplateColumns: 'minmax(0, 2.15fr) minmax(320px, 380px)',
     gridTemplateRows: 'auto 1fr',
     gap: '18px',
     padding: '20px',
@@ -61,11 +62,12 @@ const layoutStyles = {
   topBarInfo: {
     display: 'flex',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
     gap: '12px',
     fontSize: '12px',
     color: '#8ba4c7',
     justifySelf: 'end' as const,
-    whiteSpace: 'nowrap' as const,
+    maxWidth: '100%',
   },
   mainContent: {
     display: 'flex',
@@ -96,7 +98,13 @@ const layoutStyles = {
     position: 'sticky' as const,
     top: '20px',
     zIndex: 1,
-    paddingRight: '2px',
+    padding: '12px',
+    paddingRight: '12px',
+    borderRadius: '14px',
+    border: '2px solid rgba(74, 158, 255, 0.3)',
+    background: 'rgba(13, 40, 71, 0.72)',
+    boxShadow: '0 0 28px rgba(74, 158, 255, 0.14)',
+    minWidth: 0,
   },
   leaveButton: {
     padding: '10px 16px',
@@ -118,6 +126,16 @@ const layoutStyles = {
     fontWeight: 700,
     cursor: 'pointer',
   },
+  rosterButton: {
+    padding: '10px 14px',
+    borderRadius: '8px',
+    border: '2px solid rgba(67, 193, 255, 0.32)',
+    background: 'rgba(26, 58, 90, 0.78)',
+    color: '#d8ecff',
+    fontSize: '11px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
 };
 
 interface GameViewProps {
@@ -133,6 +151,7 @@ export const GameView: React.FC<GameViewProps> = ({
   const [room, setRoom] = useState<Room<GameRoomState> | null>(null);
   const [showObjectCreator, setShowObjectCreator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlayerRoster, setShowPlayerRoster] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement | null>(null);
   const [mapSize, setMapSize] = useState(() => ({
     width: 980,
@@ -276,6 +295,35 @@ export const GameView: React.FC<GameViewProps> = ({
     setShowObjectCreator(false);
     setPendingPlacement(null);
   }, [room]);
+
+  const closeRoom = useCallback(async () => {
+    const currentRoomId = room?.roomId;
+    if (!currentRoomId) {
+      return;
+    }
+
+    try {
+      await networkManager.deleteRoom(currentRoomId);
+      setShowPlayerRoster(false);
+      onLeaveRoom();
+      notify.success('房间已关闭');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '关闭房间失败';
+      notify.error(message);
+    }
+  }, [networkManager, onLeaveRoom, room?.roomId]);
+
+  const saveRoom = useCallback(() => {
+    notify.info('保存房间功能已预留，等待后端接口接入。');
+  }, []);
+
+  const invitePlayer = useCallback(() => {
+    notify.info('邀请玩家功能已预留，等待邀请流程接入。');
+  }, []);
+
+  const kickPlayer = useCallback((playerSessionId: string) => {
+    notify.info(`踢出玩家功能已预留：${playerSessionId}`);
+  }, []);
 
   const handleMapClick = useCallback((x: number, y: number) => {
     if (pendingPlacement && currentPlayer?.role === 'dm') {
@@ -527,6 +575,9 @@ export const GameView: React.FC<GameViewProps> = ({
           )}
         </div>
         <div style={layoutStyles.topBarInfo}>
+          <button style={layoutStyles.rosterButton} onClick={() => setShowPlayerRoster(true)}>
+            👥 玩家
+          </button>
           <button style={layoutStyles.settingsButton} onClick={() => setShowSettings(true)}>
             ⚙️ 设置
           </button>
@@ -566,14 +617,6 @@ export const GameView: React.FC<GameViewProps> = ({
           title="🎮 指令技能区"
           subtitle="地图控制已并入操作区"
           groups={mapActionGroups}
-        />
-
-        <PlayerPanel
-          players={players}
-          ships={ships}
-          currentSessionId={room.sessionId || ''}
-          currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
-          onToggleReady={toggleReady}
         />
 
         {selectedShip && (
@@ -635,6 +678,21 @@ export const GameView: React.FC<GameViewProps> = ({
           </>
         )}
       </div>
+
+      <PlayerRosterModal
+        isOpen={showPlayerRoster}
+        onClose={() => setShowPlayerRoster(false)}
+        players={players}
+        ships={ships}
+        currentSessionId={room.sessionId || ''}
+        currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
+        onToggleReady={toggleReady}
+        canManagePlayers={currentPlayer?.role === 'dm'}
+        onKickPlayer={currentPlayer?.role === 'dm' ? kickPlayer : undefined}
+        onInvitePlayer={currentPlayer?.role === 'dm' ? invitePlayer : undefined}
+        onCloseRoom={currentPlayer?.role === 'dm' ? closeRoom : undefined}
+        onSaveRoom={currentPlayer?.role === 'dm' ? saveRoom : undefined}
+      />
 
       <SettingsMenu isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>

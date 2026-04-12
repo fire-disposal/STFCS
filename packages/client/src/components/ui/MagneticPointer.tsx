@@ -15,6 +15,18 @@ export const MagneticPointerProvider: React.FC<{ children: React.ReactNode }> = 
   const mousePos = useRef({ x: 0, y: 0 });
   const sizeRef = useRef({ width: 4, height: 4 });
 
+  const resetPointerState = useCallback(() => {
+    currentTargetRef.current = null;
+    sizeRef.current = { width: 4, height: 4 };
+
+    if (pointerRef.current) {
+      pointerRef.current.style.width = '4px';
+      pointerRef.current.style.height = '4px';
+      pointerRef.current.style.top = '-2px';
+      pointerRef.current.style.left = '-2px';
+    }
+  }, []);
+
   // 鼠标移动处理
   const handleMouseMove = useCallback((e: MouseEvent) => {
     mousePos.current = { x: e.clientX, y: e.clientY };
@@ -25,18 +37,22 @@ export const MagneticPointerProvider: React.FC<{ children: React.ReactNode }> = 
       
       // 磁性吸附效果
       if (currentTargetRef.current) {
-        const rect = currentTargetRef.current.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        x = centerX + (x - centerX) * 0.1;
-        y = centerY + (y - centerY) * 0.1;
+        if (!currentTargetRef.current.isConnected) {
+          resetPointerState();
+        } else {
+          const rect = currentTargetRef.current.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          x = centerX + (x - centerX) * 0.1;
+          y = centerY + (y - centerY) * 0.1;
+        }
       }
       
       // 使用 style.setProperty 确保样式被正确应用
       pointerRef.current.style.transform = `translate(${x}px, ${y}px)`;
       pointerRef.current.style.display = 'block';
     }
-  }, []);
+  }, [resetPointerState]);
 
   // 鼠标进入目标元素
   const handleMouseEnter = useCallback((e: Event) => {
@@ -63,16 +79,8 @@ export const MagneticPointerProvider: React.FC<{ children: React.ReactNode }> = 
 
   // 鼠标离开目标元素
   const handleMouseLeave = useCallback(() => {
-    currentTargetRef.current = null;
-    sizeRef.current = { width: 4, height: 4 };
-    
-    if (pointerRef.current) {
-      pointerRef.current.style.width = '4px';
-      pointerRef.current.style.height = '4px';
-      pointerRef.current.style.top = '-2px';
-      pointerRef.current.style.left = '-2px';
-    }
-  }, []);
+    resetPointerState();
+  }, [resetPointerState]);
 
   // 绑定事件
   useEffect(() => {
@@ -98,8 +106,9 @@ export const MagneticPointerProvider: React.FC<{ children: React.ReactNode }> = 
     return () => {
       observer.disconnect();
       window.removeEventListener('mousemove', handleMouseMove);
+      resetPointerState();
     };
-  }, [handleMouseEnter, handleMouseLeave, handleMouseMove]);
+  }, [handleMouseEnter, handleMouseLeave, handleMouseMove, resetPointerState]);
 
   return (
     <>

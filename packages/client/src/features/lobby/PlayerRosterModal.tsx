@@ -7,14 +7,15 @@ const styles = {
     inset: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
     zIndex: 10020,
     padding: '16px',
+    overflow: 'auto',
   },
   modal: {
-    width: 'min(1040px, calc(100vw - 32px))',
-    maxHeight: '86vh',
+    width: 'min(1180px, calc(100vw - 32px))',
+    maxHeight: 'calc(100vh - 32px)',
     backgroundColor: 'rgba(6, 16, 26, 0.98)',
     borderRadius: '14px',
     border: '1px solid rgba(74, 158, 255, 0.28)',
@@ -78,8 +79,9 @@ const styles = {
     gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.85fr)',
     gap: '16px',
     padding: '18px 20px 20px',
-    overflow: 'hidden',
+    overflow: 'auto',
     minHeight: 0,
+    scrollbarGutter: 'stable' as const,
   },
   leftColumn: {
     display: 'flex',
@@ -283,6 +285,16 @@ const styles = {
     borderColor: '#4a9eff',
     background: 'rgba(74, 158, 255, 0.14)',
   },
+  actionButtonDanger: {
+    borderColor: 'rgba(248, 113, 113, 0.5)',
+    background: 'rgba(248, 113, 113, 0.12)',
+    color: '#ff9cb2',
+  },
+  actionButtonSuccess: {
+    borderColor: 'rgba(46, 204, 113, 0.5)',
+    background: 'rgba(46, 204, 113, 0.12)',
+    color: '#bdf4cf',
+  },
   footer: {
     display: 'flex',
     alignItems: 'center',
@@ -311,6 +323,25 @@ const styles = {
   footerNote: {
     fontSize: '11px',
     color: '#8ba4c7',
+  },
+  roomActions: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '8px',
+  },
+  roomActionButton: {
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid #2b4261',
+    background: '#132235',
+    color: '#cfe8ff',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  roomActionButtonDisabled: {
+    opacity: 0.45,
+    cursor: 'not-allowed',
   },
 };
 
@@ -341,6 +372,8 @@ interface PlayerRosterModalProps {
   canManagePlayers?: boolean;
   onKickPlayer?: (playerSessionId: string) => void;
   onInvitePlayer?: () => void;
+  onCloseRoom?: () => void;
+  onSaveRoom?: () => void;
 }
 
 export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
@@ -354,6 +387,8 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
   canManagePlayers = false,
   onKickPlayer,
   onInvitePlayer,
+  onCloseRoom,
+  onSaveRoom,
 }) => {
   const playerShipCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -586,13 +621,62 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 
             <div style={styles.section}>
               <div style={styles.sectionTitle}>
-                <span>房主操作预留</span>
-                <span style={styles.sectionHint}>后续可接入踢出、邀请、权限管理</span>
+                <span>房间管理</span>
+                <span style={styles.sectionHint}>保存、关闭与邀请入口预留</span>
               </div>
-              <div style={{ fontSize: '11px', color: '#8ba4c7', lineHeight: 1.7 }}>
-                - 行内“踢出”按钮已预留接口，未接入时会自动禁用。<br />
-                - 顶部“邀请玩家”按钮可直接挂接邀请流程。<br />
-                - 后续可扩展为房主专用管理面板。
+              <div style={styles.roomActions}>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.roomActionButton,
+                    ...styles.actionButtonPrimary,
+                    ...(!onInvitePlayer || !canManagePlayers ? styles.roomActionButtonDisabled : {}),
+                  }}
+                  onClick={() => onInvitePlayer?.()}
+                  disabled={!onInvitePlayer || !canManagePlayers}
+                >
+                  邀请玩家
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.roomActionButton,
+                    ...styles.actionButtonSuccess,
+                    ...(!onSaveRoom || !canManagePlayers ? styles.roomActionButtonDisabled : {}),
+                  }}
+                  onClick={() => onSaveRoom?.()}
+                  disabled={!onSaveRoom || !canManagePlayers}
+                >
+                  保存房间
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.roomActionButton,
+                    ...styles.actionButtonDanger,
+                    ...(!onCloseRoom || !canManagePlayers ? styles.roomActionButtonDisabled : {}),
+                  }}
+                  onClick={() => onCloseRoom?.()}
+                  disabled={!onCloseRoom || !canManagePlayers}
+                >
+                  关闭房间
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.roomActionButton,
+                    ...(!canManagePlayers ? styles.roomActionButtonDisabled : {}),
+                  }}
+                  disabled
+                  title="后续可扩展房主专用权限管理"
+                >
+                  权限管理
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#8ba4c7', lineHeight: 1.7, marginTop: '10px' }}>
+                - “踢出”按钮按玩家行展示，接入后可直接触发服务端操作。<br />
+                - “保存房间”与“关闭房间”已预留为房主管理动作。<br />
+                - 当前为战术终端风格布局，宽度会自动限制在可视范围内。
               </div>
             </div>
           </div>
