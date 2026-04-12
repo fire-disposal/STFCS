@@ -34,30 +34,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.32.1
-      
+
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: "pnpm"
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Run lint
         run: pnpm lint
-      
+
       - name: Run typecheck
         run: pnpm typecheck
-      
-      # 验证新架构基础包构建
+
+      # 验证基础包构建
       - name: Build core workspace packages
-        run: pnpm --filter @vt/contracts build ; pnpm --filter @vt/rules build
-      
+        run: pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build
+
       - name: Verify core package build output
         run: |
           test -f packages/contracts/dist/index.js || exit 1
@@ -71,25 +71,25 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.32.1
-      
+
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: "pnpm"
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Build core workspace packages
-        run: pnpm --filter @vt/contracts build ; pnpm --filter @vt/rules build
-      
+        run: pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build
+
       - name: Run tests
-        run: pnpm test || true  # 允许测试失败但会通知
+        run: pnpm test
 
   # ==================== 构建阶段 ====================
   build:
@@ -101,17 +101,17 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       # 构建缓存设置
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -166,7 +166,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     environment:
       name: production
-      url: http://${{ secrets.SERVER_HOST }}:3000
+      url: http://${{ secrets.SERVER_HOST }}:2567
     steps:
       - name: Set up SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
@@ -180,49 +180,47 @@ jobs:
             set -euo pipefail
             mkdir -p ~/stfcs
             cd ~/stfcs
-            
+
             # Login to registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            
+
             # Pull latest images
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-            
+
             # Remove existing containers
             for container in stfcs-server stfcs-client; do
               if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
                 docker rm -f ${container} || true
               fi
             done
-            
+
             # Create network if not exists
             docker network create stfcs-network 2>/dev/null || true
-            
-            # Start Client container
-            docker run -d \
-              --name stfcs-client \
-              --restart unless-stopped \
-              --network stfcs-network \
-              -p 8080:80 \
-              -e SERVER_URL=http://stfcs-server:3000 \
-              ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-            
+
             # Start Server container
             docker run -d \
               --name stfcs-server \
               --restart unless-stopped \
               --network stfcs-network \
-              -p 3000:3000 -p 3001:3001 \
+              -p 2567:2567 \
               -e NODE_ENV=production \
-              -e HTTP_PORT=3000 \
-              -e WS_PORT=3001 \
+              -e PORT=2567 \
               -e CORS_ORIGINS=https://stfcs.205716.xyz \
               ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            
+
+            # Start Client container  
+            docker run -d \
+              --name stfcs-client \
+              --restart unless-stopped \
+              --network stfcs-network \
+              -p 80:80 \
+              ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
+
             # Show status
             echo "=== Container Status ==="
             docker ps --filter name=stfcs --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-            
+
             # Show logs
             echo "=== Server Logs (last 50 lines) ==="
             docker logs --tail 50 stfcs-server || true
@@ -232,11 +230,11 @@ jobs:
         run: |
           echo "Waiting for service to be ready..."
           for i in $(seq 1 24); do
-            if curl -fsS http://${{ secrets.SERVER_HOST }}:3000/health > /dev/null 2>&1; then
+            if curl -fsS http://${{ secrets.SERVER_HOST }}:2567/health > /dev/null 2>&1; then
               echo "✓ Server health check passed"
-              
+
               # Check client
-              if curl -fsS http://${{ secrets.SERVER_HOST }}:8080/ > /dev/null 2>&1; then
+              if curl -fsS http://${{ secrets.SERVER_HOST }}:80/ > /dev/null 2>&1; then
                 echo "✓ Client health check passed"
                 exit 0
               else
@@ -247,7 +245,7 @@ jobs:
             echo "Attempt $i/24: Waiting for service..."
             sleep 5
           done
-          
+
           echo "✗ Health check failed after retries. Gathering diagnostics..."
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             docker ps -a --filter name=stfcs --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'

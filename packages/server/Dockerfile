@@ -84,11 +84,11 @@ RUN corepack enable && \
 # Switch to non-root user
 USER serveruser
 
-EXPOSE 3000 3001
+EXPOSE 2567
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:2567/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
 
 # Start server
-CMD ["node", "packages/server/dist/main.cjs"]
+CMD ["node", "packages/server/dist/index.js"]
