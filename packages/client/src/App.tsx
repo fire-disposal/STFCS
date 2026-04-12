@@ -131,12 +131,22 @@ const App: React.FC = () => {
 
   // 返回大厅
   const handleBackToLobby = useCallback(async () => {
+    console.log('[App] handleBackToLobby called, current appState:', appState);
+    
     if (networkManagerRef.current) {
-      await networkManagerRef.current.leaveRoom();
+      console.log('[App] Calling networkManager.leaveRoom()');
+      try {
+        await networkManagerRef.current.leaveRoom();
+        console.log('[App] leaveRoom() completed');
+      } catch (error) {
+        console.error('[App] leaveRoom error:', error);
+      }
     }
+    
+    console.log('[App] Setting appState to lobby');
     setAppState('lobby');
     notify.info('已返回大厅');
-  }, []);
+  }, [appState]);
 
   // 渲染
   if (!networkManager) {
