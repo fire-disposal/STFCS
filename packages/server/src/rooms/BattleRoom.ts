@@ -97,12 +97,13 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	 */
 	onCreate(options: {
 		playerName?: string;
+		shortId?: number;
 		roomName?: string;
 		maxPlayers?: number;
 		isPrivate?: boolean;
 	}) {
 		console.log(
-			`[BattleRoom] Room created - ID: ${this.roomId}, PlayerName: ${options.playerName || "default"}`
+			`[BattleRoom] Room created - ID: ${this.roomId}, Options:`, JSON.stringify(options)
 		);
 
 		const normalizedMaxPlayers = Number(options.maxPlayers);
