@@ -847,9 +847,28 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			`code: ${code}, allowReconnect: ${allowReconnect}`
 		);
 
-		if (allowReconnect && player) {
+		// 正常退出（主动点击离开按钮）- 立即清理，不等待重连
+		if (!allowReconnect) {
+			console.log(`[BattleRoom] Normal leave, cleaning up immediately`);
+			
+			// 设置断开状态
+			if (player) {
+				player.connected = false;
+			}
+
+			// 更新元数据
+			this.updateMetadata();
+
+			// 立即检查是否需要清理房间
+			this.checkRoomCleanup();
+			return;
+		}
+
+		// 异常断开 - 允许重连
+		if (player) {
 			try {
 				// 允许 60 秒内重连
+				console.log(`[BattleRoom] Allowing reconnection for 60 seconds...`);
 				await this.allowReconnection(client, 60);
 
 				// 重连成功，恢复连接状态
@@ -862,7 +881,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			}
 		}
 
-		// 设置断开状态
+		// 重连失败，设置断开状态
 		if (player) {
 			player.connected = false;
 		}
@@ -870,7 +889,14 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 更新元数据
 		this.updateMetadata();
 
-		// 检查是否需要清理（所有客户端都断开）
+		// 检查是否需要清理
+		this.checkRoomCleanup();
+	}
+
+	/**
+	 * 检查是否需要清理房间
+	 */
+	private checkRoomCleanup() {
 		const hasConnectedClients = Array.from(this.state.players.values()).some(p => p.connected);
 
 		if (!hasConnectedClients && this.clients.length === 0) {
