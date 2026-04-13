@@ -1,0 +1,1648 @@
+/**
+ * STFCS 游戏面板样式系统
+ * Game Panels v2.0
+ * 
+ * 继承 SettingsMenu 的硬朗科幻设计风格：
+ * - 无圆角 (border-radius: 0)
+ * - 深蓝背景 rgba(6, 16, 26, 0.98)
+ * - 边框色 #2b4261
+ * - 主色调 #4a9eff
+ * - 文字层次 #cfe8ff → #8ba4c7 → #6b7280
+ */
+
+/* ====== 颜色变量补充 ====== */
+:root {
+  /* 游戏面板专用颜色 */
+  --game-bg-primary: rgba(6, 16, 26, 0.98);
+  --game-bg-secondary: rgba(10, 30, 50, 0.8);
+  --game-bg-tertiary: rgba(13, 40, 71, 0.95);
+  --game-bg-hover: rgba(26, 74, 122, 0.3);
+  --game-bg-active: rgba(26, 74, 122, 0.5);
+  
+  --game-border: #2b4261;
+  --game-border-active: #4a9eff;
+  --game-border-glow: rgba(74, 158, 255, 0.4);
+  
+  --game-text-primary: #cfe8ff;
+  --game-text-secondary: #8ba4c7;
+  --game-text-muted: #6b7280;
+  --game-text-disabled: #4a5568;
+  
+  --game-accent-blue: #4a9eff;
+  --game-accent-red: #ff6f8f;
+  --game-accent-green: #2ecc71;
+  --game-accent-yellow: #f1c40f;
+  --game-accent-orange: #e67e22;
+  --game-accent-purple: #9b59b6;
+  
+  /* 面板按钮颜色 */
+  --game-btn-bg: #1a2d42;
+  --game-btn-bg-primary: #1a4a7a;
+  --game-btn-bg-danger: #5a2a3a;
+  --game-btn-bg-success: #1a5a3a;
+  --game-btn-bg-warning: #5a4a2a;
+}
+
+/* ====== 面板基础样式 ====== */
+
+.game-panel {
+  background-color: var(--game-bg-primary);
+  border: 1px solid var(--game-border);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.game-panel--secondary {
+  background-color: var(--game-bg-secondary);
+}
+
+.game-panel--tertiary {
+  background-color: var(--game-bg-tertiary);
+}
+
+/* 面板头部 */
+.game-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--game-border);
+}
+
+.game-panel__title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-panel__title-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--game-accent-blue);
+}
+
+.game-panel__close {
+  background: transparent;
+  border: none;
+  color: var(--game-text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.game-panel__close:hover {
+  color: var(--game-text-primary);
+}
+
+/* 面板内容 */
+.game-panel__content {
+  padding: 16px;
+}
+
+.game-panel__content--compact {
+  padding: 12px;
+}
+
+/* 面板区块 */
+.game-section {
+  margin-bottom: 16px;
+}
+
+.game-section:last-child {
+  margin-bottom: 0;
+}
+
+.game-section__title {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+
+.game-section__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--game-accent-blue);
+}
+
+.game-section__divider {
+  height: 1px;
+  background: var(--game-border);
+  margin: 12px 0;
+}
+
+/* ====== 模态框/弹窗 ====== */
+
+.game-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.game-modal {
+  background-color: var(--game-bg-primary);
+  border: 1px solid var(--game-border);
+  min-width: 500px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.game-modal--small {
+  min-width: 320px;
+  max-width: 400px;
+}
+
+.game-modal--large {
+  min-width: 600px;
+  max-width: 800px;
+}
+
+/* ====== 游戏按钮系统 ====== */
+
+.game-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--game-border);
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-primary);
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.game-btn__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.game-btn__icon--left {
+  margin-right: 2px;
+}
+
+.game-btn:hover:not(:disabled) {
+  background-color: var(--game-bg-hover);
+  border-color: var(--game-border-active);
+}
+
+.game-btn:active:not(:disabled) {
+  background-color: var(--game-bg-active);
+}
+
+.game-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--game-text-disabled);
+}
+
+/* 按钮变体 */
+.game-btn--primary {
+  background-color: var(--game-btn-bg-primary);
+  border-color: var(--game-accent-blue);
+  color: var(--game-accent-blue);
+}
+
+.game-btn--primary:hover:not(:disabled) {
+  background-color: rgba(26, 74, 122, 0.6);
+  box-shadow: 0 0 8px var(--game-border-glow);
+}
+
+.game-btn--danger {
+  background-color: var(--game-btn-bg-danger);
+  border-color: var(--game-accent-red);
+  color: var(--game-accent-red);
+}
+
+.game-btn--danger:hover:not(:disabled) {
+  background-color: rgba(90, 42, 58, 0.6);
+  box-shadow: 0 0 8px rgba(255, 111, 143, 0.3);
+}
+
+.game-btn--success {
+  background-color: var(--game-btn-bg-success);
+  border-color: var(--game-accent-green);
+  color: var(--game-accent-green);
+}
+
+.game-btn--success:hover:not(:disabled) {
+  background-color: rgba(26, 90, 58, 0.6);
+}
+
+.game-btn--warning {
+  background-color: var(--game-btn-bg-warning);
+  border-color: var(--game-accent-yellow);
+  color: var(--game-accent-yellow);
+}
+
+.game-btn--warning:hover:not(:disabled) {
+  background-color: rgba(90, 74, 42, 0.6);
+}
+
+.game-btn--ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--game-text-secondary);
+  padding: 6px 8px;
+}
+
+.game-btn--ghost:hover:not(:disabled) {
+  background-color: rgba(26, 45, 66, 0.5);
+  border-color: var(--game-border);
+  color: var(--game-text-primary);
+}
+
+/* 按钮尺寸 */
+.game-btn--small {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.game-btn--large {
+  padding: 12px 20px;
+  font-size: 14px;
+}
+
+.game-btn--full {
+  width: 100%;
+}
+
+/* 按钮组 */
+.game-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.game-btn-group--vertical {
+  flex-direction: column;
+}
+
+.game-btn-group--full {
+  width: 100%;
+}
+
+/* ====== Toggle 开关 ====== */
+
+.game-toggle {
+  width: 44px;
+  height: 22px;
+  border: none;
+  background-color: var(--game-border);
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.game-toggle--active {
+  background-color: var(--game-btn-bg-primary);
+}
+
+.game-toggle__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background-color: var(--game-text-primary);
+  transition: all 0.2s;
+}
+
+.game-toggle--active .game-toggle__knob {
+  left: 25px;
+  background-color: var(--game-accent-blue);
+}
+
+/* ====== 选项卡系统 ====== */
+
+.game-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--game-border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.game-tab {
+  padding: 8px 16px;
+  border: 1px solid var(--game-border);
+  background-color: transparent;
+  color: var(--game-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.game-tab:hover:not(.game-tab--active):not(:disabled) {
+  color: var(--game-text-primary);
+  background-color: var(--game-bg-hover);
+}
+
+.game-tab--active {
+  background-color: var(--game-btn-bg-primary);
+  border-color: var(--game-accent-blue);
+  color: var(--game-accent-blue);
+}
+
+.game-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ====== 输入框 ====== */
+
+.game-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--game-border);
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-primary);
+  font-size: 12px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.game-input:focus {
+  border-color: var(--game-accent-blue);
+  box-shadow: 0 0 4px var(--game-border-glow);
+}
+
+.game-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-input--small {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.game-input--narrow {
+  width: 80px;
+}
+
+/* 下拉选择 */
+.game-select {
+  padding: 6px 12px;
+  border: 1px solid var(--game-border);
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-primary);
+  font-size: 12px;
+  min-width: 120px;
+  cursor: pointer;
+  outline: none;
+}
+
+.game-select:focus {
+  border-color: var(--game-accent-blue);
+}
+
+/* ====== 设置行 ====== */
+
+.game-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(43, 66, 97, 0.3);
+}
+
+.game-setting-row:last-child {
+  border-bottom: none;
+}
+
+.game-setting__label {
+  font-size: 12px;
+  color: var(--game-text-primary);
+}
+
+.game-setting__hint {
+  font-size: 10px;
+  color: var(--game-text-muted);
+  margin-top: 4px;
+}
+
+.game-setting__hint--centered {
+  text-align: center;
+}
+
+/* ====== 进度条 ====== */
+
+.game-bar {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+}
+
+.game-bar--thin {
+  height: 4px;
+}
+
+.game-bar--thick {
+  height: 12px;
+}
+
+.game-bar__fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.game-bar__fill--primary {
+  background-color: var(--game-accent-blue);
+}
+
+.game-bar__fill--success {
+  background-color: var(--game-accent-green);
+}
+
+.game-bar__fill--warning {
+  background-color: var(--game-accent-yellow);
+}
+
+.game-bar__fill--danger {
+  background-color: var(--game-accent-red);
+}
+
+.game-bar__fill--flux {
+  background: linear-gradient(90deg, var(--game-accent-blue), var(--game-accent-purple));
+}
+
+.game-bar__fill--shield {
+  background: linear-gradient(90deg, #2a5a8a, var(--game-accent-blue));
+}
+
+.game-bar__fill--armor {
+  background: linear-gradient(90deg, #8a6a2a, var(--game-accent-yellow));
+}
+
+.game-bar__fill--structure {
+  background: linear-gradient(90deg, #8a2a2a, var(--game-accent-red));
+}
+
+/* 带标签的进度条 */
+.game-bar--labelled {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-bar__label {
+  font-size: 10px;
+  color: var(--game-text-secondary);
+  min-width: 40px;
+  text-transform: uppercase;
+}
+
+.game-bar__value {
+  font-size: 10px;
+  color: var(--game-text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ====== 状态徽章 ====== */
+
+.game-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.game-badge--primary {
+  background-color: var(--game-btn-bg-primary);
+  color: var(--game-accent-blue);
+}
+
+.game-badge--danger {
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+}
+
+.game-badge--success {
+  background-color: var(--game-btn-bg-success);
+  color: var(--game-accent-green);
+}
+
+.game-badge--warning {
+  background-color: var(--game-btn-bg-warning);
+  color: var(--game-accent-yellow);
+}
+
+.game-badge--muted {
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-secondary);
+}
+
+/* ====== 列表项 ====== */
+
+.game-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background-color: var(--game-btn-bg);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.game-list-item:hover {
+  background-color: var(--game-bg-hover);
+}
+
+.game-list-item--selected {
+  border-color: var(--game-accent-blue);
+  background-color: rgba(26, 74, 122, 0.4);
+}
+
+.game-list-item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ====== 统一图标系统 ====== */
+
+.game-icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.game-icon--xs { width: 12px; height: 12px; }
+.game-icon--sm { width: 14px; height: 14px; }
+.game-icon--md { width: 16px; height: 16px; }
+.game-icon--lg { width: 20px; height: 20px; }
+.game-icon--xl { width: 24px; height: 24px; }
+
+.game-icon--primary { color: var(--game-accent-blue); }
+.game-icon--danger { color: var(--game-accent-red); }
+.game-icon--success { color: var(--game-accent-green); }
+.game-icon--warning { color: var(--game-accent-yellow); }
+.game-icon--muted { color: var(--game-text-muted); }
+.game-icon--secondary { color: var(--game-text-secondary); }
+
+/* ====== 右侧面板 ====== */
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: rgba(6, 16, 26, 0.95);
+  border-radius: 0;
+  border: 1px solid var(--game-border);
+  overflow: hidden;
+}
+
+.right-panel__tabs {
+  display: flex;
+  background-color: rgba(20, 30, 40, 0.9);
+  border-bottom: 1px solid var(--game-border);
+}
+
+.right-panel__tab {
+  flex: 1;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--game-text-muted);
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.right-panel__tab:hover {
+  color: var(--game-text-secondary);
+  background-color: rgba(26, 45, 66, 0.3);
+}
+
+.right-panel__tab--active {
+  border-bottom-color: var(--game-accent-blue);
+  color: var(--game-accent-blue);
+  background-color: rgba(26, 45, 66, 0.5);
+}
+
+.right-panel__body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-panel__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-panel__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  gap: 12px;
+}
+
+.right-panel__empty-title {
+  color: var(--game-text-primary);
+  font-size: 12px;
+}
+
+.right-panel__empty-hint {
+  color: var(--game-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.right-panel__badge {
+  background-color: var(--game-accent-blue);
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* ====== 空状态 ====== */
+
+.game-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--game-text-secondary);
+  font-size: 12px;
+}
+
+.game-empty__icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  width: 24px;
+  height: 24px;
+  color: var(--game-accent-blue);
+  margin: 0 auto 8px auto;
+  display: block;
+}
+
+.game-empty__hint {
+  font-size: 10px;
+  color: var(--game-text-muted);
+  margin-top: 4px;
+}
+
+/* ====== 文本颜色 ====== */
+
+.game-text--primary { color: var(--game-text-primary); }
+.game-text--secondary { color: var(--game-text-secondary); }
+.game-text--muted { color: var(--game-text-muted); }
+.game-text--accent { color: var(--game-accent-blue); }
+.game-text--danger { color: var(--game-accent-red); }
+.game-text--success { color: var(--game-accent-green); }
+.game-text--warning { color: var(--game-accent-yellow); }
+
+/* ====== 滑块 ====== */
+
+.game-slider {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.game-slider::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  background-color: var(--game-accent-blue);
+  border: 2px solid var(--game-text-primary);
+  cursor: pointer;
+}
+
+.game-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background-color: var(--game-accent-blue);
+  border: 2px solid var(--game-text-primary);
+  cursor: pointer;
+}
+
+/* ====== 行布局 ====== */
+
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-row--between {
+  justify-content: space-between;
+}
+
+.game-row--wrap {
+  flex-wrap: wrap;
+}
+
+/* ====== DM专用样式 ====== */
+
+.game-panel--dm {
+  border-color: rgba(255, 111, 143, 0.3);
+}
+
+.game-panel--dm .game-panel__header {
+  border-bottom-color: rgba(255, 111, 143, 0.2);
+}
+
+.game-badge--dm {
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+}
+
+.game-btn--dm {
+  background-color: var(--game-btn-bg-danger);
+  border-color: var(--game-accent-red);
+  color: var(--game-accent-red);
+}
+
+/* ====== 舰船详情面板专用 ====== */
+
+.ship-panel {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.ship-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--game-border);
+  padding-bottom: 8px;
+}
+
+.ship-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ship-title__icon {
+  width: 16px;
+  height: 16px;
+  color: var(--game-accent-blue);
+  flex-shrink: 0;
+}
+
+.ship-faction-badge {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.ship-faction-badge--player {
+  background-color: var(--game-btn-bg-primary);
+  color: var(--game-accent-blue);
+}
+
+.ship-faction-badge--dm {
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+}
+
+.ship-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.ship-label {
+  color: var(--game-text-secondary);
+}
+
+.ship-value {
+  color: var(--game-text-primary);
+  font-weight: bold;
+}
+
+.ship-value--blue { color: var(--game-accent-blue); }
+.ship-value--orange { color: var(--game-accent-orange); }
+.ship-value--red { color: var(--game-accent-red); }
+.ship-value--green { color: var(--game-accent-green); }
+
+/* 护甲网格 (6象限) */
+.ship-armor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.ship-armor-cell {
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 武器列表 */
+.ship-weapon-list {
+  max-height: 120px;
+  overflow: auto;
+}
+
+.ship-weapon-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background-color: var(--game-btn-bg);
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.ship-weapon-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  font-size: 12px;
+}
+
+.ship-weapon-icon__svg {
+  width: 14px;
+  height: 14px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.ship-weapon-info {
+  flex: 1;
+}
+
+.ship-weapon-name {
+  color: var(--game-text-primary);
+}
+
+.ship-weapon-stats {
+  font-size: 10px;
+  color: var(--game-text-secondary);
+}
+
+/* 状态徽章 */
+.ship-status-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.ship-status-badge--destroyed {
+  background-color: var(--game-accent-red);
+  color: white;
+}
+
+.ship-status-badge--overloaded {
+  background-color: var(--game-accent-red);
+  color: white;
+}
+
+.ship-status-badge--cooldown {
+  background-color: var(--game-accent-orange);
+  color: white;
+}
+
+.ship-status-badge--shield-on {
+  background-color: var(--game-accent-green);
+  color: white;
+}
+
+.ship-status-badge--shield-off {
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-secondary);
+}
+
+/* ====== 舰船操作面板专用 ====== */
+
+.action-panel {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.action-header {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--game-border);
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.action-header__id {
+  font-size: 11px;
+  color: var(--game-text-secondary);
+  margin-left: 8px;
+}
+
+/* 状态消息 */
+.action-status {
+  padding: 8px;
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.action-status--error {
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+}
+
+.action-status--warning {
+  background-color: var(--game-btn-bg-warning);
+  color: var(--game-accent-yellow);
+}
+
+.action-status--success {
+  background-color: var(--game-btn-bg-success);
+  color: var(--game-accent-green);
+}
+
+/* 滑块容器 */
+.action-slider {
+  margin-bottom: 8px;
+}
+
+.action-slider__label {
+  font-size: 11px;
+  color: var(--game-text-secondary);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.action-slider__input {
+  width: 100%;
+  height: 6px;
+  background-color: var(--game-btn-bg);
+  cursor: pointer;
+}
+
+.action-slider__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 武器选择 */
+.action-weapon-list {
+  max-height: 100px;
+  overflow: auto;
+}
+
+.action-weapon-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background-color: var(--game-btn-bg);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.action-weapon-item:hover {
+  background-color: var(--game-bg-hover);
+}
+
+.action-weapon-item--selected {
+  border-color: var(--game-accent-blue);
+  background-color: rgba(26, 74, 122, 0.4);
+}
+
+.action-weapon__name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--game-text-primary);
+}
+
+.action-weapon__stats {
+  font-size: 10px;
+  color: var(--game-text-secondary);
+}
+
+/* 目标选择 */
+.action-target-select {
+  padding: 8px;
+  background-color: var(--game-btn-bg);
+  margin-bottom: 8px;
+}
+
+.action-target__label {
+  font-size: 11px;
+  color: var(--game-text-secondary);
+  margin-bottom: 4px;
+}
+
+.action-target-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.action-target-item:hover {
+  background-color: var(--game-bg-hover);
+}
+
+.action-target-item--selected {
+  border-color: var(--game-accent-red);
+  background-color: rgba(58, 42, 74, 0.5);
+}
+
+.action-target__name {
+  color: var(--game-text-primary);
+}
+
+.action-target__faction {
+  color: var(--game-text-secondary);
+}
+
+/* 按钮激活状态 */
+.game-btn--active {
+  background-color: var(--game-accent-green);
+  border-color: var(--game-accent-green);
+  color: white;
+}
+
+/* ====== 回合指示器专用 ====== */
+
+.turn-indicator {
+  background-color: rgba(6, 16, 26, 0.95);
+  border: 1px solid rgba(74, 158, 255, 0.25);
+  padding: 10px 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.turn-indicator--compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.turn-indicator--full {
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+}
+
+/* 主信息行 */
+.turn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 阶段指示 */
+.turn-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turn-phase__dot {
+  width: 12px;
+  height: 12px;
+  transition: all 0.3s ease;
+}
+
+.turn-indicator--compact .turn-phase__dot {
+  width: 10px;
+  height: 10px;
+}
+
+.turn-phase__dot--active {
+  box-shadow: 0 0 8px currentColor;
+}
+
+.turn-phase__label {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.turn-phase__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* 回合计数器 */
+.turn-counter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background-color: rgba(26, 45, 66, 0.8);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.turn-counter__label {
+  font-size: 11px;
+  color: var(--game-text-secondary);
+}
+
+.turn-counter__number {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--game-accent-blue);
+}
+
+/* 阵营徽章 */
+.turn-faction {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+
+.turn-faction__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.turn-faction--player {
+  background-color: var(--game-btn-bg-primary);
+  color: var(--game-accent-blue);
+}
+
+.turn-faction--dm {
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+}
+
+/* 进度条 */
+.turn-progress {
+  width: 100%;
+  height: 4px;
+  background-color: var(--game-btn-bg);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.turn-progress--compact {
+  height: 2px;
+  background-color: rgba(26, 45, 66, 0.7);
+}
+
+.turn-progress__fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* 阶段列表 */
+.turn-phase-list {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.turn-phase-item {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.turn-phase-item__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.turn-phase-item--active {
+  border-color: currentColor;
+}
+
+.turn-phase-item--past {
+  background-color: var(--game-border);
+  color: white;
+}
+
+.turn-phase-item--future {
+  background-color: var(--game-btn-bg);
+  color: var(--game-text-secondary);
+}
+
+/* 阶段颜色 */
+.turn-phase--deployment { background-color: #9b59b6; }
+.turn-phase--player { background-color: var(--game-accent-blue); }
+.turn-phase--dm { background-color: var(--game-accent-red); }
+.turn-phase--end { background-color: var(--game-accent-yellow); }
+
+/* 强制推进按钮 */
+.turn-advance-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--game-accent-red);
+  background-color: var(--game-btn-bg-danger);
+  color: var(--game-accent-red);
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.turn-advance-btn__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.turn-advance-btn:hover {
+  background-color: rgba(90, 42, 58, 0.7);
+  box-shadow: 0 0 8px rgba(255, 111, 143, 0.3);
+}
+
+/* 紧凑模式下的推进按钮 */
+.turn-advance-btn--compact {
+  padding: 4px 10px;
+  font-size: 10px;
+}
+
+/* ====== 浮动地图控制面板专用 ====== */
+
+.floating-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.floating-panel__toggle {
+  pointer-events: auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(74, 158, 255, 0.5);
+  background-color: rgba(6, 16, 26, 0.9);
+  color: var(--game-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.floating-panel__toggle:hover {
+  background-color: rgba(13, 40, 71, 0.95);
+  border-color: var(--game-accent-blue);
+}
+
+.floating-panel__content {
+  pointer-events: auto;
+  margin-top: 10px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid rgba(74, 158, 255, 0.35);
+  background-color: rgba(6, 16, 26, 0.95);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.floating-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.floating-panel__title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #e7f2ff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.floating-panel__title-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--game-accent-blue);
+}
+
+.floating-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.floating-panel__tiny-btn {
+  padding: 5px 8px;
+  border: 1px solid rgba(74, 158, 255, 0.25);
+  background-color: rgba(26, 45, 66, 0.9);
+  color: var(--game-text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.floating-panel__tiny-btn:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+}
+
+.floating-panel__body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 地图控制区块 */
+.map-section {
+  padding: 12px;
+  border: 1px solid rgba(74, 158, 255, 0.15);
+  background-color: rgba(13, 40, 71, 0.35);
+}
+
+.map-section__title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #8fbfd4;
+  margin-bottom: 10px;
+  letter-spacing: 0.04em;
+}
+
+.map-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.map-nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.map-label {
+  font-size: 10px;
+  color: var(--game-text-secondary);
+  margin-bottom: 4px;
+}
+
+.map-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(74, 158, 255, 0.25);
+  background-color: var(--game-btn-bg);
+  color: #e7f2ff;
+  font-size: 12px;
+  outline: none;
+}
+
+.map-input:focus {
+  border-color: var(--game-accent-blue);
+}
+
+.map-value {
+  font-size: 11px;
+  color: #d4e9ff;
+}
+
+.map-hint {
+  font-size: 10px;
+  color: #6f8ea8;
+  line-height: 1.5;
+}
+
+/* 导航按钮 */
+.map-nav-btn {
+  padding: 8px 10px;
+  border: 1px solid var(--game-accent-blue);
+  background-color: rgba(74, 158, 255, 0.15);
+  color: #e7f2ff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.map-nav-btn:hover {
+  background-color: rgba(74, 158, 255, 0.25);
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+}
+
+.map-nav-btn--secondary {
+  border-color: rgba(74, 158, 255, 0.25);
+  background-color: rgba(26, 45, 66, 0.85);
+  color: var(--game-text-primary);
+  font-weight: 400;
+}
+
+.map-nav-btn--ghost {
+  padding: 6px 8px;
+  border-color: rgba(74, 158, 255, 0.22);
+  background-color: rgba(26, 45, 66, 0.65);
+  color: var(--game-text-primary);
+  font-size: 11px;
+}
+
+/* 定位字段 */
+.map-field {
+  padding: 10px;
+  border: 1px solid rgba(74, 158, 255, 0.16);
+  background-color: rgba(10, 30, 50, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-field__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-field__title {
+  font-size: 10px;
+  color: #8fbfd4;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.map-field__value {
+  font-size: 12px;
+  color: #eef6ff;
+  font-weight: 700;
+}
+
+.map-copy-btn {
+  padding: 6px 9px;
+  border: 1px solid rgba(74, 158, 255, 0.28);
+  background-color: rgba(26, 45, 66, 0.88);
+  color: var(--game-text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.map-copy-btn:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+}
+
+/* 复制成功提示 */
+.map-feedback {
+  font-size: 10px;
+  color: var(--game-accent-green);
+  text-align: center;
+}
+
+/* ====== 磁力指针效果 ====== */
+
+[data-magnetic] {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
+}
+
+[data-magnetic]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+
+[data-magnetic]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Toggle 开关的磁力效果 */
+.game-toggle[data-magnetic]:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.2);
+}
+
+/* 按钮组的磁力效果 */
+.game-btn[data-magnetic]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+
+.game-btn[data-magnetic]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 列表项的磁力效果 */
+.game-list-item[data-magnetic]:hover {
+  transform: translateX(2px);
+}
+
+/* 武器选择项的磁力效果 */
+.action-weapon-item[data-magnetic]:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.2);
+}
+
+/* 目标选择项的磁力效果 */
+.action-target-item[data-magnetic]:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(255, 111, 143, 0.2);
+}
+
+/* ====== Spacing Utilities ====== */
+
+.map-row + .map-row { margin-top: 8px; }
+.map-section + .map-section { margin-top: 12px; }
+.map-hint + .map-hint { margin-top: 4px; }
+
+.mt-4 { margin-top: 4px; }
+.mt-6 { margin-top: 6px; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+
+/* ====== 响应式 ====== */
+
+@media (max-width: 768px) {
+  .game-modal {
+    min-width: auto;
+    max-width: 90vw;
+    width: 90vw;
+  }
+  
+  .game-btn-group {
+    flex-direction: column;
+  }
+  
+  .ship-panel {
+    min-width: auto;
+    max-width: 100%;
+  }
+}

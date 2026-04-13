@@ -1,5 +1,18 @@
+/**
+ * 浮动地图控制面板
+ *
+ * 提供地图导航和微调功能：
+ * - 视图旋转
+ * - 定位坐标
+ * - 地图平移
+ * - 星区位置导航
+ *
+ * 样式: game-panels.css (floating-panel 类)
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ShipState } from '@vt/contracts';
+import { Compass } from 'lucide-react';
 
 import { useUIStore } from '@/store/uiStore';
 import { formatPosition } from '@/utils/spaceNav';
@@ -7,190 +20,6 @@ import { calculateViewRotationForAlignment, normalizeRotation, normalizeAngle } 
 import { useSelectionStore } from '@/store/selectionStore';
 
 const STORAGE_KEY = 'stfcs_floating_map_controls_open';
-
-const styles = {
-  wrapper: {
-    position: 'absolute' as const,
-    top: '16px',
-    right: '16px',
-    zIndex: 20,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'flex-end',
-    pointerEvents: 'none' as const,
-  },
-  toggleButton: {
-    pointerEvents: 'auto' as const,
-    padding: '8px 12px',
-    borderRadius: '999px',
-    border: '1px solid rgba(74, 158, 255, 0.5)',
-    backgroundColor: 'rgba(6, 16, 26, 0.88)',
-    color: '#cfe8ff',
-    fontSize: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
-    backdropFilter: 'blur(10px)',
-  },
-  panel: {
-    pointerEvents: 'auto' as const,
-    marginTop: '10px',
-    width: '320px',
-    maxWidth: 'calc(100vw - 32px)',
-    borderRadius: '14px',
-    border: '1px solid rgba(74, 158, 255, 0.35)',
-    backgroundColor: 'rgba(6, 16, 26, 0.92)',
-    boxShadow: '0 18px 40px rgba(0, 0, 0, 0.35)',
-    backdropFilter: 'blur(12px)',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 14px',
-    borderBottom: '1px solid rgba(74, 158, 255, 0.18)',
-  },
-  title: {
-    fontSize: '13px',
-    fontWeight: 800,
-    color: '#e7f2ff',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '8px',
-  },
-  tinyButton: {
-    padding: '5px 8px',
-    borderRadius: '8px',
-    border: '1px solid rgba(74, 158, 255, 0.25)',
-    backgroundColor: 'rgba(26, 45, 66, 0.9)',
-    color: '#cfe8ff',
-    fontSize: '11px',
-    cursor: 'pointer',
-  },
-  body: {
-    padding: '14px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-  },
-  section: {
-    padding: '12px',
-    borderRadius: '12px',
-    border: '1px solid rgba(74, 158, 255, 0.14)',
-    backgroundColor: 'rgba(13, 40, 71, 0.35)',
-  },
-  sectionTitle: {
-    fontSize: '11px',
-    fontWeight: 800,
-    color: '#8fbfd4',
-    marginBottom: '10px',
-    letterSpacing: '0.04em',
-  },
-  row: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-    flexWrap: 'wrap' as const,
-  },
-  navGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '8px',
-  },
-  label: {
-    fontSize: '10px',
-    color: '#8ba4c7',
-    marginBottom: '4px',
-  },
-  input: {
-    width: '100%',
-    padding: '8px 10px',
-    borderRadius: '8px',
-    border: '1px solid rgba(74, 158, 255, 0.25)',
-    backgroundColor: '#1a2d42',
-    color: '#e7f2ff',
-    fontSize: '12px',
-    outline: 'none',
-  },
-  primaryButton: {
-    padding: '8px 10px',
-    borderRadius: '8px',
-    border: '1px solid #4a9eff',
-    backgroundColor: 'rgba(74, 158, 255, 0.14)',
-    color: '#e7f2ff',
-    fontSize: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  secondaryButton: {
-    padding: '8px 10px',
-    borderRadius: '8px',
-    border: '1px solid rgba(74, 158, 255, 0.25)',
-    backgroundColor: 'rgba(26, 45, 66, 0.85)',
-    color: '#cfe8ff',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  ghostButton: {
-    padding: '6px 8px',
-    borderRadius: '8px',
-    border: '1px solid rgba(74, 158, 255, 0.22)',
-    backgroundColor: 'rgba(26, 45, 66, 0.65)',
-    color: '#cfe8ff',
-    fontSize: '11px',
-    cursor: 'pointer',
-  },
-  hint: {
-    fontSize: '10px',
-    color: '#6f8ea8',
-    lineHeight: 1.5,
-  },
-  value: {
-    fontSize: '11px',
-    color: '#d4e9ff',
-  },
-  field: {
-    padding: '10px',
-    borderRadius: '10px',
-    border: '1px solid rgba(74, 158, 255, 0.16)',
-    backgroundColor: 'rgba(10, 30, 50, 0.45)',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-  },
-  fieldTitle: {
-    fontSize: '10px',
-    color: '#8fbfd4',
-    fontWeight: 800,
-    letterSpacing: '0.04em',
-  },
-  fieldValue: {
-    fontSize: '12px',
-    color: '#eef6ff',
-    fontWeight: 700,
-  },
-  fieldRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '8px',
-  },
-  copyButton: {
-    padding: '6px 9px',
-    borderRadius: '8px',
-    border: '1px solid rgba(74, 158, 255, 0.28)',
-    backgroundColor: 'rgba(26, 45, 66, 0.88)',
-    color: '#cfe8ff',
-    fontSize: '11px',
-    cursor: 'pointer',
-    flexShrink: 0,
-  },
-};
 
 interface FloatingMapControlsProps {
   selectedShip?: ShipState | null;
@@ -217,11 +46,8 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) {
-      setIsOpen(stored === 'true');
-    }
+    if (stored !== null) setIsOpen(stored === 'true');
   }, []);
 
   useEffect(() => {
@@ -236,7 +62,6 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
 
   useEffect(() => {
     if (!copyFeedback) return;
-
     const timer = window.setTimeout(() => setCopyFeedback(null), 1200);
     return () => window.clearTimeout(timer);
   }, [copyFeedback]);
@@ -249,9 +74,7 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
     return formatPosition(mouseWorldX, mouseWorldY, coordinatePrecision);
   }, [mouseWorldX, mouseWorldY, coordinatePrecision]);
 
-  const pointerAngle = useMemo(() => {
-    return normalizeAngle(viewRotation);
-  }, [viewRotation]);
+  const pointerAngle = useMemo(() => normalizeAngle(viewRotation), [viewRotation]);
 
   const moveCamera = useCallback((deltaX: number, deltaY: number) => {
     setCameraPosition(cameraPosition.x + deltaX, cameraPosition.y + deltaY);
@@ -260,10 +83,7 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
   const applyTargetNavigation = useCallback(() => {
     const x = Number(targetX);
     const y = Number(targetY);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return;
-    }
-
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     setCameraPosition(x, y);
   }, [targetX, targetY, setCameraPosition]);
 
@@ -291,7 +111,6 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
         document.execCommand('copy');
         document.body.removeChild(textarea);
       }
-
       setCopyFeedback(`${label} 已复制`);
     } catch {
       setCopyFeedback('复制失败');
@@ -307,125 +126,128 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({ select
   }, [copyText, viewRotation]);
 
   return (
-    <div style={styles.wrapper}>
-      <button
-        style={styles.toggleButton}
-        onClick={() => setIsOpen((open) => !open)}
-      >
+    <div className="floating-panel">
+      <button className="floating-panel__toggle" onClick={() => setIsOpen((open) => !open)}>
         {isOpen ? '收起地图控制' : '展开地图控制'}
       </button>
 
       {isOpen && (
-        <div style={styles.panel}>
-          <div style={styles.header}>
-            <div style={styles.title}>🧭 地图导航 / 微调</div>
-            <div style={styles.headerActions}>
-              <button style={styles.tinyButton} onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}>-</button>
-              <button style={styles.tinyButton} onClick={() => setZoom(Math.min(3, zoom + 0.1))}>+</button>
+        <div className="floating-panel__content">
+          <div className="floating-panel__header">
+            <div className="floating-panel__title">
+              <Compass className="floating-panel__title-icon" />
+              地图导航 / 微调
+            </div>
+            <div className="floating-panel__actions">
+              <button className="floating-panel__tiny-btn" onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}>-</button>
+              <button className="floating-panel__tiny-btn" onClick={() => setZoom(Math.min(3, zoom + 0.1))}>+</button>
             </div>
           </div>
 
-          <div style={styles.body}>
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>视图旋转</div>
-              <div style={styles.row}>
-                <span style={styles.value}>当前 {Math.round(viewRotation)}°</span>
-                <button style={styles.ghostButton} onClick={() => rotateBy(-15)}>-15°</button>
-                <button style={styles.ghostButton} onClick={() => rotateBy(-5)}>-5°</button>
-                <button style={styles.ghostButton} onClick={() => rotateBy(5)}>+5°</button>
-                <button style={styles.ghostButton} onClick={() => rotateBy(15)}>+15°</button>
-                <button style={styles.secondaryButton} onClick={resetViewRotation}>重置</button>
+          <div className="floating-panel__body">
+            {/* 视图旋转 */}
+            <div className="map-section">
+              <div className="map-section__title">视图旋转</div>
+              <div className="map-row">
+                <span className="map-value">当前 {Math.round(viewRotation)}°</span>
+                <button className="map-nav-btn map-nav-btn--ghost" onClick={() => rotateBy(-15)}>-15°</button>
+                <button className="map-nav-btn map-nav-btn--ghost" onClick={() => rotateBy(-5)}>-5°</button>
+                <button className="map-nav-btn map-nav-btn--ghost" onClick={() => rotateBy(5)}>+5°</button>
+                <button className="map-nav-btn map-nav-btn--ghost" onClick={() => rotateBy(15)}>+15°</button>
+                <button className="map-nav-btn map-nav-btn--secondary" onClick={resetViewRotation}>重置</button>
               </div>
-              <div style={{ ...styles.row, marginTop: '8px' }}>
-                <button style={styles.secondaryButton} onClick={alignToShip} disabled={!selectedShip}>
+              <div className="map-row mt-8">
+                <button className="map-nav-btn map-nav-btn--secondary" onClick={alignToShip} disabled={!selectedShip}>
                   对齐舰船朝向
                 </button>
-                <span style={styles.hint}>
+                <span className="map-hint">
                   这是备选微调入口，主视图保持稳定，旋转仅用于战术校正。
                 </span>
               </div>
             </div>
 
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>定位坐标</div>
-              <div style={styles.field}>
-                <div style={styles.fieldRow}>
+            {/* 定位坐标 */}
+            <div className="map-section">
+              <div className="map-section__title">定位坐标</div>
+              <div className="map-field">
+                <div className="map-field__row">
                   <div>
-                    <div style={styles.fieldTitle}>当前指针世界坐标</div>
-                    <div style={styles.fieldValue}>{pointerLabel}</div>
+                    <div className="map-field__title">当前指针世界坐标</div>
+                    <div className="map-field__value">{pointerLabel}</div>
                   </div>
-                  <button style={styles.copyButton} onClick={copyPointerPosition}>复制</button>
+                  <button className="map-copy-btn" onClick={copyPointerPosition}>复制</button>
                 </div>
-                <div style={styles.fieldRow}>
+                <div className="map-field__row">
                   <div>
-                    <div style={styles.fieldTitle}>继承视图旋转角度</div>
-                    <div style={styles.fieldValue}>{Math.round(pointerAngle)}°</div>
+                    <div className="map-field__title">继承视图旋转角度</div>
+                    <div className="map-field__value">{Math.round(pointerAngle)}°</div>
                   </div>
-                  <button style={styles.copyButton} onClick={copyPointerAngle}>复制角度</button>
+                  <button className="map-copy-btn" onClick={copyPointerAngle}>复制角度</button>
                 </div>
-                <div style={styles.row}>
-                  <button style={styles.secondaryButton} onClick={copyPointerPosition}>复制定位</button>
-                  <span style={styles.hint}>实时跟随鼠标更新，适合快速标记和转发坐标。</span>
+                <div className="map-row">
+                  <button className="map-nav-btn map-nav-btn--secondary" onClick={copyPointerPosition}>复制定位</button>
+                  <span className="map-hint">实时跟随鼠标更新，适合快速标记和转发坐标。</span>
                 </div>
               </div>
             </div>
 
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>地图平移</div>
-              <div style={styles.row}>
-                <button style={styles.primaryButton} onClick={() => moveCamera(-250, 0)}>←</button>
-                <button style={styles.primaryButton} onClick={() => moveCamera(250, 0)}>→</button>
-                <button style={styles.primaryButton} onClick={() => moveCamera(0, -250)}>↑</button>
-                <button style={styles.primaryButton} onClick={() => moveCamera(0, 250)}>↓</button>
-                <button style={styles.secondaryButton} onClick={() => setCameraPosition(0, 0)}>回中</button>
+            {/* 地图平移 */}
+            <div className="map-section">
+              <div className="map-section__title">地图平移</div>
+              <div className="map-row">
+                <button className="map-nav-btn" onClick={() => moveCamera(-250, 0)}>←</button>
+                <button className="map-nav-btn" onClick={() => moveCamera(250, 0)}>→</button>
+                <button className="map-nav-btn" onClick={() => moveCamera(0, -250)}>↑</button>
+                <button className="map-nav-btn" onClick={() => moveCamera(0, 250)}>↓</button>
+                <button className="map-nav-btn map-nav-btn--secondary" onClick={() => setCameraPosition(0, 0)}>回中</button>
               </div>
-              <div style={{ ...styles.hint, marginTop: '8px' }}>
+              <div className="map-hint mt-8">
                 支持直接拖拽地图；这里是精调补充，不影响主交互。
               </div>
             </div>
 
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>星区位置导航</div>
-              <div style={styles.navGrid}>
+            {/* 星区位置导航 */}
+            <div className="map-section">
+              <div className="map-section__title">星区位置导航</div>
+              <div className="map-nav-grid">
                 <div>
-                  <div style={styles.label}>X 坐标</div>
-                  <input style={styles.input} value={targetX} onChange={(e) => setTargetX(e.target.value)} inputMode="decimal" />
+                  <div className="map-label">X 坐标</div>
+                  <input className="map-input" value={targetX} onChange={(e) => setTargetX(e.target.value)} inputMode="decimal" />
                 </div>
                 <div>
-                  <div style={styles.label}>Y 坐标</div>
-                  <input style={styles.input} value={targetY} onChange={(e) => setTargetY(e.target.value)} inputMode="decimal" />
+                  <div className="map-label">Y 坐标</div>
+                  <input className="map-input" value={targetY} onChange={(e) => setTargetY(e.target.value)} inputMode="decimal" />
                 </div>
               </div>
-              <div style={{ ...styles.row, marginTop: '8px' }}>
-                <button style={styles.primaryButton} onClick={applyTargetNavigation}>居中到坐标</button>
-                <button style={styles.secondaryButton} onClick={() => {
+              <div className="map-row mt-8">
+                <button className="map-nav-btn" onClick={applyTargetNavigation}>居中到坐标</button>
+                <button className="map-nav-btn map-nav-btn--secondary" onClick={() => {
                   setTargetX(String(Math.round(cameraPosition.x)));
                   setTargetY(String(Math.round(cameraPosition.y)));
                 }}>
                   填入当前视图
                 </button>
               </div>
-              <div style={{ ...styles.hint, marginTop: '8px' }}>
+              <div className="map-hint mt-8">
                 当前中心：{cameraLabel}
               </div>
             </div>
 
+            {/* 选中舰船 */}
             {selectedShip && (
-              <div style={styles.section}>
-                <div style={styles.sectionTitle}>选中舰船</div>
-                <div style={styles.value}>
+              <div className="map-section">
+                <div className="map-section__title">选中舰船</div>
+                <div className="map-value">
                   {selectedShip.id.slice(-6)} · 朝向 {Math.round(selectedShip.transform.heading)}°
                 </div>
-                <div style={{ ...styles.hint, marginTop: '6px' }}>
+                <div className="map-hint mt-6">
                   用于快速对齐视角，作为主导航的备选工具。
                 </div>
               </div>
             )}
 
             {copyFeedback && (
-              <div style={{ ...styles.hint, color: '#4ade80', textAlign: 'center' as const }}>
-                {copyFeedback}
-              </div>
+              <div className="map-feedback">{copyFeedback}</div>
             )}
           </div>
         </div>

@@ -5,6 +5,8 @@
 @import './styles/design-system.css';
 @import './styles/components.css';
 @import './styles/fonts.css';
+@import './styles/game-panels.css';
+@import './styles/game-layout.css';
 
 /* ====== 重置和基础样式 ====== */
 * {
@@ -614,33 +616,12 @@ code, pre {
     }
 }
 
-/* ====== 工具类 ====== */
-.hidden {
-    display: none !important;
-}
+/* ====== 工具类（补充design-system.css中未定义的） ====== */
+/* 注意: .hidden, .flex, .flex-col, .items-center 等已在 design-system.css 定义 */
+/* 注意: .text-primary, .text-secondary 等已在 design-system.css 使用变量定义 */
 
 .visible {
     display: block !important;
-}
-
-.flex {
-    display: flex;
-}
-
-.flex-col {
-    flex-direction: column;
-}
-
-.items-center {
-    align-items: center;
-}
-
-.justify-center {
-    justify-content: center;
-}
-
-.justify-between {
-    justify-content: space-between;
 }
 
 .gap-2 {
@@ -657,14 +638,6 @@ code, pre {
 
 .m-4 {
     margin: 16px;
-}
-
-.text-primary {
-    color: #aaccff;
-}
-
-.text-secondary {
-    color: #8a8aa8;
 }
 
 .bg-dark {

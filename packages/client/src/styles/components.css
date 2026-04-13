@@ -3,9 +3,8 @@
  * Component Styles v1.0
  * 
  * 基于design-system.css变量，定义各组件的具体样式
+ * 注意: design-system.css 已在 styles.css 中导入，此处无需重复导入
  */
-
-@import './design-system.css';
 
 /* ====== 按钮组件 ====== */
 .btn {
@@ -1035,4 +1034,379 @@
   background: var(--tactical-active);
   border-color: rgba(74, 158, 255, 0.6);
   box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+}
+
+/* ====== 双面板认证组件 ====== */
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: linear-gradient(135deg, #00050a 0%, #001020 50%, #00050a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(100, 200, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 200, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+}
+
+.auth-dual-panel {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 950px;
+  background: rgba(13, 40, 71, 0.8);
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 0 40px rgba(74, 158, 255, 0.4);
+  z-index: 1;
+}
+
+.auth-left-panel {
+  flex: 0 0 300px;
+  padding: 48px 40px;
+  border-right: 2px solid #1a6b8c;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(180deg, #0d2847 0%, #0a2340 100%);
+}
+
+.auth-right-panel {
+  flex: 1;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 420px;
+}
+
+.auth-logo {
+  font-size: 72px;
+  margin-bottom: 16px;
+  text-align: center;
+  color: var(--color-primary);
+  text-shadow: 0 0 20px rgba(74, 158, 255, 0.6);
+}
+
+.auth-title {
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffffff;
+  text-align: center;
+  margin-bottom: 8px;
+  letter-spacing: 8px;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: #6cb4cc;
+  text-align: center;
+  letter-spacing: 4px;
+  font-weight: 500;
+}
+
+.auth-status-block {
+  padding: 20px;
+  background: rgba(13, 40, 71, 0.6);
+  border: 2px solid rgba(74, 158, 255, 0.4);
+  margin-top: 32px;
+}
+
+.auth-status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  color: #8fbfd4;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.auth-status-label {
+  color: #5a8a9e;
+  font-weight: 600;
+}
+
+.auth-status-value {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.auth-status-value--warning {
+  color: #fbbf24;
+  font-weight: bold;
+}
+
+.auth-status-value--error {
+  color: #f87171;
+  font-weight: bold;
+}
+
+.auth-version {
+  font-size: 12px;
+  color: #4a6f85;
+  margin-top: 24px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.auth-form-group {
+  margin-bottom: 24px;
+}
+
+.auth-label {
+  display: block;
+  font-size: 14px;
+  color: #8fbfd4;
+  margin-bottom: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(13, 40, 71, 0.5);
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  color: #ffffff;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.auth-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.4);
+  background: rgba(13, 40, 71, 0.7);
+}
+
+.auth-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-btn {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--color-primary);
+  background: rgba(74, 158, 255, 0.15);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  transition: all 0.3s ease;
+}
+
+.auth-btn:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.25);
+  box-shadow: 0 0 25px rgba(74, 158, 255, 0.5);
+}
+
+.auth-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #2a3a4a;
+  color: #3a4a5a;
+}
+
+.auth-error {
+  padding: 14px;
+  background: rgba(248, 113, 113, 0.15);
+  border: 2px solid #f87171;
+  color: #fca5a5;
+  font-size: 14px;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+.auth-progress {
+  text-align: center;
+  font-size: 13px;
+  color: #6cb4cc;
+  margin-top: 16px;
+  font-weight: 500;
+}
+
+.auth-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: #5a8a9e;
+  border-top: 2px solid rgba(74, 158, 255, 0.3);
+  padding-top: 16px;
+  font-weight: 600;
+}
+
+/* ====== 大厅面板组件 ====== */
+
+.lobby-container {
+  min-height: 100vh;
+  padding: var(--space-5);
+  background: #00050a;
+  color: #cfe8ff;
+}
+
+.lobby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.lobby-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.lobby-user-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lobby-main {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 16px;
+}
+
+.lobby-room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-room-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lobby-room-card {
+  border: 1px solid #2b4261;
+  padding: 10px;
+  background: rgba(20, 25, 35, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lobby-room-card:hover {
+  background: rgba(30, 35, 45, 0.7);
+  border-color: rgba(74, 158, 255, 0.4);
+}
+
+.lobby-room-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby-room-meta {
+  font-size: 12px;
+  color: #8fbfd4;
+  display: flex;
+  gap: 16px;
+}
+
+.lobby-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-stats {
+  font-size: 13px;
+  color: #8fbfd4;
+}
+
+/* ====== 磁吸指针效果 ====== */
+
+[data-magnetic] {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+[data-magnetic]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+
+[data-magnetic]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ====== 模态框 ====== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  width: 360px;
+  max-width: 90vw;
+  background: #132235;
+  padding: 16px;
+  border: 2px solid rgba(74, 158, 255, 0.4);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #8fbfd4;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(13, 40, 71, 0.5);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  color: #cfe8ff;
+  font-size: 14px;
+}
+
+.modal-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-btn {
+  padding: 8px 16px;
+  background: rgba(74, 158, 255, 0.15);
+  border: 1px solid rgba(74, 158, 255, 0.4);
+  color: #cfe8ff;
+  cursor: pointer;
+}
+
+.modal-btn:hover {
+  background: rgba(74, 158, 255, 0.25);
+}
+
+.modal-btn--primary {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: var(--color-primary);
 }
