@@ -3,7 +3,6 @@
  */
 
 import type {
-	DamageType,
 	ShieldType,
 	WeaponDefinition,
 	HullDefinition,
@@ -11,38 +10,9 @@ import type {
 	ArmorQuadrantConfig,
 } from './schemas.js';
 
-// ==================== 伤害系数映射 ====================
-
-/** 伤害类型对护盾/装甲的系数 */
-export interface DamageModifiers {
-	shield: number;
-	armor: number;
-	hull: number;
-}
-
-/** 伤害类型系数表 */
-export const DAMAGE_MODIFIERS: Record<DamageType, DamageModifiers> = {
-	KINETIC: {
-		shield: 2.0,
-		armor: 0.5,
-		hull: 1.0,
-	},
-	HIGH_EXPLOSIVE: {
-		shield: 0.5,
-		armor: 2.0,
-		hull: 1.0,
-	},
-	FRAGMENTATION: {
-		shield: 0.25,
-		armor: 0.25,
-		hull: 1.0,
-	},
-	ENERGY: {
-		shield: 1.0,
-		armor: 1.0,
-		hull: 1.0,
-	},
-};
+// 从统一定义导入伤害倍率（唯一事实来源）
+export { DAMAGE_MODIFIERS } from '../definitions/enums.js';
+export type { DamageModifiers } from '../definitions/enums.js';
 
 // ==================== 武器槽位大小 ====================
 
