@@ -978,55 +978,69 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 客户端离开房间
 	 * 实现断线重连机制
+	 *
+	 * 退出码说明：
+	 * - 1000: 正常退出（用户主动离开），立即清理，不允许重连
+	 * - 4000: 请求重连（客户端主动触发重连流程）
+	 * - 其他/undefined: 异常断开，尝试自动重连
 	 */
 	async onLeave(client: Client, code?: number) {
 		const player = this.state.players.get(client.sessionId);
-		const allowReconnect = code !== 1000; // 正常退出 (1000) 不允许重连
+		const isNormalLeave = code === 1000;
+		const isReconnectRequest = code === 4000;
 
 		console.log(
 			`[BattleRoom] Player left: ${player?.name || "unknown"} (${client.sessionId}), ` +
-				`code: ${code}, allowReconnect: ${allowReconnect}`
+				`code: ${code}, normal: ${isNormalLeave}, reconnectRequest: ${isReconnectRequest}`
 		);
 
-		// 正常退出（主动点击离开按钮）- 立即清理，不等待重连
-		if (!allowReconnect) {
+		// 正常退出 - 立即清理，不等待重连
+		if (isNormalLeave) {
 			console.log(`[BattleRoom] Normal leave, cleaning up immediately`);
 			this.removePlayerSession(client.sessionId);
 			this.assignOwnerIfMissing();
-
-			// 更新元数据
 			this.updateMetadata();
-
-			// 立即检查是否需要清理房间
 			this.checkRoomCleanup();
 			return;
 		}
 
-		// 异常断开 - 允许重连
+		// 客户端请求重连 - 保留会话数据，等待重新加入
+		if (isReconnectRequest && player) {
+			console.log(`[BattleRoom] Reconnect requested, keeping session for 60s`);
+			player.connected = false;
+			this.updateMetadata();
+
+			// 设置重连超时清理
+			setTimeout(() => {
+				const stillPlayer = this.state.players.get(client.sessionId);
+				if (stillPlayer && !stillPlayer.connected) {
+					console.log(`[BattleRoom] Reconnect timeout, removing player ${stillPlayer.name}`);
+					this.removePlayerSession(client.sessionId);
+					this.assignOwnerIfMissing();
+					this.updateMetadata();
+					this.checkRoomCleanup();
+				}
+			}, 60000);
+			return;
+		}
+
+		// 异常断开 - 使用 Colyseus 原生重连机制
 		if (player) {
 			try {
-				// 允许 60 秒内重连
-				console.log(`[BattleRoom] Allowing reconnection for 60 seconds...`);
+				console.log(`[BattleRoom] Unexpected disconnect, allowing reconnection...`);
 				await this.allowReconnection(client, 60);
-
-				// 重连成功，恢复连接状态
 				player.connected = true;
-				console.log(`[BattleRoom] Player ${player.name} reconnected`);
+				console.log(`[BattleRoom] Player ${player.name} reconnected successfully`);
 				return;
 			} catch (e) {
-				// 重连失败或超时
 				console.log(`[BattleRoom] Player ${player.name} reconnection failed`);
 			}
 		}
 
-		// 重连失败，设置断开状态
+		// 重连失败或无玩家数据 - 清理
 		this.removePlayerSession(client.sessionId);
 		this.assignOwnerIfMissing();
-
-		// 更新元数据
 		this.updateMetadata();
-
-		// 检查是否需要清理
 		this.checkRoomCleanup();
 	}
 

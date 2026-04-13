@@ -1,6 +1,12 @@
 import { Client } from "@colyseus/core";
+import type {
+	FireWeaponPayload,
+	MoveTokenPayload,
+	ToggleShieldPayload,
+	VentFluxPayload,
+	WeaponSlot,
+} from "@vt/contracts";
 import { angleBetween, angleDifference, distance, validateThreePhaseMove } from "@vt/rules";
-import type { MoveTokenPayload } from "../rooms/BattleRoom.js";
 import {
 	DAMAGE_MULTIPLIERS,
 	GAME_CONFIG,

@@ -366,7 +366,10 @@ export class NetworkManager {
 		});
 
 		this.activeRoomOperation = (async () => {
-			await this.leaveCurrentRoomIfNeeded();
+			// 异步离开前一个房间，不阻塞创建流程
+			this.leaveCurrentRoomIfNeeded().catch((e) => {
+				console.warn("[NetworkManager] Failed to leave previous room during create:", e);
+			});
 
 			// 确保有默认值
 			const createOptions = {
@@ -428,7 +431,10 @@ export class NetworkManager {
 		console.log("[NetworkManager] Joining room:", roomId, { playerName, shortId });
 
 		this.activeRoomOperation = (async () => {
-			await this.leaveCurrentRoomIfNeeded();
+			// 异步离开前一个房间，不阻塞加入流程
+			this.leaveCurrentRoomIfNeeded().catch((e) => {
+				console.warn("[NetworkManager] Failed to leave previous room during join:", e);
+			});
 
 			const room = await this.withRoomOperationTimeout(
 				this.client.joinById<GameRoomState>(roomId, { playerName, shortId }),
@@ -467,9 +473,24 @@ export class NetworkManager {
 
 	/**
 	 * 离开房间
+	 *
+	 * 调用此方法会：
+	 * 1. 发送退出通知给服务器（退出码 1000，正常退出）
+	 * 2. 清理本地状态
 	 */
 	async leaveRoom(): Promise<void> {
-		await this.leaveCurrentRoomIfNeeded();
+		if (!this.currentRoom) {
+			console.log("[NetworkManager] leaveRoom: no current room");
+			return;
+		}
+
+		console.log("[NetworkManager] leaveRoom: leaving", this.currentRoom.roomId);
+		try {
+			await this.currentRoom.leave(1000);
+			console.log("[NetworkManager] leaveRoom: completed");
+		} catch (error) {
+			console.warn("[NetworkManager] leaveRoom: error:", error);
+		}
 	}
 
 	async deleteRoom(roomId: string): Promise<void> {
@@ -502,6 +523,12 @@ export class NetworkManager {
 		await this.getRooms();
 	}
 
+	/**
+	 * 离开当前房间（如果需要）
+	 *
+	 * 注意：此方法设计为"尽力而为"，不会阻塞主要操作
+	 * 因为服务器会处理多个客户端快速加入/离开的情况
+	 */
 	private async leaveCurrentRoomIfNeeded(): Promise<void> {
 		if (this.roomLeaveOperation) {
 			console.log("[NetworkManager] leaveCurrentRoomIfNeeded: already in progress");
@@ -519,73 +546,66 @@ export class NetworkManager {
 
 		this.roomLeaveOperation = (async () => {
 			try {
-				console.log("[NetworkManager] Calling room.leave()...");
+				console.log("[NetworkManager] Calling room.leave(1000)...");
 
-				// 添加超时保护，防止永远等待
-				const leavePromise = roomToLeave.leave();
-				const timeoutPromise = new Promise((_, reject) => {
-					setTimeout(() => reject(new Error("离开房间超时")), 5000);
+				// 传递 1000 表示正常退出，不触发重连
+				// 不等待完成，因为服务器会异步处理
+				roomToLeave.leave(1000).catch((e: unknown) => {
+					console.warn("[NetworkManager] room.leave() error:", e);
 				});
 
-				await Promise.race([leavePromise, timeoutPromise]);
-				console.log("[NetworkManager] room.leave() completed");
+				// 等待短暂延迟确保服务器收到退出通知
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				console.log("[NetworkManager] room.leave() sent");
 			} catch (error) {
 				console.warn("[NetworkManager] Failed to leave previous room:", error);
-				// 即使失败也清理状态
+			} finally {
+				// 立即清理状态，不等待服务器确认
 				if (this.currentRoom === roomToLeave) {
-					console.log("[NetworkManager] Clearing current room after error");
+					console.log("[NetworkManager] Clearing current room state");
 					this.currentRoom = null;
 				}
-			} finally {
 				this.roomLeaveOperation = null;
 				console.log("[NetworkManager] Clearing roomLeaveOperation");
 			}
 		})();
 
-		await this.roomLeaveOperation;
-		console.log("[NetworkManager] leaveCurrentRoomIfNeeded completed");
+		// 不等待完成，立即返回
+		console.log("[NetworkManager] leaveCurrentRoomIfNeeded returning immediately");
 	}
 
 	private bindRoomLifecycle(room: Room<GameRoomState>): void {
 		this.currentRoom = room;
+		console.log("[NetworkManager] Binding lifecycle to room:", room.roomId);
 
+		// 消息处理
 		room.onMessage("role", (payload: unknown) => {
 			console.log("[NetworkManager] Role message received:", payload);
 		});
 
 		room.onMessage("identity", (payload: unknown) => {
-			if (!payload || typeof payload !== "object") {
-				return;
-			}
-
+			if (!payload || typeof payload !== "object") return;
 			const shortId = this.normalizeShortId((payload as Record<string, unknown>).shortId);
-			if (shortId === null) {
-				return;
-			}
-
+			if (shortId === null) return;
 			this.shortId = shortId;
 			localStorage.setItem(NetworkManager.STORAGE_KEYS.SHORT_ID, String(shortId));
 			console.log("[NetworkManager] Identity synced from server, short id:", shortId);
 		});
+
+		// 发送玩家配置
 		room.send("ROOM_UPDATE_PROFILE", this.profile);
 
-		room.onLeave(() => {
+		// 清理回调 - 统一处理
+		const cleanup = () => {
 			if (this.currentRoom === room) {
+				console.log("[NetworkManager] Room cleanup:", room.roomId);
 				this.currentRoom = null;
 			}
-		});
+		};
 
-		room.onError(() => {
-			if (this.currentRoom === room) {
-				this.currentRoom = null;
-			}
-		});
-
-		room.onDrop(() => {
-			if (this.currentRoom === room) {
-				this.currentRoom = null;
-			}
-		});
+		room.onLeave(cleanup);
+		room.onError(cleanup);
+		room.onDrop(cleanup);
 	}
 
 	buildInviteLink(roomId: string): string {
@@ -649,6 +669,7 @@ export class NetworkManager {
 	 * 清理资源
 	 */
 	dispose(): void {
+		console.log("[NetworkManager] Disposing...");
 		this.stopRoomsPolling();
 		this.roomsRequestAbortController?.abort();
 		this.roomsRequestAbortController = null;
@@ -657,7 +678,8 @@ export class NetworkManager {
 		this.roomsListeners.clear();
 		this.roomsCache = [];
 		if (this.currentRoom) {
-			this.currentRoom.leave();
+			console.log("[NetworkManager] Leaving current room during dispose");
+			this.currentRoom.leave(1000).catch(() => {});
 			this.currentRoom = null;
 		}
 	}

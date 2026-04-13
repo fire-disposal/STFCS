@@ -39,5 +39,8 @@
     "turbo": "^2.8.17",
     "typescript": "^5.9.3",
     "vue-eslint-parser": "^9.4.3"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

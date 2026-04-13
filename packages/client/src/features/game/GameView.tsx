@@ -13,7 +13,7 @@
 import { GameCanvas } from "@/components/map/GameCanvas";
 import { notify } from "@/components/ui/Notification";
 import { DMControlPanel, DMObjectCreator } from "@/features/dm";
-import { TurnIndicator } from "@/features/game";
+import { PhaseBar } from "@/features/game/PhaseBar";
 import { PlayerRosterModal } from "@/features/lobby";
 import { FuelBasedMovementController } from "@/features/movement/FuelBasedMovementController";
 import { ArmorQuadrantDisplay, FluxSystemDisplay, ShipDetailPanel } from "@/features/ship";
@@ -25,17 +25,7 @@ import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
 import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/contracts";
 import { ClientCommand, Faction, PlayerRole } from "@vt/contracts";
-import {
-	BarChart3,
-	LogOut,
-	Palette,
-	Rocket,
-	Settings,
-	Shield,
-	Sparkles,
-	Users,
-	Zap,
-} from "lucide-react";
+import { BarChart3, LogOut, Palette, Rocket, Settings, Shield, Users, Zap } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
 
@@ -47,7 +37,6 @@ interface GameViewProps {
 
 export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom }) => {
 	const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
-	const [showObjectCreator, setShowObjectCreator] = useState(false);
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
 	const [showMovementPanel, setShowMovementPanel] = useState(false);
@@ -59,6 +48,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		faction: FactionValue;
 		ownerId?: string;
 	} | null>(null);
+	const [isPlacementMode, setIsPlacementMode] = useState(false);
 	const [activeTab, setActiveTab] = useState<"info" | "flux" | "armor" | "dm">("info");
 
 	// 玩家列表
@@ -142,20 +132,19 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 
 	const handleMapClick = useCallback(
 		(x: number, y: number) => {
-			if (pendingPlacement) {
-				createObject({
-					type: pendingPlacement.type,
-					hullId: pendingPlacement.hullId,
+			// 点击摆放模式
+			if (isPlacementMode && pendingPlacement) {
+				// 使用点击的坐标发送创建命令
+				room?.send("DM_CREATE_OBJECT", {
+					...pendingPlacement,
 					x,
 					y,
-					heading: pendingPlacement.heading,
-					faction: pendingPlacement.faction,
-					ownerId: pendingPlacement.ownerId,
 				});
 				setPendingPlacement(null);
+				setIsPlacementMode(false);
 			}
 		},
-		[pendingPlacement]
+		[isPlacementMode, pendingPlacement, room]
 	);
 
 	// 命令发送
@@ -172,7 +161,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		[room]
 	);
 
-	// DM 操作
+	// DM 操作 - 手动模式直接创建
 	const createObject = useCallback(
 		(payload: {
 			type: "ship" | "station" | "asteroid";
@@ -184,10 +173,22 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			ownerId?: string;
 		}) => {
 			if (!room) return;
-			room.send("DM_CREATE_OBJECT", payload);
+			if (isPlacementMode) {
+				// 摆放模式：保存数据等待地图点击
+				setPendingPlacement(payload);
+			} else {
+				// 手动模式：直接创建
+				room.send("DM_CREATE_OBJECT", payload);
+			}
 		},
-		[room]
+		[room, isPlacementMode]
 	);
+
+	// 切换摆放模式
+	const togglePlacementMode = useCallback(() => {
+		setIsPlacementMode((prev) => !prev);
+		setPendingPlacement(null);
+	}, []);
 
 	const createTestShip = useCallback(() => {
 		if (!room) return;
@@ -306,13 +307,11 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				</div>
 
 				<div className="game-layout__top-bar-center">
-					<TurnIndicator
+					<PhaseBar
 						currentPhase={room.state.currentPhase}
 						turnCount={room.state.turnCount}
 						activeFaction={room.state.activeFaction}
 						playerRole={currentPlayer?.role || PlayerRole.PLAYER}
-						onNextPhase={isDM ? nextPhase : undefined}
-						compact
 					/>
 				</div>
 
@@ -363,7 +362,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 							onSelectShip={(id) => console.log("[GameView] Select:", id)}
 							onPanDelta={handleMapPan}
 							onRotateDelta={handleMapRotate}
-							onClick={pendingPlacement && isDM ? handleMapClick : undefined}
+							onClick={isPlacementMode && isDM ? handleMapClick : undefined}
 						/>
 					</div>
 				</div>
@@ -438,51 +437,29 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 									</div>
 								</div>
 
-								<div className="game-section">
-									<div className="game-section__title">
-										<Sparkles className="game-section__icon" />
-										对象创建
-									</div>
-									<button
-										data-magnetic
-										className="game-btn game-btn--primary game-btn--full"
-										onClick={() => setShowObjectCreator(!showObjectCreator)}
-									>
-										{showObjectCreator ? "关闭" : "打开"} 创建工具
-									</button>
+								<DMObjectCreator
+									onCreateObject={createObject}
+									players={players
+										.filter((p) => p.role !== PlayerRole.DM)
+										.map((p) => ({
+											sessionId: p.sessionId,
+											name: p.nickname || p.name,
+											role: p.role,
+										}))}
+									isPlacementMode={isPlacementMode}
+									onTogglePlacementMode={togglePlacementMode}
+								/>
 
-									{showObjectCreator && (
-										<DMObjectCreator
-											isOpen={showObjectCreator}
-											onClose={() => setShowObjectCreator(false)}
-											onCreateObject={createObject}
-											players={players
-												.filter((p) => p.role !== PlayerRole.DM)
-												.map((p) => ({
-													sessionId: p.sessionId,
-													name: p.nickname || p.name,
-													role: p.role,
-												}))}
-										/>
-									)}
-								</div>
-
-								<div className="game-section">
-									<div className="game-section__title">
-										<Rocket className="game-section__icon" />
-										舰船管理
-									</div>
-									<DMControlPanel
-										ships={ships}
-										players={players}
-										isDM={true}
-										onCreateTestShip={createTestShip}
-										onClearOverload={clearOverload}
-										onSetArmor={setArmor}
-										onAssignShip={assignShip}
-										onNextPhase={nextPhase}
-									/>
-								</div>
+								<DMControlPanel
+									ships={ships}
+									players={players}
+									isDM={true}
+									onCreateTestShip={createTestShip}
+									onClearOverload={clearOverload}
+									onSetArmor={setArmor}
+									onAssignShip={assignShip}
+									onNextPhase={nextPhase}
+								/>
 							</div>
 						)}
 					</div>
@@ -498,7 +475,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				onFire={handleFire}
 				onVent={handleVent}
 				onNextPhase={isDM ? nextPhase : undefined}
-				onCreateObject={isDM ? () => setShowObjectCreator(true) : undefined}
 			/>
 
 			{/* 移动面板弹窗 - 燃料池制度 */}
