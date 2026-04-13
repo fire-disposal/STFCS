@@ -14,16 +14,15 @@ import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import {
 	ArraySchema,
 	ClientCommand,
+	ConnectionQuality,
+	Faction,
 	GAME_CONFIG,
-	GamePhase,
 	GameRoomState,
+	PlayerRole,
 	PlayerState,
 	ShipState,
 	WeaponSlot,
 	WeaponState,
-	Faction,
-	PlayerRole,
-	ConnectionQuality,
 } from "../schema/GameSchema.js";
 
 // ==================== 消息 Payload 类型定义 ====================
@@ -45,7 +44,8 @@ export interface MoveTokenPayload {
 		phaseBForward: number;
 		phaseBStrafe: number;
 	};
-	phase?: 'PHASE_A' | 'ATTACK_1' | 'PHASE_B' | 'ATTACK_2' | 'PHASE_C';
+	phase?: "PHASE_A" | "ATTACK_1" | "PHASE_B" | "ATTACK_2" | "PHASE_C";
+	isIncremental?: boolean; // 是否为增量移动（燃料池制度）
 }
 
 export interface ToggleShieldPayload {
@@ -80,7 +80,7 @@ interface CreateObjectPayload {
 	x: number;
 	y: number;
 	heading: number;
-	faction: typeof Faction[keyof typeof Faction];
+	faction: (typeof Faction)[keyof typeof Faction];
 	ownerId?: string;
 }
 
@@ -114,7 +114,8 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		isPrivate?: boolean;
 	}) {
 		console.log(
-			`[BattleRoom] Room created - ID: ${this.roomId}, Options:`, JSON.stringify(options)
+			`[BattleRoom] Room created - ID: ${this.roomId}, Options:`,
+			JSON.stringify(options)
 		);
 
 		const normalizedMaxPlayers = Number(options.maxPlayers);
@@ -161,10 +162,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	 * 客户端认证 - 简化版，直接使用用户名
 	 * 在 onJoin 之前调用
 	 */
-	async onAuth(
-		client: Client,
-		options: { playerName?: string; shortId?: number }
-	) {
+	async onAuth(client: Client, options: { playerName?: string; shortId?: number }) {
 		// 简化认证：直接使用用户名，无需 token
 		const playerName = options?.playerName?.trim();
 
@@ -174,7 +172,9 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		}
 
 		if (playerName.length > 32) {
-			console.warn(`[BattleRoom] Auth failed: name too long (${playerName.length}) from ${client.sessionId}`);
+			console.warn(
+				`[BattleRoom] Auth failed: name too long (${playerName.length}) from ${client.sessionId}`
+			);
 			throw new Error("玩家名称不能超过 32 个字符");
 		}
 
@@ -286,14 +286,22 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 检查是否有同短 ID 的玩家已连接（防止重复）
 		const existingPlayerByShortId = this.findPlayerByShortId(shortId);
 		if (existingPlayerByShortId && existingPlayerByShortId.sessionId !== client.sessionId) {
-			console.log(`[BattleRoom] Removing duplicate player with same shortId: ${existingPlayerByShortId.sessionId}`);
+			console.log(
+				`[BattleRoom] Removing duplicate player with same shortId: ${existingPlayerByShortId.sessionId}`
+			);
 			this.removePlayerSession(existingPlayerByShortId.sessionId);
 		}
 
 		// 检查是否有同名的玩家已连接（用户名独占性）
 		const existingPlayerByName = this.findPlayerByName(playerName);
-		if (existingPlayerByName && existingPlayerByName.connected && existingPlayerByName.sessionId !== client.sessionId) {
-			console.warn(`[BattleRoom] Username "${playerName}" already in use by ${existingPlayerByName.sessionId}`);
+		if (
+			existingPlayerByName &&
+			existingPlayerByName.connected &&
+			existingPlayerByName.sessionId !== client.sessionId
+		) {
+			console.warn(
+				`[BattleRoom] Username "${playerName}" already in use by ${existingPlayerByName.sessionId}`
+			);
 			throw new Error(`用户名 "${playerName}" 已被使用，请选择其他用户名`);
 		}
 
@@ -340,7 +348,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	private updateMetadata(): void {
 		let playerCount = 0;
 		let dmCount = 0;
-		
+
 		this.state.players.forEach((p) => {
 			if (p.connected) {
 				if (p.role === PlayerRole.DM) dmCount++;
@@ -357,7 +365,9 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			playerCount,
 			dmCount,
 			ownerId: this.roomOwnerId,
-			ownerShortId: this.roomOwnerId ? (this.playerIdentity.get(this.roomOwnerId)?.shortId ?? null) : null,
+			ownerShortId: this.roomOwnerId
+				? (this.playerIdentity.get(this.roomOwnerId)?.shortId ?? null)
+				: null,
 		});
 	}
 
@@ -390,17 +400,17 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	 */
 	private registerMessageHandlers() {
 		// 聊天消息
-		this.onMessage('chat', (client, payload: { content: string; playerName?: string }) => {
+		this.onMessage("chat", (client, payload: { content: string; playerName?: string }) => {
 			const player = this.state.players.get(client.sessionId);
-			const senderName = payload.playerName || player?.nickname || player?.name || 'Unknown';
-			
+			const senderName = payload.playerName || player?.nickname || player?.name || "Unknown";
+
 			// 广播聊天消息给所有客户端
-			this.broadcast('chat', {
+			this.broadcast("chat", {
 				senderId: client.sessionId,
 				senderName,
 				content: payload.content.trim(),
 			});
-			
+
 			console.log(`[Chat] ${senderName}: ${payload.content}`);
 		});
 
@@ -486,7 +496,10 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 创建测试舰船（旧接口，保留兼容性）
 		this.onMessage(
 			"CREATE_TEST_SHIP",
-			(client, payload: { faction: typeof Faction[keyof typeof Faction]; x: number; y: number }) => {
+			(
+				client,
+				payload: { faction: (typeof Faction)[keyof typeof Faction]; x: number; y: number }
+			) => {
 				const player = this.state.players.get(client.sessionId);
 				if (player?.role === PlayerRole.DM) {
 					this.createTestShip(payload.faction, payload.x, payload.y);
@@ -565,8 +578,13 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			const identity = this.playerIdentity.get(client.sessionId);
 			if (!player || !identity) return;
 
-			player.nickname = String(payload.nickname || "").trim().slice(0, 24);
-			player.avatar = String(payload.avatar || "👤").trim().slice(0, 4) || "👤";
+			player.nickname = String(payload.nickname || "")
+				.trim()
+				.slice(0, 24);
+			player.avatar =
+				String(payload.avatar || "👤")
+					.trim()
+					.slice(0, 4) || "👤";
 			this.profileStore.set(identity.shortId, { nickname: player.nickname, avatar: player.avatar });
 		});
 
@@ -592,43 +610,43 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 游戏主循环
 	 */
-private update(deltaTime: number) {
-    const destroyedShips: string[] = [];
-    
-    this.state.ships.forEach((ship: ShipState) => {
-      if (ship.isDestroyed) {
-        destroyedShips.push(ship.id);
-        return;
-      }
+	private update(deltaTime: number) {
+		const destroyedShips: string[] = [];
 
-      ship.weapons.forEach((weapon: WeaponSlot) => {
-        if (weapon.cooldownRemaining > 0) {
-          weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaTime / 1000);
-          if (weapon.cooldownRemaining <= 0) {
-            if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
-              weapon.state = WeaponState.OUT_OF_AMMO;
-            } else {
-              weapon.state = WeaponState.READY;
-            }
-          }
-        }
-      });
+		this.state.ships.forEach((ship: ShipState) => {
+			if (ship.isDestroyed) {
+				destroyedShips.push(ship.id);
+				return;
+			}
 
-      if (ship.isOverloaded && ship.overloadTime > 0) {
-        ship.overloadTime -= deltaTime / 1000;
-        if (ship.overloadTime <= 0) {
-          ship.isOverloaded = false;
-          ship.overloadTime = 0;
-        }
-      }
-    });
+			ship.weapons.forEach((weapon: WeaponSlot) => {
+				if (weapon.cooldownRemaining > 0) {
+					weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaTime / 1000);
+					if (weapon.cooldownRemaining <= 0) {
+						if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
+							weapon.state = WeaponState.OUT_OF_AMMO;
+						} else {
+							weapon.state = WeaponState.READY;
+						}
+					}
+				}
+			});
 
-    for (const shipId of destroyedShips) {
-      this.state.ships.delete(shipId);
-      console.log(`[BattleRoom] Removed destroyed ship: ${shipId}`);
-      this.broadcast("ship_destroyed", { shipId, timestamp: Date.now() });
-    }
-  }
+			if (ship.isOverloaded && ship.overloadTime > 0) {
+				ship.overloadTime -= deltaTime / 1000;
+				if (ship.overloadTime <= 0) {
+					ship.isOverloaded = false;
+					ship.overloadTime = 0;
+				}
+			}
+		});
+
+		for (const shipId of destroyedShips) {
+			this.state.ships.delete(shipId);
+			console.log(`[BattleRoom] Removed destroyed ship: ${shipId}`);
+			this.broadcast("ship_destroyed", { shipId, timestamp: Date.now() });
+		}
+	}
 
 	/**
 	 * 检查是否自动进入下一阶段
@@ -657,10 +675,10 @@ private update(deltaTime: number) {
 	/**
 	 * 推进游戏阶段
 	 */
-private advancePhase(): void {
-    const phases: string[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
-    const currentIndex = phases.indexOf(this.state.currentPhase as string);
-    let nextIndex = currentIndex + 1;
+	private advancePhase(): void {
+		const phases: string[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
+		const currentIndex = phases.indexOf(this.state.currentPhase as string);
+		let nextIndex = currentIndex + 1;
 
 		if (nextIndex >= phases.length) {
 			nextIndex = phases.indexOf("PLAYER_TURN");
@@ -679,7 +697,8 @@ private advancePhase(): void {
 		}
 
 		// 设置活跃阵营
-		this.state.activeFaction = this.state.currentPhase === "PLAYER_TURN" ? Faction.PLAYER : Faction.DM;
+		this.state.activeFaction =
+			this.state.currentPhase === "PLAYER_TURN" ? Faction.PLAYER : Faction.DM;
 
 		// 广播阶段变更
 		this.broadcast("phase_change", {
@@ -696,38 +715,53 @@ private advancePhase(): void {
 	/**
 	 * 处理结束阶段
 	 */
-private handleEndPhase(): void {
-    this.state.ships.forEach((ship: ShipState) => {
-      if (ship.isDestroyed) return;
+	private handleEndPhase(): void {
+		this.state.ships.forEach((ship: ShipState) => {
+			if (ship.isDestroyed) return;
 
-      ship.fluxSoft = 0;
+			ship.fluxSoft = 0;
 
-      ship.hasMoved = false;
-      ship.hasFired = false;
+			// 重置移动状态
+			ship.hasMoved = false;
+			ship.hasFired = false;
 
-      ship.weapons.forEach((weapon: WeaponSlot) => {
-        weapon.hasFiredThisTurn = false;
-        
-        if (weapon.state === WeaponState.OUT_OF_AMMO && weapon.maxAmmo > 0 && weapon.reloadTime > 0) {
-          weapon.currentAmmo = weapon.maxAmmo;
-          weapon.state = WeaponState.READY;
-          console.log(`[EndPhase] ${ship.name || ship.id} 武器 ${weapon.name || weapon.mountId} 装填完成`);
-        }
-      });
+			// 重置燃料池（新回合）
+			ship.fuelPhaseAForwardUsed = 0;
+			ship.fuelPhaseAStrafeUsed = 0;
+			ship.fuelPhaseBTurnUsed = 0;
+			ship.fuelPhaseCForwardUsed = 0;
+			ship.fuelPhaseCStrafeUsed = 0;
+			ship.currentMovementPhase = 0;
 
-      if (ship.isShieldUp) {
-        ship.fluxSoft += ship.fluxDissipation * 0.2;
-      }
+			ship.weapons.forEach((weapon: WeaponSlot) => {
+				weapon.hasFiredThisTurn = false;
 
-      ship.fluxHard = Math.max(0, ship.fluxHard - ship.fluxDissipation * 0.5);
+				if (
+					weapon.state === WeaponState.OUT_OF_AMMO &&
+					weapon.maxAmmo > 0 &&
+					weapon.reloadTime > 0
+				) {
+					weapon.currentAmmo = weapon.maxAmmo;
+					weapon.state = WeaponState.READY;
+					console.log(
+						`[EndPhase] ${ship.name || ship.id} 武器 ${weapon.name || weapon.mountId} 装填完成`
+					);
+				}
+			});
 
-      if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
-        ship.isOverloaded = true;
-        ship.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
-        ship.isShieldUp = false;
-        console.log(`[EndPhase] ${ship.name || ship.id} 过载！`);
-      }
-    });
+			if (ship.isShieldUp) {
+				ship.fluxSoft += ship.fluxDissipation * 0.2;
+			}
+
+			ship.fluxHard = Math.max(0, ship.fluxHard - ship.fluxDissipation * 0.5);
+
+			if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
+				ship.isOverloaded = true;
+				ship.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
+				ship.isShieldUp = false;
+				console.log(`[EndPhase] ${ship.name || ship.id} 过载！`);
+			}
+		});
 
 		this.state.turnCount++;
 	}
@@ -735,59 +769,59 @@ private handleEndPhase(): void {
 	/**
 	 * 创建测试舰船
 	 */
-private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number, y: number) {
-    const shipSpec = getShipHullSpec("frigate_assault");
-    if (!shipSpec) {
-      console.error("[BattleRoom] Test ship spec not found");
-      return;
-    }
+	private createTestShip(faction: (typeof Faction)[keyof typeof Faction], x: number, y: number) {
+		const shipSpec = getShipHullSpec("frigate_assault");
+		if (!shipSpec) {
+			console.error("[BattleRoom] Test ship spec not found");
+			return;
+		}
 
-    const ship = new ShipState();
-    ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    ship.faction = faction;
-    ship.hullType = "frigate_assault";
-    ship.name = shipSpec.name;
-    ship.width = shipSpec.width;
-    ship.length = shipSpec.length;
-    ship.ownerId = "";
-    ship.transform.x = x;
-    ship.transform.y = y;
-    ship.transform.heading = faction === Faction.PLAYER ? 0 : 180;
-    ship.isDestroyed = false;
+		const ship = new ShipState();
+		ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		ship.faction = faction;
+		ship.hullType = "frigate_assault";
+		ship.name = shipSpec.name;
+		ship.width = shipSpec.width;
+		ship.length = shipSpec.length;
+		ship.ownerId = "";
+		ship.transform.x = x;
+		ship.transform.y = y;
+		ship.transform.heading = faction === Faction.PLAYER ? 0 : 180;
+		ship.isDestroyed = false;
 
-    ship.hullMax = shipSpec.hullPoints;
-    ship.hullCurrent = shipSpec.hullPoints;
+		ship.hullMax = shipSpec.hullPoints;
+		ship.hullCurrent = shipSpec.hullPoints;
 
-    const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-    ship.armorMax = new ArraySchema<number>(...armorDist);
-    ship.armorCurrent = new ArraySchema<number>(...armorDist);
+		const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
+		ship.armorMax = new ArraySchema<number>(...armorDist);
+		ship.armorCurrent = new ArraySchema<number>(...armorDist);
 
-    ship.fluxMax = shipSpec.fluxCapacity;
-    ship.fluxDissipation = shipSpec.fluxDissipation;
-    ship.fluxHard = 0;
-    ship.fluxSoft = 0;
+		ship.fluxMax = shipSpec.fluxCapacity;
+		ship.fluxDissipation = shipSpec.fluxDissipation;
+		ship.fluxHard = 0;
+		ship.fluxSoft = 0;
 
-    ship.maxSpeed = shipSpec.maxSpeed;
-    ship.maxTurnRate = shipSpec.maxTurnRate;
-    ship.acceleration = shipSpec.acceleration;
+		ship.maxSpeed = shipSpec.maxSpeed;
+		ship.maxTurnRate = shipSpec.maxTurnRate;
+		ship.acceleration = shipSpec.acceleration;
 
-    if (shipSpec.hasShield) {
-      ship.isShieldUp = false;
-      ship.shieldOrientation = ship.transform.heading;
-      ship.shieldArc = shipSpec.shieldArc || 120;
-      ship.shieldRadius = shipSpec.shieldRadius || 0;
-    }
+		if (shipSpec.hasShield) {
+			ship.isShieldUp = false;
+			ship.shieldOrientation = ship.transform.heading;
+			ship.shieldArc = shipSpec.shieldArc || 120;
+			ship.shieldRadius = shipSpec.shieldRadius || 0;
+		}
 
-    for (const mount of shipSpec.weaponMounts) {
-      const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
-      if (weaponSpec) {
-        ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
-      }
-    }
+		for (const mount of shipSpec.weaponMounts) {
+			const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
+			if (weaponSpec) {
+				ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
+			}
+		}
 
-    this.state.ships.set(ship.id, ship);
-    console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
-  }
+		this.state.ships.set(ship.id, ship);
+		console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
+	}
 
 	/**
 	 * DM 创建对象（舰船/空间站/小行星）
@@ -841,10 +875,7 @@ private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number,
 			for (const mount of shipSpec.weaponMounts) {
 				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
 				if (weaponSpec) {
-					ship.weapons.set(
-						mount.id,
-						this.createWeaponSlotFromSpec(mount, weaponSpec)
-					);
+					ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
 				}
 			}
 
@@ -877,8 +908,29 @@ private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number,
 	}
 
 	private createWeaponSlotFromSpec(
-		mount: { id: string; mountType: string; offsetX: number; offsetY: number; facing: number; arcMin: number; arcMax: number },
-		spec: { id: string; name: string; category: string; damageType: string; mountType: string; damage: number; range: number; cooldown: number; fluxCost: number; ammo: number; reloadTime: number; ignoresShields: boolean }
+		mount: {
+			id: string;
+			mountType: string;
+			offsetX: number;
+			offsetY: number;
+			facing: number;
+			arcMin: number;
+			arcMax: number;
+		},
+		spec: {
+			id: string;
+			name: string;
+			category: string;
+			damageType: string;
+			mountType: string;
+			damage: number;
+			range: number;
+			cooldown: number;
+			fluxCost: number;
+			ammo: number;
+			reloadTime: number;
+			ignoresShields: boolean;
+		}
 	): WeaponSlot {
 		const weapon = new WeaponSlot();
 		weapon.mountId = mount.id;
@@ -887,35 +939,35 @@ private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number,
 		weapon.category = spec.category;
 		weapon.damageType = spec.damageType;
 		weapon.mountType = spec.mountType;
-		
+
 		weapon.offsetX = mount.offsetX;
 		weapon.offsetY = mount.offsetY;
 		weapon.mountFacing = mount.facing;
 		weapon.arcMin = mount.arcMin;
 		weapon.arcMax = mount.arcMax;
-		
+
 		weapon.damage = spec.damage;
 		weapon.range = spec.range;
 		weapon.fluxCost = spec.fluxCost;
-		
+
 		weapon.cooldownMax = spec.cooldown;
 		weapon.cooldownRemaining = 0;
-		
+
 		weapon.maxAmmo = spec.ammo;
 		weapon.currentAmmo = spec.ammo;
 		weapon.reloadTime = spec.reloadTime;
-		
+
 		weapon.state = WeaponState.READY;
 		weapon.ignoresShields = spec.ignoresShields;
 		weapon.hasFiredThisTurn = false;
-		
+
 		return weapon;
 	}
 
 	/**
 	 * 将 Ping 值转换为连接质量
 	 */
-	private toQuality(pingMs: number): typeof ConnectionQuality[keyof typeof ConnectionQuality] {
+	private toQuality(pingMs: number): (typeof ConnectionQuality)[keyof typeof ConnectionQuality] {
 		if (pingMs < 0) return ConnectionQuality.OFFLINE;
 		if (pingMs <= 80) return ConnectionQuality.EXCELLENT;
 		if (pingMs <= 140) return ConnectionQuality.GOOD;
@@ -933,7 +985,7 @@ private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number,
 
 		console.log(
 			`[BattleRoom] Player left: ${player?.name || "unknown"} (${client.sessionId}), ` +
-			`code: ${code}, allowReconnect: ${allowReconnect}`
+				`code: ${code}, allowReconnect: ${allowReconnect}`
 		);
 
 		// 正常退出（主动点击离开按钮）- 立即清理，不等待重连
@@ -982,17 +1034,20 @@ private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number,
 	 * 检查是否需要清理房间
 	 */
 	private checkRoomCleanup() {
-		const hasConnectedClients = Array.from(this.state.players.values()).some(p => p.connected);
+		const hasConnectedClients = Array.from(this.state.players.values()).some((p) => p.connected);
 
 		if (!hasConnectedClients && this.clients.length === 0) {
 			// 给 5 分钟清理时间，防止短暂网络波动
 			console.log(`[BattleRoom] No connected clients, scheduling cleanup in 5 minutes`);
-			setTimeout(() => {
-				if (this.clients.length === 0) {
-					console.log(`[BattleRoom] No clients after timeout, disconnecting`);
-					this.disconnect();
-				}
-			}, 5 * 60 * 1000);
+			setTimeout(
+				() => {
+					if (this.clients.length === 0) {
+						console.log(`[BattleRoom] No clients after timeout, disconnecting`);
+						this.disconnect();
+					}
+				},
+				5 * 60 * 1000
+			);
 		}
 	}
 

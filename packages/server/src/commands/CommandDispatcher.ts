@@ -1,21 +1,19 @@
-import { 
-  ClientCommand, 
-  GAME_CONFIG, 
-  GameRoomState, 
-  ShipState, 
-  WeaponSlot, 
-  WeaponState,
-  DAMAGE_MULTIPLIERS,
-  PlayerRole
-} from "../schema/GameSchema.js";
 import { Client } from "@colyseus/core";
 import { 
-  distance, 
   angleBetween, 
   angleDifference,
+  distance, 
   validateThreePhaseMove,
 } from "@vt/rules";
-import type { MoveTokenPayload, ToggleShieldPayload, FireWeaponPayload, VentFluxPayload } from "../rooms/BattleRoom.js";
+import type { MoveTokenPayload, } from "../rooms/BattleRoom.js";
+import { 
+  DAMAGE_MULTIPLIERS,
+  GAME_CONFIG, 
+  GameRoomState, 
+  PlayerRole,
+  ShipState, 
+  WeaponState
+} from "../schema/GameSchema.js";
 
 /**
  * 命令分发器 - 处理所有客户端指令的验证与执行
@@ -54,16 +52,137 @@ export class CommandDispatcher {
   }
 
   /**
-   * 处理移动指令 - 支持三阶段移动
+   * 处理移动指令 - 支持燃料池制度的三阶段移动
+   * 
+   * 燃料池规则：
+   * - 阶段 A: 2X 前进燃料 + X 侧移燃料
+   * - 阶段 B: Y 转向燃料
+   * - 阶段 C: 2X 前进燃料 + X 侧移燃料
+   * 
+   * 增量移动：阶段内可任意次数消耗燃料进行移动
    */
   dispatchMoveToken(client: Client, payload: MoveTokenPayload): void {
-    const { shipId, x, y, heading, movementPlan } = payload;
+    const { shipId, x, y, heading, movementPlan, phase, isIncremental } = payload;
 
     // 获取舰船
     const ship = this.state.ships.get(shipId);
     if (!ship) {
       throw new Error(`Ship ${shipId} not found`);
     }
+
+    this.validateAuthority(client, ship);
+
+    // 检查是否过载
+    if (ship.isOverloaded) {
+      throw new Error("Cannot move while overloaded");
+    }
+
+    // 增量移动模式：不检查 hasMoved，允许阶段内多次移动
+    if (!isIncremental && ship.hasMoved) {
+      throw new Error("Ship has already moved this turn");
+    }
+
+    const startX = ship.transform.x;
+    const startY = ship.transform.y;
+    const startHeading = ship.transform.heading;
+
+    // 如果有详细的移动计划，使用三阶段移动验证
+    if (movementPlan) {
+      const validation = validateThreePhaseMove(
+        startX, startY, startHeading,
+        movementPlan,
+        ship.maxSpeed,
+        ship.maxTurnRate
+      );
+      
+      if (!validation.valid) {
+        throw new Error(validation.error || "Invalid movement");
+      }
+      
+      // 记录移动参数（用于最终位置计算）
+      ship.movePhaseAX = movementPlan.phaseAForward;
+      ship.movePhaseAStrafe = movementPlan.phaseAStrafe;
+      ship.turnAngle = movementPlan.turnAngle;
+      ship.movePhaseBX = movementPlan.phaseBForward;
+      ship.movePhaseBStrafe = movementPlan.phaseBStrafe;
+      
+      // 执行移动
+      ship.transform.x = x;
+      ship.transform.y = y;
+      ship.transform.heading = heading;
+      
+      // 非增量移动：标记为已移动
+      if (!isIncremental) {
+        ship.hasMoved = true;
+      }
+      
+      console.log(`Ship ${shipId} moved to (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`);
+      return;
+    }
+
+    // 增量移动：验证单步移动
+    if (isIncremental) {
+      // 计算移动距离
+      const moveDistance = distance(startX, startY, x, y);
+      
+      // 验证转向角度
+      const headingDiff = angleDifference(startHeading, heading);
+      
+      // 根据阶段验证移动
+      const currentPhase = phase || 'PHASE_A';
+      
+      if (currentPhase === 'PHASE_A' || currentPhase === 'PHASE_C') {
+        // 平移阶段：验证移动距离（单步不超过 maxSpeed）
+        if (moveDistance > ship.maxSpeed) {
+          throw new Error(`Incremental move distance ${moveDistance.toFixed(2)} exceeds single step limit ${ship.maxSpeed}`);
+        }
+        
+        // 执行移动
+        ship.transform.x = x;
+        ship.transform.y = y;
+        
+      } else if (currentPhase === 'PHASE_B') {
+        // 转向阶段：验证转向角度（单步不超过 maxTurnRate）
+        if (headingDiff > ship.maxTurnRate) {
+          throw new Error(`Incremental turn angle ${headingDiff.toFixed(2)} exceeds limit ${ship.maxTurnRate}`);
+        }
+        
+        // 执行转向
+        ship.transform.heading = heading;
+      }
+      
+      console.log(`Ship ${shipId} incremental move in ${currentPhase}: (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`);
+      return;
+    }
+
+    // 简化验证：直接检查距离和角度
+    const moveDistance = distance(startX, startY, x, y);
+    const maxMoveDistance = ship.maxSpeed * 4; // 两阶段各最大 2X
+    
+    if (moveDistance > maxMoveDistance) {
+      throw new Error(`Move distance ${moveDistance.toFixed(2)} exceeds maximum ${maxMoveDistance}`);
+    }
+
+    // 验证转向角度
+    const headingDiff = angleDifference(startHeading, heading);
+    if (headingDiff > ship.maxTurnRate) {
+      throw new Error(`Turn angle ${headingDiff.toFixed(2)} exceeds maximum ${ship.maxTurnRate}`);
+    }
+
+    // 检查地图边界
+    if (x < -this.state.mapWidth / 2 || x > this.state.mapWidth / 2 || 
+        y < -this.state.mapHeight / 2 || y > this.state.mapHeight / 2) {
+      throw new Error("Target position is outside map boundaries");
+    }
+
+    // 执行移动
+    ship.transform.x = x;
+    ship.transform.y = y;
+    ship.transform.heading = heading;
+    ship.hasMoved = true;
+
+    console.log(`Ship ${shipId} moved to (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`);
+  }
 
     this.validateAuthority(client, ship);
 
