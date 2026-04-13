@@ -79,6 +79,11 @@ interface CreateObjectPayload {
 	ownerId?: string;
 }
 
+interface UpdateProfilePayload {
+	nickname?: string;
+	avatar?: string;
+}
+
 // ==================== 战斗房间类 ====================
 
 export class BattleRoom extends Room<{ state: GameRoomState }> {
@@ -90,6 +95,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	private roomDisplayName = "";
 	private roomOwnerId: string | null = null;
 	private isPrivateRoom = false;
+	private profileStore = new Map<number, { nickname: string; avatar: string }>();
 
 	/**
 	 * 房间创建初始化
@@ -274,13 +280,9 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 		// 检查是否有同短 ID 的玩家已连接（防止重复）
 		const existingPlayerByShortId = this.findPlayerByShortId(shortId);
-		if (existingPlayerByShortId && existingPlayerByShortId.connected && existingPlayerByShortId.sessionId !== client.sessionId) {
-			// 旧玩家已断开，清理旧数据，允许新玩家加入
-			console.log(`[BattleRoom] Cleaning up disconnected player with same shortId: ${existingPlayerByShortId.sessionId}`);
-			this.state.players.delete(existingPlayerByShortId.sessionId);
-			this.playerIdentity.delete(existingPlayerByShortId.sessionId);
-			this.pingEwma.delete(existingPlayerByShortId.sessionId);
-			this.jitterEwma.delete(existingPlayerByShortId.sessionId);
+		if (existingPlayerByShortId && existingPlayerByShortId.sessionId !== client.sessionId) {
+			console.log(`[BattleRoom] Removing duplicate player with same shortId: ${existingPlayerByShortId.sessionId}`);
+			this.removePlayerSession(existingPlayerByShortId.sessionId);
 		}
 
 		// 检查是否有同名的玩家已连接（用户名独占性）
@@ -296,6 +298,9 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		player.sessionId = client.sessionId;
 		player.shortId = shortId;
 		player.name = playerName;
+		const savedProfile = this.profileStore.get(shortId);
+		player.nickname = savedProfile?.nickname ?? "";
+		player.avatar = savedProfile?.avatar ?? "👤";
 		player.connected = true;
 		player.role = "player";
 		player.isReady = false;
@@ -382,7 +387,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 聊天消息
 		this.onMessage('chat', (client, payload: { content: string; playerName?: string }) => {
 			const player = this.state.players.get(client.sessionId);
-			const senderName = payload.playerName || player?.name || 'Unknown';
+			const senderName = payload.playerName || player?.nickname || player?.name || 'Unknown';
 			
 			// 广播聊天消息给所有客户端
 			this.broadcast('chat', {
@@ -548,6 +553,34 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 				jitterMs: player.jitterMs,
 				quality: player.connectionQuality,
 			});
+		});
+
+		this.onMessage("ROOM_UPDATE_PROFILE", (client, payload: UpdateProfilePayload) => {
+			const player = this.state.players.get(client.sessionId);
+			const identity = this.playerIdentity.get(client.sessionId);
+			if (!player || !identity) return;
+
+			player.nickname = String(payload.nickname || "").trim().slice(0, 24);
+			player.avatar = String(payload.avatar || "👤").trim().slice(0, 4) || "👤";
+			this.profileStore.set(identity.shortId, { nickname: player.nickname, avatar: player.avatar });
+		});
+
+		this.onMessage("ROOM_KICK_PLAYER", (client, payload: { targetSessionId?: string }) => {
+			if (client.sessionId !== this.roomOwnerId) {
+				client.send("error", { message: "仅房间管理员可踢出玩家" });
+				return;
+			}
+
+			const targetSessionId = String(payload?.targetSessionId || "");
+			if (!targetSessionId || targetSessionId === client.sessionId) {
+				return;
+			}
+
+			const targetClient = this.clients.find((item) => item.sessionId === targetSessionId);
+			targetClient?.send("ROOM_KICKED", { reason: "你已被房主移出房间" });
+			targetClient?.leave(4001);
+			this.removePlayerSession(targetSessionId);
+			this.updateMetadata();
 		});
 	}
 
@@ -850,11 +883,8 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 正常退出（主动点击离开按钮）- 立即清理，不等待重连
 		if (!allowReconnect) {
 			console.log(`[BattleRoom] Normal leave, cleaning up immediately`);
-			
-			// 设置断开状态
-			if (player) {
-				player.connected = false;
-			}
+			this.removePlayerSession(client.sessionId);
+			this.assignOwnerIfMissing();
 
 			// 更新元数据
 			this.updateMetadata();
@@ -882,9 +912,8 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		}
 
 		// 重连失败，设置断开状态
-		if (player) {
-			player.connected = false;
-		}
+		this.removePlayerSession(client.sessionId);
+		this.assignOwnerIfMissing();
 
 		// 更新元数据
 		this.updateMetadata();
@@ -909,6 +938,30 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 				}
 			}, 5 * 60 * 1000);
 		}
+	}
+
+	private removePlayerSession(sessionId: string): void {
+		this.state.players.delete(sessionId);
+		this.playerIdentity.delete(sessionId);
+		this.pingEwma.delete(sessionId);
+		this.jitterEwma.delete(sessionId);
+	}
+
+	private assignOwnerIfMissing(): void {
+		if (this.roomOwnerId && this.state.players.has(this.roomOwnerId)) {
+			return;
+		}
+
+		const nextOwner = Array.from(this.state.players.values()).find((player) => player.connected);
+		if (!nextOwner) {
+			this.roomOwnerId = null;
+			return;
+		}
+
+		this.roomOwnerId = nextOwner.sessionId;
+		this.state.players.forEach((player) => {
+			player.role = player.sessionId === nextOwner.sessionId ? "dm" : "player";
+		});
 	}
 
 	/**
