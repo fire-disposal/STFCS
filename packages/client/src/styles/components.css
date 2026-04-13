@@ -1256,85 +1256,369 @@
 
 .lobby-container {
   min-height: 100vh;
-  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
   background: #00050a;
   color: #cfe8ff;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lobby-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(100, 200, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 200, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
 }
 
 .lobby-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(74, 158, 255, 0.4);
+  position: relative;
+  z-index: 1;
 }
 
 .lobby-title {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--color-primary);
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
 }
 
 .lobby-user-bar {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   align-items: center;
+}
+
+.lobby-user-name {
+  font-size: 15px;
+  color: #8fbfd4;
+  font-weight: 600;
 }
 
 .lobby-main {
   display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 16px;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.lobby-room-panel {
+  background: rgba(13, 40, 71, 0.7);
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  padding: 28px;
+  box-shadow: 0 0 30px rgba(74, 158, 255, 0.2);
 }
 
 .lobby-room-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .lobby-room-list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 18px;
 }
 
 .lobby-room-card {
-  border: 1px solid #2b4261;
-  padding: 10px;
-  background: rgba(20, 25, 35, 0.6);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding: 18px 20px;
+  background: rgba(13, 40, 71, 0.5);
+  border: 2px solid rgba(74, 158, 255, 0.2);
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.lobby-room-card:hover {
-  background: rgba(30, 35, 45, 0.7);
-  border-color: rgba(74, 158, 255, 0.4);
+.lobby-room-card:hover:not(.is-disabled) {
+  border-color: var(--color-primary);
+  background: rgba(13, 40, 71, 0.8);
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+.lobby-room-card.is-disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .lobby-room-name {
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .lobby-room-meta {
-  font-size: 12px;
-  color: #8fbfd4;
   display: flex;
   gap: 16px;
+  font-size: 13px;
+  color: #6cb4cc;
+  flex-wrap: wrap;
+}
+
+.lobby-room-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby-status-dot {
+  width: 8px;
+  height: 8px;
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.lobby-room-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lobby-room-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+.lobby-room-badge--warning {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.lobby-room-badge--success {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.lobby-empty {
+  padding: 48px;
+  text-align: center;
+  color: #4a6f85;
+  font-size: 14px;
+  background: rgba(13, 40, 71, 0.3);
+  border: 2px dashed rgba(74, 158, 255, 0.2);
+}
+
+.lobby-empty-hint {
+  font-size: 12px;
+  margin-top: 12px;
+  color: #6cb4cc;
 }
 
 .lobby-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
 }
 
-.lobby-stats {
-  font-size: 13px;
+.lobby-section {
+  background: rgba(13, 40, 71, 0.6);
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  padding: 24px;
+}
+
+.lobby-section-title {
+  font-size: 15px;
+  font-weight: bold;
   color: #8fbfd4;
+  margin-bottom: 18px;
+  letter-spacing: 2px;
+}
+
+.lobby-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 2px solid rgba(74, 158, 255, 0.2);
+  font-size: 13px;
+  color: #6cb4cc;
+}
+
+.lobby-stat:last-child {
+  border-bottom: none;
+}
+
+.lobby-stat-value {
+  font-weight: bold;
+}
+
+.lobby-stat-value--primary {
+  color: var(--color-primary);
+}
+
+.lobby-stat-value--success {
+  color: #4ade80;
+}
+
+.lobby-stat-value--danger {
+  color: #f87171;
+}
+
+.lobby-guide {
+  font-size: 12px;
+  color: #6cb4cc;
+  line-height: 1.8;
+}
+
+/* 大厅按钮 */
+.lobby-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 10px 18px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.lobby-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #2a3a4a;
+  color: #3a4a5a;
+}
+
+.lobby-btn--primary {
+  background: rgba(74, 158, 255, 0.15);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.2);
+}
+
+.lobby-btn--primary:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.25);
+  box-shadow: 0 0 30px rgba(74, 158, 255, 0.5);
+}
+
+.lobby-btn--secondary {
+  background: rgba(100, 100, 150, 0.1);
+  border-color: rgba(100, 100, 150, 0.3);
+  color: #8fbfd4;
+}
+
+.lobby-btn--secondary:hover:not(:disabled) {
+  background: rgba(100, 100, 150, 0.2);
+  border-color: rgba(100, 100, 150, 0.5);
+  color: #cfe8ff;
+}
+
+.lobby-btn--danger {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.lobby-btn--danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
+}
+
+.lobby-btn--small {
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.lobby-btn--refresh {
+  padding: 8px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  background: rgba(74, 158, 255, 0.1);
+  border-color: rgba(74, 158, 255, 0.4);
+  color: #6cb4cc;
+}
+
+.lobby-btn--refresh:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: rgba(74, 158, 255, 0.6);
+  color: #8fbfd4;
+  box-shadow: 0 0 15px rgba(74, 158, 255, 0.3);
+}
+
+.lobby-btn--join {
+  padding: 8px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  background: rgba(74, 158, 255, 0.15);
+  border-color: rgba(74, 158, 255, 0.4);
+  color: #cfe8ff;
+}
+
+.lobby-btn--join:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: rgba(74, 158, 255, 0.6);
+  box-shadow: 0 0 15px rgba(74, 158, 255, 0.3);
+}
+
+.lobby-btn--block {
+  width: 100%;
+}
+
+/* 大厅模态框 */
+.lobby-modal {
+  max-width: 400px;
+}
+
+.lobby-avatar-list {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.lobby-avatar-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(13, 40, 71, 0.5);
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  border-radius: 4px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lobby-avatar-btn:hover {
+  background: rgba(74, 158, 255, 0.15);
+  border-color: var(--color-primary);
+}
+
+.lobby-avatar-btn.is-active {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.4);
 }
 
 /* ====== 磁吸指针效果 ====== */

@@ -3,11 +3,11 @@
  * 提供图层可见性切换和视图模式选择
  */
 
+import { LayerGroupId, ViewMode } from "@/features/game/layers/types";
+import { useLayerManager } from "@/hooks/useLayerManager";
+import { ChevronDown, ChevronRight, Eye, EyeOff, Layers } from "lucide-react";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLayerManager } from "@/hooks/useLayerManager";
-import { LayerGroupId, ViewMode } from "@/features/game/layers/types";
-import { Eye, EyeOff, Layers, ChevronDown, ChevronRight } from "lucide-react";
 
 interface LayerControlPanelProps {
 	className?: string;
@@ -16,9 +16,7 @@ interface LayerControlPanelProps {
 	onToggle?: () => void;
 }
 
-export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
-	className,
-}) => {
+export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({ className }) => {
 	const { t } = useTranslation();
 	const layerManager = useLayerManager();
 	const [expandedGroups, setExpandedGroups] = useState<Set<LayerGroupId>>(
@@ -39,9 +37,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 
 	const renderViewModeButton = (mode: ViewMode, labelKey: string) => (
 		<button
-			className={`view-mode-button ${
-				layerManager.currentViewMode === mode ? "active" : ""
-			}`}
+			className={`view-mode-button ${layerManager.currentViewMode === mode ? "active" : ""}`}
 			onClick={() => layerManager.switchViewMode(mode)}
 			title={layerManager.getCurrentViewModeConfig()?.description}
 		>
@@ -71,10 +67,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 			<div className="layer-groups">
 				{groups.map((group) => (
 					<div key={group.id} className="layer-group">
-						<div
-							className="layer-group-header"
-							onClick={() => toggleGroup(group.id)}
-						>
+						<div className="layer-group-header" onClick={() => toggleGroup(group.id)}>
 							<span className="group-expand-icon">
 								{expandedGroups.has(group.id) ? (
 									<ChevronDown size={14} />
@@ -87,10 +80,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 								className="group-toggle-button"
 								onClick={(e) => {
 									e.stopPropagation();
-									layerManager.setGroupVisibility(
-										group.id,
-										!group.allVisible
-									);
+									layerManager.setGroupVisibility(group.id, !group.allVisible);
 								}}
 								title={group.allVisible ? t("layer.hideAll") : t("layer.showAll")}
 							>
@@ -113,19 +103,10 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 											<span className="layer-name">{layer.name}</span>
 											<button
 												className="layer-toggle-button"
-												onClick={() =>
-													layerManager.setLayerVisibility(
-														layerId,
-														!layer.visible
-													)
-												}
+												onClick={() => layerManager.setLayerVisibility(layerId, !layer.visible)}
 												title={layer.visible ? t("layer.hide") : t("layer.show")}
 											>
-												{layer.visible ? (
-													<Eye size={14} />
-												) : (
-													<EyeOff size={14} />
-												)}
+												{layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
 											</button>
 										</div>
 									);
@@ -135,158 +116,6 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 					</div>
 				))}
 			</div>
-
-			<style>{`
-				.layer-control-panel {
-					padding: 12px;
-					background: rgba(20, 20, 40, 0.7);
-					border-radius: 4px;
-				}
-
-				.layer-panel-header {
-					margin-bottom: 12px;
-					padding-bottom: 8px;
-					border-bottom: 1px solid rgba(74, 158, 255, 0.2);
-				}
-
-				.layer-panel-header h3 {
-					display: flex;
-					align-items: center;
-					gap: 8px;
-					color: #aaccff;
-					font-size: 14px;
-					margin: 0;
-				}
-
-				.view-mode-section {
-					margin-bottom: 16px;
-				}
-
-				.view-mode-buttons {
-					display: flex;
-					gap: 6px;
-				}
-
-				.view-mode-button {
-					flex: 1;
-					padding: 6px 8px;
-					background: rgba(40, 40, 80, 0.5);
-					border: 1px solid rgba(74, 158, 255, 0.2);
-					color: #8a9ebf;
-					border-radius: 4px;
-					font-size: 11px;
-					cursor: pointer;
-					transition: all 0.2s ease;
-				}
-
-				.view-mode-button:hover {
-					background: rgba(60, 60, 100, 0.6);
-					border-color: rgba(74, 158, 255, 0.4);
-				}
-
-				.view-mode-button.active {
-					background: rgba(74, 158, 255, 0.2);
-					border-color: #4a9eff;
-					color: #aaccff;
-				}
-
-				.layer-groups {
-					display: flex;
-					flex-direction: column;
-					gap: 8px;
-				}
-
-				.layer-group {
-					background: rgba(30, 30, 60, 0.3);
-					border-radius: 4px;
-					overflow: hidden;
-				}
-
-				.layer-group-header {
-					display: flex;
-					align-items: center;
-					gap: 6px;
-					padding: 8px 10px;
-					background: rgba(40, 40, 80, 0.4);
-					cursor: pointer;
-					transition: background 0.2s ease;
-				}
-
-				.layer-group-header:hover {
-					background: rgba(50, 50, 100, 0.5);
-				}
-
-				.group-expand-icon {
-					color: #6a7a9f;
-					display: flex;
-					align-items: center;
-				}
-
-				.group-name {
-					flex: 1;
-					color: #8a9ebf;
-					font-size: 12px;
-					font-weight: 500;
-				}
-
-				.group-toggle-button {
-					padding: 4px;
-					background: transparent;
-					border: none;
-					color: #6a7a9f;
-					cursor: pointer;
-					border-radius: 4px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					transition: all 0.2s ease;
-				}
-
-				.group-toggle-button:hover {
-					background: rgba(74, 158, 255, 0.2);
-					color: #4a9eff;
-				}
-
-				.layer-group-items {
-					padding: 4px 8px 8px;
-					display: flex;
-					flex-direction: column;
-					gap: 4px;
-				}
-
-				.layer-item {
-					display: flex;
-					align-items: center;
-					justify-content: space-between;
-					padding: 6px 10px;
-					background: rgba(20, 20, 40, 0.5);
-					border-radius: 4px;
-				}
-
-				.layer-name {
-					flex: 1;
-					color: #6a7a9f;
-					font-size: 11px;
-				}
-
-				.layer-toggle-button {
-					padding: 4px;
-					background: transparent;
-					border: none;
-					color: #6a7a9f;
-					cursor: pointer;
-					border-radius: 4px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					transition: all 0.2s ease;
-				}
-
-				.layer-toggle-button:hover {
-					background: rgba(74, 158, 255, 0.2);
-					color: #4a9eff;
-				}
-			`}</style>
 		</div>
 	);
 };

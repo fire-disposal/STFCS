@@ -1,9 +1,18 @@
 import { useAppSelector } from "@/store";
 import { updateToken } from "@/store/slices/mapSlice";
 import type { TokenInfo } from "@vt/contracts/types";
+import {
+	Check,
+	MapPin,
+	Rocket,
+	RotateCcw,
+	RotateCw,
+	Satellite,
+	SkipForward,
+	Zap,
+} from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Rocket, Satellite, MapPin, RotateCcw, RotateCw, Check, Zap, SkipForward } from "lucide-react";
 import { useDispatch } from "react-redux";
 
 interface TokenInfoPanelProps {
@@ -100,24 +109,7 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 		);
 	};
 
-	// 获取回合状态颜色
-	const getTurnStateColor = (state: TokenInfo["turnState"]) => {
-		switch (state) {
-			case "active":
-				return "#4ade80";
-			case "moved":
-				return "#fbbf24";
-			case "acted":
-				return "#ef4444";
-			case "ended":
-				return "#6b7280";
-			case "waiting":
-			default:
-				return "#8a8aa8";
-		}
-	};
-
-	// 获取token类型图标
+	// 获取 token 类型图标
 	const getTokenTypeIcon = (type: TokenInfo["type"]) => {
 		switch (type) {
 			case "ship":
@@ -139,16 +131,17 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 					<div className="token-title">
 						<h3>{tokenClass.toUpperCase()}</h3>
 						<div className="token-subtitle">
-							<span className="token-id">{t("token.id")}: {token.id.slice(0, 8)}</span>
-							<span className="token-type">{t("token.type.ship")}: {token.type}</span>
+							<span className="token-id">
+								{t("token.id")}: {token.id.slice(0, 8)}
+							</span>
+							<span className="token-type">
+								{t("token.type.ship")}: {token.type}
+							</span>
 						</div>
 					</div>
 				</div>
 				<div className="token-status">
-					<span
-						className="turn-state-indicator"
-						style={{ backgroundColor: getTurnStateColor(token.turnState) }}
-					/>
+					<span className={`turn-state-indicator turn-state-indicator--${token.turnState}`} />
 					<span className="turn-state-label">{token.turnState.toUpperCase()}</span>
 				</div>
 			</div>
@@ -268,7 +261,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								onClick={() => handleRotate("left")}
 								disabled={token.turnState === "acted"}
 							>
-								<span className="button-icon"><RotateCcw size={16} /></span>
+								<span className="button-icon">
+									<RotateCcw size={16} />
+								</span>
 								<span className="button-text">{t("token.rotateLeft")}</span>
 							</button>
 							<button
@@ -276,7 +271,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								onClick={() => handleRotate("right")}
 								disabled={token.turnState === "acted"}
 							>
-								<span className="button-icon"><RotateCw size={16} /></span>
+								<span className="button-icon">
+									<RotateCw size={16} />
+								</span>
 								<span className="button-text">{t("token.rotateRight")}</span>
 							</button>
 						</div>
@@ -286,7 +283,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								onClick={handleMarkMoved}
 								disabled={token.turnState === "acted" || token.remainingMovement === 0}
 							>
-								<span className="button-icon"><Check size={16} /></span>
+								<span className="button-icon">
+									<Check size={16} />
+								</span>
 								<span className="button-text">{t("token.markMoved")}</span>
 							</button>
 							<button
@@ -294,7 +293,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								onClick={handleMarkActed}
 								disabled={token.turnState === "acted" || token.remainingActions === 0}
 							>
-								<span className="button-icon"><Zap size={16} /></span>
+								<span className="button-icon">
+									<Zap size={16} />
+								</span>
 								<span className="button-text">{t("token.markActed")}</span>
 							</button>
 						</div>
@@ -304,7 +305,9 @@ const TokenInfoPanel: React.FC<TokenInfoPanelProps> = ({ className }) => {
 								onClick={handleEndTurn}
 								disabled={token.turnState === "waiting" || token.turnState === "ended"}
 							>
-								<span className="button-icon"><SkipForward size={16} /></span>
+								<span className="button-icon">
+									<SkipForward size={16} />
+								</span>
 								<span className="button-text">{t("token.endTurn")}</span>
 							</button>
 						</div>
