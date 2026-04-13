@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ClientCommand, PROTOCOL_VERSION, type GameRoomState, type PlayerState, type ShipState } from '@vt/contracts';
+import { ClientCommand, PROTOCOL_VERSION, PlayerRole, Faction, ConnectionQuality, type GameRoomState, type PlayerState, type ShipState } from '@vt/contracts';
 import {
   PRESET_SHIPS,
   PRESET_WEAPONS,
@@ -69,19 +69,19 @@ describe('core contracts and rules', () => {
     const player: PlayerState = {
       sessionId: 'session-1',
       shortId: 123456,
-      role: 'dm',
+      role: PlayerRole.DM,
       name: 'Commander',
       isReady: false,
       connected: true,
       pingMs: 33,
       jitterMs: 2,
-      connectionQuality: 'excellent',
+      connectionQuality: ConnectionQuality.EXCELLENT,
     };
 
     const ship: ShipState = {
       id: 'ship-1',
       ownerId: 'session-1',
-      faction: 'dm',
+      faction: Faction.DM,
       hullType: 'frigate',
       transform: { x: 12, y: 24, heading: 90 },
       hullCurrent: 100,
@@ -115,7 +115,7 @@ describe('core contracts and rules', () => {
       turnCount: 1,
       players: new Map([[player.sessionId, player]]),
       ships: new Map([[ship.id, ship]]),
-      activeFaction: 'player',
+      activeFaction: Faction.PLAYER,
       mapWidth: 2000,
       mapHeight: 2000,
     };

@@ -1,6 +1,59 @@
+/**
+ * 服务端 Schema 定义
+ * 
+ * Colyseus Schema 类必须使用装饰器，无法直接使用 interface
+ * 类型值和常量从 contracts/definitions 导入（唯一事实来源）
+ */
+
 import { Schema, type, ArraySchema, MapSchema } from '@colyseus/schema';
 
+// 从统一定义导入枚举和常量
+import {
+  DAMAGE_MODIFIERS,
+  GAME_CONFIG as GAME_CONFIG_UNIFIED,
+  WeaponState as WeaponStateEnum,
+  ClientCommand as ClientCommandEnum,
+  Faction as FactionEnum,
+  PlayerRole as PlayerRoleEnum,
+  ConnectionQuality as ConnectionQualityEnum,
+} from '@vt/contracts';
+
 export { ArraySchema };
+
+// ==================== 统一的枚举常量（从 contracts 导入） ====================
+
+// 导出 WeaponState 枚举
+export const WeaponState = WeaponStateEnum;
+
+// 导出 ClientCommand 枚举
+export const ClientCommand = ClientCommandEnum;
+
+// 导出 Faction 枚举
+export const Faction = FactionEnum;
+
+// 导出 PlayerRole 枚举
+export const PlayerRole = PlayerRoleEnum;
+
+// 导出 ConnectionQuality 枚举
+export const ConnectionQuality = ConnectionQualityEnum;
+
+// 导出统一配置
+export const GAME_CONFIG = GAME_CONFIG_UNIFIED;
+
+// 导出伤害倍率（兼容小写键版本）
+export const DAMAGE_MULTIPLIERS: Record<string, { shield: number; armor: number; hull: number }> = {
+  kinetic: DAMAGE_MODIFIERS.KINETIC,
+  high_explosive: DAMAGE_MODIFIERS.HIGH_EXPLOSIVE,
+  energy: DAMAGE_MODIFIERS.ENERGY,
+  fragmentation: DAMAGE_MODIFIERS.FRAGMENTATION,
+  // 大写键版本（新代码使用）
+  KINETIC: DAMAGE_MODIFIERS.KINETIC,
+  HIGH_EXPLOSIVE: DAMAGE_MODIFIERS.HIGH_EXPLOSIVE,
+  ENERGY: DAMAGE_MODIFIERS.ENERGY,
+  FRAGMENTATION: DAMAGE_MODIFIERS.FRAGMENTATION,
+};
+
+// ==================== Schema 类定义 ====================
 
 export class Transform extends Schema {
   @type('number') x: number = 0;
@@ -9,46 +62,39 @@ export class Transform extends Schema {
 }
 
 export class WeaponSlot extends Schema {
-  @type('string') weaponId: string = '';
-  @type('string') type: 'kinetic' | 'high_explosive' | 'energy' | 'fragmentation' = 'kinetic';
-  @type('number') cooldown: number = 0;
+  @type('string') mountId: string = '';
+  @type('string') weaponSpecId: string = '';
+  @type('string') name: string = '';
+  @type('string') category: string = 'BALLISTIC';
+  @type('string') damageType: string = 'KINETIC';
+  @type('string') mountType: string = 'TURRET';
+  
+  @type('number') offsetX: number = 0;
+  @type('number') offsetY: number = 0;
+  @type('number') mountFacing: number = 0;
+  @type('number') arcMin: number = -90;
+  @type('number') arcMax: number = 90;
+  
   @type('number') damage: number = 0;
   @type('number') range: number = 0;
-  @type('number') arc: number = 0;
-  @type('number') angle: number = 0;
+  @type('number') fluxCost: number = 0;
+  
+  @type('number') cooldownMax: number = 0;
+  @type('number') cooldownRemaining: number = 0;
+  
+  @type('number') maxAmmo: number = 0;
+  @type('number') currentAmmo: number = 0;
+  @type('number') reloadTime: number = 0;
+  
+  @type('string') state: string = WeaponState.READY;
+  @type('boolean') ignoresShields: boolean = false;
+  @type('boolean') hasFiredThisTurn: boolean = false;
 }
-
-export type WeaponDamageType = 'kinetic' | 'high_explosive' | 'energy' | 'fragmentation';
-export type ConnectionQuality = 'excellent' | 'good' | 'fair' | 'poor' | 'offline';
-
-export enum ClientCommand {
-  CMD_MOVE_TOKEN = 'CMD_MOVE_TOKEN',
-  CMD_TOGGLE_SHIELD = 'CMD_TOGGLE_SHIELD',
-  CMD_FIRE_WEAPON = 'CMD_FIRE_WEAPON',
-  CMD_VENT_FLUX = 'CMD_VENT_FLUX',
-  CMD_ASSIGN_SHIP = 'CMD_ASSIGN_SHIP',
-  CMD_TOGGLE_READY = 'CMD_TOGGLE_READY',
-  CMD_NEXT_PHASE = 'CMD_NEXT_PHASE',
-}
-
-export const DAMAGE_MULTIPLIERS: Record<WeaponDamageType, { shield: number; armor: number; hull: number }> = {
-  kinetic: { shield: 0.5, armor: 2, hull: 1 },
-  high_explosive: { shield: 0.5, armor: 0.5, hull: 1 },
-  energy: { shield: 1, armor: 1, hull: 1 },
-  fragmentation: { shield: 0.25, armor: 0.25, hull: 0.25 },
-};
-
-export const GAME_CONFIG = {
-  SHIELD_UP_FLUX_COST: 10,
-  OVERLOAD_BASE_DURATION: 10,
-  VENT_FLUX_RATE: 30,
-  OVERLOAD_FLUX_DECAY: 20,
-} as const;
 
 export class PlayerState extends Schema {
   @type('string') sessionId: string = '';
   @type('number') shortId: number = 0;
-  @type('string') role: 'dm' | 'player' = 'player';
+  @type('string') role: string = 'PLAYER';
   @type('string') name: string = '';
   @type('string') nickname: string = '';
   @type('string') avatar: string = '👤';
@@ -56,17 +102,27 @@ export class PlayerState extends Schema {
   @type('boolean') connected: boolean = true;
   @type('number') pingMs: number = -1;
   @type('number') jitterMs: number = 0;
-  @type('string') connectionQuality: ConnectionQuality = 'offline';
+  @type('string') connectionQuality: string = 'OFFLINE';
 }
 
 export class ShipState extends Schema {
   @type('string') id: string = '';
   @type('string') ownerId: string = '';
-  @type('string') faction: 'player' | 'dm' = 'player';
+  @type('string') faction: string = 'PLAYER';
   @type('string') hullType: string = '';
+  @type('string') name: string = '';
+  @type('number') width: number = 20;
+  @type('number') length: number = 40;
   @type(Transform) transform = new Transform();
+  
+  // 护甲使用 MapSchema（对象形式）
+  @type({ map: 'number' }) armorQuadrants = new MapSchema<number>();
+  @type('number') armorMaxPerQuadrant: number = 0;
+  
+  // 兼容旧数组形式（逐步废弃）
   @type(['number']) armorCurrent = new ArraySchema<number>(0, 0, 0, 0, 0, 0);
   @type(['number']) armorMax = new ArraySchema<number>(0, 0, 0, 0, 0, 0);
+  
   @type('number') hullCurrent: number = 0;
   @type('number') hullMax: number = 0;
   @type('number') fluxMax: number = 0;
@@ -76,8 +132,10 @@ export class ShipState extends Schema {
   @type('boolean') isShieldUp: boolean = false;
   @type('number') shieldOrientation: number = 0;
   @type('number') shieldArc: number = 120;
+  @type('number') shieldRadius: number = 0;
   @type('boolean') isOverloaded: boolean = false;
   @type('number') overloadTime: number = 0;
+  @type('boolean') isDestroyed: boolean = false;
   @type('number') maxSpeed: number = 0;
   @type('number') maxTurnRate: number = 0;
   @type('number') acceleration: number = 0;
@@ -94,11 +152,11 @@ export class ShipState extends Schema {
 export type GamePhase = 'DEPLOYMENT' | 'PLAYER_TURN' | 'DM_TURN' | 'END_PHASE';
 
 export class GameRoomState extends Schema {
-  @type('string') currentPhase: GamePhase = 'DEPLOYMENT';
+  @type('string') currentPhase: string = 'DEPLOYMENT';
   @type('number') turnCount: number = 1;
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type({ map: ShipState }) ships = new MapSchema<ShipState>();
-  @type('string') activeFaction: 'player' | 'dm' = 'player';
+  @type('string') activeFaction: string = 'PLAYER';
   @type('number') mapWidth: number = 2000;
   @type('number') mapHeight: number = 2000;
 }

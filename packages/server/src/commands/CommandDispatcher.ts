@@ -1,4 +1,13 @@
-import { ClientCommand, GAME_CONFIG, GameRoomState, ShipState, type WeaponDamageType, DAMAGE_MULTIPLIERS } from "../schema/GameSchema.js";
+import { 
+  ClientCommand, 
+  GAME_CONFIG, 
+  GameRoomState, 
+  ShipState, 
+  WeaponSlot, 
+  WeaponState,
+  DAMAGE_MULTIPLIERS,
+  PlayerRole
+} from "../schema/GameSchema.js";
 import { Client } from "@colyseus/core";
 import { 
   distance, 
@@ -24,7 +33,7 @@ export class CommandDispatcher {
     }
 
     // DM 拥有最高权限
-    if (player.role === "dm") {
+    if (player.role === PlayerRole.DM) {
       return;
     }
 
@@ -171,36 +180,42 @@ export class CommandDispatcher {
     const target = this.state.ships.get(targetId);
 
     if (!attacker) {
-      throw new Error(`Attacker ${attackerId} not found`);
+      throw new Error(`舰船 ${attackerId} 不存在`);
     }
     
     this.validateAuthority(client, attacker);
 
     if (!target) {
-      throw new Error(`Target ${targetId} not found`);
+      throw new Error(`目标舰船 ${targetId} 不存在`);
+    }
+
+    if (target.isDestroyed) {
+      throw new Error("目标已被摧毁");
     }
 
     const weapon = attacker.weapons.get(weaponId);
     if (!weapon) {
-      throw new Error(`Weapon ${weaponId} not found`);
+      throw new Error(`武器 ${weaponId} 不存在`);
     }
 
-    // 检查是否过载
     if (attacker.isOverloaded) {
-      throw new Error("Cannot fire while overloaded");
+      throw new Error("过载状态无法开火");
     }
 
-    // 检查冷却
-    if (weapon.cooldown > 0) {
-      throw new Error(`Weapon is on cooldown: ${weapon.cooldown.toFixed(2)}s remaining`);
+    if (weapon.state !== WeaponState.READY) {
+      if (weapon.state === WeaponState.COOLDOWN) {
+        throw new Error(`武器冷却中：剩余 ${weapon.cooldownRemaining.toFixed(1)} 秒`);
+      }
+      if (weapon.state === WeaponState.OUT_OF_AMMO) {
+        throw new Error("弹药耗尽");
+      }
+      throw new Error("武器不可用");
     }
 
-    // 检查是否已开火
-    if (attacker.hasFired) {
-      throw new Error("Ship has already fired this turn");
+    if (weapon.hasFiredThisTurn) {
+      throw new Error("该武器本回合已射击");
     }
 
-    // 计算距离和角度
     const dist = distance(
       attacker.transform.x, 
       attacker.transform.y,
@@ -208,15 +223,30 @@ export class CommandDispatcher {
       target.transform.y
     );
 
-    // 检查射程
     if (dist > weapon.range) {
-      throw new Error(`Target out of range: ${dist.toFixed(2)} > ${weapon.range}`);
+      throw new Error(`目标超出射程：距离 ${dist.toFixed(0)} > 射程 ${weapon.range}`);
     }
 
-    // 计算武器绝对角度
-    const weaponAbsoluteAngle = attacker.transform.heading + weapon.angle;
-    
-    // 计算目标相对角度
+    if (weapon.fluxCost > 0) {
+      const totalFlux = attacker.fluxHard + attacker.fluxSoft + weapon.fluxCost;
+      if (totalFlux > attacker.fluxMax) {
+        throw new Error(`辐能不足：需要 ${weapon.fluxCost}，当前容量 ${attacker.fluxMax - attacker.fluxHard - attacker.fluxSoft}`);
+      }
+      attacker.fluxSoft += weapon.fluxCost;
+    }
+
+    if (weapon.maxAmmo > 0) {
+      if (weapon.currentAmmo <= 0) {
+        weapon.state = WeaponState.OUT_OF_AMMO;
+        throw new Error("弹药耗尽");
+      }
+      weapon.currentAmmo -= 1;
+      if (weapon.currentAmmo <= 0) {
+        weapon.state = WeaponState.OUT_OF_AMMO;
+      }
+    }
+
+    const weaponWorldAngle = attacker.transform.heading + weapon.mountFacing;
     const angleToTarget = angleBetween(
       attacker.transform.x,
       attacker.transform.y,
@@ -224,20 +254,25 @@ export class CommandDispatcher {
       target.transform.y
     );
 
-    // 检查射界
-    const angleDiff = angleDifference(weaponAbsoluteAngle, angleToTarget);
-    if (angleDiff > weapon.arc / 2) {
-      throw new Error(`Target outside weapon arc: ${angleDiff.toFixed(2)} > ${weapon.arc / 2}`);
+    const normalizedWeaponAngle = ((weaponWorldAngle % 360) + 360) % 360;
+    const normalizedTargetAngle = ((angleToTarget % 360) + 360) % 360;
+    const angleDiff = angleDifference(normalizedWeaponAngle, normalizedTargetAngle);
+    
+    const arcCenter = (weapon.arcMin + weapon.arcMax) / 2;
+    const arcHalfWidth = (weapon.arcMax - weapon.arcMin) / 2;
+    const relativeArcDiff = angleDifference(arcCenter, normalizedTargetAngle);
+    
+    if (Math.abs(relativeArcDiff) > arcHalfWidth) {
+      throw new Error(`目标不在射界内：角度偏差 ${relativeArcDiff.toFixed(0)}°`);
     }
 
-    // 设置冷却
-    weapon.cooldown = 5; // 简化：固定5秒冷却
-    attacker.hasFired = true;
+    weapon.cooldownRemaining = weapon.cooldownMax || GAME_CONFIG.DEFAULT_COOLDOWN;
+    weapon.state = WeaponState.COOLDOWN;
+    weapon.hasFiredThisTurn = true;
 
-    // 计算伤害
     this.applyDamage(attacker, weapon, target);
 
-    console.log(`Ship ${attackerId} fired weapon ${weaponId} at ${targetId}`);
+    console.log(`[Fire] ${attacker.name || attackerId} 使用 ${weapon.name || weaponId} 攻击 ${target.name || targetId}`);
   }
 
   /**
@@ -245,15 +280,12 @@ export class CommandDispatcher {
    */
   private applyDamage(
     attacker: ShipState, 
-    weapon: { type: WeaponDamageType; damage: number }, 
+    weapon: WeaponSlot, 
     target: ShipState
   ): void {
-    const damageType = weapon.type;
+    const damageType = weapon.damageType;
     const baseDamage = weapon.damage;
     
-    // 计算命中象限 (0-5)
-    // 象限0: 前 (0-60°), 1: 前右 (60-120°), 2: 后右 (120-180°)
-    // 3: 后 (180-240°), 4: 后左 (240-300°), 5: 前左 (300-360°)
     const hitAngle = angleBetween(
       target.transform.x,
       target.transform.y,
@@ -267,67 +299,56 @@ export class CommandDispatcher {
     let actualDamage = baseDamage;
     let hitShield = false;
 
-    // 检查是否命中护盾
-    if (target.isShieldUp) {
+    if (target.isShieldUp && !weapon.ignoresShields) {
       const shieldAngleDiff = angleDifference(target.shieldOrientation, hitAngle);
       if (shieldAngleDiff <= target.shieldArc / 2) {
         hitShield = true;
         
-        // 护盾伤害计算
         const shieldMultiplier = DAMAGE_MULTIPLIERS[damageType].shield;
         const shieldDamage = baseDamage * shieldMultiplier;
         
-        // 护盾将伤害转化为硬辐能
-        target.fluxHard += shieldDamage;
+        target.fluxHard += shieldDamage * GAME_CONFIG.SHIELD_FLUX_PER_DAMAGE;
         
-        // 检查是否过载
         if (target.fluxHard + target.fluxSoft >= target.fluxMax) {
           target.isOverloaded = true;
           target.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
-          target.isShieldUp = false; // 护盾崩溃
-          console.log(`Ship ${target.id} overloaded!`);
+          target.isShieldUp = false;
+          console.log(`[Damage] ${target.name || target.id} 过载！`);
         }
 
-        actualDamage = 0; // 护盾完全吸收
-        console.log(`Hit shield: ${shieldDamage.toFixed(2)} hard flux added`);
+        actualDamage = 0;
+        console.log(`[Damage] 护盾吸收 ${shieldDamage.toFixed(0)} → 硬辐能 +${shieldDamage}`);
       }
     }
 
-    // 如果未命中护盾或护盾已崩溃，伤害装甲/船体
     if (!hitShield && actualDamage > 0) {
       const armorMultiplier = DAMAGE_MULTIPLIERS[damageType].armor;
       const hullMultiplier = DAMAGE_MULTIPLIERS[damageType].hull;
       
       const currentArmor = target.armorCurrent[section] ?? 0;
-      const maxArmor = target.armorMax[section] || 1;
       
-      // 计算有效护甲值 (根据远行星号公式)
-      // 基础伤害减免公式: damage = base * (hitStrength / (hitStrength + armor))
       const hitStrength = actualDamage * armorMultiplier;
-      const effectiveArmor = Math.max(currentArmor * 0.05, currentArmor); // 最小5%护甲值
+      const effectiveArmor = Math.max(currentArmor * 0.05, currentArmor);
       const damageReduction = hitStrength / (hitStrength + effectiveArmor);
       const armorDamage = Math.min(currentArmor, actualDamage * armorMultiplier);
       
-      if ((currentArmor ?? 0) > 0) {
-        // 伤害装甲
-        target.armorCurrent[section] = Math.max(0, (currentArmor ?? 0) - armorDamage);
+      if (currentArmor > 0) {
+        target.armorCurrent[section] = Math.max(0, currentArmor - armorDamage);
         
-        // 剩余伤害传递到船体 (根据伤害减免)
         const hullDamage = actualDamage * hullMultiplier * (1 - damageReduction);
         target.hullCurrent -= hullDamage;
         
-        console.log(`Hit armor section ${section}: ${armorDamage.toFixed(2)} armor, ${hullDamage.toFixed(2)} hull`);
+        console.log(`[Damage] 象限${section}: 装甲-${armorDamage.toFixed(0)}, 船体-${hullDamage.toFixed(0)}`);
       } else {
-        // 直接伤害船体
         target.hullCurrent -= actualDamage * hullMultiplier;
-        console.log(`Direct hull hit: ${(actualDamage * hullMultiplier).toFixed(2)}`);
+        console.log(`[Damage] 直接船体伤害: ${actualDamage * hullMultiplier}`);
       }
 
-      // 检查舰船是否被摧毁
       if (target.hullCurrent <= 0) {
         target.hullCurrent = 0;
-        console.log(`Ship ${target.id} destroyed!`);
-        // TODO: 处理舰船被摧毁
+        target.isDestroyed = true;
+        target.isShieldUp = false;
+        console.log(`[Damage] ${target.name || target.id} 被摧毁！`);
       }
     }
   }
@@ -370,9 +391,9 @@ export class CommandDispatcher {
   /**
    * 强制清除过载 (DM指令)
    */
-  dispatchClearOverload(client: Client, shipId: string): void {
+   dispatchClearOverload(client: Client, shipId: string): void {
     const player = this.state.players.get(client.sessionId);
-    if (!player || player.role !== "dm") {
+    if (!player || player.role !== PlayerRole.DM) {
       throw new Error("只有 DM 可以执行此指令");
     }
 
@@ -391,9 +412,9 @@ export class CommandDispatcher {
   /**
    * 强制修改护甲值 (DM指令)
    */
-  dispatchSetArmor(client: Client, shipId: string, section: number, value: number): void {
+   dispatchSetArmor(client: Client, shipId: string, section: number, value: number): void {
     const player = this.state.players.get(client.sessionId);
-    if (!player || player.role !== "dm") {
+    if (!player || player.role !== PlayerRole.DM) {
       throw new Error("只有 DM 可以执行此指令");
     }
 
@@ -415,9 +436,9 @@ export class CommandDispatcher {
   /**
    * 分配舰船控制权 (DM指令)
    */
-  dispatchAssignShip(client: Client, shipId: string, targetSessionId: string): void {
+   dispatchAssignShip(client: Client, shipId: string, targetSessionId: string): void {
     const player = this.state.players.get(client.sessionId);
-    if (!player || player.role !== "dm") {
+    if (!player || player.role !== PlayerRole.DM) {
       throw new Error("只有 DM 可以执行此指令");
     }
 

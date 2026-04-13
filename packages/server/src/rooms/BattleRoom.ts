@@ -14,11 +14,16 @@ import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import {
 	ArraySchema,
 	ClientCommand,
+	GAME_CONFIG,
 	GamePhase,
 	GameRoomState,
 	PlayerState,
 	ShipState,
 	WeaponSlot,
+	WeaponState,
+	Faction,
+	PlayerRole,
+	ConnectionQuality,
 } from "../schema/GameSchema.js";
 
 // ==================== 消息 Payload 类型定义 ====================
@@ -75,7 +80,7 @@ interface CreateObjectPayload {
 	x: number;
 	y: number;
 	heading: number;
-	faction: "player" | "dm";
+	faction: typeof Faction[keyof typeof Faction];
 	ownerId?: string;
 }
 
@@ -302,15 +307,15 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		player.nickname = savedProfile?.nickname ?? "";
 		player.avatar = savedProfile?.avatar ?? "👤";
 		player.connected = true;
-		player.role = "player";
+		player.role = PlayerRole.PLAYER;
 		player.isReady = false;
 		player.pingMs = -1;
 		player.jitterMs = 0;
-		player.connectionQuality = "excellent";
+		player.connectionQuality = ConnectionQuality.EXCELLENT;
 
 		// 第一个玩家自动成为 DM
 		if (this.clients.length === 1) {
-			player.role = "dm";
+			player.role = PlayerRole.DM;
 			this.roomOwnerId = client.sessionId;
 			console.log(`[BattleRoom] First player is DM`);
 		}
@@ -338,7 +343,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		
 		this.state.players.forEach((p) => {
 			if (p.connected) {
-				if (p.role === "dm") dmCount++;
+				if (p.role === PlayerRole.DM) dmCount++;
 				else playerCount++;
 			}
 		});
@@ -468,7 +473,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		this.onMessage(ClientCommand.CMD_NEXT_PHASE, (client) => {
 			try {
 				const player = this.state.players.get(client.sessionId);
-				if (player?.role === "dm") {
+				if (player?.role === PlayerRole.DM) {
 					this.advancePhase();
 				} else {
 					throw new Error("只有 DM 可以强制进入下一阶段");
@@ -481,9 +486,9 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 创建测试舰船（旧接口，保留兼容性）
 		this.onMessage(
 			"CREATE_TEST_SHIP",
-			(client, payload: { faction: "player" | "dm"; x: number; y: number }) => {
+			(client, payload: { faction: typeof Faction[keyof typeof Faction]; x: number; y: number }) => {
 				const player = this.state.players.get(client.sessionId);
-				if (player?.role === "dm") {
+				if (player?.role === PlayerRole.DM) {
 					this.createTestShip(payload.faction, payload.x, payload.y);
 				} else {
 					client.send("error", { message: "只有 DM 可以创建测试舰船" });
@@ -494,7 +499,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// DM 创建对象（新接口）
 		this.onMessage("DM_CREATE_OBJECT", (client, payload: CreateObjectPayload) => {
 			const player = this.state.players.get(client.sessionId);
-			if (player?.role === "dm") {
+			if (player?.role === PlayerRole.DM) {
 				this.createObject(payload);
 			} else {
 				client.send("error", { message: "只有 DM 可以创建对象" });
@@ -587,26 +592,43 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 游戏主循环
 	 */
-	private update(deltaTime: number) {
-		// 更新所有舰船的状态
-		this.state.ships.forEach((ship: ShipState) => {
-			// 更新武器冷却
-			ship.weapons.forEach((weapon: WeaponSlot) => {
-				if (weapon.cooldown > 0) {
-					weapon.cooldown = Math.max(0, weapon.cooldown - deltaTime / 1000);
-				}
-			});
+private update(deltaTime: number) {
+    const destroyedShips: string[] = [];
+    
+    this.state.ships.forEach((ship: ShipState) => {
+      if (ship.isDestroyed) {
+        destroyedShips.push(ship.id);
+        return;
+      }
 
-			// 更新过载时间
-			if (ship.isOverloaded && ship.overloadTime > 0) {
-				ship.overloadTime -= deltaTime / 1000;
-				if (ship.overloadTime <= 0) {
-					ship.isOverloaded = false;
-					ship.overloadTime = 0;
-				}
-			}
-		});
-	}
+      ship.weapons.forEach((weapon: WeaponSlot) => {
+        if (weapon.cooldownRemaining > 0) {
+          weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaTime / 1000);
+          if (weapon.cooldownRemaining <= 0) {
+            if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
+              weapon.state = WeaponState.OUT_OF_AMMO;
+            } else {
+              weapon.state = WeaponState.READY;
+            }
+          }
+        }
+      });
+
+      if (ship.isOverloaded && ship.overloadTime > 0) {
+        ship.overloadTime -= deltaTime / 1000;
+        if (ship.overloadTime <= 0) {
+          ship.isOverloaded = false;
+          ship.overloadTime = 0;
+        }
+      }
+    });
+
+    for (const shipId of destroyedShips) {
+      this.state.ships.delete(shipId);
+      console.log(`[BattleRoom] Removed destroyed ship: ${shipId}`);
+      this.broadcast("ship_destroyed", { shipId, timestamp: Date.now() });
+    }
+  }
 
 	/**
 	 * 检查是否自动进入下一阶段
@@ -618,7 +640,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		let hasPlayers = false;
 
 		this.state.players.forEach((player: PlayerState) => {
-			if (player.role === "player" && player.connected) {
+			if (player.role === PlayerRole.PLAYER && player.connected) {
 				hasPlayers = true;
 				if (!player.isReady) {
 					allReady = false;
@@ -635,10 +657,10 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 推进游戏阶段
 	 */
-	private advancePhase(): void {
-		const phases: GamePhase[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
-		const currentIndex = phases.indexOf(this.state.currentPhase);
-		let nextIndex = currentIndex + 1;
+private advancePhase(): void {
+    const phases: string[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
+    const currentIndex = phases.indexOf(this.state.currentPhase as string);
+    let nextIndex = currentIndex + 1;
 
 		if (nextIndex >= phases.length) {
 			nextIndex = phases.indexOf("PLAYER_TURN");
@@ -657,7 +679,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		}
 
 		// 设置活跃阵营
-		this.state.activeFaction = this.state.currentPhase === "PLAYER_TURN" ? "player" : "dm";
+		this.state.activeFaction = this.state.currentPhase === "PLAYER_TURN" ? Faction.PLAYER : Faction.DM;
 
 		// 广播阶段变更
 		this.broadcast("phase_change", {
@@ -674,27 +696,38 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 处理结束阶段
 	 */
-	private handleEndPhase(): void {
-		this.state.ships.forEach((ship: ShipState) => {
-			// 清空软辐能
-			ship.fluxSoft = 0;
+private handleEndPhase(): void {
+    this.state.ships.forEach((ship: ShipState) => {
+      if (ship.isDestroyed) return;
 
-			// 重置行动标记
-			ship.hasMoved = false;
-			ship.hasFired = false;
+      ship.fluxSoft = 0;
 
-			// 护盾维持消耗
-			if (ship.isShieldUp) {
-				ship.fluxSoft += 2;
-			}
+      ship.hasMoved = false;
+      ship.hasFired = false;
 
-			// 检查过载
-			if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
-				ship.isOverloaded = true;
-				ship.overloadTime = 10;
-				ship.isShieldUp = false;
-			}
-		});
+      ship.weapons.forEach((weapon: WeaponSlot) => {
+        weapon.hasFiredThisTurn = false;
+        
+        if (weapon.state === WeaponState.OUT_OF_AMMO && weapon.maxAmmo > 0 && weapon.reloadTime > 0) {
+          weapon.currentAmmo = weapon.maxAmmo;
+          weapon.state = WeaponState.READY;
+          console.log(`[EndPhase] ${ship.name || ship.id} 武器 ${weapon.name || weapon.mountId} 装填完成`);
+        }
+      });
+
+      if (ship.isShieldUp) {
+        ship.fluxSoft += ship.fluxDissipation * 0.2;
+      }
+
+      ship.fluxHard = Math.max(0, ship.fluxHard - ship.fluxDissipation * 0.5);
+
+      if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
+        ship.isOverloaded = true;
+        ship.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
+        ship.isShieldUp = false;
+        console.log(`[EndPhase] ${ship.name || ship.id} 过载！`);
+      }
+    });
 
 		this.state.turnCount++;
 	}
@@ -702,32 +735,59 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	/**
 	 * 创建测试舰船
 	 */
-	private createTestShip(faction: "player" | "dm", x: number, y: number) {
-		const ship = new ShipState();
-		ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-		ship.faction = faction;
-		ship.hullType = "frigate";
-		ship.transform.x = x;
-		ship.transform.y = y;
-		ship.transform.heading = faction === "player" ? 0 : 180;
+private createTestShip(faction: typeof Faction[keyof typeof Faction], x: number, y: number) {
+    const shipSpec = getShipHullSpec("frigate_assault");
+    if (!shipSpec) {
+      console.error("[BattleRoom] Test ship spec not found");
+      return;
+    }
 
-		ship.hullMax = 1000;
-		ship.hullCurrent = 1000;
-		ship.armorMax = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
-		ship.armorCurrent = new ArraySchema<number>(150, 150, 150, 100, 150, 150);
-		ship.fluxMax = 200;
-		ship.fluxHard = 0;
-		ship.fluxSoft = 0;
-		ship.maxSpeed = 100;
-		ship.maxTurnRate = 45;
-		ship.acceleration = 50;
+    const ship = new ShipState();
+    ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    ship.faction = faction;
+    ship.hullType = "frigate_assault";
+    ship.name = shipSpec.name;
+    ship.width = shipSpec.width;
+    ship.length = shipSpec.length;
+    ship.ownerId = "";
+    ship.transform.x = x;
+    ship.transform.y = y;
+    ship.transform.heading = faction === Faction.PLAYER ? 0 : 180;
+    ship.isDestroyed = false;
 
-		const weapon = this.createWeaponSlot(`weapon_${Date.now()}`, "kinetic", 50, 300, 90, 0, 0);
-		ship.weapons.set(weapon.weaponId, weapon);
+    ship.hullMax = shipSpec.hullPoints;
+    ship.hullCurrent = shipSpec.hullPoints;
 
-		this.state.ships.set(ship.id, ship);
-		console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
-	}
+    const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
+    ship.armorMax = new ArraySchema<number>(...armorDist);
+    ship.armorCurrent = new ArraySchema<number>(...armorDist);
+
+    ship.fluxMax = shipSpec.fluxCapacity;
+    ship.fluxDissipation = shipSpec.fluxDissipation;
+    ship.fluxHard = 0;
+    ship.fluxSoft = 0;
+
+    ship.maxSpeed = shipSpec.maxSpeed;
+    ship.maxTurnRate = shipSpec.maxTurnRate;
+    ship.acceleration = shipSpec.acceleration;
+
+    if (shipSpec.hasShield) {
+      ship.isShieldUp = false;
+      ship.shieldOrientation = ship.transform.heading;
+      ship.shieldArc = shipSpec.shieldArc || 120;
+      ship.shieldRadius = shipSpec.shieldRadius || 0;
+    }
+
+    for (const mount of shipSpec.weaponMounts) {
+      const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
+      if (weaponSpec) {
+        ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
+      }
+    }
+
+    this.state.ships.set(ship.id, ship);
+    console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
+  }
 
 	/**
 	 * DM 创建对象（舰船/空间站/小行星）
@@ -766,28 +826,24 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			ship.maxSpeed = shipSpec.maxSpeed;
 			ship.maxTurnRate = shipSpec.maxTurnRate;
 			ship.acceleration = shipSpec.acceleration;
+			ship.width = shipSpec.width;
+			ship.length = shipSpec.length;
+			ship.name = shipSpec.name;
+			ship.isDestroyed = false;
 
 			if (shipSpec.hasShield) {
 				ship.isShieldUp = false;
 				ship.shieldOrientation = heading;
 				ship.shieldArc = shipSpec.shieldArc || 120;
+				ship.shieldRadius = shipSpec.shieldRadius || 0;
 			}
 
-			// 添加武器
 			for (const mount of shipSpec.weaponMounts) {
 				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
 				if (weaponSpec) {
 					ship.weapons.set(
 						mount.id,
-						this.createWeaponSlot(
-							mount.id,
-							this.mapDamageType(weaponSpec.damageType),
-							weaponSpec.damage,
-							weaponSpec.range,
-							weaponSpec.arc,
-							mount.facing,
-							0
-						)
+						this.createWeaponSlotFromSpec(mount, weaponSpec)
 					);
 				}
 			}
@@ -820,51 +876,51 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		}
 	}
 
-	/**
-	 * 映射伤害类型
-	 */
-	private mapDamageType(type: string): "kinetic" | "high_explosive" | "energy" | "fragmentation" {
-		switch (type) {
-			case "kinetic":
-				return "kinetic";
-			case "high_explosive":
-				return "high_explosive";
-			case "energy":
-				return "energy";
-			default:
-				return "fragmentation";
-		}
-	}
-
-	private createWeaponSlot(
-		weaponId: string,
-		type: "kinetic" | "high_explosive" | "energy" | "fragmentation",
-		damage: number,
-		range: number,
-		arc: number,
-		angle: number,
-		cooldown: number
+	private createWeaponSlotFromSpec(
+		mount: { id: string; mountType: string; offsetX: number; offsetY: number; facing: number; arcMin: number; arcMax: number },
+		spec: { id: string; name: string; category: string; damageType: string; mountType: string; damage: number; range: number; cooldown: number; fluxCost: number; ammo: number; reloadTime: number; ignoresShields: boolean }
 	): WeaponSlot {
 		const weapon = new WeaponSlot();
-		weapon.weaponId = weaponId;
-		weapon.type = type;
-		weapon.damage = damage;
-		weapon.range = range;
-		weapon.arc = arc;
-		weapon.angle = angle;
-		weapon.cooldown = cooldown;
+		weapon.mountId = mount.id;
+		weapon.weaponSpecId = spec.id;
+		weapon.name = spec.name;
+		weapon.category = spec.category;
+		weapon.damageType = spec.damageType;
+		weapon.mountType = spec.mountType;
+		
+		weapon.offsetX = mount.offsetX;
+		weapon.offsetY = mount.offsetY;
+		weapon.mountFacing = mount.facing;
+		weapon.arcMin = mount.arcMin;
+		weapon.arcMax = mount.arcMax;
+		
+		weapon.damage = spec.damage;
+		weapon.range = spec.range;
+		weapon.fluxCost = spec.fluxCost;
+		
+		weapon.cooldownMax = spec.cooldown;
+		weapon.cooldownRemaining = 0;
+		
+		weapon.maxAmmo = spec.ammo;
+		weapon.currentAmmo = spec.ammo;
+		weapon.reloadTime = spec.reloadTime;
+		
+		weapon.state = WeaponState.READY;
+		weapon.ignoresShields = spec.ignoresShields;
+		weapon.hasFiredThisTurn = false;
+		
 		return weapon;
 	}
 
 	/**
 	 * 将 Ping 值转换为连接质量
 	 */
-	private toQuality(pingMs: number): "excellent" | "good" | "fair" | "poor" | "offline" {
-		if (pingMs < 0) return "offline";
-		if (pingMs <= 80) return "excellent";
-		if (pingMs <= 140) return "good";
-		if (pingMs <= 220) return "fair";
-		return "poor";
+	private toQuality(pingMs: number): typeof ConnectionQuality[keyof typeof ConnectionQuality] {
+		if (pingMs < 0) return ConnectionQuality.OFFLINE;
+		if (pingMs <= 80) return ConnectionQuality.EXCELLENT;
+		if (pingMs <= 140) return ConnectionQuality.GOOD;
+		if (pingMs <= 220) return ConnectionQuality.FAIR;
+		return ConnectionQuality.POOR;
 	}
 
 	/**
@@ -960,7 +1016,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 		this.roomOwnerId = nextOwner.sessionId;
 		this.state.players.forEach((player) => {
-			player.role = player.sessionId === nextOwner.sessionId ? "dm" : "player";
+			player.role = player.sessionId === nextOwner.sessionId ? PlayerRole.DM : PlayerRole.PLAYER;
 		});
 	}
 
