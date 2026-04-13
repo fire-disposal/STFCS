@@ -584,26 +584,14 @@
   cursor: not-allowed;
 }
 
-/* ====== 统一图标系统 ====== */
-
-.game-icon {
-  flex-shrink: 0;
-  vertical-align: middle;
-  display: inline-block;
-}
+/* ====== 图标系统 ====== */
+/* lucide-react 图标默认已处理 flex-shrink 和 vertical-align */
 
 .game-icon--xs { width: 12px; height: 12px; }
 .game-icon--sm { width: 14px; height: 14px; }
 .game-icon--md { width: 16px; height: 16px; }
 .game-icon--lg { width: 20px; height: 20px; }
 .game-icon--xl { width: 24px; height: 24px; }
-
-.game-icon--primary { color: var(--game-accent-blue); }
-.game-icon--danger { color: var(--game-accent-red); }
-.game-icon--success { color: var(--game-accent-green); }
-.game-icon--warning { color: var(--game-accent-yellow); }
-.game-icon--muted { color: var(--game-text-muted); }
-.game-icon--secondary { color: var(--game-text-secondary); }
 
 /* ====== 右侧面板 ====== */
 

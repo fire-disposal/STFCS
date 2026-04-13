@@ -179,7 +179,383 @@
   gap: 12px;
 }
 
-/* ====== 底部命令区 ====== */
+/* ====== 底部命令区 - 新版 ====== */
+
+.bottom-command-dock {
+  height: 220px;
+  min-height: 220px;
+  background-color: rgba(13, 40, 71, 0.95);
+  border-top: 2px solid rgba(74, 158, 255, 0.3);
+  flex-shrink: 0;
+  display: flex;
+  padding: 12px 16px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.bottom-command-dock__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  color: var(--game-text-secondary);
+  font-size: 14px;
+}
+
+/* 左侧：舰船立绘区 */
+.bottom-command-dock__ship-portrait {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.ship-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(6, 16, 26, 0.8);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  width: 100%;
+}
+
+.ship-portrait__frame {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(74, 158, 255, 0.4);
+  background-color: rgba(26, 74, 122, 0.3);
+}
+
+.ship-portrait__icon {
+  width: 40px;
+  height: 40px;
+  color: var(--game-accent-blue);
+}
+
+.ship-portrait__info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.ship-portrait__name {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+}
+
+.ship-portrait__faction {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 8px;
+}
+
+.ship-portrait__faction.faction--player {
+  background-color: rgba(74, 158, 255, 0.3);
+  color: var(--game-accent-blue);
+}
+
+.ship-portrait__faction.faction--dm {
+  background-color: rgba(255, 111, 143, 0.3);
+  color: var(--game-accent-red);
+}
+
+.ship-portrait__id {
+  font-size: 9px;
+  color: var(--game-text-muted);
+}
+
+/* 中部：信息展示区 */
+.bottom-command-dock__info-section {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+/* 信息区块 */
+.info-block {
+  background-color: rgba(6, 16, 26, 0.8);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-block__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--game-text-secondary);
+}
+
+.info-block__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.info-block__title {
+  flex: 1;
+}
+
+.info-block__value {
+  font-size: 10px;
+  color: var(--game-text-primary);
+  font-weight: bold;
+}
+
+.info-block__bar {
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.info-block__bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.info-block__sub-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--game-text-muted);
+}
+
+.info-block__sub-stats .sub-stat {
+  flex-shrink: 0;
+}
+
+.info-block__sub-stats .sub-stat--warning {
+  color: var(--game-accent-red);
+  font-weight: bold;
+}
+
+/* 护甲网格 */
+.armor-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.armor-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  border: 1px solid;
+  background-color: rgba(0, 0, 0, 0.3);
+  font-size: 8px;
+  color: var(--game-text-primary);
+}
+
+.armor-cell__name {
+  font-size: 7px;
+  color: var(--game-text-muted);
+  margin-bottom: 2px;
+}
+
+.armor-cell__value {
+  font-weight: bold;
+}
+
+/* 机动参数 */
+.movement-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.movement-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.movement-stat__label {
+  font-size: 8px;
+  color: var(--game-text-muted);
+}
+
+.movement-stat__value {
+  font-size: 11px;
+  color: var(--game-text-primary);
+  font-weight: bold;
+}
+
+/* 右侧：操作区 */
+.bottom-command-dock__action-section {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-group {
+  background-color: rgba(6, 16, 26, 0.8);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-group__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--game-text-secondary);
+}
+
+.action-group__icon {
+  width: 14px;
+  height: 14px;
+  color: var(--game-accent-blue);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  color: var(--game-text-primary);
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 56px;
+}
+
+.action-btn__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.action-btn__label {
+  font-size: 8px;
+}
+
+.action-btn:hover:not(:disabled) {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(74, 158, 255, 0.2);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-btn--fire {
+  background-color: rgba(255, 111, 143, 0.2);
+  border-color: rgba(255, 111, 143, 0.4);
+  color: var(--game-accent-red);
+}
+
+.action-btn--fire:hover:not(:disabled) {
+  background-color: rgba(255, 111, 143, 0.3);
+  box-shadow: 0 4px 8px rgba(255, 111, 143, 0.2);
+}
+
+.action-btn--shield {
+  background-color: rgba(46, 204, 113, 0.2);
+  border-color: rgba(46, 204, 113, 0.4);
+  color: var(--game-accent-green);
+}
+
+.action-btn--active {
+  background-color: var(--game-accent-green);
+  border-color: var(--game-accent-green);
+  color: white;
+}
+
+.action-btn--move {
+  background-color: rgba(74, 158, 255, 0.2);
+  border-color: rgba(74, 158, 255, 0.4);
+  color: var(--game-accent-blue);
+}
+
+.action-btn--vent {
+  background-color: rgba(241, 196, 15, 0.2);
+  border-color: rgba(241, 196, 15, 0.4);
+  color: var(--game-accent-yellow);
+}
+
+.action-btn--weapon {
+  background-color: rgba(155, 89, 182, 0.2);
+  border-color: rgba(155, 89, 182, 0.4);
+  color: var(--game-accent-purple);
+}
+
+/* 状态指示 */
+.action-group--status {
+  padding: 8px 10px;
+}
+
+.status-indicators {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  font-size: 9px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 0;
+}
+
+.status-badge--used {
+  background-color: rgba(107, 114, 128, 0.5);
+  color: var(--game-text-muted);
+}
+
+.status-badge--shield {
+  background-color: rgba(46, 204, 113, 0.3);
+  color: var(--game-accent-green);
+  border: 1px solid rgba(46, 204, 113, 0.4);
+}
+
+.status-badge--overload {
+  background-color: rgba(231, 76, 60, 0.3);
+  color: var(--game-accent-red);
+  border: 1px solid rgba(231, 76, 60, 0.4);
+}
+
+/* ====== 旧版底部命令区（保留兼容） ====== */
 
 .game-layout__command-dock {
   height: 120px;
@@ -528,4 +904,568 @@
 .game-layout__loading-text {
   font-size: 16px;
   color: var(--game-text-muted);
+}
+
+/* ====== 右侧面板 - 新版 ====== */
+
+.right-side-panel {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(13, 40, 71, 0.95);
+  border-left: 2px solid rgba(74, 158, 255, 0.2);
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  transition: width 0.3s ease;
+}
+
+.right-side-panel--collapsed {
+  width: 56px;
+}
+
+.right-side-panel__collapse-btn,
+.right-side-panel__expand-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(26, 74, 122, 0.5);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  color: var(--game-text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.right-side-panel__collapse-btn {
+  right: 0;
+  border-left: none;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.right-side-panel__expand-btn {
+  left: 0;
+  border-right: none;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.right-side-panel__collapse-btn:hover,
+.right-side-panel__expand-btn:hover {
+  background-color: rgba(26, 74, 122, 0.8);
+  border-color: var(--game-accent-blue);
+}
+
+/* 折叠状态下的 mini tabs */
+.right-side-panel__mini-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 60px 8px 8px 8px;
+}
+
+.right-side-panel__mini-tab {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  color: var(--game-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.right-side-panel__mini-tab:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  color: var(--game-text-secondary);
+}
+
+.right-side-panel__mini-tab--active {
+  background-color: rgba(26, 74, 122, 0.6);
+  border-color: var(--game-accent-blue);
+  color: var(--game-accent-blue);
+}
+
+/* Tab 头部 */
+.right-side-panel__tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.right-side-panel__tab {
+  flex: 1;
+  padding: 12px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--game-text-muted);
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.right-side-panel__tab-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.right-side-panel__tab-label {
+  font-size: 11px;
+}
+
+.right-side-panel__tab:hover:not(.right-side-panel__tab--active) {
+  color: var(--game-text-secondary);
+  background-color: rgba(26, 45, 66, 0.3);
+}
+
+.right-side-panel__tab--active {
+  border-bottom-color: var(--game-accent-blue);
+  color: var(--game-accent-blue);
+  background-color: rgba(26, 74, 122, 0.2);
+}
+
+/* Tab 内容 */
+.right-side-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ====== 视图控制面板 ====== */
+
+.view-control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.view-section {
+  background-color: rgba(6, 16, 26, 0.8);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.view-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--game-text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(74, 158, 255, 0.1);
+}
+
+.view-section__icon {
+  width: 14px;
+  height: 14px;
+  color: var(--game-accent-blue);
+  flex-shrink: 0;
+}
+
+.view-section--hints {
+  background-color: transparent;
+  border: none;
+  padding: 8px 0;
+}
+
+/* 字段组 */
+.view-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.view-field__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--game-text-secondary);
+  font-weight: bold;
+}
+
+.view-field__icon {
+  width: 12px;
+  height: 12px;
+  color: var(--game-accent-blue);
+}
+
+.view-field__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.view-field__input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.view-field__prefix {
+  font-size: 10px;
+  color: var(--game-text-muted);
+  font-weight: bold;
+}
+
+.view-field__input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  color: var(--game-text-primary);
+  font-size: 10px;
+  font-family: monospace;
+  text-align: right;
+}
+
+.view-field__input:focus {
+  border-color: var(--game-accent-blue);
+  outline: none;
+}
+
+.view-field__input--small {
+  width: 60px;
+  flex: none;
+}
+
+.view-field__copy-btn {
+  padding: 4px 6px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  color: var(--game-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.view-field__copy-btn:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+  color: var(--game-accent-green);
+}
+
+.view-field__action-btn {
+  padding: 4px 8px;
+  background-color: rgba(74, 158, 255, 0.2);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  color: var(--game-text-primary);
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.view-field__action-btn:hover:not(:disabled) {
+  background-color: rgba(74, 158, 255, 0.3);
+  border-color: var(--game-accent-blue);
+}
+
+.view-field__action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.view-field__action-btn--small {
+  padding: 4px 6px;
+  font-size: 8px;
+}
+
+.view-field__value-display {
+  flex: 1;
+  min-width: 80px;
+}
+
+.view-field__value {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--game-accent-blue);
+  font-family: monospace;
+}
+
+.view-field__buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.view-field__buttons--spread {
+  justify-content: space-between;
+}
+
+.view-field__control-btn {
+  padding: 6px 8px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  color: var(--game-text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.view-field__control-btn:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+}
+
+.view-field__control-btn--labeled {
+  flex: 1;
+  flex-direction: column;
+  padding: 8px 6px;
+}
+
+.view-field__slider-container {
+  width: 100%;
+}
+
+.view-field__slider {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  appearance: none;
+  cursor: pointer;
+}
+
+.view-field__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--game-accent-blue);
+  border: 2px solid var(--game-text-primary);
+  cursor: pointer;
+}
+
+/* 图层切换 */
+.view-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 10px;
+  color: var(--game-text-primary);
+}
+
+.view-toggle:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+}
+
+.view-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.view-toggle__indicator {
+  width: 14px;
+  height: 14px;
+  background-color: rgba(74, 158, 255, 0.2);
+  border: 1px solid rgba(74, 158, 255, 0.4);
+  position: relative;
+}
+
+.view-toggle input[type="checkbox"]:checked + .view-toggle__indicator {
+  background-color: var(--game-accent-blue);
+  border-color: var(--game-accent-blue);
+}
+
+.view-toggle__indicator::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  background-color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.view-toggle input[type="checkbox"]:checked + .view-toggle__indicator::after {
+  opacity: 1;
+}
+
+.view-toggle__icon {
+  width: 12px;
+  height: 12px;
+  color: var(--game-text-secondary);
+}
+
+.view-toggle input[type="checkbox"]:checked ~ .view-toggle__icon {
+  color: var(--game-accent-blue);
+}
+
+.view-toggle__label {
+  flex: 1;
+  font-weight: bold;
+}
+
+/* 视图操作 */
+.view-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.view-action-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background-color: rgba(26, 74, 122, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.2);
+  color: var(--game-text-primary);
+  font-size: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.view-action-btn:hover {
+  background-color: rgba(26, 74, 122, 0.5);
+  border-color: var(--game-accent-blue);
+}
+
+/* 快捷键提示 */
+.view-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.view-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--game-text-muted);
+}
+
+.view-hint__key {
+  font-weight: bold;
+  color: var(--game-accent-blue);
+  background-color: rgba(74, 158, 255, 0.1);
+  padding: 2px 6px;
+  border: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.view-hint__desc {
+  flex: 1;
+}
+
+/* ====== DM 面板 ====== */
+
+.dm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ====== 响应式 ====== */
+
+@media (max-width: 1400px) {
+  .right-side-panel {
+    width: 340px;
+  }
+  
+  .bottom-command-dock__info-section {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .right-side-panel {
+    width: 320px;
+  }
+  
+  .bottom-command-dock {
+    height: 200px;
+    min-height: 200px;
+  }
+  
+  .bottom-command-dock__ship-portrait {
+    width: 160px;
+  }
+  
+  .bottom-command-dock__action-section {
+    width: 240px;
+  }
+}
+
+@media (max-width: 900px) {
+  .right-side-panel {
+    width: 300px;
+  }
+  
+  .bottom-command-dock__info-section {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .right-side-panel {
+    width: 280px;
+  }
+  
+  .bottom-command-dock {
+    height: 180px;
+    min-height: 180px;
+  }
+  
+  .bottom-command-dock__ship-portrait {
+    width: 120px;
+  }
+  
+  .bottom-command-dock__info-section {
+    grid-template-columns: 1fr;
+  }
+  
+  .bottom-command-dock__action-section {
+    width: 200px;
+  }
 }

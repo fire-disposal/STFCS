@@ -280,14 +280,14 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 			{/* 可折叠头部 */}
 			<div style={styles.header} onClick={() => setCollapsed(!collapsed)}>
 				<div style={styles.headerTitle}>
-					<Sparkles className="game-icon game-icon--sm" />
+					<Sparkles className="game-icon--sm" />
 					对象创建工具
 				</div>
 				<button style={styles.collapseButton}>
 					{collapsed ? (
-						<ChevronRight className="game-icon game-icon--xs" />
+						<ChevronRight className="game-icon--xs" />
 					) : (
-						<ChevronDown className="game-icon game-icon--xs" />
+						<ChevronDown className="game-icon--xs" />
 					)}
 				</button>
 			</div>
@@ -298,7 +298,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 					{/* 对象类型选择 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
-							<Palette className="game-icon game-icon--xs" />
+							<Palette className="game-icon--xs" />
 							对象类型
 						</div>
 						<div style={styles.objectTypeGrid}>
@@ -323,7 +323,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 					{objectType === "ship" && (
 						<div style={styles.section}>
 							<div style={styles.sectionTitle}>
-								<Rocket className="game-icon game-icon--xs" />
+								<Rocket className="game-icon--xs" />
 								选择舰船型号
 							</div>
 							<div style={styles.shipGrid}>
@@ -357,7 +357,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 					{/* 位置设置 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
-							<MapPin className="game-icon game-icon--xs" />
+							<MapPin className="game-icon--xs" />
 							摆放位置
 						</div>
 						<div style={styles.inputRow}>
@@ -398,7 +398,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 							}}
 							disabled={isPlacementMode}
 						>
-							<MapPin className="game-icon game-icon--xs" />
+							<MapPin className="game-icon--xs" />
 							{isPlacementMode ? "请点击地图选择位置" : "点击地图选择位置"}
 						</button>
 					</div>
@@ -406,7 +406,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 					{/* 阵营和归属权 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
-							<Users className="game-icon game-icon--xs" />
+							<Users className="game-icon--xs" />
 							阵营与归属
 						</div>
 						<select
@@ -441,7 +441,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						className="game-btn game-btn--primary game-btn--full"
 						onClick={handleCreate}
 					>
-						<Sparkles className="game-icon game-icon--xs" />
+						<Sparkles className="game-icon--xs" />
 						创建对象
 					</button>
 				</div>

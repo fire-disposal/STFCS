@@ -61,7 +61,7 @@ export const RightPanelTabs: React.FC<RightPanelTabsProps> = ({
       case 'players':
         return (
           <div className="right-panel__empty">
-            <Users className="game-icon game-icon--xl game-icon--primary" />
+            <Users className="game-icon--xl game-icon--primary" />
             <div className="right-panel__empty-title">玩家列表</div>
             <button data-magnetic className="game-btn game-btn--primary" onClick={onShowPlayerRoster}>
               查看玩家列表
@@ -72,7 +72,7 @@ export const RightPanelTabs: React.FC<RightPanelTabsProps> = ({
       case 'log':
         return (
           <div className="right-panel__empty">
-            <FileText className="game-icon game-icon--xl game-icon--muted" />
+            <FileText className="game-icon--xl game-icon--muted" />
             <div className="right-panel__empty-hint">战斗日志功能开发中...</div>
           </div>
         );
@@ -80,7 +80,7 @@ export const RightPanelTabs: React.FC<RightPanelTabsProps> = ({
       case 'settings':
         return (
           <div className="right-panel__empty">
-            <Settings className="game-icon game-icon--xl game-icon--primary" />
+            <Settings className="game-icon--xl game-icon--primary" />
             <div className="right-panel__empty-title">游戏设置</div>
             <button data-magnetic className="game-btn game-btn--primary" onClick={onShowSettings}>
               打开设置菜单
@@ -103,7 +103,7 @@ export const RightPanelTabs: React.FC<RightPanelTabsProps> = ({
             className={`right-panel__tab ${activeTab === tab.id ? 'right-panel__tab--active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <tab.Icon className="game-icon game-icon--sm" />
+            <tab.Icon className="game-icon--sm" />
             {tab.label}
             {tab.badge !== undefined && tab.badge > 0 && (
               <span className="right-panel__badge">{tab.badge}</span>

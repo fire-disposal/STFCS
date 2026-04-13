@@ -4,20 +4,17 @@
  * 类似星际争霸的战术终端布局：
  * - 顶部：回合状态栏
  * - 中央：地图区域
- * - 右侧：信息面板（Tab化）
- * - 底部：命令 Dock
+ * - 右侧：信息面板（视图/日志/DM，支持折叠）
+ * - 底部：命令 Dock（整合舰船信息/辐能/护甲）
  *
- * 样式: game-layout.css + game-panels.css
+ * 样式：game-layout.css + game-panels.css
  */
 
 import { GameCanvas } from "@/components/map/GameCanvas";
 import { notify } from "@/components/ui/Notification";
-import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { PhaseBar } from "@/features/game/PhaseBar";
 import { PlayerRosterModal } from "@/features/lobby";
 import { FuelBasedMovementController } from "@/features/movement/FuelBasedMovementController";
-import { ArmorQuadrantDisplay, FluxSystemDisplay, ShipDetailPanel } from "@/features/ship";
-import { CommandDock } from "@/features/ui/CommandDock";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { useCurrentGameRoom } from "@/hooks";
 import { NetworkManager } from "@/network/NetworkManager";
@@ -25,7 +22,7 @@ import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
 import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/contracts";
 import { ClientCommand, Faction, PlayerRole } from "@vt/contracts";
-import { BarChart3, LogOut, Palette, Rocket, Settings, Shield, Users, Zap } from "lucide-react";
+import { LogOut, Rocket, Settings, Users } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
 
@@ -49,7 +46,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		ownerId?: string;
 	} | null>(null);
 	const [isPlacementMode, setIsPlacementMode] = useState(false);
-	const [activeTab, setActiveTab] = useState<"info" | "flux" | "armor" | "dm">("info");
 
 	// 玩家列表
 	const players = useMemo(() => {
@@ -190,10 +186,17 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		setPendingPlacement(null);
 	}, []);
 
-	const createTestShip = useCallback(() => {
-		if (!room) return;
-		room.send("CREATE_TEST_SHIP", { faction: Faction.DM, x: 500, y: 500 });
-	}, [room]);
+	const createTestShip = useCallback(
+		(faction: "player" | "dm", x: number, y: number) => {
+			if (!room) return;
+			room.send("CREATE_TEST_SHIP", {
+				faction: faction === "player" ? Faction.PLAYER : Faction.DM,
+				x,
+				y,
+			});
+		},
+		[room]
+	);
 
 	const clearOverload = useCallback(
 		(shipId: string) => {
@@ -367,114 +370,52 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 					</div>
 				</div>
 
-				{/* 右侧信息面板 */}
-				<div className="game-layout__info-panel">
-					{/* Tab 头部 */}
-					<div className="game-layout__info-tabs">
-						<button
-							data-magnetic
-							className={`game-layout__info-tab ${activeTab === "info" ? "game-layout__info-tab--active" : ""}`}
-							onClick={() => setActiveTab("info")}
-						>
-							<BarChart3 className="game-layout__info-tab-icon" />
-							信息
-						</button>
-						<button
-							data-magnetic
-							className={`game-layout__info-tab ${activeTab === "flux" ? "game-layout__info-tab--active" : ""}`}
-							onClick={() => setActiveTab("flux")}
-						>
-							<Zap className="game-layout__info-tab-icon" />
-							辐能
-						</button>
-						<button
-							data-magnetic
-							className={`game-layout__info-tab ${activeTab === "armor" ? "game-layout__info-tab--active" : ""}`}
-							onClick={() => setActiveTab("armor")}
-						>
-							<Shield className="game-layout__info-tab-icon" />
-							护甲
-						</button>
-						{isDM && (
-							<button
-								data-magnetic
-								className={`game-layout__info-tab ${activeTab === "dm" ? "game-layout__info-tab--active" : ""}`}
-								onClick={() => setActiveTab("dm")}
-							>
-								<Palette className="game-layout__info-tab-icon" />
-								DM
-							</button>
-						)}
-					</div>
-
-					{/* Tab 内容 */}
-					<div className="game-layout__info-content">
-						{activeTab === "info" && (
-							<>
-								{selectedShip ? (
-									<ShipDetailPanel ship={selectedShip} currentPhase={room.state.currentPhase} />
-								) : (
-									<div className="game-empty">
-										<Rocket className="game-empty__icon" />
-										选择一艘舰船查看详情
-									</div>
-								)}
-							</>
-						)}
-
-						{activeTab === "flux" && selectedShip && (
-							<FluxSystemDisplay ship={selectedShip} currentPhase={room.state.currentPhase} />
-						)}
-
-						{activeTab === "armor" && selectedShip && <ArmorQuadrantDisplay ship={selectedShip} />}
-
-						{activeTab === "dm" && isDM && (
-							<div className="info-block">
-								<div className="info-block__header">
-									<div className="info-block__title">
-										<Palette className="info-block__icon" />
-										DM 控制中心
-									</div>
-								</div>
-
-								<DMObjectCreator
-									onCreateObject={createObject}
-									players={players
-										.filter((p) => p.role !== PlayerRole.DM)
-										.map((p) => ({
-											sessionId: p.sessionId,
-											name: p.nickname || p.name,
-											role: p.role,
-										}))}
-									isPlacementMode={isPlacementMode}
-									onTogglePlacementMode={togglePlacementMode}
-								/>
-
-								<DMControlPanel
-									ships={ships}
-									players={players}
-									isDM={true}
-									onCreateTestShip={createTestShip}
-									onClearOverload={clearOverload}
-									onSetArmor={setArmor}
-									onAssignShip={assignShip}
-									onNextPhase={nextPhase}
-								/>
-							</div>
-						)}
-					</div>
-				</div>
+				{/* 右侧面板 - 视图/日志/DM */}
+				<RightSidePanel
+					room={room}
+					isDM={isDM}
+					ships={ships}
+					players={players}
+					onCreateObject={createObject}
+					isPlacementMode={isPlacementMode}
+					onTogglePlacementMode={togglePlacementMode}
+					onCreateTestShip={createTestShip}
+					onClearOverload={clearOverload}
+					onSetArmor={setArmor}
+					onAssignShip={assignShip}
+					onNextPhase={nextPhase}
+					zoom={zoom}
+					cameraX={cameraPosition.x}
+					cameraY={cameraPosition.y}
+					viewRotation={viewRotation}
+					showGrid={showGrid}
+					showBackground={showBackground}
+					showWeaponArcs={showWeaponArcs}
+					showMovementRange={showMovementRange}
+					onZoomChange={(newZoom) => useUIStore.getState().setZoom(newZoom)}
+					onCameraChange={(x, y) => setCameraPosition(x, y)}
+					onViewRotationChange={(rotation) => setViewRotation(rotation)}
+					onToggleGrid={() => useUIStore.getState().toggleGrid()}
+					onToggleBackground={() => useUIStore.getState().toggleBackground()}
+					onToggleWeaponArcs={() => useUIStore.getState().toggleWeaponArcs()}
+					onToggleMovementRange={() => useUIStore.getState().toggleMovementRange()}
+					onResetView={() => {
+						setCameraPosition(0, 0);
+						setViewRotation(0);
+						useUIStore.getState().setZoom(1);
+					}}
+				/>
 			</div>
 
-			{/* 底部命令 Dock */}
-			<CommandDock
+			{/* 底部命令 Dock - 整合舰船信息/辐能/护甲 */}
+			<BottomCommandDock
 				selectedShip={selectedShip}
 				playerRole={currentPlayer?.role || PlayerRole.PLAYER}
 				onMove={handleOpenMovement}
 				onToggleShield={handleToggleShield}
 				onFire={handleFire}
 				onVent={handleVent}
-				onNextPhase={isDM ? nextPhase : undefined}
+				disabled={false}
 			/>
 
 			{/* 移动面板弹窗 - 燃料池制度 */}

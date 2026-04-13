@@ -234,11 +234,11 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
         onClick={() => setCollapsed(!collapsed)}
       >
         <div style={styles.headerTitle}>
-          <Palette className="game-icon game-icon--sm" />
+          <Palette className="game-icon--sm" />
           DM 控制中心
         </div>
         <button style={styles.collapseButton}>
-          {collapsed ? <ChevronRight className="game-icon game-icon--xs" /> : <ChevronDown className="game-icon game-icon--xs" />}
+          {collapsed ? <ChevronRight className="game-icon--xs" /> : <ChevronDown className="game-icon--xs" />}
         </button>
       </div>
 
@@ -248,7 +248,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 快速创建 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <Rocket className="game-icon game-icon--xs" />
+              <Rocket className="game-icon--xs" />
               快速创建
             </div>
             <div style={styles.inputRow}>
@@ -276,7 +276,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
                 onClick={() => onCreateTestShip('player', createX, createY)}
                 disabled={disabled}
               >
-                <User className="game-icon game-icon--xs" />
+                <User className="game-icon--xs" />
                 玩家舰船
               </button>
               <button
@@ -285,7 +285,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
                 onClick={() => onCreateTestShip('dm', createX, createY)}
                 disabled={disabled}
               >
-                <Palette className="game-icon game-icon--xs" />
+                <Palette className="game-icon--xs" />
                 DM 舰船
               </button>
             </div>
@@ -294,7 +294,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 选择舰船 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <FileText className="game-icon game-icon--xs" />
+              <FileText className="game-icon--xs" />
               选择舰船
             </div>
             {ships.length > 0 ? (
@@ -323,7 +323,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 清除过载 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <Zap className="game-icon game-icon--xs" />
+              <Zap className="game-icon--xs" />
               清除过载 ({overloadedShips.length})
             </div>
             {selectedShip && selectedShip.isOverloaded ? (
@@ -333,7 +333,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
                 onClick={handleClearOverload}
                 disabled={disabled}
               >
-                <Sparkles className="game-icon game-icon--xs" />
+                <Sparkles className="game-icon--xs" />
                 清除 {selectedShip.hullType} 的过载
               </button>
             ) : (
@@ -346,7 +346,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 修改护甲 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <Shield className="game-icon game-icon--xs" />
+              <Shield className="game-icon--xs" />
               修改护甲
             </div>
             {selectedShip ? (
@@ -389,7 +389,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 分配舰船 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <Users className="game-icon game-icon--xs" />
+              <Users className="game-icon--xs" />
               分配舰船
             </div>
             {selectedShip && regularPlayers.length > 0 ? (
@@ -426,7 +426,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
           {/* 阶段控制 */}
           <div style={styles.section}>
             <div style={styles.sectionTitle}>
-              <FastForward className="game-icon game-icon--xs" />
+              <FastForward className="game-icon--xs" />
               阶段控制
             </div>
             <button
@@ -435,7 +435,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
               onClick={onNextPhase}
               disabled={disabled}
             >
-              <FastForward className="game-icon game-icon--xs" />
+              <FastForward className="game-icon--xs" />
               强制进入下一阶段
             </button>
           </div>
