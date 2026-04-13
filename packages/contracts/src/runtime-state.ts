@@ -23,6 +23,8 @@ export interface PlayerState {
   shortId: number;
   role: 'dm' | 'player';
   name: string;
+  nickname?: string;
+  avatar?: string;
   isReady: boolean;
   connected: boolean;
   pingMs: number;

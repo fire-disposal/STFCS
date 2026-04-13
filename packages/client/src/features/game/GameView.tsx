@@ -343,12 +343,17 @@ export const GameView: React.FC<GameViewProps> = ({
   }, [room, currentPlayer?.isReady]);
 
   const kickPlayer = useCallback((sessionId: string) => {
-    console.log('[GameView] Kick player:', sessionId);
-  }, []);
+    if (!room) return;
+    room.send('ROOM_KICK_PLAYER', { targetSessionId: sessionId });
+    notify.info('已发送踢出请求');
+  }, [room]);
 
-  const invitePlayer = useCallback((sessionId: string) => {
-    console.log('[GameView] Invite player:', sessionId);
-  }, []);
+  const invitePlayer = useCallback(async () => {
+    if (!room) return;
+    const link = networkManager.buildInviteLink(room.roomId);
+    await navigator.clipboard.writeText(link);
+    notify.success('邀请链接已复制到剪贴板');
+  }, [networkManager, room]);
 
   const closeRoom = useCallback(() => {
     console.log('[GameView] Close room');
@@ -579,7 +584,7 @@ export const GameView: React.FC<GameViewProps> = ({
                       onCreateObject={createObject}
                       players={players.filter(p => p.role !== 'dm').map(p => ({
                         sessionId: p.sessionId,
-                        name: p.name,
+                        name: p.nickname || p.name,
                         role: p.role,
                       }))}
                     />
@@ -616,10 +621,11 @@ export const GameView: React.FC<GameViewProps> = ({
         currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
         onToggleReady={toggleReady}
         canManagePlayers={currentPlayer?.role === 'dm'}
-        onKickPlayer={currentPlayer?.role === 'dm' ? () => {} : undefined}
-        onInvitePlayer={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        onKickPlayer={currentPlayer?.role === 'dm' ? kickPlayer : undefined}
+        onInvitePlayer={currentPlayer?.role === 'dm' ? invitePlayer : undefined}
         onCloseRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
         onSaveRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        onLeaveRoom={onLeaveRoom}
       />
 
       <SettingsMenu isOpen={showSettings} onClose={() => setShowSettings(false)} />

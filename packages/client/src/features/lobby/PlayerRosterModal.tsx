@@ -470,6 +470,8 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
                     const shipCount = playerShipCounts[player.sessionId] || 0;
                     const quality = qualityColors[player.connectionQuality] || qualityColors.offline;
                     const qualityIcon = qualityIcons[player.connectionQuality] || '○';
+                    const displayName = player.nickname || player.name;
+                    const avatar = player.avatar || (isDM ? '👑' : '👤');
 
                     return (
                       <div
@@ -487,13 +489,13 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
                             color: isDM ? '#ff9cb2' : '#43c1ff',
                           }}
                         >
-                          {isDM ? '👑' : '👤'}
+                          {avatar}
                         </div>
 
                         <div style={styles.playerInfo}>
                           <div style={styles.playerNameRow}>
                             <div style={styles.playerName}>
-                              {player.name}
+                              {displayName}
                               {isCurrent && <span style={{ color: '#2ecc71', marginLeft: '4px' }}>（你）</span>}
                             </div>
                           </div>
@@ -593,7 +595,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 
               <div style={styles.actionCard}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#d8ecff', marginBottom: '6px' }}>
-                  {currentPlayer?.name || '未知玩家'}
+                  {currentPlayer?.nickname || currentPlayer?.name || '未知玩家'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#8ba4c7', lineHeight: 1.6 }}>
                   {currentPlayer?.role === 'dm'

@@ -50,6 +50,8 @@ export class PlayerState extends Schema {
   @type('number') shortId: number = 0;
   @type('string') role: 'dm' | 'player' = 'player';
   @type('string') name: string = '';
+  @type('string') nickname: string = '';
+  @type('string') avatar: string = '👤';
   @type('boolean') isReady: boolean = false;
   @type('boolean') connected: boolean = true;
   @type('number') pingMs: number = -1;

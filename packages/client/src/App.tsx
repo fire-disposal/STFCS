@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const roomsUnsubscribeRef = useRef<(() => void) | null>(null);
   const [userName, setUserName] = useState<string>('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
+  const [pendingInviteRoomId, setPendingInviteRoomId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // 初始化 NetworkManager
@@ -38,6 +39,10 @@ const App: React.FC = () => {
       setAppState('lobby');
       console.log('[App] Restored user:', restoredUser);
       notify.success(`欢迎回来，${restoredUser}！`);
+    }
+    const inviteRoomId = new URLSearchParams(window.location.search).get('room');
+    if (inviteRoomId) {
+      setPendingInviteRoomId(inviteRoomId);
     }
 
     return () => {
@@ -129,6 +134,12 @@ const App: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!pendingInviteRoomId || appState !== 'lobby') return;
+    handleJoinRoom(pendingInviteRoomId);
+    setPendingInviteRoomId(null);
+  }, [pendingInviteRoomId, appState, handleJoinRoom]);
+
   // 返回大厅
   const handleBackToLobby = useCallback(async () => {
     console.log('[App] handleBackToLobby called, current appState:', appState);
@@ -162,6 +173,7 @@ const App: React.FC = () => {
       {appState === 'lobby' && (
         <LobbyPanel
           playerName={userName}
+          profile={networkManager.getProfile()}
           currentShortId={networkManager.getShortId()}
           currentRoomId={networkManager.getCurrentRoomId()}
           rooms={rooms}
@@ -171,6 +183,7 @@ const App: React.FC = () => {
           onDeleteRoom={(roomId) => networkManagerRef.current?.deleteRoom(roomId)}
           onRefresh={() => networkManagerRef.current?.getRooms()}
           onLogout={handleLogout}
+          onUpdateProfile={(profile) => networkManagerRef.current?.setProfile(profile)}
         />
       )}
 

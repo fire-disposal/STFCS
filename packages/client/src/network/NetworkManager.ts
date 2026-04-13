@@ -28,6 +28,8 @@ export class NetworkManager {
   private static readonly STORAGE_KEYS = {
     USERNAME: 'stfcs_username',
     SHORT_ID: 'stfcs_short_id',
+    NICKNAME: 'stfcs_nickname',
+    AVATAR: 'stfcs_avatar',
     LAST_ROOM: 'stfcs_last_room',
   } as const;
 
@@ -36,6 +38,7 @@ export class NetworkManager {
   private client: Client;
   private currentRoom: Room<GameRoomState> | null = null;
   public userName: string | null = null;
+  private profile = { nickname: '', avatar: '👤' };
   private shortId: number | null = null;
   private roomsCache: RoomInfo[] = [];
   private roomsListeners: Set<(rooms: RoomInfo[]) => void> = new Set();
@@ -65,6 +68,8 @@ export class NetworkManager {
     // 生成或恢复 shortId
     this.shortId = this.restoreOrCreateShortId();
     localStorage.setItem(NetworkManager.STORAGE_KEYS.SHORT_ID, String(this.shortId));
+    this.profile.nickname = localStorage.getItem(NetworkManager.STORAGE_KEYS.NICKNAME) || '';
+    this.profile.avatar = localStorage.getItem(NetworkManager.STORAGE_KEYS.AVATAR) || '👤';
 
     console.log('[NetworkManager] User set:', this.userName, 'ShortId:', this.shortId);
   }
@@ -77,6 +82,8 @@ export class NetworkManager {
     if (username) {
       this.userName = username;
       this.shortId = this.restoreOrCreateShortId();
+      this.profile.nickname = localStorage.getItem(NetworkManager.STORAGE_KEYS.NICKNAME) || '';
+      this.profile.avatar = localStorage.getItem(NetworkManager.STORAGE_KEYS.AVATAR) || '👤';
       return true;
     }
     return false;
@@ -114,6 +121,20 @@ export class NetworkManager {
 
   getUserName(): string | null {
     return this.userName;
+  }
+
+  getProfile(): { nickname: string; avatar: string } {
+    return { ...this.profile };
+  }
+
+  setProfile(profile: { nickname?: string; avatar?: string }): void {
+    this.profile = {
+      nickname: String(profile.nickname || '').trim().slice(0, 24),
+      avatar: String(profile.avatar || '👤').trim().slice(0, 4) || '👤',
+    };
+    localStorage.setItem(NetworkManager.STORAGE_KEYS.NICKNAME, this.profile.nickname);
+    localStorage.setItem(NetworkManager.STORAGE_KEYS.AVATAR, this.profile.avatar);
+    this.currentRoom?.send('ROOM_UPDATE_PROFILE', this.profile);
   }
 
   getShortId(): number | null {
@@ -363,6 +384,7 @@ export class NetworkManager {
       }
 
       this.bindRoomLifecycle(room);
+      localStorage.setItem(NetworkManager.STORAGE_KEYS.LAST_ROOM, room.roomId);
       return room;
     })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to create room:', error);
@@ -414,6 +436,7 @@ export class NetworkManager {
       }
 
       this.bindRoomLifecycle(room);
+      localStorage.setItem(NetworkManager.STORAGE_KEYS.LAST_ROOM, room.roomId);
       return room;
     })().catch((error: unknown) => {
       console.error('[NetworkManager] Failed to join room:', error);
@@ -532,6 +555,7 @@ export class NetworkManager {
       localStorage.setItem(NetworkManager.STORAGE_KEYS.SHORT_ID, String(shortId));
       console.log('[NetworkManager] Identity synced from server, short id:', shortId);
     });
+    room.send('ROOM_UPDATE_PROFILE', this.profile);
 
     room.onLeave(() => {
       if (this.currentRoom === room) {
@@ -550,6 +574,12 @@ export class NetworkManager {
         this.currentRoom = null;
       }
     });
+  }
+
+  buildInviteLink(roomId: string): string {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', roomId);
+    return url.toString();
   }
 
   private getValidatedPlayerName(): string {
