@@ -7,10 +7,12 @@
 import React, { useState, useMemo } from 'react';
 import type { ShipHullSpec } from '@vt/rules';
 import { getShipHullSpec, getAvailableShips } from '@vt/rules';
+import type { FactionValue } from '@vt/contracts';
+import { Faction } from '@vt/contracts';
 
 interface DeploymentPanelProps {
   isDM?: boolean;
-  onDeployShip?: (shipSpec: ShipHullSpec, x: number, y: number, faction: 'player' | 'dm') => void;
+  onDeployShip?: (shipSpec: ShipHullSpec, x: number, y: number, faction: FactionValue) => void;
   onReady?: () => void;
   onCancelReady?: () => void;
   isReady?: boolean;
@@ -98,7 +100,7 @@ export const DeploymentPanel: React.FC<DeploymentPanelProps> = ({
   currentPhase = 'DEPLOYMENT',
 }) => {
   const [selectedShipId, setSelectedShipId] = useState<string | null>(null);
-  const [deployFaction, setDeployFaction] = useState<'player' | 'dm'>('player');
+  const [deployFaction, setDeployFaction] = useState<FactionValue>(Faction.PLAYER);
 
   const availableShips = useMemo(() => getAvailableShips(), []);
   const selectedShip = selectedShipId ? getShipHullSpec(selectedShipId) : null;
@@ -170,8 +172,8 @@ export const DeploymentPanel: React.FC<DeploymentPanelProps> = ({
                     <input
                       type="radio"
                       value="player"
-                      checked={deployFaction === 'player'}
-                      onChange={() => setDeployFaction('player')}
+                      checked={deployFaction === Faction.PLAYER}
+                      onChange={() => setDeployFaction(Faction.PLAYER)}
                     />
                     玩家阵营
                   </label>
@@ -179,8 +181,8 @@ export const DeploymentPanel: React.FC<DeploymentPanelProps> = ({
                     <input
                       type="radio"
                       value="dm"
-                      checked={deployFaction === 'dm'}
-                      onChange={() => setDeployFaction('dm')}
+                      checked={deployFaction === Faction.DM}
+                      onChange={() => setDeployFaction(Faction.DM)}
                     />
                     DM 阵营
                   </label>

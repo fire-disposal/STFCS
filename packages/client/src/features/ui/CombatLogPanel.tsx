@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { CombatLogEntry, LogLevel, LogType } from '@vt/contracts';
 import { combatLog, type LogFilter } from '@vt/contracts';
+import { FileText, Trash2, Download, Info, AlertTriangle, XCircle, CheckCircle, X } from 'lucide-react';
 
 interface CombatLogPanelProps {
   isOpen?: boolean;
@@ -21,11 +22,11 @@ const LOG_LEVEL_COLORS: Record<LogLevel, string> = {
   success: '#3ddb6f',
 };
 
-const LOG_LEVEL_ICONS: Record<LogLevel, string> = {
-  info: 'ℹ️',
-  warning: '⚠️',
-  error: '❌',
-  success: '✅',
+const LOG_LEVEL_ICONS: Record<LogLevel, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  info: Info,
+  warning: AlertTriangle,
+  error: XCircle,
+  success: CheckCircle,
 };
 
 const LOG_TYPE_LABELS: Record<LogType, string> = {
@@ -151,7 +152,8 @@ export const CombatLogPanel: React.FC<CombatLogPanelProps> = ({
       {/* 头部 */}
       <div style={styles.header}>
         <div style={styles.title}>
-          📋 战斗日志
+          <FileText className="game-icon game-icon--sm game-icon--primary" />
+          战斗日志
           <span style={styles.logCount}>({filteredLogs.length} 条)</span>
         </div>
         <div style={styles.headerActions}>
@@ -163,13 +165,15 @@ export const CombatLogPanel: React.FC<CombatLogPanelProps> = ({
             />
             自动滚动
           </label>
-          <button style={styles.iconButton} onClick={handleClear} title="清空日志">
-            🗑️
+          <button data-magnetic className="game-btn game-btn--small game-btn--ghost" onClick={handleClear} title="清空日志">
+            <Trash2 className="game-icon game-icon--xs" />
           </button>
-          <button style={styles.iconButton} onClick={handleExport} title="导出日志">
-            📥
+          <button data-magnetic className="game-btn game-btn--small game-btn--ghost" onClick={handleExport} title="导出日志">
+            <Download className="game-icon game-icon--xs" />
           </button>
-          <button style={styles.closeButton} onClick={onClose}>×</button>
+          <button style={styles.closeButton} onClick={onClose}>
+            <X className="game-icon game-icon--sm" />
+          </button>
         </div>
       </div>
 
@@ -213,7 +217,9 @@ export const CombatLogPanel: React.FC<CombatLogPanelProps> = ({
         {filteredLogs.length === 0 ? (
           <div style={styles.emptyLogs}>暂无日志记录</div>
         ) : (
-          filteredLogs.map((log) => (
+          filteredLogs.map((log) => {
+            const LevelIcon = LOG_LEVEL_ICONS[log.level];
+            return (
             <div
               key={log.id}
               style={{
@@ -224,7 +230,7 @@ export const CombatLogPanel: React.FC<CombatLogPanelProps> = ({
             >
               <div style={styles.logHeader}>
                 <span style={styles.logLevelIcon}>
-                  {LOG_LEVEL_ICONS[log.level]}
+                  <>{React.createElement(LOG_LEVEL_ICONS[log.level], { className: "game-icon game-icon--xs", style: { color: LOG_LEVEL_COLORS[log.level] } })}</>
                 </span>
                 <span style={styles.logType}>
                   {LOG_TYPE_LABELS[log.type]}
@@ -248,7 +254,8 @@ export const CombatLogPanel: React.FC<CombatLogPanelProps> = ({
                 </details>
               )}
             </div>
-          ))
+            );
+          })
         )}
         <div ref={logsEndRef} />
       </div>

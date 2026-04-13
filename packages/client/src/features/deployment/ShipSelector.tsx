@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo } from 'react';
-import type { ShipDefinition, HullSize, FactionId } from '@vt/contracts';
+import type { ShipDefinition, HullSizeValue, FactionId } from '@vt/contracts';
 
 // 样式
 const styles = {
@@ -77,7 +77,7 @@ const styles = {
 };
 
 // 舰船尺寸图标映射
-const hullSizeIcons: Record<HullSize, string> = {
+const hullSizeIcons: Record<HullSizeValue, string> = {
   FIGHTER: '✈️',
   FRIGATE: '🚀',
   DESTROYER: '🛡️',
@@ -86,7 +86,7 @@ const hullSizeIcons: Record<HullSize, string> = {
 };
 
 // 舰船尺寸显示名称
-const hullSizeNames: Record<HullSize, string> = {
+const hullSizeNames: Record<HullSizeValue, string> = {
   FIGHTER: '战机',
   FRIGATE: '护卫舰',
   DESTROYER: '驱逐舰',
@@ -118,7 +118,7 @@ export const ShipSelector: React.FC<ShipSelectorProps> = ({
 
   // 按尺寸分组
   const shipsBySize = useMemo(() => {
-    const groups: Record<HullSize, ShipDefinition[]> = {
+    const groups: Record<HullSizeValue, ShipDefinition[]> = {
       FIGHTER: [],
       FRIGATE: [],
       DESTROYER: [],
@@ -168,7 +168,7 @@ export const ShipSelector: React.FC<ShipSelectorProps> = ({
           return (
             <div key={size}>
               <div style={styles.categoryTitle}>
-                {hullSizeNames[size as HullSize]}
+                {hullSizeNames[size as HullSizeValue]}
               </div>
               {sizeShips.map(ship => (
                 <ShipCard

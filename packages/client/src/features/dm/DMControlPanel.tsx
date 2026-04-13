@@ -11,6 +11,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import type { ShipState, PlayerState } from '@vt/contracts';
+import { PlayerRole } from '@vt/contracts';
+import { Palette, Rocket, User, FileText, Zap, Sparkles, Shield, Users, FastForward, ChevronRight, ChevronDown } from 'lucide-react';
 
 // 样式定义
 const styles = {
@@ -189,7 +191,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
   // 普通玩家列表（排除 DM）
   const regularPlayers = useMemo(() => {
-    return players.filter(p => p.role !== 'dm');
+    return players.filter(p => p.role !== PlayerRole.DM);
   }, [players]);
 
   // 选中的舰船对象
@@ -232,10 +234,11 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
         onClick={() => setCollapsed(!collapsed)}
       >
         <div style={styles.headerTitle}>
-          🎨 DM 控制中心
+          <Palette className="game-icon game-icon--sm" />
+          DM 控制中心
         </div>
         <button style={styles.collapseButton}>
-          {collapsed ? '▶' : '▼'}
+          {collapsed ? <ChevronRight className="game-icon game-icon--xs" /> : <ChevronDown className="game-icon game-icon--xs" />}
         </button>
       </div>
 
@@ -244,7 +247,10 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
         <div style={styles.content}>
           {/* 快速创建 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>🚀 快速创建</div>
+            <div style={styles.sectionTitle}>
+              <Rocket className="game-icon game-icon--xs" />
+              快速创建
+            </div>
             <div style={styles.inputRow}>
               <input
                 style={styles.input}
@@ -265,25 +271,32 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
             </div>
             <div style={styles.buttonGroup}>
               <button
-                style={{ ...styles.button, ...styles.buttonPrimary }}
+                data-magnetic
+                className="game-btn game-btn--primary game-btn--small"
                 onClick={() => onCreateTestShip('player', createX, createY)}
                 disabled={disabled}
               >
-                👤 玩家舰船
+                <User className="game-icon game-icon--xs" />
+                玩家舰船
               </button>
               <button
-                style={{ ...styles.button, ...styles.buttonPrimary }}
+                data-magnetic
+                className="game-btn game-btn--primary game-btn--small"
                 onClick={() => onCreateTestShip('dm', createX, createY)}
                 disabled={disabled}
               >
-                🎯 DM 舰船
+                <Palette className="game-icon game-icon--xs" />
+                DM 舰船
               </button>
             </div>
           </div>
 
           {/* 选择舰船 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>📋 选择舰船</div>
+            <div style={styles.sectionTitle}>
+              <FileText className="game-icon game-icon--xs" />
+              选择舰船
+            </div>
             {ships.length > 0 ? (
               <div style={styles.shipList}>
                 {ships.map((ship) => (
@@ -309,14 +322,19 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
           {/* 清除过载 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>⚡ 清除过载 ({overloadedShips.length})</div>
+            <div style={styles.sectionTitle}>
+              <Zap className="game-icon game-icon--xs" />
+              清除过载 ({overloadedShips.length})
+            </div>
             {selectedShip && selectedShip.isOverloaded ? (
               <button
-                style={{ ...styles.button, ...styles.buttonPrimary }}
+                data-magnetic
+                className="game-btn game-btn--primary game-btn--full"
                 onClick={handleClearOverload}
                 disabled={disabled}
               >
-                ✨ 清除 {selectedShip.hullType} 的过载
+                <Sparkles className="game-icon game-icon--xs" />
+                清除 {selectedShip.hullType} 的过载
               </button>
             ) : (
               <div style={styles.emptyState}>
@@ -327,7 +345,10 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
           {/* 修改护甲 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>🛡️ 修改护甲</div>
+            <div style={styles.sectionTitle}>
+              <Shield className="game-icon game-icon--xs" />
+              修改护甲
+            </div>
             {selectedShip ? (
               <>
                 <select
@@ -352,11 +373,12 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
                   disabled={disabled}
                 />
                 <button
-                  style={{ ...styles.button, ...styles.buttonPrimary }}
+                  data-magnetic
+                  className="game-btn game-btn--primary game-btn--full"
                   onClick={handleSetArmor}
                   disabled={disabled}
                 >
-                  ✏️ 修改护甲
+                  修改护甲
                 </button>
               </>
             ) : (
@@ -366,7 +388,10 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
           {/* 分配舰船 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>👥 分配舰船</div>
+            <div style={styles.sectionTitle}>
+              <Users className="game-icon game-icon--xs" />
+              分配舰船
+            </div>
             {selectedShip && regularPlayers.length > 0 ? (
               <>
                 <select
@@ -383,11 +408,12 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
                   ))}
                 </select>
                 <button
-                  style={{ ...styles.button, ...styles.buttonPrimary }}
+                  data-magnetic
+                  className="game-btn game-btn--primary game-btn--full"
                   onClick={handleAssignShip}
                   disabled={!selectedPlayerId || disabled}
                 >
-                  📤 分配给玩家
+                  分配给玩家
                 </button>
               </>
             ) : (
@@ -399,13 +425,18 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
           {/* 阶段控制 */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>⏭️ 阶段控制</div>
+            <div style={styles.sectionTitle}>
+              <FastForward className="game-icon game-icon--xs" />
+              阶段控制
+            </div>
             <button
-              style={{ ...styles.button, ...styles.buttonPrimary }}
+              data-magnetic
+              className="game-btn game-btn--primary game-btn--full"
               onClick={onNextPhase}
               disabled={disabled}
             >
-              ⏭️ 强制进入下一阶段
+              <FastForward className="game-icon game-icon--xs" />
+              强制进入下一阶段
             </button>
           </div>
         </div>

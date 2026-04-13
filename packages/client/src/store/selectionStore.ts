@@ -5,7 +5,8 @@
  */
 
 import { create } from 'zustand';
-import type { ShipState } from '@vt/contracts';
+import type { ShipState, PlayerRoleValue } from '@vt/contracts';
+import { PlayerRole } from '@vt/contracts';
 
 /**
  * 交互模式枚举
@@ -181,7 +182,7 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
     if (ship.isOverloaded) return false;
 
     // DM 可以操作任何舰船
-    if (playerRole === 'dm') return true;
+    if (playerRole === PlayerRole.DM) return true;
 
     // 玩家只能操作自己的舰船
     if (ship.ownerId !== playerSessionId) return false;

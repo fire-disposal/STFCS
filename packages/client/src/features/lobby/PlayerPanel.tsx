@@ -9,6 +9,7 @@
 
 import React, { useMemo } from 'react';
 import type { PlayerState, ShipState } from '@vt/contracts';
+import { PlayerRole } from '@vt/contracts';
 
 // 样式定义
 const styles = {
@@ -188,7 +189,7 @@ export const PlayerPanel: React.FC<PlayerPanelProps> = ({
     const total = players.length;
     const ready = players.filter((p) => p.isReady && p.connected).length;
     const online = players.filter((p) => p.connected).length;
-    const dmCount = players.filter((p) => p.role === 'dm').length;
+    const dmCount = players.filter((p) => p.role === PlayerRole.DM).length;
     return { total, ready, online, dmCount };
   }, [players]);
 
@@ -197,7 +198,7 @@ export const PlayerPanel: React.FC<PlayerPanelProps> = ({
     if (disabled) return false;
     if (!currentPlayer) return false;
     if (!currentPlayer.connected) return false;
-    if (currentPlayer.role === 'dm') return false; // DM 不需要准备
+    if (currentPlayer.role === PlayerRole.DM) return false; // DM 不需要准备
     if (currentPhase !== 'PLAYER_TURN') return false;
     return true;
   }, [disabled, currentPlayer, currentPhase]);
@@ -226,7 +227,7 @@ export const PlayerPanel: React.FC<PlayerPanelProps> = ({
       <div style={styles.playerList}>
         {players.map((player) => {
           const isCurrent = player.sessionId === currentSessionId;
-          const isDM = player.role === 'dm';
+          const isDM = player.role === PlayerRole.DM;
           const shipCount = playerShipCounts[player.sessionId] || 0;
           const quality = qualityColors[player.connectionQuality] || qualityColors.offline;
           const qualityIcon = qualityIcons[player.connectionQuality] || '○';
@@ -302,7 +303,7 @@ export const PlayerPanel: React.FC<PlayerPanelProps> = ({
       </div>
 
       {/* 准备按钮 */}
-      {currentPlayer && currentPlayer.role !== 'dm' && (
+      {currentPlayer && currentPlayer.role !== PlayerRole.DM && (
         <button
           style={{
             ...styles.readyButton,

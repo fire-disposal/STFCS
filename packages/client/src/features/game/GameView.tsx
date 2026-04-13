@@ -1,172 +1,33 @@
 /**
  * 游戏视图组件
  *
- * 战术终端风格布局：
- * - 顶部固定状态栏
- * - 中央地图区域
- * - 右侧功能面板（集成地图控制、Tab 系统、舰船信息、DM 工具）
+ * 类似星际争霸的战术终端布局：
+ * - 顶部：回合状态栏
+ * - 中央：地图区域
+ * - 右侧：信息面板（Tab化）
+ * - 底部：命令 Dock
+ *
+ * 样式: game-layout.css + game-panels.css
  */
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import type { ShipState, PlayerState } from "@vt/contracts";
-import { ClientCommand } from "@vt/contracts";
+import React, { useState, useMemo, useCallback, useRef } from "react";
+import type { ShipState, PlayerState, ClientCommandValue, FactionValue } from "@vt/contracts";
+import { ClientCommand, PlayerRole, Faction } from "@vt/contracts";
 import { NetworkManager } from "@/network/NetworkManager";
 import { GameCanvas } from "@/components/map/GameCanvas";
 import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
-import { ShipDetailPanel, ShipActionPanel, FluxSystemDisplay, ArmorQuadrantDisplay } from "@/features/ship";
+import { ShipDetailPanel, FluxSystemDisplay, ArmorQuadrantDisplay } from "@/features/ship";
 import { TurnIndicator } from "@/features/game";
 import { PlayerRosterModal } from "@/features/lobby";
 import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
-import { ActionCommandDock, type ActionCommandGroup } from "@/features/ui/ActionCommandDock";
+import { CommandDock } from "@/features/ui/CommandDock";
 import { ThreePhaseMovementController } from "@/features/movement";
 import { useCurrentGameRoom } from "@/hooks";
 import { notify } from "@/components/ui/Notification";
-
-// ==================== 布局样式 ====================
-
-const layoutStyles = {
-  // 主容器 - 占满全屏
-  gameView: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    width: '100%',
-    height: '100vh',
-    backgroundColor: '#00050a',
-    color: '#cfe8ff',
-    fontFamily: 'Arial, sans-serif',
-    overflow: 'hidden',
-  },
-
-  // 顶部状态栏
-  topBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: '48px',
-    minHeight: '48px',
-    padding: '0 16px',
-    backgroundColor: 'rgba(13, 40, 71, 0.95)',
-    borderBottom: '2px solid rgba(74, 158, 255, 0.3)',
-    flexShrink: 0,
-  },
-
-  topBarLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-
-  topBarTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    letterSpacing: '2px',
-    color: '#4a9eff',
-    whiteSpace: 'nowrap' as const,
-  },
-
-  topBarCenter: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center',
-    minWidth: 0,
-  },
-
-  topBarRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexShrink: 0,
-  },
-
-  // 主内容区
-  mainContent: {
-    display: 'flex',
-    flex: 1,
-    overflow: 'hidden',
-  },
-
-  // 地图区域
-  mapContainer: {
-    flex: 1,
-    position: 'relative' as const,
-    backgroundColor: 'rgba(6, 16, 26, 0.8)',
-    overflow: 'hidden',
-  },
-
-  mapSection: {
-    width: '100%',
-    height: '100%',
-    position: 'relative' as const,
-  },
-
-  // 右侧面板容器
-  sidePanelContainer: {
-    width: '380px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    backgroundColor: 'rgba(13, 40, 71, 0.95)',
-    borderLeft: '2px solid rgba(74, 158, 255, 0.2)',
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
-
-  // 右侧面板内容区（滚动）
-  sidePanelContent: {
-    flex: 1,
-    overflowY: 'auto' as const,
-    overflowX: 'hidden' as const,
-    padding: '12px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-  },
-
-  // 按钮样式
-  button: {
-    padding: '6px 12px',
-    backgroundColor: 'rgba(26, 45, 66, 0.8)',
-    border: '1px solid rgba(74, 158, 255, 0.3)',
-    color: '#cfe8ff',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    letterSpacing: '1px',
-    whiteSpace: 'nowrap' as const,
-  },
-
-  buttonPrimary: {
-    backgroundColor: 'rgba(26, 74, 122, 0.9)',
-    borderColor: 'rgba(74, 158, 255, 0.5)',
-    color: '#4a9eff',
-  },
-
-  buttonDanger: {
-    backgroundColor: 'rgba(90, 42, 58, 0.9)',
-    borderColor: 'rgba(255, 111, 143, 0.5)',
-    color: '#ff6f8f',
-  },
-
-  // 面板样式
-  panel: {
-    backgroundColor: 'rgba(6, 16, 26, 0.95)',
-    border: '1px solid rgba(74, 158, 255, 0.2)',
-    padding: '12px',
-  },
-
-  panelTitle: {
-    fontSize: '11px',
-    fontWeight: 'bold',
-    color: '#7aa2d4',
-    marginBottom: '8px',
-    letterSpacing: '1px',
-    textTransform: 'uppercase' as const,
-  },
-};
-
-// ==================== 组件 ====================
+import { Rocket, Users, Settings, BarChart3, Zap, Shield, Palette, Sparkles, LogOut } from 'lucide-react';
+import "@/styles/game-layout.css";
 
 interface GameViewProps {
   networkManager: NetworkManager;
@@ -177,48 +38,37 @@ interface GameViewProps {
 export const GameView: React.FC<GameViewProps> = ({
   networkManager,
   onLeaveRoom,
-  playerName,
 }) => {
   const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
   const [showObjectCreator, setShowObjectCreator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+  const [showMovementPanel, setShowMovementPanel] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement | null>(null);
-  const [mapSize, setMapSize] = useState(() => ({
-    width: 980,
-    height: typeof window !== 'undefined' ? Math.max(680, window.innerHeight - 200) : 680,
-  }));
   const [pendingPlacement, setPendingPlacement] = useState<{
     type: 'ship' | 'station' | 'asteroid';
     hullId?: string;
     heading: number;
-    faction: 'player' | 'dm';
+    faction: FactionValue;
     ownerId?: string;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'flux' | 'armor' | 'dm'>('info');
 
   // 玩家列表
   const players = useMemo(() => {
     const rosterByIdentity = new Map<string, PlayerState>();
-
-    room?.state.players.forEach((value) => {
+    (room?.state.players as Map<string, PlayerState>).forEach((value: PlayerState) => {
       const shortId = (value as PlayerState & { shortId?: number }).shortId ?? 0;
       const identityKey = shortId > 0 ? `short:${shortId}` : `session:${value.sessionId}`;
       const current = rosterByIdentity.get(identityKey);
-
       if (!current) {
         rosterByIdentity.set(identityKey, value);
         return;
       }
-
-      const shouldReplace = (value.connected && !current.connected)
-        || value.sessionId === room?.sessionId
-        || (current.pingMs < 0 && value.pingMs >= 0);
-
-      if (shouldReplace) {
+      if (value.connected && !current.connected || value.sessionId === room?.sessionId) {
         rosterByIdentity.set(identityKey, value);
       }
     });
-
     return Array.from(rosterByIdentity.values());
   }, [room?.state.players, room?.sessionId]);
 
@@ -230,7 +80,7 @@ export const GameView: React.FC<GameViewProps> = ({
   // 舰船列表
   const ships = useMemo(() => {
     const result: ShipState[] = [];
-    room?.state.ships.forEach((value) => result.push(value));
+    (room?.state.ships as Map<string, ShipState>).forEach((value: ShipState) => result.push(value));
     return result;
   }, [room?.state.ships]);
 
@@ -243,19 +93,17 @@ export const GameView: React.FC<GameViewProps> = ({
     return selected?.id || null;
   }, [ships, players, room?.sessionId]);
 
-  const selectShip = useCallback((shipId: string | null) => {
-    console.log('[GameView] Select ship:', shipId);
-  }, []);
+  const selectedShip = useMemo(() => {
+    return ships.find(s => s.id === selectedShipId) || null;
+  }, [ships, selectedShipId]);
 
   // UI 状态
   const {
     zoom,
-    setZoom,
     cameraPosition,
     setCameraPosition,
     viewRotation,
     setViewRotation,
-    resetViewRotation,
     showGrid,
     showBackground,
     showWeaponArcs,
@@ -287,9 +135,8 @@ export const GameView: React.FC<GameViewProps> = ({
   }, [pendingPlacement]);
 
   // 命令发送
-  const sendCommand = useCallback(async (command: ClientCommand, payload: unknown) => {
+  const sendCommand = useCallback(async (command: ClientCommandValue, payload: unknown) => {
     if (!room) return;
-
     try {
       await room.send(command, payload);
     } catch (error) {
@@ -305,7 +152,7 @@ export const GameView: React.FC<GameViewProps> = ({
     x: number;
     y: number;
     heading: number;
-    faction: 'player' | 'dm';
+    faction: FactionValue;
     ownerId?: string;
   }) => {
     if (!room) return;
@@ -314,7 +161,7 @@ export const GameView: React.FC<GameViewProps> = ({
 
   const createTestShip = useCallback(() => {
     if (!room) return;
-    room.send('CREATE_TEST_SHIP', { faction: 'dm', x: 500, y: 500 });
+    room.send('CREATE_TEST_SHIP', { faction: Faction.DM, x: 500, y: 500 });
   }, [room]);
 
   const clearOverload = useCallback((shipId: string) => {
@@ -355,137 +202,91 @@ export const GameView: React.FC<GameViewProps> = ({
     notify.success('邀请链接已复制到剪贴板');
   }, [networkManager, room]);
 
-  const closeRoom = useCallback(() => {
-    console.log('[GameView] Close room');
+  // 命令 Dock 操作
+  const handleOpenMovement = useCallback(() => {
+    setShowMovementPanel(true);
   }, []);
 
-  const saveRoom = useCallback(() => {
-    console.log('[GameView] Save room');
+  const handleCloseMovement = useCallback(() => {
+    setShowMovementPanel(false);
   }, []);
 
-  // 地图控制指令（紧凑布局，用于右侧面板）
-  const mapActionGroups: ActionCommandGroup[] = useMemo(() => [
-    {
-      id: 'view_control',
-      title: '视图控制',
-      actions: [
-        {
-          id: 'zoom_in',
-          label: '放大',
-          icon: '🔍',
-          shortcut: '+',
-          onActivate: () => setZoom(Math.min(3, zoom + 0.2)),
-        },
-        {
-          id: 'zoom_out',
-          label: '缩小',
-          icon: '🔍',
-          shortcut: '-',
-          onActivate: () => setZoom(Math.max(0.5, zoom - 0.2)),
-        },
-        {
-          id: 'reset_view',
-          label: '重置',
-          icon: '🔄',
-          shortcut: 'R',
-          onActivate: () => {
-            setZoom(1);
-            setCameraPosition(0, 0);
-            resetViewRotation();
-          },
-        },
-      ],
-    },
-    {
-      id: 'display_control',
-      title: '显示控制',
-      actions: [
-        {
-          id: 'toggle_grid',
-          label: '网格',
-          icon: '▦',
-          active: showGrid,
-          onActivate: () => {},
-        },
-        {
-          id: 'toggle_arcs',
-          label: '射界',
-          icon: '🎯',
-          active: showWeaponArcs,
-          onActivate: () => {},
-        },
-      ],
-    },
-  ], [zoom, showGrid, showWeaponArcs, setZoom, setCameraPosition, resetViewRotation]);
+  const handleToggleShield = useCallback(() => {
+    if (!selectedShip) return;
+    sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, {
+      shipId: selectedShip.id,
+      isActive: !selectedShip.isShieldUp,
+      orientation: selectedShip.transform.heading,
+    });
+  }, [selectedShip, sendCommand]);
+
+  const handleFire = useCallback(() => {
+    notify.info('请选择武器和目标进行攻击');
+  }, []);
+
+  const handleVent = useCallback(() => {
+    if (!selectedShip) return;
+    sendCommand(ClientCommand.CMD_VENT_FLUX, { shipId: selectedShip.id });
+  }, [selectedShip, sendCommand]);
 
   if (!room) {
     return (
-      <div style={layoutStyles.gameView}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <div style={{ fontSize: '16px', color: '#6b7280' }}>连接中...</div>
+      <div className="game-layout">
+        <div className="game-layout__loading">
+          <div className="game-layout__loading-text">连接中...</div>
         </div>
       </div>
     );
   }
 
+  const isDM = currentPlayer?.role === PlayerRole.DM;
+
   return (
-    <div style={layoutStyles.gameView}>
+    <div className="game-layout">
       {/* 顶部状态栏 */}
-      <div style={layoutStyles.topBar}>
-        <div style={layoutStyles.topBarLeft}>
-          <div style={layoutStyles.topBarTitle}>
-            🚀 STFCS
+      <div className="game-layout__top-bar">
+        <div className="game-layout__top-bar-left">
+          <div className="game-layout__top-bar-title">
+            <Rocket className="game-layout__top-bar-icon" />
+            STFCS
           </div>
-          <div style={{ fontSize: '12px', color: '#6b7280' }}>
-            {room.state.currentPhase || '加载中'}
-          </div>
+          <div className="game-layout__top-bar-phase">{room.state.currentPhase || '加载中'}</div>
         </div>
 
-        <div style={layoutStyles.topBarCenter}>
+        <div className="game-layout__top-bar-center">
           <TurnIndicator
             currentPhase={room.state.currentPhase}
             turnCount={room.state.turnCount}
             activeFaction={room.state.activeFaction}
-            playerRole={currentPlayer?.role || 'player'}
-            onNextPhase={currentPlayer?.role === 'dm' ? nextPhase : undefined}
+playerRole={currentPlayer?.role || PlayerRole.PLAYER}
+            onNextPhase={isDM ? nextPhase : undefined}
             compact
           />
         </div>
 
-        <div style={layoutStyles.topBarRight}>
-          <button
-            style={{ ...layoutStyles.button, cursor: 'pointer' }}
-            onClick={() => setShowPlayerRoster(true)}
-          >
-            👥 玩家
+        <div className="game-layout__top-bar-right">
+          <button data-magnetic className="game-btn game-btn--small" onClick={() => setShowPlayerRoster(true)}>
+            <Users className="game-btn__icon game-btn__icon--left" />
+            玩家
           </button>
-          <button
-            style={{ ...layoutStyles.button, cursor: 'pointer' }}
-            onClick={() => setShowSettings(true)}
-          >
-            ⚙️ 设置
+          <button data-magnetic className="game-btn game-btn--small" onClick={() => setShowSettings(true)}>
+            <Settings className="game-btn__icon game-btn__icon--left" />
+            设置
           </button>
-          <button
-            style={{ ...layoutStyles.button, ...layoutStyles.buttonDanger, cursor: 'pointer' }}
-            onClick={() => {
-              console.log('[GameView] Leave button clicked');
-              onLeaveRoom();
-            }}
-          >
+          <button data-magnetic className="game-btn game-btn--small game-btn--danger" onClick={onLeaveRoom}>
+            <LogOut className="game-btn__icon game-btn__icon--left" />
             离开
           </button>
         </div>
       </div>
 
       {/* 主内容区 */}
-      <div style={layoutStyles.mainContent}>
+      <div className="game-layout__main">
         {/* 地图区域 */}
-        <div style={layoutStyles.mapContainer}>
-          <div ref={mapSectionRef} style={layoutStyles.mapSection}>
+        <div className="game-layout__map-area">
+          <div ref={mapSectionRef} className="game-layout__map-section">
             <GameCanvas
               ships={ships}
-              width={mapSize.width}
-              height={mapSize.height}
               zoom={zoom}
               cameraX={cameraPosition.x}
               cameraY={cameraPosition.y}
@@ -495,86 +296,97 @@ export const GameView: React.FC<GameViewProps> = ({
               showWeaponArcs={showWeaponArcs}
               showMovementRange={showMovementRange}
               selectedShipId={selectedShipId}
-              onSelectShip={(shipId) => selectShip(shipId)}
+              onSelectShip={(id) => console.log('[GameView] Select:', id)}
               onPanDelta={handleMapPan}
               onRotateDelta={handleMapRotate}
-              onClick={pendingPlacement && currentPlayer?.role === 'dm' ? handleMapClick : undefined}
+              onClick={pendingPlacement && isDM ? handleMapClick : undefined}
             />
           </div>
         </div>
 
-        {/* 右侧面板 */}
-        <div style={layoutStyles.sidePanelContainer}>
-          {/* 可滚动内容区 */}
-          <div style={layoutStyles.sidePanelContent}>
-            {/* 地图控制 */}
-            <div style={layoutStyles.panel}>
-              <div style={layoutStyles.panelTitle}>🎮 地图控制</div>
-              <ActionCommandDock
-                title=""
-                subtitle=""
-                groups={mapActionGroups}
-              />
-            </div>
+        {/* 右侧信息面板 */}
+        <div className="game-layout__info-panel">
+          {/* Tab 头部 */}
+          <div className="game-layout__info-tabs">
+            <button
+              data-magnetic
+              className={`game-layout__info-tab ${activeTab === 'info' ? 'game-layout__info-tab--active' : ''}`}
+              onClick={() => setActiveTab('info')}
+            >
+              <BarChart3 className="game-layout__info-tab-icon" />
+              信息
+            </button>
+            <button
+              data-magnetic
+              className={`game-layout__info-tab ${activeTab === 'flux' ? 'game-layout__info-tab--active' : ''}`}
+              onClick={() => setActiveTab('flux')}
+            >
+              <Zap className="game-layout__info-tab-icon" />
+              辐能
+            </button>
+            <button
+              data-magnetic
+              className={`game-layout__info-tab ${activeTab === 'armor' ? 'game-layout__info-tab--active' : ''}`}
+              onClick={() => setActiveTab('armor')}
+            >
+              <Shield className="game-layout__info-tab-icon" />
+              护甲
+            </button>
+            {isDM && (
+              <button
+                data-magnetic
+                className={`game-layout__info-tab ${activeTab === 'dm' ? 'game-layout__info-tab--active' : ''}`}
+                onClick={() => setActiveTab('dm')}
+              >
+                <Palette className="game-layout__info-tab-icon" />
+                DM
+              </button>
+            )}
+          </div>
 
-            {/* 舰船信息面板（选中时显示） */}
-            {selectedShipId && ships.find(s => s.id === selectedShipId) && (
+          {/* Tab 内容 */}
+          <div className="game-layout__info-content">
+            {activeTab === 'info' && (
               <>
-                <ShipDetailPanel
-                  ship={ships.find(s => s.id === selectedShipId)!}
-                  currentPhase={room.state.currentPhase}
-                />
-                <FluxSystemDisplay
-                  ship={ships.find(s => s.id === selectedShipId)!}
-                  currentPhase={room.state.currentPhase}
-                />
-                <ArmorQuadrantDisplay
-                  ship={ships.find(s => s.id === selectedShipId)!}
-                />
-                <ThreePhaseMovementController
-                  ship={ships.find(s => s.id === selectedShipId)!}
-                  networkManager={networkManager}
-                  onClose={() => {}}
-                  onOpenAttack={() => {
-                    notify.info('请选择武器和目标进行攻击');
-                  }}
-                />
-                <ShipActionPanel
-                  ship={ships.find(s => s.id === selectedShipId)!}
-                  allShips={ships}
-                  currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
-                  activeFaction={room.state.activeFaction || 'player'}
-                  playerRole={currentPlayer?.role || 'player'}
-                  playerSessionId={room.sessionId || ''}
-                  onSendCommand={sendCommand}
-                />
+                {selectedShip ? (
+                  <ShipDetailPanel ship={selectedShip} currentPhase={room.state.currentPhase} />
+                ) : (
+                  <div className="game-empty">
+                    <Rocket className="game-empty__icon" />
+                    选择一艘舰船查看详情
+                  </div>
+                )}
               </>
             )}
 
-            {/* DM 控制面板 */}
-            {currentPlayer?.role === 'dm' && (
-              <div style={layoutStyles.panel}>
-                <div style={layoutStyles.panelTitle}>🎨 DM 控制中心</div>
-                
-                {/* 阶段控制 */}
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>📊 阶段控制</div>
-                  <button
-                    style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%' }}
-                    onClick={nextPhase}
-                  >
-                    ⏭️ 进入下一阶段
-                  </button>
-                </div>
+            {activeTab === 'flux' && selectedShip && (
+              <FluxSystemDisplay ship={selectedShip} currentPhase={room.state.currentPhase} />
+            )}
 
-                {/* 对象创建 */}
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>✨ 对象创建</div>
+            {activeTab === 'armor' && selectedShip && (
+              <ArmorQuadrantDisplay ship={selectedShip} />
+            )}
+
+            {activeTab === 'dm' && isDM && (
+              <div className="info-block">
+                <div className="info-block__header">
+                  <div className="info-block__title">
+                    <Palette className="info-block__icon" />
+                    DM 控制中心
+                  </div>
+                </div>
+                
+                <div className="game-section">
+                  <div className="game-section__title">
+                    <Sparkles className="game-section__icon" />
+                    对象创建
+                  </div>
                   <button
-                    style={{ ...layoutStyles.button, ...layoutStyles.buttonPrimary, width: '100%', marginBottom: '8px' }}
+                    data-magnetic
+                    className="game-btn game-btn--primary game-btn--full"
                     onClick={() => setShowObjectCreator(!showObjectCreator)}
                   >
-                    {showObjectCreator ? '❌ 关闭' : '➕ 打开'} 创建工具
+                    {showObjectCreator ? '关闭' : '打开'} 创建工具
                   </button>
                   
                   {showObjectCreator && (
@@ -582,7 +394,7 @@ export const GameView: React.FC<GameViewProps> = ({
                       isOpen={showObjectCreator}
                       onClose={() => setShowObjectCreator(false)}
                       onCreateObject={createObject}
-                      players={players.filter(p => p.role !== 'dm').map(p => ({
+                      players={players.filter(p => p.role !== PlayerRole.DM).map(p => ({
                         sessionId: p.sessionId,
                         name: p.nickname || p.name,
                         role: p.role,
@@ -591,9 +403,11 @@ export const GameView: React.FC<GameViewProps> = ({
                   )}
                 </div>
 
-                {/* 舰船管理 */}
-                <div>
-                  <div style={{...layoutStyles.panelTitle, marginBottom: '6px' }}>🚀 舰船管理</div>
+                <div className="game-section">
+                  <div className="game-section__title">
+                    <Rocket className="game-section__icon" />
+                    舰船管理
+                  </div>
                   <DMControlPanel
                     ships={ships}
                     players={players}
@@ -611,6 +425,32 @@ export const GameView: React.FC<GameViewProps> = ({
         </div>
       </div>
 
+      {/* 底部命令 Dock */}
+      <CommandDock
+        selectedShip={selectedShip}
+        playerRole={currentPlayer?.role || PlayerRole.PLAYER}
+        onMove={handleOpenMovement}
+        onToggleShield={handleToggleShield}
+        onFire={handleFire}
+        onVent={handleVent}
+        onNextPhase={isDM ? nextPhase : undefined}
+        onCreateObject={isDM ? () => setShowObjectCreator(true) : undefined}
+      />
+
+      {/* 移动面板弹窗 */}
+      {showMovementPanel && selectedShip && (
+        <div className="game-modal-overlay" onClick={handleCloseMovement}>
+          <div className="game-modal game-modal--large" onClick={(e) => e.stopPropagation()}>
+            <ThreePhaseMovementController
+              ship={selectedShip}
+              networkManager={networkManager}
+              onClose={handleCloseMovement}
+              onOpenAttack={handleFire}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 弹窗 */}
       <PlayerRosterModal
         isOpen={showPlayerRoster}
@@ -620,11 +460,11 @@ export const GameView: React.FC<GameViewProps> = ({
         currentSessionId={room.sessionId || ''}
         currentPhase={room.state.currentPhase || 'DEPLOYMENT'}
         onToggleReady={toggleReady}
-        canManagePlayers={currentPlayer?.role === 'dm'}
-        onKickPlayer={currentPlayer?.role === 'dm' ? kickPlayer : undefined}
-        onInvitePlayer={currentPlayer?.role === 'dm' ? invitePlayer : undefined}
-        onCloseRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
-        onSaveRoom={currentPlayer?.role === 'dm' ? () => {} : undefined}
+        canManagePlayers={isDM}
+        onKickPlayer={isDM ? kickPlayer : undefined}
+        onInvitePlayer={isDM ? invitePlayer : undefined}
+        onCloseRoom={undefined}
+        onSaveRoom={undefined}
         onLeaveRoom={onLeaveRoom}
       />
 

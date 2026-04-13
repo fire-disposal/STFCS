@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import type { AttackPreviewResult, DamageType } from '@vt/contracts';
+import type { AttackPreviewResult, DamageTypeValue } from '@vt/contracts';
 
 // 样式
 const styles = {
@@ -126,7 +126,7 @@ const styles = {
 };
 
 // 伤害类型颜色
-const damageTypeColors: Record<DamageType, string> = {
+const damageTypeColors: Record<DamageTypeValue, string> = {
   KINETIC: '#4a90d9',
   HIGH_EXPLOSIVE: '#e74c3c',
   FRAGMENTATION: '#95a5a6',
@@ -147,7 +147,7 @@ const blockReasonText: Record<string, string> = {
 
 interface AttackPreviewProps {
   preview: AttackPreviewResult | null;
-  damageType?: DamageType;
+  damageType?: DamageTypeValue;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;

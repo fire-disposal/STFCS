@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { PlayerState, ShipState } from '@vt/contracts';
+import { PlayerRole } from '@vt/contracts';
 
 const styles = {
   overlay: {
@@ -421,14 +422,14 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
     const total = players.length;
     const ready = players.filter((p) => p.isReady && p.connected).length;
     const online = players.filter((p) => p.connected).length;
-    const dmCount = players.filter((p) => p.role === 'dm').length;
+    const dmCount = players.filter((p) => p.role === PlayerRole.DM).length;
     return { total, ready, online, dmCount };
   }, [players]);
 
   const canReady = useMemo(() => {
     if (!currentPlayer) return false;
     if (!currentPlayer.connected) return false;
-    if (currentPlayer.role === 'dm') return false;
+    if (currentPlayer.role === PlayerRole.DM) return false;
     if (currentPhase !== 'PLAYER_TURN') return false;
     return true;
   }, [currentPlayer, currentPhase]);
@@ -466,7 +467,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
                 <div style={styles.list}>
                   {players.map((player) => {
                     const isCurrent = player.sessionId === currentSessionId;
-                    const isDM = player.role === 'dm';
+                    const isDM = player.role === PlayerRole.DM;
                     const shipCount = playerShipCounts[player.sessionId] || 0;
                     const quality = qualityColors[player.connectionQuality] || qualityColors.offline;
                     const qualityIcon = qualityIcons[player.connectionQuality] || '○';
@@ -598,12 +599,12 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
                   {currentPlayer?.nickname || currentPlayer?.name || '未知玩家'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#8ba4c7', lineHeight: 1.6 }}>
-                  {currentPlayer?.role === 'dm'
+                  {currentPlayer?.role === PlayerRole.DM
                     ? '你当前是主持人，可管理成员并推进回合。'
                     : '你当前是玩家，可在回合允许时切换准备状态。'}
                 </div>
                 <div style={styles.actionRow}>
-                  {currentPlayer?.role !== 'dm' && (
+                  {currentPlayer?.role !== PlayerRole.DM && (
                     <button
                       style={{
                         ...styles.actionButton,
@@ -712,7 +713,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
           <div style={styles.footerNote}>
             仅在当前回合允许时显示准备按钮；房主管理入口保留在弹窗内。
           </div>
-          {currentPlayer && currentPlayer.role !== 'dm' && (
+          {currentPlayer && currentPlayer.role !== PlayerRole.DM && (
             <button
               style={{
                 ...styles.readyButton,

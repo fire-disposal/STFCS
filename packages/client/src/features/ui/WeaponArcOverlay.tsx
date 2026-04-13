@@ -6,8 +6,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Container, Graphics } from 'pixi.js';
 import type { ShipState } from '@vt/contracts';
-import type { WeaponMount } from '@vt/contracts/types';
-import { PRESET_WEAPONS, getWeaponSpec, distance } from '@vt/rules';
+import { distance } from '@vt/rules';
 
 interface WeaponArcOverlayProps {
   ships: ShipState[];
@@ -34,45 +33,49 @@ export const WeaponArcOverlay: React.FC<WeaponArcOverlayProps> = ({
       if (ship.id !== selectedShipId) continue;
 
       // 绘制武器挂载点射界
-      ship.weapons.forEach((weaponSlot, weaponId) => {
-        const weaponSpec = getWeaponSpec(weaponId);
-        if (!weaponSpec) return;
-
-        const mountX = ship.transform.x;
-        const mountY = ship.transform.y;
+      ship.weapons.forEach((weaponSlot, _mountId) => {
+        const ws = weaponSlot as unknown as { 
+          mountId: string; 
+          weaponSpecId: string; 
+          mountFacing: number; 
+          arcMin: number; 
+          arcMax: number;
+          range: number;
+          mountType: string;
+          offsetX: number;
+          offsetY: number;
+        };
         
-        // 计算武器绝对朝向
-        const weaponAbsoluteAngle = ship.transform.heading + (weaponSpec.mountType === 'turret' ? 0 : (weaponSlot.angle || 0));
+        const mountX = ship.transform.x + ws.offsetX;
+        const mountY = ship.transform.y + ws.offsetY;
+        
+        const weaponAbsoluteAngle = ship.transform.heading + ws.mountFacing;
+        const arcWidth = ws.arcMax - ws.arcMin;
 
-        // 绘制射程范围（虚线圆）
         if (showRanges) {
           const rangeCircle = new Graphics();
           rangeCircle
-            .circle(0, 0, weaponSpec.range)
+            .circle(0, 0, ws.range)
             .stroke({ color: 0xffa500, alpha: 0.3, width: 1 });
           rangeCircle.position.set(mountX, mountY);
           containerRef.addChild(rangeCircle);
         }
 
-        // 绘制武器射界扇形
         if (showWeaponArcs) {
           const arcGraphics = new Graphics();
-          const arcRad = (weaponSpec.arc * Math.PI) / 180;
+          const arcRad = (arcWidth * Math.PI) / 180;
           const baseAngle = ((weaponAbsoluteAngle - 90) * Math.PI) / 180;
           const startAngle = baseAngle - arcRad / 2;
           const endAngle = baseAngle + arcRad / 2;
 
-          // 扇形填充
           arcGraphics.moveTo(0, 0);
           for (let angle = startAngle; angle <= endAngle; angle += 0.05) {
-            const x = Math.cos(angle) * weaponSpec.range;
-            const y = Math.sin(angle) * weaponSpec.range;
+            const x = Math.cos(angle) * ws.range;
+            const y = Math.sin(angle) * ws.range;
             arcGraphics.lineTo(x, y);
           }
           arcGraphics.lineTo(0, 0);
           arcGraphics.fill({ color: 0xff6b35, alpha: 0.15 });
-
-          // 扇形边框
           arcGraphics.stroke({ color: 0xff6b35, alpha: 0.6, width: 1 });
 
           arcGraphics.position.set(mountX, mountY);

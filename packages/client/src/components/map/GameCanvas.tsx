@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Application } from "@pixi/react";
 import { Container, Graphics, Text, TextStyle, Rectangle } from "pixi.js";
 import type { ShipState } from "@vt/contracts";
+import { Faction } from "@vt/contracts";
 import { StarfieldGenerator } from "@/features/game/rendering/StarfieldBackground";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
@@ -10,8 +11,6 @@ import { drawMovementRange, drawTurnArc, drawMovementPath } from "@/features/mov
 
 interface GameCanvasProps {
   ships: ShipState[];
-  width?: number;
-  height?: number;
   zoom: number;
   cameraX: number;
   cameraY: number;
@@ -24,22 +23,22 @@ interface GameCanvasProps {
   showMovementRange?: boolean;
   showBackground?: boolean;
   onClick?: (x: number, y: number) => void;
-  viewRotation?: number; // 视图旋转角度
+  viewRotation?: number;
 }
 
 type LayerRegistry = {
   world: Container;
   background: Container;
-  starfieldDeep: Container;      // 深层星空
-  starfieldMid: Container;       // 中层星空
-  starfieldNear: Container;      // 浅层星空
-  starfieldNebula: Container;    // 银河星云
+  starfieldDeep: Container;
+  starfieldMid: Container;
+  starfieldNear: Container;
+  starfieldNebula: Container;
   grid: Container;
   ships: Container;
   labels: Container;
   effects: Container;
   weaponArcs: Container;
-  movementVisuals: Container;    // 移动可视化
+  movementVisuals: Container;
 };
 
 const labelStyle = new TextStyle({
@@ -65,8 +64,6 @@ const useStarfield = () => {
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
   ships,
-  width = 980,
-  height = 620,
   zoom,
   cameraX,
   cameraY,
@@ -82,6 +79,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   viewRotation = 0,
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
+  const pixiAppRef = useRef<any>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 980, height: 620 });
   const [layers, setLayers] = useState<LayerRegistry | null>(null);
   const starfield = useStarfield();
   const { 
@@ -99,6 +98,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const spacePressedRef = useRef(false);
   const zoomAnimationRef = useRef<number | null>(null);
   const zoomTargetRef = useRef<{ zoom: number; cameraX: number; cameraY: number } | null>(null);
+  const shipCacheRef = useRef<Map<string, { token: Graphics; label: Text; hpBar: Graphics; isSelected: boolean }>>(new Map());
   const dragStateRef = useRef<{
     active: boolean;
     mode: 'pan' | 'rotate' | null;
@@ -142,8 +142,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       y: scaledX * sin + scaledY * cos,
     };
   }, []);
-  const canvasWidth = width;
-  const canvasHeight = height;
+  const canvasWidth = canvasSize.width;
+  const canvasHeight = canvasSize.height;
 
   const screenToWorldPoint = useCallback((screenX: number, screenY: number, zoomValue: number, cameraXValue: number, cameraYValue: number, rotationValue: number) => {
     const centerX = canvasWidth / 2;
@@ -205,8 +205,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const nextZoom = clampZoom(current.zoom * zoomFactor);
     const worldPoint = screenToWorldPoint(screenX, screenY, current.zoom, current.cameraX, current.cameraY, current.viewRotation);
 
-    const centerX = width / 2;
-    const centerY = height / 2;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
     const relativeX = screenX - centerX;
     const relativeY = screenY - centerY;
     const theta = (current.viewRotation * Math.PI) / 180;
@@ -225,7 +225,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       cancelAnimationFrame(zoomAnimationRef.current);
     }
     zoomAnimationRef.current = requestAnimationFrame(animateZoomToTarget);
-  }, [animateZoomToTarget, clampZoom, screenToWorldPoint]);
+  }, [animateZoomToTarget, clampZoom, screenToWorldPoint, canvasWidth, canvasHeight]);
 
   const flushDragDelta = useCallback(() => {
     const dragState = dragStateRef.current;
@@ -281,6 +281,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   }, [queueZoom]);
 
   useEffect(() => {
+    const node = hostRef.current;
+    if (!node) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        setCanvasSize({ width: Math.floor(width), height: Math.floor(height) });
+      }
+    });
+
+    resizeObserver.observe(node);
+    
+    const { width, height } = node.getBoundingClientRect();
+    setCanvasSize({ width: Math.floor(width), height: Math.floor(height) });
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
         spacePressedRef.current = true;
@@ -321,30 +343,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     });
   }, [flushDragDelta]);
 
-  // 动画循环 - 更新星空闪烁
+  // 动画循环 - 更新星空闪烁（优化：分层频率）
   useEffect(() => {
     if (!layers || !starfield) return;
+
+    let frameCount = 0;
 
     const animate = (timestamp: number) => {
       const deltaTime = (timestamp - lastTimeRef.current) / 1000;
       lastTimeRef.current = timestamp;
+      frameCount++;
 
-      // 限制最大 deltaTime 避免跳跃
       const safeDelta = Math.min(deltaTime, 0.1);
-      
       starfield.update(safeDelta);
 
-      // 重新绘制星空（只更新闪烁，不重新计算位置）
-      if (layers.starfieldDeep.children[0]) {
+      // 深层星星：每3帧更新一次（闪烁慢，数量多）
+      if (frameCount % 3 === 0 && layers.starfieldDeep.children[0]) {
         const graphics = layers.starfieldDeep.children[0] as Graphics;
         graphics.clear();
         starfield.drawDeepStars(graphics, 0, 0);
       }
-      if (layers.starfieldMid.children[0]) {
+
+      // 中层星星：每2帧更新一次
+      if (frameCount % 2 === 0 && layers.starfieldMid.children[0]) {
         const graphics = layers.starfieldMid.children[0] as Graphics;
         graphics.clear();
         starfield.drawMidStars(graphics, 0, 0);
       }
+
+      // 近层星星：每帧更新（数量少，闪烁明显）
       if (layers.starfieldNear.children[0]) {
         const graphics = layers.starfieldNear.children[0] as Graphics;
         graphics.clear();
@@ -399,6 +426,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       -cameraY * parallaxFactor * 0.2,
     );
   }, [layers, zoom, cameraX, cameraY, canvasWidth, canvasHeight, viewRotation, showBackground]);
+
+  useEffect(() => {
+    if (!layers) return;
+    layers.world.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
+    layers.ships.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
+    if (pixiAppRef.current) {
+      pixiAppRef.current.stage.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
+    }
+  }, [layers, canvasWidth, canvasHeight]);
 
   // 初始渲染星空背景（位置在上面的动画循环中更新）
   useEffect(() => {
@@ -473,82 +509,98 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   useEffect(() => {
     if (!layers) return;
 
-    layers.ships.removeChildren();
-    layers.labels.removeChildren();
+    const cache = shipCacheRef.current;
+    const currentIds = new Set(ships.map(s => s.id));
 
+    // 移除不再存在的舰船
+    for (const [id, item] of cache) {
+      if (!currentIds.has(id)) {
+        layers.ships.removeChild(item.token);
+        layers.labels.removeChild(item.label);
+        cache.delete(id);
+      }
+    }
+
+    // 更新或新增舰船
     for (const ship of ships) {
-      const token = new Graphics();
       const isSelected = ship.id === selectedShipId;
-      const color = ship.faction === "player" ? 0x43c1ff : 0xff6f8f;
+      const color = ship.faction === Faction.PLAYER ? 0x43c1ff : 0xff6f8f;
       const radius = 20;
+      const cached = cache.get(ship.id);
 
-      token
-        .poly([
-          0,
-          -radius,
-          radius * 0.7,
-          radius,
-          0,
-          radius * 0.45,
-          -radius * 0.7,
-          radius,
-        ])
-        .fill({ color, alpha: 0.88 })
-        .stroke({
-          color: isSelected ? 0xffffff : 0x10263e,
-          alpha: isSelected ? 0.95 : 0.7,
-          width: isSelected ? 3 : 2,
-        });
+      if (cached) {
+        // 增量更新：只更新位置、旋转、选中状态
+        cached.token.position.set(ship.transform.x, ship.transform.y);
+        cached.token.rotation = (ship.transform.heading * Math.PI) / 180;
+        cached.label.position.set(ship.transform.x, ship.transform.y - radius - 8);
 
-      token.position.set(ship.transform.x, ship.transform.y);
-      token.rotation = (ship.transform.heading * Math.PI) / 180;
-      token.eventMode = "static";
-      token.cursor = "pointer";
-      
-      // 点击选择处理
-      token.on("pointertap", (e) => {
-        const isDoubleClick = handleClick(e.data.global.x, e.data.global.y);
-        if (isDoubleClick) {
-          // 双击：强制选择
-          storeSelectShip(ship.id);
-          onSelectShip?.(ship.id);
-        } else {
-          // 单击：切换选择
-          if (isSelected) {
-            // 取消选择时不传递 null，而是传递空字符串或不处理
-            // 这里我们保持选中状态，让用户通过其他方式取消
-          } else {
+        // 更新选中状态边框
+        const needsStrokeUpdate = isSelected !== cached.isSelected;
+        if (needsStrokeUpdate) {
+          cached.isSelected = isSelected;
+          cached.token.clear();
+          cached.token
+            .poly([0, -radius, radius * 0.7, radius, 0, radius * 0.45, -radius * 0.7, radius])
+            .fill({ color, alpha: 0.88 })
+            .stroke({ color: isSelected ? 0xffffff : 0x10263e, alpha: isSelected ? 0.95 : 0.7, width: isSelected ? 3 : 2 });
+          cached.token.position.set(ship.transform.x, ship.transform.y);
+          cached.token.rotation = (ship.transform.heading * Math.PI) / 180;
+        }
+
+        // 更新 HP 条
+        const hpPercent = Math.max(0, Math.min(1, ship.hullMax > 0 ? ship.hullCurrent / ship.hullMax : 0));
+        cached.hpBar.clear();
+        cached.hpBar.rect(-24, radius + 8, 48, 5).fill({ color: 0x000000, alpha: 0.45 });
+        cached.hpBar.rect(-24, radius + 8, 48 * hpPercent, 5).fill({ color: 0x3ddb6f, alpha: 0.95 });
+
+        // 更新标签文本
+        cached.label.text = `${ship.id.slice(-6)}  F:${Math.round(ship.fluxHard + ship.fluxSoft)}/${Math.round(ship.fluxMax)}`;
+      } else {
+        // 新建舰船 Token
+        const token = new Graphics();
+        token
+          .poly([0, -radius, radius * 0.7, radius, 0, radius * 0.45, -radius * 0.7, radius])
+          .fill({ color, alpha: 0.88 })
+          .stroke({ color: isSelected ? 0xffffff : 0x10263e, alpha: isSelected ? 0.95 : 0.7, width: isSelected ? 3 : 2 });
+        token.position.set(ship.transform.x, ship.transform.y);
+        token.rotation = (ship.transform.heading * Math.PI) / 180;
+        token.eventMode = "static";
+        token.cursor = "pointer";
+
+        token.on("pointertap", (e) => {
+          const isDoubleClick = handleClick(e.data.global.x, e.data.global.y);
+          if (isDoubleClick) {
+            storeSelectShip(ship.id);
+            onSelectShip?.(ship.id);
+          } else if (ship.id !== selectedShipId) {
             storeSelectShip(ship.id);
             onSelectShip?.(ship.id);
           }
-        }
-      });
-      
-      // 鼠标移动时更新世界坐标
-      token.on("pointermove", (e) => {
-        const worldX = (e.data.global.x - canvasWidth / 2) / zoom + cameraX;
-        const worldY = (e.data.global.y - canvasHeight / 2) / zoom + cameraY;
-        setMouseWorldPosition(worldX, worldY);
-      });
+        });
 
-      const hpPercent = Math.max(0, Math.min(1, ship.hullMax > 0 ? ship.hullCurrent / ship.hullMax : 0));
-      const hpBg = new Graphics();
-      hpBg
-        .rect(-24, radius + 8, 48, 5)
-        .fill({ color: 0x000000, alpha: 0.45 })
-        .rect(-24, radius + 8, 48 * hpPercent, 5)
-        .fill({ color: 0x3ddb6f, alpha: 0.95 });
-      token.addChild(hpBg);
+        token.on("pointermove", (e) => {
+          const worldX = (e.data.global.x - canvasWidth / 2) / zoom + cameraX;
+          const worldY = (e.data.global.y - canvasHeight / 2) / zoom + cameraY;
+          setMouseWorldPosition(worldX, worldY);
+        });
 
-      const label = new Text({
-        text: `${ship.id.slice(-6)}  F:${Math.round(ship.fluxHard + ship.fluxSoft)}/${Math.round(ship.fluxMax)}`,
-        style: labelStyle,
-      });
-      label.anchor.set(0.5, 1);
-      label.position.set(ship.transform.x, ship.transform.y - radius - 8);
+        const hpBar = new Graphics();
+        const hpPercent = Math.max(0, Math.min(1, ship.hullMax > 0 ? ship.hullCurrent / ship.hullMax : 0));
+        hpBar.rect(-24, radius + 8, 48, 5).fill({ color: 0x000000, alpha: 0.45 });
+        hpBar.rect(-24, radius + 8, 48 * hpPercent, 5).fill({ color: 0x3ddb6f, alpha: 0.95 });
+        token.addChild(hpBar);
 
-      layers.ships.addChild(token);
-      layers.labels.addChild(label);
+        const label = new Text({
+          text: `${ship.id.slice(-6)}  F:${Math.round(ship.fluxHard + ship.fluxSoft)}/${Math.round(ship.fluxMax)}`,
+          style: labelStyle,
+        });
+        label.anchor.set(0.5, 1);
+        label.position.set(ship.transform.x, ship.transform.y - radius - 8);
+
+        layers.ships.addChild(token);
+        layers.labels.addChild(label);
+        cache.set(ship.id, { token, label, hpBar, isSelected });
+      }
     }
   }, [layers, ships, selectedShipId, onSelectShip]);
 
@@ -565,7 +617,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!selectedShip) return;
 
     // 绘制选中舰船的武器射界
-    selectedShip.weapons.forEach((weaponSlot, weaponId) => {
+    selectedShip.weapons.forEach((weaponSlot, _weaponId) => {
       // 从预设获取武器数据
       const weaponArc = 90; // 默认射界
       const weaponRange = weaponSlot.range || 300;
@@ -663,15 +715,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   return (
     <div
       ref={hostRef}
-      style={{
-        width: '100%',
-        height: canvasHeight,
-        border: '2px solid rgba(74, 158, 255, 0.3)',
-        borderRadius: 14,
-        overflow: 'hidden',
-        background: 'rgba(6, 16, 26, 0.85)',
-        boxShadow: '0 0 28px rgba(74, 158, 255, 0.12)',
-      }}
+      className="game-map-container"
     >
       <Application
         resizeTo={hostRef}
@@ -769,6 +813,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             movementVisuals: movementVisualsLayer,
           });
 
+          pixiAppRef.current = app;
           app.stage.eventMode = 'static';
           app.stage.hitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
           app.stage.cursor = 'grab';

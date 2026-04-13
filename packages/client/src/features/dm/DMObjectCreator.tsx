@@ -5,6 +5,8 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import type { FactionValue } from '@vt/contracts';
+import { Faction } from '@vt/contracts';
 import { getAvailableShips } from '@vt/rules';
 
 type TokenType = 'ship' | 'station' | 'asteroid';
@@ -196,7 +198,7 @@ interface DMObjectCreatorProps {
     x: number;
     y: number;
     heading: number;
-    faction: 'player' | 'dm';
+    faction: FactionValue;
     ownerId?: string;
   }) => void;
   players: Array<{ sessionId: string; name: string; role: string }>;
@@ -225,7 +227,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
   const [positionY, setPositionY] = useState(0);
   const [heading, setHeading] = useState(0);
   // 阵营和归属
-  const [faction, setFaction] = useState<'player' | 'dm'>('dm');
+  const [faction, setFaction] = useState<FactionValue>(Faction.DM);
   const [ownerId, setOwnerId] = useState<string>('');
   // 摆放模式
   const [placementMode, setPlacementMode] = useState<'manual' | 'click'>('click');
@@ -238,7 +240,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
     setPositionX(0);
     setPositionY(0);
     setHeading(0);
-    setFaction('dm');
+    setFaction(Faction.DM);
     setOwnerId('');
   }, []);
 
@@ -372,13 +374,13 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
           <select
             style={styles.select}
             value={faction}
-            onChange={(e) => setFaction(e.target.value as 'player' | 'dm')}
+            onChange={(e) => setFaction(e.target.value as FactionValue)}
           >
-            <option value="player">玩家阵营</option>
-            <option value="dm">DM 阵营（敌方）</option>
+            <option value={Faction.PLAYER}>玩家阵营</option>
+            <option value={Faction.DM}>DM 阵营（敌方）</option>
           </select>
         </div>
-        {faction === 'player' && (
+        {faction === Faction.PLAYER && (
           <div style={styles.inputRow}>
             <span style={styles.inputLabel}>归属</span>
             <select

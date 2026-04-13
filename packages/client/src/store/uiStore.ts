@@ -1,10 +1,6 @@
 import { create } from "zustand";
-import type { GameRoomState, ShipState } from "@vt/contracts";
+import type { GameRoomState, ShipState, PlayerRoleValue } from "@vt/contracts";
 
-/**
- * 本地UI状态存储
- * 注意：这里只存储客户端本地UI状态，不涉及游戏逻辑状态
- */
 // 交互模式枚举
 export type InteractionMode =
   | 'IDLE'
@@ -22,7 +18,7 @@ interface UIState {
   // 连接状态
   isConnected: boolean;
   connectionError: string | null;
-  playerRole: "player" | "dm" | null;
+  playerRole: PlayerRoleValue | null;
   roomId: string | null;
 
   // 选中的舰船及交互模式
@@ -66,7 +62,7 @@ interface UIActions {
   // 连接相关
   setConnected: (connected: boolean) => void;
   setConnectionError: (error: string | null) => void;
-  setPlayerRole: (role: "player" | "dm" | null) => void;
+  setPlayerRole: (role: PlayerRoleValue | null) => void;
   setRoomId: (roomId: string | null) => void;
 
   // 选择相关
@@ -219,7 +215,7 @@ export function updateGameStateRef(state: GameRoomState): void {
 
   // 同步舰船数据
   gameStateRef.ships.clear();
-  state.ships.forEach((ship, key) => {
+  for (const [key, ship] of (state.ships as Map<string, ShipState>).entries()) {
     gameStateRef.ships.set(key, ship);
-  });
+  }
 }

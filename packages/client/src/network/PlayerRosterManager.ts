@@ -1,16 +1,16 @@
 import type { Room } from "@colyseus/sdk";
-import type { ConnectionQuality, GameRoomState } from "@vt/contracts";
+import type { GameRoomState, ConnectionQualityValue, PlayerRoleValue } from "@vt/contracts";
 
 export interface PlayerView {
   sessionId: string;
   shortId: number;
   name: string;
-  role: "dm" | "player";
+  role: PlayerRoleValue;
   isReady: boolean;
   connected: boolean;
   pingMs: number;
   jitterMs: number;
-  quality: ConnectionQuality;
+  quality: ConnectionQualityValue;
 }
 
 export type PlayerRosterListener = (players: PlayerView[]) => void;
@@ -50,8 +50,8 @@ export class PlayerRosterManager {
   getPlayers(): PlayerView[] {
     const playersByIdentity = new Map<string, PlayerView>();
 
-    this.room.state.players.forEach((p, id) => {
-      const shortId = (p as typeof p & { shortId?: number }).shortId ?? 0;
+    for (const [id, p] of (this.room.state.players as Map<string, any>).entries()) {
+      const shortId = (p as { shortId?: number }).shortId ?? 0;
       const playerView: PlayerView = {
         sessionId: id,
         shortId,
@@ -69,7 +69,7 @@ export class PlayerRosterManager {
 
       if (!current) {
         playersByIdentity.set(identityKey, playerView);
-        return;
+        continue;
       }
 
       const shouldReplace = (playerView.connected && !current.connected)
@@ -79,11 +79,11 @@ export class PlayerRosterManager {
       if (shouldReplace) {
         playersByIdentity.set(identityKey, playerView);
       }
-    });
+    }
 
     return Array.from(playersByIdentity.values()).sort((a, b) => {
       if (a.role !== b.role) {
-        return a.role === "dm" ? -1 : 1;
+        return a.role === 'DM' ? -1 : 1;
       }
       return a.name.localeCompare(b.name);
     });
