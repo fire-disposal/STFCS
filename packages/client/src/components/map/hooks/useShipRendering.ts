@@ -1,3 +1,4 @@
+import { toRadians } from "@/utils/mathUtils";
 import type { ShipState } from "@vt/contracts";
 import { Faction } from "@vt/contracts";
 import { Graphics, Text, TextStyle } from "pixi.js";
@@ -96,12 +97,19 @@ export function renderShips(
 			token.eventMode = "static";
 			token.cursor = "pointer";
 
-			token.on("pointertap", (e) => {
-				const isDoubleClick = handleClick?.(e.data.global.x, e.data.global.y);
-				if (isDoubleClick) {
-					storeSelectShip?.(ship.id);
-					onSelectShip?.(ship.id);
-				} else if (ship.id !== selectedShipId) {
+			// 添加点击吸附范围（半径 + 15px 吸附区域）
+			// 使用 Rectangle 作为 hitArea
+			const hitRadius = radius + 15;
+			token.hitArea = {
+				x: -hitRadius,
+				y: -hitRadius,
+				width: hitRadius * 2,
+				height: hitRadius * 2,
+			};
+
+			token.on("pointertap", () => {
+				// 单击即可选中
+				if (ship.id !== selectedShipId) {
 					storeSelectShip?.(ship.id);
 					onSelectShip?.(ship.id);
 				}
@@ -109,8 +117,25 @@ export function renderShips(
 
 			token.on("pointermove", (e) => {
 				if (setMouseWorldPosition && canvasWidth && canvasHeight && zoom && cameraX && cameraY) {
-					const worldX = (e.data.global.x - canvasWidth / 2) / zoom + cameraX;
-					const worldY = (e.data.global.y - canvasHeight / 2) / zoom + cameraY;
+					// e.data.global.x/y 是 PixiJS 的屏幕空间坐标（画布中心为原点）
+					// 需要转换为世界坐标
+					const screenX = e.data.global.x;
+					const screenY = e.data.global.y;
+
+					// 屏幕坐标转世界坐标（考虑旋转）
+					// PixiJS 的 world.rotation 已经应用了视图旋转
+					// global 坐标是相对于画布中心的，需要反向旋转补偿
+					const dx = screenX;
+					const dy = screenY;
+					const theta = toRadians(-viewRotation);
+					const cos = Math.cos(theta);
+					const sin = Math.sin(theta);
+					const rotatedX = (dx * cos - dy * sin) / zoom;
+					const rotatedY = (dx * sin + dy * cos) / zoom;
+
+					const worldX = rotatedX + cameraX;
+					const worldY = rotatedY + cameraY;
+
 					setMouseWorldPosition(worldX, worldY);
 				}
 			});
@@ -152,7 +177,8 @@ export function useShipRendering(
 	canvasWidth?: number,
 	canvasHeight?: number,
 	handleClick?: (x: number, y: number) => boolean,
-	storeSelectShip?: (shipId: string) => void
+	storeSelectShip?: (shipId: string) => void,
+	viewRotation?: number
 ) {
 	useEffect(() => {
 		renderShips(

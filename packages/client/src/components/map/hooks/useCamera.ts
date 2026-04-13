@@ -1,3 +1,4 @@
+import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/mathUtils";
 import { useCallback, useEffect, useRef } from "react";
 import type { CanvasSize } from "./useCanvasResize";
 
@@ -51,32 +52,23 @@ export function useCamera(
 			const centerY = canvasSize.height / 2;
 			const relativeX = screenX - centerX;
 			const relativeY = screenY - centerY;
-			const theta = (rotationValue * Math.PI) / 180;
-			const cos = Math.cos(-theta);
-			const sin = Math.sin(-theta);
-			const worldDeltaX = (relativeX * cos - relativeY * sin) / zoomValue;
-			const worldDeltaY = (relativeX * sin + relativeY * cos) / zoomValue;
-
-			return {
-				x: cameraXValue + worldDeltaX,
-				y: cameraYValue + worldDeltaY,
-			};
+			// 使用统一的坐标转换工具
+			return screenToWorld(
+				relativeX,
+				relativeY,
+				zoomValue,
+				cameraXValue,
+				cameraYValue,
+				rotationValue
+			);
 		},
 		[canvasSize.width, canvasSize.height]
 	);
 
 	const screenDeltaToWorldDelta = useCallback((deltaX: number, deltaY: number) => {
 		const { zoom: currentZoom, viewRotation: currentRotation } = cameraRef.current;
-		const theta = (currentRotation * Math.PI) / 180;
-		const cos = Math.cos(-theta);
-		const sin = Math.sin(-theta);
-		const scaledX = -deltaX / currentZoom;
-		const scaledY = -deltaY / currentZoom;
-
-		return {
-			x: scaledX * cos - scaledY * sin,
-			y: scaledX * sin + scaledY * cos,
-		};
+		// 使用统一的向量转换工具
+		return deltaUtil(deltaX, deltaY, currentZoom, currentRotation);
 	}, []);
 
 	const animateZoomToTarget = useCallback(() => {

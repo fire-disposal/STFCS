@@ -131,17 +131,19 @@ const styles = {
 		gap: "2px",
 	},
 	inputRow: {
-		display: "flex",
+		display: "grid",
+		gridTemplateColumns: "1fr 1fr 80px",
 		gap: "6px",
 	},
 	input: {
-		flex: 1,
+		width: "100%",
 		padding: "8px",
 		borderRadius: "0",
 		border: "1px solid rgba(90, 42, 58, 0.8)",
 		backgroundColor: "rgba(26, 45, 66, 0.8)",
 		color: "#cfe8ff",
 		fontSize: "10px",
+		boxSizing: "border-box" as const,
 	},
 	select: {
 		width: "100%",
@@ -160,12 +162,6 @@ const styles = {
 		fontSize: "10px",
 		textAlign: "center" as const,
 		border: "1px dashed rgba(255, 111, 143, 0.4)",
-	},
-	emptyState: {
-		textAlign: "center" as const,
-		color: "#8ba4c7",
-		padding: "8px",
-		fontSize: "10px",
 	},
 };
 
@@ -194,15 +190,15 @@ interface DMObjectCreatorProps {
 		ownerId?: string;
 	}) => void;
 	players: Array<{ sessionId: string; name: string; role: string }>;
-	isPlacementMode: boolean;
-	onTogglePlacementMode: () => void;
+	mapCursor: { x: number; y: number; heading: number } | null;
 }
+
+// 移除未使用的样式
 
 export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	onCreateObject,
 	players,
-	isPlacementMode,
-	onTogglePlacementMode,
+	mapCursor,
 }) => {
 	// 折叠状态
 	const [collapsed, setCollapsed] = useState(false);
@@ -210,9 +206,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	const [objectType, setObjectType] = useState<TokenType>("ship");
 	// 选中的舰船 ID
 	const [selectedHullId, setSelectedHullId] = useState<string>("frigate_assault");
-	// 摆放位置
-	const [positionX, setPositionX] = useState(0);
-	const [positionY, setPositionY] = useState(0);
+	// 朝向（从游标继承）
 	const [heading, setHeading] = useState(0);
 	// 阵营和归属
 	const [faction, setFaction] = useState<FactionValue>(Faction.DM);
@@ -221,59 +215,20 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	// 可用舰船列表
 	const availableShips = useMemo(() => getAvailableShips(), []);
 
-	// 重置状态
-	const resetState = useCallback(() => {
-		setPositionX(0);
-		setPositionY(0);
-		setHeading(0);
-		setFaction(Faction.DM);
-		setOwnerId("");
-	}, []);
-
-	// 处理创建对象 - 手动模式直接创建
+	// 处理创建对象 - 直接在游标位置创建
 	const handleCreate = useCallback(() => {
+		if (!mapCursor) return;
+
 		onCreateObject({
 			type: objectType,
 			hullId: objectType === "ship" ? selectedHullId : undefined,
-			x: positionX,
-			y: positionY,
-			heading,
+			x: mapCursor.x,
+			y: mapCursor.y,
+			heading: mapCursor.heading,
 			faction,
 			ownerId: ownerId || undefined,
 		});
-		resetState();
-	}, [
-		objectType,
-		selectedHullId,
-		positionX,
-		positionY,
-		heading,
-		faction,
-		ownerId,
-		onCreateObject,
-		resetState,
-	]);
-
-	// 准备摆放数据 - 点击摆放模式下调用
-	const preparePlacement = useCallback(() => {
-		onCreateObject({
-			type: objectType,
-			hullId: objectType === "ship" ? selectedHullId : undefined,
-			x: positionX,
-			y: positionY,
-			heading,
-			faction,
-			ownerId: ownerId || undefined,
-		});
-	}, [objectType, selectedHullId, positionX, positionY, heading, faction, ownerId, onCreateObject]);
-
-	// 启用点击摆放模式
-	const enableClickPlacement = useCallback(() => {
-		if (!isPlacementMode) {
-			preparePlacement();
-			onTogglePlacementMode();
-		}
-	}, [isPlacementMode, preparePlacement, onTogglePlacementMode]);
+	}, [objectType, selectedHullId, mapCursor, faction, ownerId, onCreateObject]);
 
 	return (
 		<div style={styles.panel}>
@@ -351,56 +306,31 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						</div>
 					)}
 
-					{/* 摆放模式提示 */}
-					{isPlacementMode && <div style={styles.modeHint}>🎯 请点击地图选择摆放位置</div>}
+					{/* 游标位置提示 */}
+					{mapCursor ? (
+						<div style={styles.modeHint}>
+							🎯 游标位置：({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) 朝向：
+							{Math.round(mapCursor.heading)}°
+						</div>
+					) : (
+						<div style={styles.modeHint}>🎯 右键点击地图设置游标位置</div>
+					)}
 
-					{/* 位置设置 */}
+					{/* 朝向设置 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
 							<MapPin className="game-icon--xs" />
-							摆放位置
+							朝向调整
 						</div>
-						<div style={styles.inputRow}>
-							<input
-								style={styles.input}
-								type="number"
-								placeholder="X"
-								value={positionX}
-								onChange={(e) => setPositionX(Number(e.target.value))}
-								disabled={isPlacementMode}
-							/>
-							<input
-								style={styles.input}
-								type="number"
-								placeholder="Y"
-								value={positionY}
-								onChange={(e) => setPositionY(Number(e.target.value))}
-								disabled={isPlacementMode}
-							/>
-							<input
-								style={styles.input}
-								type="number"
-								placeholder="朝向"
-								value={heading}
-								onChange={(e) => setHeading(Number(e.target.value))}
-								min={0}
-								max={359}
-							/>
-						</div>
-						<button
-							data-magnetic
-							className="game-btn game-btn--primary game-btn--full"
-							onClick={() => {
-								if (!isPlacementMode) {
-									preparePlacement();
-									onTogglePlacementMode();
-								}
-							}}
-							disabled={isPlacementMode}
-						>
-							<MapPin className="game-icon--xs" />
-							{isPlacementMode ? "请点击地图选择位置" : "点击地图选择位置"}
-						</button>
+						<input
+							style={styles.input}
+							type="number"
+							placeholder="朝向 (0-359)"
+							value={heading}
+							onChange={(e) => setHeading(Number(e.target.value))}
+							min={0}
+							max={359}
+						/>
 					</div>
 
 					{/* 阵营和归属权 */}
@@ -440,9 +370,10 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						data-magnetic
 						className="game-btn game-btn--primary game-btn--full"
 						onClick={handleCreate}
+						disabled={!mapCursor}
 					>
 						<Sparkles className="game-icon--xs" />
-						创建对象
+						{mapCursor ? "创建对象" : "请先设置游标位置"}
 					</button>
 				</div>
 			)}

@@ -1,3 +1,4 @@
+import { screenToWorld } from "@/utils/mathUtils";
 import { useCallback, useEffect, useRef } from "react";
 import type { UseCameraResult } from "./useCamera";
 import type { CanvasSize } from "./useCanvasResize";
@@ -44,20 +45,24 @@ export function useZoomInteraction(
 				current.viewRotation
 			);
 
+			// 使用统一的坐标转换计算新相机位置
 			const centerX = canvasSize.width / 2;
 			const centerY = canvasSize.height / 2;
 			const relativeX = screenX - centerX;
 			const relativeY = screenY - centerY;
-			const theta = (current.viewRotation * Math.PI) / 180;
-			const cos = Math.cos(-theta);
-			const sin = Math.sin(-theta);
-			const newWorldDeltaX = (relativeX * cos - relativeY * sin) / nextZoom;
-			const newWorldDeltaY = (relativeX * sin + relativeY * cos) / nextZoom;
+			const newWorldPoint = screenToWorld(
+				relativeX,
+				relativeY,
+				nextZoom,
+				0, // 相机位置为 0，因为我们要的是相对偏移
+				0,
+				current.viewRotation
+			);
 
 			zoomTargetRef.current = {
 				zoom: nextZoom,
-				cameraX: worldPoint.x - newWorldDeltaX,
-				cameraY: worldPoint.y - newWorldDeltaY,
+				cameraX: worldPoint.x - newWorldPoint.x,
+				cameraY: worldPoint.y - newWorldPoint.y,
 			};
 
 			if (zoomAnimationRef.current !== null) {

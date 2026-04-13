@@ -9,6 +9,8 @@
  * 支持向右折叠收缩
  */
 
+import { useCameraAnimation } from "@/hooks/useCameraAnimation";
+import { useUIStore } from "@/store/uiStore";
 import type { Room } from "@colyseus/sdk";
 import type { FactionValue, GameRoomState, PlayerState, ShipState } from "@vt/contracts";
 import { ChevronLeft, ChevronRight, FileText, Monitor, Palette } from "lucide-react";
@@ -98,6 +100,20 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 	const [activeTab, setActiveTab] = useState<TabId>("view");
 	const [isCollapsed, setIsCollapsed] = useState(false);
 
+	// 摄像机动画 Hook
+	const cameraAnimation = useCameraAnimation({
+		onCameraChange,
+		onViewRotationChange,
+		onZoomChange,
+		currentX: cameraX,
+		currentY: cameraY,
+		currentRotation: viewRotation,
+		currentZoom: zoom,
+	});
+
+	// 游标状态
+	const { mapCursor, setMapCursor, clearMapCursor } = useUIStore();
+
 	const tabs: TabDef[] = [
 		{ id: "view", label: "视图", Icon: Monitor },
 		{ id: "log", label: "日志", Icon: FileText },
@@ -181,7 +197,12 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 						onToggleBackground={onToggleBackground}
 						onToggleWeaponArcs={onToggleWeaponArcs}
 						onToggleMovementRange={onToggleMovementRange}
+						cameraAnimation={cameraAnimation}
 						onResetView={onResetView}
+						mapCursor={mapCursor}
+						onSetMapCursor={setMapCursor}
+						onClearMapCursor={clearMapCursor}
+						cursorR={mapCursor?.heading ?? null}
 					/>
 				)}
 
@@ -200,8 +221,7 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 									name: p.nickname || p.name,
 									role: p.role,
 								}))}
-							isPlacementMode={isPlacementMode}
-							onTogglePlacementMode={onTogglePlacementMode}
+							mapCursor={mapCursor}
 						/>
 
 						<DMControlPanel

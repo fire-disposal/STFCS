@@ -4,7 +4,7 @@ import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
 import { Application } from "@pixi/react";
 import type { ShipState } from "@vt/contracts";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
 	useCamera,
 	useCanvasResize,
@@ -12,6 +12,7 @@ import {
 	useInitializeStarfield,
 	useInteraction,
 	useLayerSystem,
+	useMapCursor,
 	useMovementRendering,
 	usePixiApp,
 	useShipRendering,
@@ -76,23 +77,31 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
 	const { selectShip: storeSelectShip, setMouseWorldPosition, handleClick } = useSelectionStore();
-	const { setZoom, setCameraPosition } = useUIStore();
+	const { setZoom, setCameraPosition, setMapCursor, mapCursor } = useUIStore();
 	const movementState = useAppSelector((state: any) => state.movement) as MovementState;
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
 	const interaction = useInteraction(onPanDelta, onRotateDelta, camera.screenDeltaToWorldDelta);
 	const layerSystem = useLayerSystem();
 	const zoomInteraction = useZoomInteraction(camera, canvasSize, setZoom, setCameraPosition);
-	const pixiApp = usePixiApp(
+	const pixiApp = usePixiApp({
 		canvasSize,
-		camera.cameraRef,
-		interaction.dragStateRef,
-		interaction.spacePressedRef,
-		interaction.flushDragDelta,
-		interaction.scheduleDragFlush,
+		cameraRef: camera.cameraRef,
+		dragStateRef: interaction.dragStateRef,
+		spacePressedRef: interaction.spacePressedRef,
+		flushDragDelta: interaction.flushDragDelta,
+		scheduleDragFlush: interaction.scheduleDragFlush,
 		onClick,
-		layerSystem.setLayers
-	);
+		setLayers: layerSystem.setLayers,
+		setMapCursor,
+	});
+
+	// 游标渲染
+	useMapCursor({
+		layers: layerSystem.layers,
+		mapCursor,
+		options: { cameraX, cameraY, zoom, viewRotation },
+	});
 
 	useWheelZoom(hostRef, zoomInteraction.queueZoom);
 	useStarfieldRendering(layerSystem.layers, starfield);
@@ -109,7 +118,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		canvasSize.width,
 		canvasSize.height,
 		handleClick,
-		storeSelectShip
+		storeSelectShip,
+		viewRotation
 	);
 	useMovementRendering(layerSystem.layers, ships, selectedShipId, movementState);
 
@@ -120,10 +130,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useGridRendering(layerSystem.layers, showGrid);
 
+	// 同步相机状态
 	useEffect(() => {
 		camera.cameraRef.current = { cameraX, cameraY, zoom, viewRotation };
-	}, [cameraX, cameraY, zoom, viewRotation]);
+	}, [camera, cameraX, cameraY, zoom, viewRotation]);
 
+	// 更新图层变换
 	useEffect(() => {
 		layerSystem.updateLayerTransforms(
 			zoom,
@@ -135,16 +147,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		);
 	}, [layerSystem, zoom, cameraX, cameraY, canvasSize, viewRotation, showBackground]);
 
+	// 更新点击区域
 	useEffect(() => {
 		layerSystem.updateHitAreas(canvasSize);
 	}, [layerSystem, canvasSize]);
 
-	const handleInit = useCallback(
-		(app: any) => {
-			pixiApp.handleInit(app);
-		},
-		[pixiApp]
-	);
+	// 设置游标事件监听（在 usePixiApp 中统一处理）
+
+	const handleInit = (app: any) => {
+		pixiApp.handleInit(app);
+	};
 
 	return (
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container">

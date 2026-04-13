@@ -10,6 +10,7 @@ export interface LayerRegistry {
 	starfieldNear: Container;
 	starfieldNebula: Container;
 	grid: Container;
+	cursor: Container; // 游标层（独立于网格，不随视图旋转）
 	ships: Container;
 	labels: Container;
 	effects: Container;

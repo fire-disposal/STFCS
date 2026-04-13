@@ -15,6 +15,8 @@ import { notify } from "@/components/ui/Notification";
 import { PhaseBar } from "@/features/game/PhaseBar";
 import { PlayerRosterModal } from "@/features/lobby";
 import { FuelBasedMovementController } from "@/features/movement/FuelBasedMovementController";
+import { BottomCommandDock } from "@/features/ui/BottomCommandDock";
+import { RightSidePanel } from "@/features/ui/RightSidePanel";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { useCurrentGameRoom } from "@/hooks";
 import { NetworkManager } from "@/network/NetworkManager";
@@ -319,27 +321,15 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				</div>
 
 				<div className="game-layout__top-bar-right">
-					<button
-						data-magnetic
-						className="game-btn game-btn--small"
-						onClick={() => setShowPlayerRoster(true)}
-					>
+					<button data-magnetic className="game-btn" onClick={() => setShowPlayerRoster(true)}>
 						<Users className="game-btn__icon game-btn__icon--left" />
 						玩家
 					</button>
-					<button
-						data-magnetic
-						className="game-btn game-btn--small"
-						onClick={() => setShowSettings(true)}
-					>
+					<button data-magnetic className="game-btn" onClick={() => setShowSettings(true)}>
 						<Settings className="game-btn__icon game-btn__icon--left" />
 						设置
 					</button>
-					<button
-						data-magnetic
-						className="game-btn game-btn--small game-btn--danger"
-						onClick={onLeaveRoom}
-					>
+					<button data-magnetic className="game-btn game-btn--danger" onClick={onLeaveRoom}>
 						<LogOut className="game-btn__icon game-btn__icon--left" />
 						离开
 					</button>

@@ -9,9 +9,10 @@
  * - 视图操作（重置、归零等）
  */
 
+import { CursorCoordinateInput } from "@/components/map/CursorCoordinateInput";
+import { CoordinateInput } from "@/components/ui/CoordinateInput";
+import type { UseCameraAnimationResult } from "@/hooks/useCameraAnimation";
 import {
-	Check,
-	Copy,
 	Crosshair,
 	Grid3X3,
 	Home,
@@ -20,13 +21,12 @@ import {
 	Monitor,
 	Move,
 	Navigation2,
-	RotateCcnw,
 	RotateCcw,
 	RotateCw,
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 
 interface ViewControlPanelProps {
 	zoom: number;
@@ -45,6 +45,11 @@ interface ViewControlPanelProps {
 	onToggleWeaponArcs: () => void;
 	onToggleMovementRange: () => void;
 	onResetView: () => void;
+	cameraAnimation?: UseCameraAnimationResult;
+	mapCursor?: { x: number; y: number; heading: number } | null;
+	onSetMapCursor: (x: number, y: number, heading: number) => void;
+	onClearMapCursor: () => void;
+	cursorR?: number | null;
 }
 
 export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
@@ -64,40 +69,12 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 	onToggleWeaponArcs,
 	onToggleMovementRange,
 	onResetView,
+	cameraAnimation,
+	mapCursor,
+	onSetMapCursor,
+	onClearMapCursor,
+	cursorR,
 }) => {
-	const [inputX, setInputX] = useState<string>("");
-	const [inputY, setInputY] = useState<string>("");
-	const [inputRotation, setInputRotation] = useState<string>("");
-	const [copiedField, setCopiedField] = useState<string | null>(null);
-
-	// 处理坐标跳转
-	const handleJumpToPosition = () => {
-		const x = parseFloat(inputX);
-		const y = parseFloat(inputY);
-		if (!isNaN(x) && !isNaN(y)) {
-			onCameraChange(x, y);
-		}
-	};
-
-	// 处理旋转角度设置
-	const handleSetRotation = () => {
-		const rotation = parseFloat(inputRotation);
-		if (!isNaN(rotation)) {
-			onViewRotationChange(rotation % 360);
-		}
-	};
-
-	// 复制坐标到剪贴板
-	const copyToClipboard = async (text: string, field: string) => {
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopiedField(field);
-			setTimeout(() => setCopiedField(null), 2000);
-		} catch (err) {
-			console.error("复制失败:", err);
-		}
-	};
-
 	// 缩放控制
 	const handleZoomIn = () => {
 		onZoomChange(Math.min(zoom * 1.2, 5));
@@ -131,8 +108,42 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		onZoomChange(1);
 	};
 
+	// 视图预设
+	const viewPresets = [
+		{ name: "全局", zoom: 0.5, x: 0, y: 0, rotation: 0 },
+		{ name: "标准", zoom: 1, x: 0, y: 0, rotation: 0 },
+		{ name: "局部", zoom: 2, x: 0, y: 0, rotation: 0 },
+		{ name: "细节", zoom: 3, x: 0, y: 0, rotation: 0 },
+	];
+
+	const applyPreset = (preset: (typeof viewPresets)[0]) => {
+		onZoomChange(preset.zoom);
+		onCameraChange(preset.x, preset.y);
+		onViewRotationChange(preset.rotation);
+	};
+
 	return (
 		<div className="view-control-panel">
+			{/* 视图状态概览 */}
+			<div className="view-status-bar">
+				<div className="view-status-item">
+					<span className="view-status-label">坐标</span>
+					<span className="view-status-value">
+						({Math.round(cameraX)}, {Math.round(cameraY)})
+					</span>
+				</div>
+				<div className="view-status-divider" />
+				<div className="view-status-item">
+					<span className="view-status-label">缩放</span>
+					<span className="view-status-value">{zoom.toFixed(2)}x</span>
+				</div>
+				<div className="view-status-divider" />
+				<div className="view-status-item">
+					<span className="view-status-label">旋转</span>
+					<span className="view-status-value">{Math.round(viewRotation)}°</span>
+				</div>
+			</div>
+
 			{/* 视图信息区块 */}
 			<div className="view-section">
 				<div className="view-section__title">
@@ -146,65 +157,50 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<Navigation2 className="view-field__icon" />
 						<span>相机坐标</span>
 					</div>
-					<div className="view-field__row">
-						<div className="view-field__input-group">
-							<span className="view-field__prefix">X:</span>
-							<input
-								type="number"
-								className="view-field__input"
-								value={inputX || cameraX.toFixed(1)}
-								onChange={(e) => setInputX(e.target.value)}
-								onBlur={() => setInputX("")}
-								onFocus={(e) => e.target.select()}
-								step="10"
-							/>
-							<button
-								data-magnetic
-								className="view-field__copy-btn"
-								onClick={() => copyToClipboard(cameraX.toFixed(1), "x")}
-								title="复制 X 坐标"
-							>
-								{copiedField === "x" ? (
-									<Check className="game-icon--xs" />
-								) : (
-									<Copy className="game-icon--xs" />
-								)}
-							</button>
-						</div>
-						<div className="view-field__input-group">
-							<span className="view-field__prefix">Y:</span>
-							<input
-								type="number"
-								className="view-field__input"
-								value={inputY || cameraY.toFixed(1)}
-								onChange={(e) => setInputY(e.target.value)}
-								onBlur={() => setInputY("")}
-								onFocus={(e) => e.target.select()}
-								step="10"
-							/>
-							<button
-								data-magnetic
-								className="view-field__copy-btn"
-								onClick={() => copyToClipboard(cameraY.toFixed(1), "y")}
-								title="复制 Y 坐标"
-							>
-								{copiedField === "y" ? (
-									<Check className="game-icon--xs" />
-								) : (
-									<Copy className="game-icon--xs" />
-								)}
-							</button>
-						</div>
-						<button
-							data-magnetic
-							className="view-field__action-btn"
-							onClick={handleJumpToPosition}
-							disabled={!inputX && !inputY}
-						>
-							<Move className="game-icon--xs" />
-							<span>跳转</span>
-						</button>
+					{/* 一体化坐标输入组件 */}
+					<CoordinateInput
+						cameraX={cameraX}
+						cameraY={cameraY}
+						viewRotation={viewRotation}
+						zoom={zoom}
+						onCameraChange={onCameraChange}
+						onViewRotationChange={onViewRotationChange}
+						onZoomChange={onZoomChange}
+						animateToCoords={cameraAnimation?.animateToCoords}
+						worldBounds={{
+							minX: -10000,
+							maxX: 10000,
+							minY: -10000,
+							maxY: 10000,
+							minZoom: 0.1,
+							maxZoom: 5,
+						}}
+					/>
+				</div>
+
+				{/* 游标坐标 */}
+				<div className="view-field-group">
+					<div className="view-field__label">
+						<Move className="view-field__icon" />
+						<span>游标位置</span>
 					</div>
+					<CursorCoordinateInput
+						cursorX={mapCursor?.x ?? null}
+						cursorY={mapCursor?.y ?? null}
+						cursorR={cursorR ?? null}
+						cameraX={cameraX}
+						cameraY={cameraY}
+						viewRotation={viewRotation}
+						onCameraChange={onCameraChange}
+						onSetMapCursor={onSetMapCursor}
+						onClearMapCursor={onClearMapCursor}
+						worldBounds={{
+							minX: -10000,
+							maxX: 10000,
+							minY: -10000,
+							maxY: 10000,
+						}}
+					/>
 				</div>
 
 				{/* 缩放信息 */}
@@ -225,7 +221,21 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 								title="缩小"
 							>
 								<ZoomOut className="game-icon--sm" />
+							</button>
+							<button
+								data-magnetic
+								className="view-field__control-btn"
+								onClick={handleZoomReset}
+								title="重置缩放"
+							>
 								<Maximize className="game-icon--sm" />
+							</button>
+							<button
+								data-magnetic
+								className="view-field__control-btn"
+								onClick={handleZoomIn}
+								title="放大"
+							>
 								<ZoomIn className="game-icon--sm" />
 							</button>
 						</div>
@@ -247,32 +257,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				<div className="view-field-group">
 					<div className="view-field__label">
 						<RotateCcw className="view-field__icon" />
-						<span>视图旋转</span>
-					</div>
-					<div className="view-field__row">
-						<div className="view-field__value-display">
-							<span className="view-field__value">{viewRotation.toFixed(1)}°</span>
-						</div>
-						<div className="view-field__input-group">
-							<input
-								type="number"
-								className="view-field__input view-field__input--small"
-								value={inputRotation || ""}
-								onChange={(e) => setInputRotation(e.target.value)}
-								onBlur={() => setInputRotation("")}
-								onFocus={(e) => e.target.select()}
-								placeholder="角度"
-								step="15"
-							/>
-							<button
-								data-magnetic
-								className="view-field__action-btn view-field__action-btn--small"
-								onClick={handleSetRotation}
-								disabled={!inputRotation}
-							>
-								<span>设置</span>
-							</button>
-						</div>
+						<span>视图旋转（已在坐标组件中控制）</span>
 					</div>
 					<div className="view-field__buttons view-field__buttons--spread">
 						<button
@@ -281,8 +266,24 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 							onClick={handleRotateLeft}
 							title="逆时针旋转 15°"
 						>
-							<RotateCcnw className="game-icon--sm" />
+							<RotateCcw className="game-icon--sm" />
+							<span>-15°</span>
+						</button>
+						<button
+							data-magnetic
+							className="view-field__control-btn view-field__control-btn--labeled"
+							onClick={handleRotateReset}
+							title="重置旋转"
+						>
 							<Home className="game-icon--sm" />
+							<span>归零</span>
+						</button>
+						<button
+							data-magnetic
+							className="view-field__control-btn view-field__control-btn--labeled"
+							onClick={handleRotateRight}
+							title="顺时针旋转 15°"
+						>
 							<RotateCw className="game-icon--sm" />
 							<span>+15°</span>
 						</button>
@@ -325,6 +326,27 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<Navigation2 className="view-toggle__icon" />
 						<span className="view-toggle__label">移动范围</span>
 					</label>
+				</div>
+			</div>
+
+			{/* 视图预设 */}
+			<div className="view-section">
+				<div className="view-section__title">
+					<Monitor className="view-section__icon" />
+					<span>视图预设</span>
+				</div>
+				<div className="view-presets">
+					{viewPresets.map((preset) => (
+						<button
+							key={preset.name}
+							data-magnetic
+							className="view-preset-btn"
+							onClick={() => applyPreset(preset)}
+							title={`缩放：${preset.zoom * 100}%, 位置：(${preset.x}, ${preset.y}), 旋转：${preset.rotation}°`}
+						>
+							{preset.name}
+						</button>
+					))}
 				</div>
 			</div>
 

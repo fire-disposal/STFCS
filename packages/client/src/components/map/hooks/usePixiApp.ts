@@ -1,5 +1,6 @@
+import { screenToWorld } from "@/utils/mathUtils";
 import { Container, Rectangle } from "pixi.js";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { CameraState } from "./useCamera";
 import type { CanvasSize } from "./useCanvasResize";
 import type { DragState } from "./useInteraction";
@@ -16,16 +17,31 @@ export interface UsePixiAppResult {
 	setLayers: (layers: LayerRegistry) => void;
 }
 
-export function usePixiApp(
-	canvasSize: CanvasSize,
-	cameraRef: React.MutableRefObject<CameraState>,
-	dragStateRef: React.MutableRefObject<DragState>,
-	spacePressedRef: React.MutableRefObject<boolean>,
-	flushDragDelta: () => void,
-	scheduleDragFlush: () => void,
-	onClick?: (x: number, y: number) => void,
-	setLayers?: (layers: LayerRegistry) => void
-): UsePixiAppResult {
+export interface UsePixiAppOptions {
+	canvasSize: CanvasSize;
+	cameraRef: React.MutableRefObject<CameraState>;
+	dragStateRef: React.MutableRefObject<DragState>;
+	spacePressedRef: React.MutableRefObject<boolean>;
+	flushDragDelta: () => void;
+	scheduleDragFlush: () => void;
+	onClick?: (x: number, y: number) => void;
+	setLayers?: (layers: LayerRegistry) => void;
+	setMapCursor?: (x: number, y: number, heading: number) => void;
+}
+
+export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
+	const {
+		canvasSize,
+		cameraRef,
+		dragStateRef,
+		spacePressedRef,
+		flushDragDelta,
+		scheduleDragFlush,
+		onClick,
+		setLayers,
+		setMapCursor,
+	} = options;
+
 	const pixiAppRef = useRef<any>(null);
 	const layersRef = useRef<LayerRegistry | null>(null);
 
@@ -33,19 +49,14 @@ export function usePixiApp(
 		(event: any, cameraState: CameraState, canvasSize: CanvasSize) => {
 			const screenX = typeof event.global?.x === "number" ? event.global.x : event.clientX;
 			const screenY = typeof event.global?.y === "number" ? event.global.y : event.clientY;
-			const centerX = canvasSize.width / 2;
-			const centerY = canvasSize.height / 2;
-			const relativeX = screenX - centerX;
-			const relativeY = screenY - centerY;
-			const theta = (cameraState.viewRotation * Math.PI) / 180;
-			const cos = Math.cos(-theta);
-			const sin = Math.sin(-theta);
-			const worldDeltaX = (relativeX * cos - relativeY * sin) / cameraState.zoom;
-			const worldDeltaY = (relativeX * sin + relativeY * cos) / cameraState.zoom;
-			return {
-				x: cameraState.cameraX + worldDeltaX,
-				y: cameraState.cameraY + worldDeltaY,
-			};
+			return screenToWorld(
+				screenX - canvasSize.width / 2,
+				screenY - canvasSize.height / 2,
+				cameraState.zoom,
+				cameraState.cameraX,
+				cameraState.cameraY,
+				cameraState.viewRotation
+			);
 		},
 		[]
 	);
@@ -81,6 +92,11 @@ export function usePixiApp(
 			grid.zIndex = 4;
 			grid.eventMode = "none";
 
+			const cursorLayer = new Container();
+			cursorLayer.zIndex = 4; // 与网格同层，但在网格之后绘制
+			cursorLayer.eventMode = "none";
+			// 游标层添加到 world 内，自动继承相机变换
+
 			const shipsLayer = new Container();
 			shipsLayer.zIndex = 5;
 			shipsLayer.eventMode = "static";
@@ -109,6 +125,7 @@ export function usePixiApp(
 				starfieldMid,
 				starfieldNear,
 				grid,
+				cursorLayer,
 				shipsLayer,
 				labels,
 				effects,
@@ -125,6 +142,7 @@ export function usePixiApp(
 				starfieldMid,
 				starfieldNear,
 				grid,
+				cursor: cursorLayer,
 				ships: shipsLayer,
 				labels,
 				effects,
@@ -137,18 +155,38 @@ export function usePixiApp(
 
 			pixiAppRef.current = app;
 			app.stage.eventMode = "static";
-			app.stage.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+			app.stage.hitArea = new Rectangle(
+				-canvasSize.width * 2,
+				-canvasSize.height * 2,
+				canvasSize.width * 4,
+				canvasSize.height * 4
+			);
 			app.stage.cursor = "grab";
 
-			app.stage.on("pointerdown", (event: any) => {
+			// 清理旧的事件监听器
+			const stage = app.stage;
+			stage.off("pointerdown");
+			stage.off("pointermove");
+			stage.off("pointerup");
+			stage.off("pointerupoutside");
+
+			// 绑定统一的事件监听器
+			stage.on("pointerdown", (event: any) => {
 				const target = event.target;
 				const button = event.button ?? event.data?.button ?? 0;
 				const dragState = dragStateRef.current;
 
+				// 右键 - 设置游标
 				if (button === 2) {
+					event.preventDefault();
+					if (setMapCursor) {
+						const worldPoint = getWorldPoint(event, cameraRef.current, canvasSize);
+						setMapCursor(worldPoint.x, worldPoint.y, cameraRef.current.viewRotation);
+					}
 					return;
 				}
 
+				// 中键 - 旋转视图
 				if (button === 1) {
 					dragState.active = true;
 					dragState.mode = "rotate";
@@ -161,6 +199,7 @@ export function usePixiApp(
 					return;
 				}
 
+				// 左键 - 平移或点击空白
 				if (button === 0) {
 					if (!spacePressedRef.current && target !== app.stage) {
 						return;
@@ -177,7 +216,7 @@ export function usePixiApp(
 				}
 			});
 
-			app.stage.on("pointermove", (event: any) => {
+			stage.on("pointermove", (event: any) => {
 				const dragState = dragStateRef.current;
 				if (!dragState.active) {
 					return;
@@ -224,8 +263,8 @@ export function usePixiApp(
 				app.stage.cursor = spacePressedRef.current ? "grab" : "default";
 			};
 
-			app.stage.on("pointerup", finishDrag);
-			app.stage.on("pointerupoutside", finishDrag);
+			stage.on("pointerup", finishDrag);
+			stage.on("pointerupoutside", finishDrag);
 		},
 		[
 			canvasSize,
@@ -237,12 +276,21 @@ export function usePixiApp(
 			cameraRef,
 			onClick,
 			flushDragDelta,
+			setMapCursor,
 		]
 	);
 
 	const setLayersRef = useCallback((layers: LayerRegistry) => {
 		layersRef.current = layers;
 	}, []);
+
+	// 更新 hitArea 以覆盖整个画布
+	useEffect(() => {
+		const app = pixiAppRef.current;
+		if (app?.stage && canvasSize.width > 0 && canvasSize.height > 0) {
+			app.stage.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+		}
+	}, [canvasSize.width, canvasSize.height]);
 
 	return {
 		handleInit,
