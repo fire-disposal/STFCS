@@ -14,6 +14,7 @@ import {
 	type MovementCommand,
 	MovementPhase,
 	advancePhase,
+	clearMovement,
 	completeAnimation,
 	executeMove,
 	getRemainingFuel,
@@ -57,13 +58,22 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 	}, [movementState, movementState.currentPhase]);
 
 	// 阶段名称
-	const phaseNames: Record<MovementPhase, string> = {
-		[MovementPhase.NONE]: "准备",
-		[MovementPhase.PHASE_A]: "A - 平移",
-		[MovementPhase.PHASE_B]: "B - 转向",
-		[MovementPhase.PHASE_C]: "C - 平移",
-		[MovementPhase.COMPLETED]: "完成",
-	} as const;
+	const getPhaseName = (phase: MovementPhase): string => {
+		switch (phase) {
+			case MovementPhase.NONE:
+				return "准备";
+			case MovementPhase.PHASE_A:
+				return "A - 平移";
+			case MovementPhase.PHASE_B:
+				return "B - 转向";
+			case MovementPhase.PHASE_C:
+				return "C - 平移";
+			case MovementPhase.COMPLETED:
+				return "完成";
+			default:
+				return "未知";
+		}
+	};
 
 	// 初始化移动流程
 	useEffect(() => {
@@ -341,7 +351,7 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 					<>
 						<div style={styles.phaseGroup}>
 							<div style={styles.phaseTitle}>
-								{isAnimating ? "⏳" : "📍"} {phaseNames[currentPhase]}
+								{isAnimating ? "⏳" : "📍"} {getPhaseName(currentPhase)}
 								{isAnimating && (
 									<span style={{ color: "#f1c40f", fontSize: "10px" }}>执行中...</span>
 								)}
@@ -379,7 +389,7 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 					<>
 						<div style={styles.phaseGroup}>
 							<div style={styles.phaseTitle}>
-								{isAnimating ? "⏳" : "🔄"} {phaseNames[currentPhase]}
+								{isAnimating ? "⏳" : "🔄"} {getPhaseName(currentPhase)}
 								{isAnimating && (
 									<span style={{ color: "#f1c40f", fontSize: "10px" }}>执行中...</span>
 								)}
@@ -474,7 +484,7 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 								...(isCompleted ? styles.phaseStepCompleted : {}),
 							}}
 						>
-							{phaseNames[p]}
+							{getPhaseName(p)}
 						</div>
 					);
 				})}

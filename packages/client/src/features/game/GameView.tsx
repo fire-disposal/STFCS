@@ -15,6 +15,7 @@ import { notify } from "@/components/ui/Notification";
 import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { TurnIndicator } from "@/features/game";
 import { PlayerRosterModal } from "@/features/lobby";
+import { FuelBasedMovementController } from "@/features/movement/FuelBasedMovementController";
 import { ArmorQuadrantDisplay, FluxSystemDisplay, ShipDetailPanel } from "@/features/ship";
 import { CommandDock } from "@/features/ui/CommandDock";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
