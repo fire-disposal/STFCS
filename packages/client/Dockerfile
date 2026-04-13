@@ -4,7 +4,7 @@
 # =============================================
 
 # ==================== Stage 1: Dependencies ====================
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN pnpm fetch --frozen-lockfile
 RUN pnpm install --frozen-lockfile --offline
 
 # ==================== Stage 2: Builder ====================
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
@@ -28,6 +28,7 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/pnpm-store ./pnpm-store
+COPY --from=deps /app/.pnpm-store ./pnpm-store
 
 # Copy workspace configuration
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
