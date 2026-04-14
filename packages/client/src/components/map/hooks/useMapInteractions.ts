@@ -160,12 +160,24 @@ export function useMapInteractions(props: UseMapInteractionsProps): UseMapIntera
 		};
 	}, []);
 
-	// 屏幕坐标转世界坐标
+	// 屏幕坐标转世界坐标（考虑旋转）
 	const screenToWorld = useCallback((screenX: number, screenY: number) => {
-		const { zoom, cameraX, cameraY, canvasWidth, canvasHeight } = propsRef.current;
+		const { zoom, cameraX, cameraY, canvasWidth, canvasHeight, viewRotation } = propsRef.current;
+		const centerX = canvasWidth / 2;
+		const centerY = canvasHeight / 2;
+		const relativeX = screenX - centerX;
+		const relativeY = screenY - centerY;
+
+		const theta = (viewRotation * Math.PI) / 180;
+		const cos = Math.cos(theta);
+		const sin = Math.sin(theta);
+
+		const rotatedX = relativeX * cos - relativeY * sin;
+		const rotatedY = relativeX * sin + relativeY * cos;
+
 		return {
-			worldX: (screenX - canvasWidth / 2) / zoom + cameraX,
-			worldY: (screenY - canvasHeight / 2) / zoom + cameraY,
+			worldX: cameraX + rotatedX / zoom,
+			worldY: cameraY + rotatedY / zoom,
 		};
 	}, []);
 
@@ -279,10 +291,10 @@ export function useMapInteractions(props: UseMapInteractionsProps): UseMapIntera
 						propsRef.current.onRotateDelta(rotateDelta);
 					}
 				} else {
-					// 平移视图
+					// 平移视图（使用统一的坐标转换工具）
 					const { x: worldDx, y: worldDy } = screenToWorld(dx, dy);
 					if (Math.abs(worldDx) > 0.1 || Math.abs(worldDy) > 0.1) {
-						propsRef.current.onPanDelta(-worldDx, -worldDy);
+						propsRef.current.onPanDelta(worldDx, worldDy);
 					}
 				}
 

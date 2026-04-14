@@ -93,9 +93,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			grid.eventMode = "none";
 
 			const cursorLayer = new Container();
-			cursorLayer.zIndex = 4; // 与网格同层，但在网格之后绘制
+			cursorLayer.zIndex = 4;
 			cursorLayer.eventMode = "none";
-			// 游标层添加到 world 内，自动继承相机变换
+			cursorLayer.sortableChildren = true;
 
 			const shipsLayer = new Container();
 			shipsLayer.zIndex = 5;
@@ -118,6 +118,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			movementVisualsLayer.zIndex = 9;
 			movementVisualsLayer.eventMode = "none";
 
+			const shipIconsLayer = new Container();
+			shipIconsLayer.zIndex = 10;
+			shipIconsLayer.eventMode = "none";
+
 			world.addChild(
 				background,
 				starfieldNebula,
@@ -130,7 +134,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				labels,
 				effects,
 				weaponArcsLayer,
-				movementVisualsLayer
+				movementVisualsLayer,
+				shipIconsLayer
 			);
 			app.stage.addChild(world);
 
@@ -148,6 +153,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				effects,
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,
+				shipIcons: shipIconsLayer,
 			};
 
 			layersRef.current = newLayers;

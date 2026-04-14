@@ -61,18 +61,18 @@ export const screenToWorld = (
 	cameraY: number,
 	viewRotation: number
 ): { x: number; y: number } => {
-	const theta = toRadians(-viewRotation);
+	const theta = toRadians(viewRotation);
 	const cos = Math.cos(theta);
 	const sin = Math.sin(theta);
 
-	// 应用旋转矩阵的逆变换
+	// 应用旋转变换（将屏幕坐标旋转到世界坐标系）
 	const rotatedX = screenX * cos - screenY * sin;
 	const rotatedY = screenX * sin + screenY * cos;
 
 	// 应用缩放和相机偏移
 	return {
-		x: rotatedX / zoom + cameraX,
-		y: rotatedY / zoom + cameraY,
+		x: cameraX + rotatedX / zoom,
+		y: cameraY + rotatedY / zoom,
 	};
 };
 
@@ -96,28 +96,29 @@ export const worldToScreen = (
 	viewRotation: number
 ): { x: number; y: number } => {
 	// 应用相机偏移和缩放
-	const scaledX = (worldX - cameraX) * zoom;
-	const scaledY = (worldY - cameraY) * zoom;
+	const relativeX = (worldX - cameraX) * zoom;
+	const relativeY = (worldY - cameraY) * zoom;
 
-	// 应用旋转变换
-	const theta = toRadians(viewRotation);
+	// 应用旋转变换（将世界坐标旋转到屏幕坐标系）
+	const theta = toRadians(-viewRotation);
 	const cos = Math.cos(theta);
 	const sin = Math.sin(theta);
 
 	return {
-		x: scaledX * cos - scaledY * sin,
-		y: scaledX * sin + scaledY * cos,
+		x: relativeX * cos - relativeY * sin,
+		y: relativeX * sin + relativeY * cos,
 	};
 };
 
 /**
- * 屏幕向量转世界向量（仅考虑旋转和缩放，不考虑位置）
+ * 屏幕向量转世界向量（考虑摄像机视角）
+ * 以摄像机视角为基准进行平移操作
  *
- * @param screenDx 屏幕 X 向量
- * @param screenDy 屏幕 Y 向量
+ * @param screenDx 屏幕 X 向量（像素）
+ * @param screenDy 屏幕 Y 向量（像素）
  * @param zoom 缩放级别
- * @param viewRotation 视图旋转角度（度数）
- * @returns 世界向量
+ * @param viewRotation 视图旋转角度（度数，0°指向右方）
+ * @returns 世界向量（dx, dy）
  */
 export const screenDeltaToWorldDelta = (
 	screenDx: number,
@@ -125,7 +126,7 @@ export const screenDeltaToWorldDelta = (
 	zoom: number,
 	viewRotation: number
 ): { x: number; y: number } => {
-	const theta = toRadians(-viewRotation);
+	const theta = toRadians(viewRotation);
 	const cos = Math.cos(theta);
 	const sin = Math.sin(theta);
 
@@ -133,8 +134,8 @@ export const screenDeltaToWorldDelta = (
 	const rotatedY = screenDx * sin + screenDy * cos;
 
 	return {
-		x: -rotatedX / zoom,
-		y: -rotatedY / zoom,
+		x: rotatedX / zoom,
+		y: rotatedY / zoom,
 	};
 };
 

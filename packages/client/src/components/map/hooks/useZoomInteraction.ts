@@ -54,7 +54,7 @@ export function useZoomInteraction(
 				relativeX,
 				relativeY,
 				nextZoom,
-				0, // 相机位置为 0，因为我们要的是相对偏移
+				0,
 				0,
 				current.viewRotation
 			);

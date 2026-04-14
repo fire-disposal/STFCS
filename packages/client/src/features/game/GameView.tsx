@@ -49,6 +49,40 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	} | null>(null);
 	const [isPlacementMode, setIsPlacementMode] = useState(false);
 
+	// 监听 ship_created 广播，更新本地舰船列表
+	useEffect(() => {
+		if (!room) return;
+
+		const handleShipCreated = (payload: {
+			shipId: string;
+			hullType: string;
+			faction: number;
+			x: number;
+			y: number;
+			heading: number;
+			timestamp: number;
+		}) => {
+			console.log("[GameView] Ship created:", payload);
+			// 强制更新舰船列表
+			setVersion((v) => v + 1);
+		};
+
+		const handleShipDestroyed = (payload: { shipId: string; timestamp: number }) => {
+			console.log("[GameView] Ship destroyed:", payload.shipId);
+			setVersion((v) => v + 1);
+		};
+
+		room.on("ship_created", handleShipCreated);
+		room.on("ship_destroyed", handleShipDestroyed);
+
+		return () => {
+			room.off("ship_created", handleShipCreated);
+			room.off("ship_destroyed", handleShipDestroyed);
+		};
+	}, [room]);
+
+	const [, setVersion] = useState(0);
+
 	// 玩家列表
 	const players = useMemo(() => {
 		const rosterByIdentity = new Map<string, PlayerState>();
@@ -85,7 +119,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		}
 		shipsMap.forEach((value: ShipState) => result.push(value));
 		return result;
-	}, [room?.state?.ships]);
+	}, [room?.state?.ships, version]);
 
 	// 选中的舰船
 	const selectedShipId = useMemo(() => {

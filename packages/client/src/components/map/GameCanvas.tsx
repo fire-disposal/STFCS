@@ -96,11 +96,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		setMapCursor,
 	});
 
-	// 游标渲染
+	// 游标渲染（作为图层挂载）
 	useMapCursor({
 		layers: layerSystem.layers,
 		mapCursor,
-		options: { cameraX, cameraY, zoom, viewRotation },
 	});
 
 	useWheelZoom(hostRef, zoomInteraction.queueZoom);

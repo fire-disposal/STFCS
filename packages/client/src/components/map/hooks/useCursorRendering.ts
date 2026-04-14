@@ -1,8 +1,8 @@
 /**
  * 游标渲染 Hook
  *
- * 在 stage 层绘制游标标记（不随相机平移，但随缩放）
- * 游标位置是世界坐标，需要手动转换为屏幕坐标
+ * 作为独立图层挂载到 LayerRegistry，由 useLayerSystem 统一管理
+ * 游标位置是世界坐标，由图层系统自动处理坐标变换
  */
 
 import { Container, Graphics } from "pixi.js";
@@ -15,37 +15,19 @@ export interface CursorState {
 	heading: number;
 }
 
-export interface UseCursorRenderingOptions {
-	cameraX: number;
-	cameraY: number;
-	zoom: number;
-	viewRotation: number;
-}
-
-export function useCursorRendering(
-	layers: LayerRegistry | null,
-	cursor: CursorState | null,
-	options: UseCursorRenderingOptions
-) {
+export function useCursorRendering(layers: LayerRegistry | null, cursor: CursorState | null) {
 	const cursorContainerRef = useRef<Container | null>(null);
-	const optionsRef = useRef(options);
-
-	// 保持 options 引用稳定
-	optionsRef.current = options;
 
 	useEffect(() => {
 		if (!layers || !layers.cursor) return;
 
-		// 创建或获取游标容器
 		if (!cursorContainerRef.current) {
 			cursorContainerRef.current = new Container();
 			layers.cursor.addChild(cursorContainerRef.current);
 		}
 
 		const cursorContainer = cursorContainerRef.current;
-		const opts = optionsRef.current;
 
-		// 如果没有游标数据，清空并返回
 		if (!cursor) {
 			cursorContainer.removeChildren();
 			cursorContainer.visible = false;
@@ -55,22 +37,15 @@ export function useCursorRendering(
 		cursorContainer.visible = true;
 		cursorContainer.removeChildren();
 
-		// 创建图形容器
 		const graphics = new Graphics();
 
-		// 计算屏幕坐标（世界坐标 → 屏幕坐标）
-		const screenX = (cursor.x - opts.cameraX) * opts.zoom;
-		const screenY = (cursor.y - opts.cameraY) * opts.zoom;
-
-		graphics.position.set(screenX, screenY);
-
-		// 设置旋转（游标 heading 补偿 viewRotation）
-		const compensatedRotation = ((cursor.heading - opts.viewRotation) * Math.PI) / 180;
-		graphics.rotation = compensatedRotation;
+		// 使用图层系统的坐标变换，直接使用世界坐标
+		graphics.position.set(cursor.x, cursor.y);
+		graphics.rotation = (cursor.heading * Math.PI) / 180;
 
 		// 绘制游标十字线
-		const crossSize = 25 / opts.zoom;
-		const crossThickness = 2 / opts.zoom;
+		const crossSize = 25;
+		const crossThickness = 2;
 
 		graphics
 			.moveTo(-crossSize, 0)
@@ -84,19 +59,19 @@ export function useCursorRendering(
 			});
 
 		// 绘制游标圆环
-		const ringRadius = 35 / opts.zoom;
+		const ringRadius = 35;
 		graphics.circle(0, 0, ringRadius).stroke({
 			color: 0x4a9eff,
-			width: 2 / opts.zoom,
+			width: 2,
 			alpha: 0.6,
 		});
 
 		// 绘制方向指示器
-		const arrowSize = 12 / opts.zoom;
+		const arrowSize = 12;
 		graphics
-			.moveTo(0, -ringRadius - 5 / opts.zoom)
-			.lineTo(-arrowSize / 2, -ringRadius + 5 / opts.zoom)
-			.lineTo(arrowSize / 2, -ringRadius + 5 / opts.zoom)
+			.moveTo(0, -ringRadius - 5)
+			.lineTo(-arrowSize / 2, -ringRadius + 5)
+			.lineTo(arrowSize / 2, -ringRadius + 5)
 			.closePath()
 			.fill({
 				color: 0x4a9eff,

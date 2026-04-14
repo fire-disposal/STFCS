@@ -9,7 +9,7 @@ import type { FactionValue } from "@vt/contracts";
 import { Faction } from "@vt/contracts";
 import { getAvailableShips } from "@vt/rules";
 import { ChevronDown, ChevronRight, MapPin, Palette, Rocket, Sparkles, Users } from "lucide-react";
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 
 type TokenType = "ship" | "station" | "asteroid";
 
@@ -206,7 +206,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	const [objectType, setObjectType] = useState<TokenType>("ship");
 	// 选中的舰船 ID
 	const [selectedHullId, setSelectedHullId] = useState<string>("frigate_assault");
-	// 朝向（从游标继承）
+	// 朝向（从游标继承，可手动调整）
 	const [heading, setHeading] = useState(0);
 	// 阵营和归属
 	const [faction, setFaction] = useState<FactionValue>(Faction.DM);
@@ -215,7 +215,14 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	// 可用舰船列表
 	const availableShips = useMemo(() => getAvailableShips(), []);
 
-	// 处理创建对象 - 直接在游标位置创建
+	// 当游标更新时，自动同步 heading
+	useEffect(() => {
+		if (mapCursor && mapCursor.heading !== undefined) {
+			setHeading(mapCursor.heading);
+		}
+	}, [mapCursor]);
+
+	// 处理创建对象 - 使用 heading 状态（可手动调整）而非直接使用 mapCursor.heading
 	const handleCreate = useCallback(() => {
 		if (!mapCursor) return;
 
@@ -224,11 +231,11 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 			hullId: objectType === "ship" ? selectedHullId : undefined,
 			x: mapCursor.x,
 			y: mapCursor.y,
-			heading: mapCursor.heading,
+			heading: heading,
 			faction,
 			ownerId: ownerId || undefined,
 		});
-	}, [objectType, selectedHullId, mapCursor, faction, ownerId, onCreateObject]);
+	}, [objectType, selectedHullId, mapCursor, heading, faction, ownerId, onCreateObject]);
 
 	return (
 		<div style={styles.panel}>

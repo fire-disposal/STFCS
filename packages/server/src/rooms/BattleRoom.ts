@@ -821,6 +821,15 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 		this.state.ships.set(ship.id, ship);
 		console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
+		this.broadcast("ship_created", {
+			shipId: ship.id,
+			hullType: "frigate_assault",
+			faction,
+			x,
+			y,
+			heading: ship.transform.heading,
+			timestamp: Date.now(),
+		});
 	}
 
 	/**
@@ -881,6 +890,15 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 			this.state.ships.set(ship.id, ship);
 			console.log(`[BattleRoom] Created ${hullId} for ${faction} at (${x}, ${y})`);
+			this.broadcast("ship_created", {
+				shipId: ship.id,
+				hullType: hullId,
+				faction: faction,
+				x,
+				y,
+				heading,
+				timestamp: Date.now(),
+			});
 		} else if (type === "station" || type === "asteroid") {
 			const ship = new ShipState();
 			ship.id = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -904,6 +922,15 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 			this.state.ships.set(ship.id, ship);
 			console.log(`[BattleRoom] Created ${type} at (${x}, ${y})`);
+			this.broadcast("ship_created", {
+				shipId: ship.id,
+				hullType: type,
+				faction: faction,
+				x,
+				y,
+				heading,
+				timestamp: Date.now(),
+			});
 		}
 	}
 

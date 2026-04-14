@@ -1,4 +1,3 @@
-import { toRadians } from "@/utils/mathUtils";
 import type { ShipState } from "@vt/contracts";
 import { Faction } from "@vt/contracts";
 import { Graphics, Text, TextStyle } from "pixi.js";
@@ -117,24 +116,18 @@ export function renderShips(
 
 			token.on("pointermove", (e) => {
 				if (setMouseWorldPosition && canvasWidth && canvasHeight && zoom && cameraX && cameraY) {
-					// e.data.global.x/y 是 PixiJS 的屏幕空间坐标（画布中心为原点）
-					// 需要转换为世界坐标
 					const screenX = e.data.global.x;
 					const screenY = e.data.global.y;
 
-					// 屏幕坐标转世界坐标（考虑旋转）
-					// PixiJS 的 world.rotation 已经应用了视图旋转
-					// global 坐标是相对于画布中心的，需要反向旋转补偿
-					const dx = screenX;
-					const dy = screenY;
-					const theta = toRadians(-viewRotation);
-					const cos = Math.cos(theta);
-					const sin = Math.sin(theta);
-					const rotatedX = (dx * cos - dy * sin) / zoom;
-					const rotatedY = (dx * sin + dy * cos) / zoom;
-
-					const worldX = rotatedX + cameraX;
-					const worldY = rotatedY + cameraY;
+					// 使用统一的坐标转换工具（考虑旋转）
+					const { x: worldX, y: worldY } = screenToWorld(
+						screenX - canvasWidth / 2,
+						screenY - canvasHeight / 2,
+						zoom,
+						cameraX,
+						cameraY,
+						viewRotation || 0
+					);
 
 					setMouseWorldPosition(worldX, worldY);
 				}

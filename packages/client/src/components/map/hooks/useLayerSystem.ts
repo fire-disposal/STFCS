@@ -10,12 +10,13 @@ export interface LayerRegistry {
 	starfieldNear: Container;
 	starfieldNebula: Container;
 	grid: Container;
-	cursor: Container; // 游标层（独立于网格，不随视图旋转）
+	cursor: Container;
 	ships: Container;
 	labels: Container;
 	effects: Container;
 	weaponArcs: Container;
 	movementVisuals: Container;
+	shipIcons: Container;
 }
 
 export interface UseLayerSystemResult {
@@ -93,6 +94,7 @@ export function useLayerSystem(): UseLayerSystemResult {
 
 		currentLayers.world.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
 		currentLayers.ships.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+		currentLayers.cursor.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
 	}, []);
 
 	useEffect(() => {

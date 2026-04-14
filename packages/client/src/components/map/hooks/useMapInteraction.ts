@@ -161,15 +161,15 @@ export function useMapInteraction(
 			const relativeY = screenY - centerY;
 
 			const theta = (viewRotation * Math.PI) / 180;
-			const cos = Math.cos(-theta);
-			const sin = Math.sin(-theta);
+			const cos = Math.cos(theta);
+			const sin = Math.sin(theta);
 
-			const worldDeltaX = (relativeX * cos - relativeY * sin) / zoom;
-			const worldDeltaY = (relativeX * sin + relativeY * cos) / zoom;
+			const rotatedX = relativeX * cos - relativeY * sin;
+			const rotatedY = relativeX * sin + relativeY * cos;
 
 			return {
-				x: cameraX + worldDeltaX,
-				y: cameraY + worldDeltaY,
+				x: cameraX + rotatedX / zoom,
+				y: cameraY + rotatedY / zoom,
 			};
 		},
 		[config.canvasSize]
@@ -178,14 +178,15 @@ export function useMapInteraction(
 	const screenDeltaToWorldDelta = useCallback((deltaX: number, deltaY: number) => {
 		const { zoom, viewRotation } = cameraRef.current;
 		const theta = (viewRotation * Math.PI) / 180;
-		const cos = Math.cos(-theta);
-		const sin = Math.sin(-theta);
-		const scaledX = -deltaX / zoom;
-		const scaledY = -deltaY / zoom;
+		const cos = Math.cos(theta);
+		const sin = Math.sin(theta);
+
+		const rotatedX = deltaX * cos - deltaY * sin;
+		const rotatedY = deltaX * sin + deltaY * cos;
 
 		return {
-			x: scaledX * cos - scaledY * sin,
-			y: scaledX * sin + scaledY * cos,
+			x: rotatedX / zoom,
+			y: rotatedY / zoom,
 		};
 	}, []);
 
