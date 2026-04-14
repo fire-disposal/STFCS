@@ -45,7 +45,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 	const layersRef = useRef<LayerRegistry | null>(null);
 	const onClickRef = useRef(onClick);
 	const setMapCursorRef = useRef(setMapCursor);
-	const tickerRef = useRef<any>(null);
+	const tickerCallbackRef = useRef<any>(null);
 
 	onClickRef.current = onClick;
 	setMapCursorRef.current = setMapCursor;
@@ -70,21 +70,21 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				}
 			}
 
-		const world = layersRef.current?.world;
-		if (world && screenX !== undefined && screenY !== undefined) {
-			const local = world.toLocal(new Point(screenX, screenY));
-			return { x: local.x, y: local.y };
-		}
+			const world = layersRef.current?.world;
+			if (world && screenX !== undefined && screenY !== undefined) {
+				const local = world.toLocal(new Point(screenX, screenY));
+				return { x: local.x, y: local.y };
+			}
 
-		const { zoom, cameraX, cameraY, viewRotation } = cameraRef.current;
-		return screenToWorld(
-			screenX - screenWidth / 2,
-			screenY - screenHeight / 2,
-			zoom,
-			cameraX,
-			cameraY,
-			viewRotation
-		);
+			const { zoom, cameraX, cameraY, viewRotation } = cameraRef.current;
+			return screenToWorld(
+				screenX - screenWidth / 2,
+				screenY - screenHeight / 2,
+				zoom,
+				cameraX,
+				cameraY,
+				viewRotation
+			);
 		},
 		[canvasSize.width, canvasSize.height, cameraRef]
 	);
@@ -287,7 +287,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				const dx = currentX - dragState.lastX;
 				const dy = currentY - dragState.lastY;
 
-				if (Math.abs(currentX - dragState.startX) > 3 || Math.abs(currentY - dragState.startY) > 3) {
+				if (
+					Math.abs(currentX - dragState.startX) > 3 ||
+					Math.abs(currentY - dragState.startY) > 3
+				) {
 					dragState.moved = true;
 				}
 
@@ -305,7 +308,12 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			const finishDrag = (event: any) => {
 				const dragState = dragStateRef.current;
 
-				if (dragState.active && dragState.mode === "pan" && !dragState.moved && !isShipObject(event.target)) {
+				if (
+					dragState.active &&
+					dragState.mode === "pan" &&
+					!dragState.moved &&
+					!isShipObject(event.target)
+				) {
 					const worldPoint = getWorldPoint(event);
 					const { viewRotation } = cameraRef.current;
 					setMapCursorRef.current?.(worldPoint.x, worldPoint.y, -viewRotation);
@@ -331,11 +339,11 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				}
 			});
 
-			const ticker = app.ticker;
-			ticker.add(() => {
+			const tickerCallback = () => {
 				camera.tickZoomAnimation();
-			});
-			tickerRef.current = ticker;
+			};
+			app.ticker.add(tickerCallback);
+			tickerCallbackRef.current = tickerCallback;
 
 			const handleKeyDown = (e: KeyboardEvent) => {
 				if (e.code === "Space" && !e.repeat) {
@@ -398,8 +406,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 		return () => {
 			const app = pixiAppRef.current;
 			if (app) {
-				if (tickerRef.current) {
-					tickerRef.current.destroy();
+				if (tickerCallbackRef.current) {
+					app.ticker.remove(tickerCallbackRef.current);
+					tickerCallbackRef.current = null;
 				}
 				if ((app as any).__cleanupKeyListeners) {
 					(app as any).__cleanupKeyListeners();
