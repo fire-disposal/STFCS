@@ -87,8 +87,8 @@ export const ArmorQuadrantDisplay: React.FC<ArmorQuadrantDisplayProps> = ({ ship
 		);
 	}
 
-	const armorCurrent = Array.from(ship.armorCurrent);
-	const armorMax = Array.from(ship.armorMax);
+	const armorCurrent = Array.from({ length: 6 }, (_, i) => ship.armor.quadrants[i] ?? 0);
+	const armorMax = Array.from({ length: 6 }, () => ship.armor.maxPerQuadrant || 1);
 	const totalArmor = armorCurrent.reduce((sum, val) => sum + val, 0);
 	const maxTotalArmor = armorMax.reduce((sum, val) => sum + val, 0);
 	const averagePercent = maxTotalArmor > 0 ? (totalArmor / maxTotalArmor) * 100 : 0;

@@ -4,12 +4,7 @@
  * 绘制护盾、护甲象限、辐能系统等
  */
 
-import type {
-	ArmorInstanceState,
-	ArmorQuadrant,
-	FluxInstanceState,
-	ShieldInstanceState,
-} from "@vt/types";
+import type { ArmorInstanceState, FluxInstanceState, ShieldInstanceState } from "@vt/types";
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import {
 	SHIELD_COLORS,
@@ -189,12 +184,9 @@ export function renderShieldHitEffect(shield: ShieldInstanceState, hitAngle: num
 
 /** 护甲渲染选项 */
 export interface ArmorRenderOptions {
-	/** 是否显示数值 */
 	showValues?: boolean;
-	/** 是否高亮受损象限 */
 	highlightDamaged?: boolean;
-	/** 选中的象限 */
-	selectedQuadrant?: ArmorQuadrant;
+	selectedQuadrant?: ArmorQuadrantValue;
 }
 
 /**
@@ -235,10 +227,10 @@ export function renderArmorQuadrants(
 /**
  * 渲染象限高亮
  */
-function renderQuadrantHighlight(quadrant: ArmorQuadrant, radius: number): Graphics {
+function renderQuadrantHighlight(quadrant: ArmorQuadrantValue, radius: number): Graphics {
 	const graphics = new Graphics();
 
-	const quadrantAngles: Record<ArmorQuadrant, { start: number; end: number }> = {
+	const quadrantAngles: Record<ArmorQuadrantValue, { start: number; end: number }> = {
 		FRONT_TOP: { start: -60, end: 0 },
 		FRONT_BOTTOM: { start: 0, end: 60 },
 		RIGHT_TOP: { start: 60, end: 120 },
@@ -264,7 +256,7 @@ function renderQuadrantHighlight(quadrant: ArmorQuadrant, radius: number): Graph
 function renderQuadrantLabels(armor: ArmorInstanceState): Container {
 	const container = new Container();
 
-	const quadrantPositions: Record<ArmorQuadrant, { x: number; y: number }> = {
+	const quadrantPositions: Record<ArmorQuadrantValue, { x: number; y: number }> = {
 		FRONT_TOP: { x: 0, y: -30 },
 		FRONT_BOTTOM: { x: 0, y: 30 },
 		RIGHT_TOP: { x: 35, y: -15 },
@@ -280,7 +272,7 @@ function renderQuadrantLabels(armor: ArmorInstanceState): Container {
 	});
 
 	for (const [quadrant, pos] of Object.entries(quadrantPositions)) {
-		const value = armor.quadrants[quadrant as ArmorQuadrant];
+		const value = armor.quadrants[quadrant as ArmorQuadrantValue];
 		const percent = Math.round((value / armor.maxPerQuadrant) * 100);
 
 		const text = new Text({
@@ -299,10 +291,10 @@ function renderQuadrantLabels(armor: ArmorInstanceState): Container {
 /**
  * 渲染护甲受击效果
  */
-export function renderArmorHitEffect(quadrant: ArmorQuadrant, damage: number): Graphics {
+export function renderArmorHitEffect(quadrant: ArmorQuadrantValue, damage: number): Graphics {
 	const graphics = new Graphics();
 
-	const quadrantAngles: Record<ArmorQuadrant, number> = {
+	const quadrantAngles: Record<ArmorQuadrantValue, number> = {
 		FRONT_TOP: -30,
 		FRONT_BOTTOM: 30,
 		RIGHT_TOP: 90,

@@ -7,7 +7,7 @@
  * - 配置阵营
  */
 
-import type { FactionId, HullSize, Point, ShipDefinition } from "@vt/types";
+import type { FactionValue, HullSizeValue, Point, ShipDefinition } from "@vt/types";
 import React, { useState, useCallback } from "react";
 
 // 样式
@@ -152,7 +152,7 @@ const styles = {
 };
 
 // 阵营列表
-const factions: Array<{ id: FactionId; name: string; color: string }> = [
+const factions: Array<{ id: FactionValue; name: string; color: string }> = [
 	{ id: "hegemony", name: "霸主", color: "#4a90d9" },
 	{ id: "sindrian", name: "辛德里亚", color: "#d4af37" },
 	{ id: "persean", name: "珀尔修斯", color: "#2ecc71" },
@@ -162,7 +162,7 @@ const factions: Array<{ id: FactionId; name: string; color: string }> = [
 ];
 
 // 舰船尺寸图标
-const hullSizeIcons: Record<HullSize, string> = {
+const hullSizeIcons: Record<HullSizeValue, string> = {
 	FIGHTER: "✈️",
 	FRIGATE: "🚀",
 	DESTROYER: "🛡️",
@@ -176,7 +176,7 @@ interface EnemyUnitCreatorProps {
 		shipDefinitionId: string;
 		position: Point;
 		heading: number;
-		faction: FactionId;
+		faction: FactionValue;
 		name?: string;
 	}) => void;
 	onCancel?: () => void;
@@ -194,7 +194,7 @@ export const EnemyUnitCreator: React.FC<EnemyUnitCreatorProps> = ({
 	const [selectedShipId, setSelectedShipId] = useState<string | null>(null);
 	const [position, setPosition] = useState<Point>(defaultPosition);
 	const [heading, setHeading] = useState(defaultHeading);
-	const [faction, setFaction] = useState<FactionId>("pirate");
+	const [faction, setFaction] = useState<FactionValue>("pirate");
 	const [name, setName] = useState("");
 
 	// 选中的舰船

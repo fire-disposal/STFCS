@@ -47,26 +47,26 @@ const damageTypeIconComponents: Record<string, React.ComponentType<{ className?:
 
 interface ShipDetailPanelProps {
 	ship: ShipState | null;
-	currentPhase?: string;
 }
 
 export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 	const armorPercentages = useMemo(() => {
 		if (!ship) return [];
-		return ship.armorCurrent.map((current: number, i: number) => {
-			const max = ship.armorMax[i] || 1;
+		return Array.from({ length: 6 }, (_, i) => {
+			const max = ship.armor.maxPerQuadrant || 1;
+			const current = ship.armor.quadrants[i] ?? 0;
 			return Math.round((current / max) * 100);
 		});
 	}, [ship]);
 
 	const fluxPercentage = useMemo(() => {
-		if (!ship || ship.fluxMax <= 0) return 0;
-		return Math.round(((ship.fluxHard + ship.fluxSoft) / ship.fluxMax) * 100);
+		if (!ship || ship.flux.max <= 0) return 0;
+		return Math.round(ship.flux.percent);
 	}, [ship]);
 
 	const hullPercentage = useMemo(() => {
-		if (!ship || ship.hullMax <= 0) return 0;
-		return Math.round((ship.hullCurrent / ship.hullMax) * 100);
+		if (!ship || ship.hull.max <= 0) return 0;
+		return Math.round(ship.hull.percent);
 	}, [ship]);
 
 	const weapons = useMemo(() => {
@@ -149,14 +149,14 @@ export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 				<div className="game-section__title">
 					<Heart className="game-section__icon" />
 					船体
-					{ship.hullCurrent <= 0 && (
+					{ship.isDestroyed && (
 						<span className="ship-status-badge ship-status-badge--destroyed">摧毁</span>
 					)}
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">当前 / 最大</span>
 					<span className="ship-value">
-						{Math.round(ship.hullCurrent)} / {ship.hullMax}
+						{Math.round(ship.hull.current)} / {ship.hull.max}
 					</span>
 				</div>
 				<div className="game-bar">
@@ -178,7 +178,7 @@ export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 							key={i}
 							className="ship-armor-cell"
 							style={{ backgroundColor: getArmorColor(percent) }}
-							title={`${quadrantNames[i]}: ${ship.armorCurrent[i]}/${ship.armorMax[i]}`}
+							title={`${quadrantNames[i]}: ${ship.armor.quadrants[i] ?? 0}/${ship.armor.maxPerQuadrant}`}
 						>
 							{quadrantNames[i]}
 							<br />
@@ -198,15 +198,15 @@ export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">软辐能</span>
-					<span className="ship-value ship-value--blue">{Math.round(ship.fluxSoft)}</span>
+					<span className="ship-value ship-value--blue">{Math.round(ship.flux.soft)}</span>
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">硬辐能</span>
-					<span className="ship-value ship-value--orange">{Math.round(ship.fluxHard)}</span>
+					<span className="ship-value ship-value--orange">{Math.round(ship.flux.hard)}</span>
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">容量</span>
-					<span className="ship-value">{ship.fluxMax}</span>
+					<span className="ship-value">{ship.flux.max}</span>
 				</div>
 				<div className="game-bar">
 					<div
@@ -230,18 +230,18 @@ export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 					<Sparkles className="game-section__icon" />
 					护盾
 					<span
-						className={`ship-status-badge ${ship.isShieldUp ? "ship-status-badge--shield-on" : "ship-status-badge--shield-off"}`}
+						className={`ship-status-badge ${ship.shield.active ? "ship-status-badge--shield-on" : "ship-status-badge--shield-off"}`}
 					>
-						{ship.isShieldUp ? "开启" : "关闭"}
+						{ship.shield.active ? "开启" : "关闭"}
 					</span>
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">朝向</span>
-					<span className="ship-value">{ship.shieldOrientation.toFixed(1)}°</span>
+					<span className="ship-value">{ship.shield.orientation.toFixed(1)}°</span>
 				</div>
 				<div className="ship-row">
 					<span className="ship-label">弧宽</span>
-					<span className="ship-value">{ship.shieldArc}°</span>
+					<span className="ship-value">{ship.shield.arc}°</span>
 				</div>
 			</div>
 
@@ -306,10 +306,6 @@ export const ShipDetailPanel: React.FC<ShipDetailPanelProps> = ({ ship }) => {
 				<div className="ship-row">
 					<span className="ship-label">最大转向</span>
 					<span className="ship-value">{ship.maxTurnRate}°</span>
-				</div>
-				<div className="ship-row">
-					<span className="ship-label">加速度</span>
-					<span className="ship-value">{ship.acceleration}</span>
 				</div>
 			</div>
 

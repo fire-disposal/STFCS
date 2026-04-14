@@ -1,1415 +1,210 @@
 /**
- * 战斗房间 - Colyseus 多人游戏房间
- *
- * 遵循 Colyseus 最佳实践：
- * - 使用泛型声明状态类型
- * - 实现 onAuth 进行认证
- * - 正确处理 onLeave 和重连
- * - 使用 setMetadata 更新房间元数据
+ * 战斗房间
  */
 
 import { Client, Room } from "@colyseus/core";
-import { getShipHullSpec, getWeaponSpec } from "@vt/data";
+import type { CreateObjectPayload, FactionValue, RoomMetadata } from "@vt/types";
+import { Faction, GamePhase, PlayerRole } from "@vt/types";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
-import {
-	ClientCommand,
-	ConnectionQuality,
-	Faction,
-	GAME_CONFIG,
-	GameRoomState,
-	PlayerRole,
-	PlayerState,
-	ShipState,
-	WeaponSlot,
-	WeaponState,
-} from "../schema/GameSchema.js";
+import { toGameLoadedDto, toGameSavedDto, toIdentityDto, toRoleDto, toShipCreatedDto } from "../dto/index.js";
+import { createAsteroid, createShip, createStation } from "../factory/ShipFactory.js";
+import { registerMessageHandlers } from "../handlers/BattleRoomHandlers.js";
+import { deserializeShipSave, serializeGameSave } from "../schema/GameSave.js";
+import { ChatMessage, GameRoomState, PlayerState } from "../schema/GameSchema.js";
+import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
+import { saveStore } from "../services/SaveStore.js";
 import { RoomEventLogger } from "../utils/ColyseusMessaging.js";
 
-// ==================== 消息 Payload 类型定义 ====================
-
-interface NetPingPayload {
-	seq: number;
-	clientSentAt: number;
-}
-
-export interface MoveTokenPayload {
-	shipId: string;
-	x: number;
-	y: number;
-	heading: number;
-	movementPlan?: {
-		phaseAForward: number;
-		phaseAStrafe: number;
-		turnAngle: number;
-		phaseBForward: number;
-		phaseBStrafe: number;
-	};
-	phase?: "PHASE_A" | "ATTACK_1" | "PHASE_B" | "ATTACK_2" | "PHASE_C";
-	isIncremental?: boolean; // 是否为增量移动（燃料池制度）
-}
-
-export interface ToggleShieldPayload {
-	shipId: string;
-	isActive: boolean;
-	orientation?: number;
-}
-
-export interface FireWeaponPayload {
-	attackerId: string;
-	weaponId: string;
-	targetId: string;
-}
-
-export interface VentFluxPayload {
-	shipId: string;
-}
-
-interface DMClearOverloadPayload {
-	shipId: string;
-}
-
-interface DMSetArmorPayload {
-	shipId: string;
-	section: number;
-	value: number;
-}
-
-interface CreateObjectPayload {
-	type: "ship" | "station" | "asteroid";
-	hullId?: string;
-	x: number;
-	y: number;
-	heading: number;
-	faction: (typeof Faction)[keyof typeof Faction];
-	ownerId?: string;
-}
-
-interface UpdateProfilePayload {
-	nickname?: string;
-	avatar?: string;
-}
-
-// ==================== 战斗房间类 ====================
-
-export class BattleRoom extends Room<{ state: GameRoomState }> {
+export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetadata }> {
 	maxClients = 8;
-	private commandDispatcher!: CommandDispatcher;
-	private eventLogger!: RoomEventLogger;
+	private dispatcher!: CommandDispatcher;
+	private logger!: RoomEventLogger;
 	private pingEwma = new Map<string, number>();
 	private jitterEwma = new Map<string, number>();
-	private playerIdentity = new Map<string, { userName: string; shortId: number }>();
-	private roomDisplayName = "";
 	private roomOwnerId: string | null = null;
-	private isPrivateRoom = false;
+	private roomDisplayName = "";
 	private profileStore = new Map<number, { nickname: string; avatar: string }>();
+	private createdAt = Date.now();
 
-	// 死区检测：记录上次更新的舰船位置
-	private lastUpdateState: {
-		shipPositions: Map<string, { x: number; y: number; heading: number }>;
-		destroyedCount: number;
-	};
-
-	// 聊天消息自动清理（每 5 分钟清理一次超过 1 小时的消息）
-	private chatCleanupInterval: NodeJS.Timeout | null = null;
-
-	// 自动保存（每 5 分钟）
-	private autoSaveInterval: NodeJS.Timeout | null = null;
-	private lastSaveId: string | null = null;
-
-	/**
-	 * 房间创建初始化
-	 * Colyseus 在第一个客户端加入时自动调用
-	 */
-	onCreate(options: {
-		playerName?: string;
-		shortId?: number;
-		roomName?: string;
-		maxPlayers?: number;
-		isPrivate?: boolean;
-	}) {
-		console.log(
-			`[BattleRoom] Room created - ID: ${this.roomId}, Options:`,
-			JSON.stringify(options)
-		);
-
-		const normalizedMaxPlayers = Number(options.maxPlayers);
-		if (Number.isFinite(normalizedMaxPlayers)) {
-			this.maxClients = Math.min(16, Math.max(2, Math.floor(normalizedMaxPlayers)));
-		}
-
-		this.roomDisplayName = options.roomName?.trim() || `Battle - ${this.roomId.substring(0, 6)}`;
-		this.isPrivateRoom = Boolean(options.isPrivate);
-
-		// 初始化状态
+	onCreate(options: { roomName?: string; maxPlayers?: number }) {
+		this.maxClients = Math.min(16, Math.max(2, options.maxPlayers ?? 8));
+		this.roomDisplayName = options.roomName?.trim() || `Battle-${this.roomId.substring(0, 6)}`;
+		this.createdAt = Date.now();
 		this.state = new GameRoomState();
-		this.assertSchemaMetadataSafe();
+		this.dispatcher = new CommandDispatcher(this.state);
+		this.logger = new RoomEventLogger(this.state);
 
-		// 初始化命令分发器
-		this.commandDispatcher = new CommandDispatcher(this.state);
-
-		// 初始化事件日志器
-		this.eventLogger = new RoomEventLogger(this.state);
-
-		// 设置初始游戏阶段
-		this.state.currentPhase = "DEPLOYMENT";
-		this.state.turnCount = 1;
-
-		// 启动聊天消息自动清理（每 5 分钟清理一次）
-		this.chatCleanupInterval = setInterval(
-			() => {
-				this.cleanupOldMessages();
-			},
-			5 * 60 * 1000
-		);
-
-		// 启动自动保存（每 5 分钟）
-		this.autoSaveInterval = setInterval(
-			() => {
-				this.autoSave();
-			},
-			5 * 60 * 1000
-		);
-
-		// 设置初始元数据
-		this.setMetadata({
-			name: this.roomDisplayName,
-			phase: this.state.currentPhase,
-			turnCount: 1,
-			isPrivate: this.isPrivateRoom,
-			maxPlayers: this.maxClients,
-			playerCount: 0,
-			dmCount: 0,
+		registerMessageHandlers(this, {
+			state: this.state,
+			dispatcher: this.dispatcher,
+			logger: this.logger,
+			broadcast: (t, d) => this.broadcast(t, d),
+			pingEwma: this.pingEwma,
+			jitterEwma: this.jitterEwma,
+			getRoomOwnerId: () => this.roomOwnerId,
+			setMetadata: () => this.syncMetadata(),
+			profileStore: this.profileStore,
+			createObject: (payload: CreateObjectPayload) => this.createObject(payload),
 		});
 
-		// 注册所有消息处理器
-		this.registerMessageHandlers();
-
-		// 设置游戏循环 (20 FPS - 回合制游戏足够，减少带宽使用)
-		this.setSimulationInterval((deltaTime) => this.update(deltaTime), 50);
-
-		// 初始化状态缓存用于死区检测
-		this.lastUpdateState = {
-			shipPositions: new Map(),
-			destroyedCount: 0,
-		};
-
-		console.log(`[BattleRoom] Initialization complete, metadata set`);
-		console.log(`[BattleRoom] Room state type: ${this.state.constructor.name}`);
+		this.syncMetadata();
+		this.setSimulationInterval((dt) => this.update(dt / 1000), 50);
 	}
 
-	/**
-	 * 客户端认证 - 简化版，直接使用用户名
-	 * 在 onJoin 之前调用
-	 */
-	async onAuth(client: Client, options: { playerName?: string; shortId?: number }) {
-		// 简化认证：直接使用用户名，无需 token
-		const playerName = options?.playerName?.trim();
+	onJoin(client: Client, options: { playerName?: string; shortId?: number }) {
+		const name = options.playerName?.trim() || `Player-${client.sessionId.substring(0, 4)}`;
+		const shortId = options.shortId ?? Math.floor(100000 + Math.random() * 900000);
 
-		if (!playerName || playerName.length === 0) {
-			console.warn(`[BattleRoom] Auth failed: empty player name from ${client.sessionId}`);
-			throw new Error("请输入玩家名称");
-		}
-
-		if (playerName.length > 32) {
-			console.warn(
-				`[BattleRoom] Auth failed: name too long (${playerName.length}) from ${client.sessionId}`
-			);
-			throw new Error("玩家名称不能超过 32 个字符");
-		}
-
-		const shortId = this.resolveShortId(options?.shortId);
-
-		// 保存到 client 对象供 onJoin 使用
-		(client as any).playerName = playerName;
-		(client as any).shortId = shortId;
-
-		console.log(`[BattleRoom] Auth: ${playerName} (${client.sessionId}) [${shortId}]`);
-		return true;
-	}
-
-	private resolveShortId(shortId: number | undefined): number {
-		if (
-			typeof shortId === "number" &&
-			Number.isInteger(shortId) &&
-			shortId >= 100000 &&
-			shortId <= 999999
-		) {
-			return shortId;
-		}
-
-		return Math.floor(100000 + Math.random() * 900000);
-	}
-
-	private findPlayerSessionByShortId(shortId: number): string | null {
-		for (const [sessionId, identity] of this.playerIdentity.entries()) {
-			if (identity.shortId === shortId) {
-				return sessionId;
-			}
-		}
-
-		return null;
-	}
-
-	private transferPlayerOwnership(fromSessionId: string, toSessionId: string): void {
-		if (this.roomOwnerId === fromSessionId) {
-			this.roomOwnerId = toSessionId;
-		}
-
-		this.state.ships.forEach((ship: ShipState) => {
-			if (ship.ownerId === fromSessionId) {
-				ship.ownerId = toSessionId;
-			}
-		});
-	}
-
-	private assertSchemaMetadataSafe(): void {
-		const classes: Array<[string, unknown]> = [
-			["GameRoomState", GameRoomState],
-			["PlayerState", PlayerState],
-			["ShipState", ShipState],
-			["WeaponSlot", WeaponSlot],
-		];
-
-		for (const [name, klass] of classes) {
-			const metadata = (
-				klass as { [Symbol.metadata]?: Record<string, { name?: string; type?: unknown }> }
-			)[Symbol.metadata];
-			if (!metadata) {
-				throw new Error(`[SchemaCheck] ${name} metadata missing`);
-			}
-
-			for (const [index, field] of Object.entries(metadata)) {
-				if (!field || typeof field !== "object") {
-					continue;
-				}
-
-				if ("type" in field && field.type === undefined) {
-					const fieldName = "name" in field ? String(field.name) : `#${index}`;
-					throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined type`);
-				}
-
-				if ("type" in field && typeof field.type === "object" && field.type !== null) {
-					const fieldName = "name" in field ? String(field.name) : `#${index}`;
-					const complexType = field.type as Record<string, unknown>;
-
-					if ("map" in complexType && complexType.map === undefined) {
-						throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined map child type`);
-					}
-
-					if ("array" in complexType && complexType.array === undefined) {
-						throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined array child type`);
-					}
-
-					if ("set" in complexType && complexType.set === undefined) {
-						throw new Error(`[SchemaCheck] ${name}.${fieldName} has undefined set child type`);
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * 客户端加入房间
-	 * 在 onAuth 成功后调用
-	 */
-	onJoin(client: Client) {
-		// 从 onAuth 传递的名称
-		const playerName =
-			(client as Client & { playerName: string }).playerName ||
-			`Player_${client.sessionId.substring(0, 4)}`;
-		const shortId =
-			(client as Client & { shortId?: number }).shortId || this.resolveShortId(undefined);
-
-		console.log(`[BattleRoom] Player joined: ${playerName} (${client.sessionId}) [${shortId}]`);
-
-		// 检查是否有同短 ID 的玩家已连接（防止重复）
-		const existingPlayerByShortId = this.findPlayerByShortId(shortId);
-		if (existingPlayerByShortId && existingPlayerByShortId.sessionId !== client.sessionId) {
-			console.log(
-				`[BattleRoom] Removing duplicate player with same shortId: ${existingPlayerByShortId.sessionId}`
-			);
-			this.removePlayerSession(existingPlayerByShortId.sessionId);
-		}
-
-		// 检查是否有同名的玩家已连接（用户名独占性）
-		const existingPlayerByName = this.findPlayerByName(playerName);
-		if (
-			existingPlayerByName &&
-			existingPlayerByName.connected &&
-			existingPlayerByName.sessionId !== client.sessionId
-		) {
-			console.warn(
-				`[BattleRoom] Username "${playerName}" already in use by ${existingPlayerByName.sessionId}`
-			);
-			throw new Error(`用户名 "${playerName}" 已被使用，请选择其他用户名`);
-		}
-
-		// 创建玩家状态
-		this.assertSchemaMetadataSafe();
 		const player = new PlayerState();
 		player.sessionId = client.sessionId;
 		player.shortId = shortId;
-		player.name = playerName;
-		const savedProfile = this.profileStore.get(shortId);
-		player.nickname = savedProfile?.nickname ?? "";
-		player.avatar = savedProfile?.avatar ?? "👤";
+		player.name = name;
 		player.connected = true;
-		player.role = PlayerRole.PLAYER;
-		player.isReady = false;
-		player.pingMs = -1;
-		player.jitterMs = 0;
-		player.connectionQuality = ConnectionQuality.EXCELLENT;
+		player.role = this.clients.length === 1 ? PlayerRole.DM : PlayerRole.PLAYER;
 
-		// 第一个玩家自动成为 DM
-		if (this.clients.length === 1) {
-			player.role = PlayerRole.DM;
-			this.roomOwnerId = client.sessionId;
-			console.log(`[BattleRoom] First player is DM`);
-		}
+		if (player.role === PlayerRole.DM) this.roomOwnerId = client.sessionId;
 
-		// 发送角色信息
-		client.send("role", { role: player.role });
-		client.send("identity", { userName: playerName, shortId });
-
-		// 添加到状态
+		client.send("role", toRoleDto(player.role));
+		client.send("identity", toIdentityDto(name, shortId));
 		this.state.players.set(client.sessionId, player);
-		this.playerIdentity.set(client.sessionId, { userName: playerName, shortId });
 		this.pingEwma.set(client.sessionId, -1);
-		this.jitterEwma.set(client.sessionId, 0);
-
-		// 更新元数据
-		this.updateMetadata();
+		this.syncMetadata();
 	}
 
-	/**
-	 * 更新房间元数据
-	 */
-	private updateMetadata(): void {
-		let playerCount = 0;
-		let dmCount = 0;
-
-		this.state.players.forEach((p) => {
-			if (p.connected) {
-				if (p.role === PlayerRole.DM) dmCount++;
-				else playerCount++;
-			}
-		});
-
-		this.setMetadata({
-			name: this.roomDisplayName,
-			phase: this.state.currentPhase,
-			turnCount: this.state.turnCount,
-			isPrivate: this.isPrivateRoom,
-			maxPlayers: this.maxClients,
-			playerCount,
-			dmCount,
-			ownerId: this.roomOwnerId,
-			ownerShortId: this.roomOwnerId
-				? (this.playerIdentity.get(this.roomOwnerId)?.shortId ?? null)
-				: null,
-		});
-	}
-
-	/**
-	 * 根据 shortId 查找玩家
-	 */
-	private findPlayerByShortId(shortId: number): PlayerState | null {
-		for (const player of this.state.players.values()) {
-			if (player.shortId === shortId) {
-				return player;
-			}
+	onLeave(client: Client, code?: number) {
+		const player = this.state.players.get(client.sessionId);
+		if (code === 1000) {
+			this.state.players.delete(client.sessionId);
+			this.assignOwner();
+			this.syncMetadata();
+			return;
 		}
-		return null;
-	}
-
-	/**
-	 * 根据用户名查找玩家
-	 */
-	private findPlayerByName(name: string): PlayerState | null {
-		for (const player of this.state.players.values()) {
-			if (player.name.toLowerCase() === name.toLowerCase()) {
-				return player;
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * 注册所有消息处理器
-	 */
-	private registerMessageHandlers() {
-		// 聊天消息 - 使用 Schema 状态同步（Colyseus 推荐方式）
-		this.onMessage("chat", (client, payload: { content: string; playerName?: string }) => {
-			const player = this.state.players.get(client.sessionId);
-			const senderName = payload.playerName || player?.nickname || player?.name || "Unknown";
-
-			// 直接修改 Schema 状态，Colyseus 会自动同步给所有客户端
-			this.eventLogger.addChatMessage(client.sessionId, senderName, payload.content);
-		});
-
-		// 移动指令
-		this.onMessage(ClientCommand.CMD_MOVE_TOKEN, (client, payload: MoveTokenPayload) => {
-			try {
-				this.commandDispatcher.dispatchMoveToken(client, payload);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 护盾指令
-		this.onMessage(ClientCommand.CMD_TOGGLE_SHIELD, (client, payload: ToggleShieldPayload) => {
-			try {
-				this.commandDispatcher.dispatchToggleShield(client, payload);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 开火指令
-		this.onMessage(ClientCommand.CMD_FIRE_WEAPON, (client, payload: FireWeaponPayload) => {
-			try {
-				this.commandDispatcher.dispatchFireWeapon(client, payload);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 排散指令
-		this.onMessage(ClientCommand.CMD_VENT_FLUX, (client, payload: VentFluxPayload) => {
-			try {
-				this.commandDispatcher.dispatchVentFlux(client, payload);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 分配舰船指令
-		this.onMessage(
-			ClientCommand.CMD_ASSIGN_SHIP,
-			(client, payload: { shipId: string; targetSessionId: string }) => {
-				try {
-					this.commandDispatcher.dispatchAssignShip(
-						client,
-						payload.shipId,
-						payload.targetSessionId
-					);
-				} catch (error) {
-					client.send("error", { message: (error as Error).message });
-				}
-			}
-		);
-
-		// 切换准备状态
-		this.onMessage(ClientCommand.CMD_TOGGLE_READY, (client, payload: { isReady: boolean }) => {
-			try {
-				const player = this.state.players.get(client.sessionId);
-				if (player) {
-					player.isReady = payload.isReady;
-					this.checkAutoAdvancePhase();
-				}
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 下一阶段指令
-		this.onMessage(ClientCommand.CMD_NEXT_PHASE, (client) => {
-			try {
-				const player = this.state.players.get(client.sessionId);
-				if (player?.role === PlayerRole.DM) {
-					this.advancePhase();
-				} else {
-					throw new Error("只有 DM 可以强制进入下一阶段");
-				}
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 创建测试舰船（旧接口，保留兼容性）
-		this.onMessage(
-			"CREATE_TEST_SHIP",
-			(
-				client,
-				payload: { faction: (typeof Faction)[keyof typeof Faction]; x: number; y: number }
-			) => {
-				const player = this.state.players.get(client.sessionId);
-				if (player?.role === PlayerRole.DM) {
-					this.createTestShip(payload.faction, payload.x, payload.y);
-				} else {
-					client.send("error", { message: "只有 DM 可以创建测试舰船" });
-				}
-			}
-		);
-
-		// DM 创建对象（新接口）
-		this.onMessage("DM_CREATE_OBJECT", (client, payload: CreateObjectPayload) => {
-			const player = this.state.players.get(client.sessionId);
-			if (player?.role === PlayerRole.DM) {
-				this.createObject(payload);
-			} else {
-				client.send("error", { message: "只有 DM 可以创建对象" });
-			}
-		});
-
-		// DM 清除过载
-		this.onMessage("DM_CLEAR_OVERLOAD", (client, payload: DMClearOverloadPayload) => {
-			try {
-				this.commandDispatcher.dispatchClearOverload(client, payload.shipId);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// DM 修改护甲
-		this.onMessage("DM_SET_ARMOR", (client, payload: DMSetArmorPayload) => {
-			try {
-				this.commandDispatcher.dispatchSetArmor(
-					client,
-					payload.shipId,
-					payload.section,
-					payload.value
-				);
-			} catch (error) {
-				client.send("error", { message: (error as Error).message });
-			}
-		});
-
-		// 网络质量探测
-		this.onMessage("NET_PING", (client, payload: NetPingPayload) => {
-			const player = this.state.players.get(client.sessionId);
-			if (!player || !player.connected) return;
-
-			const now = Date.now();
-			const sampleRtt = Math.max(0, now - payload.clientSentAt);
-			const prevRtt = this.pingEwma.get(client.sessionId) ?? -1;
-			const alpha = 0.2;
-			const nextRtt = prevRtt < 0 ? sampleRtt : prevRtt * (1 - alpha) + sampleRtt * alpha;
-
-			const prevJitter = this.jitterEwma.get(client.sessionId) ?? 0;
-			const jitterSample = prevRtt < 0 ? 0 : Math.abs(sampleRtt - prevRtt);
-			const nextJitter = prevJitter * 0.7 + jitterSample * 0.3;
-
-			this.pingEwma.set(client.sessionId, nextRtt);
-			this.jitterEwma.set(client.sessionId, nextJitter);
-
-			player.pingMs = Math.round(nextRtt);
-			player.jitterMs = Math.round(nextJitter);
-			player.connectionQuality = this.toQuality(player.pingMs);
-
-			client.send("NET_PONG", {
-				seq: payload.seq,
-				serverTime: now,
-				pingMs: player.pingMs,
-				jitterMs: player.jitterMs,
-				quality: player.connectionQuality,
-			});
-		});
-
-		this.onMessage("ROOM_UPDATE_PROFILE", (client, payload: UpdateProfilePayload) => {
-			const player = this.state.players.get(client.sessionId);
-			const identity = this.playerIdentity.get(client.sessionId);
-			if (!player || !identity) return;
-
-			player.nickname = String(payload.nickname || "")
-				.trim()
-				.slice(0, 24);
-			player.avatar =
-				String(payload.avatar || "👤")
-					.trim()
-					.slice(0, 4) || "👤";
-			this.profileStore.set(identity.shortId, { nickname: player.nickname, avatar: player.avatar });
-		});
-
-		this.onMessage("ROOM_KICK_PLAYER", (client, payload: { targetSessionId?: string }) => {
-			if (client.sessionId !== this.roomOwnerId) {
-				client.send("error", { message: "仅房间管理员可踢出玩家" });
-				return;
-			}
-
-			const targetSessionId = String(payload?.targetSessionId || "");
-			if (!targetSessionId || targetSessionId === client.sessionId) {
-				return;
-			}
-
-			const targetClient = this.clients.find((item) => item.sessionId === targetSessionId);
-			targetClient?.send("ROOM_KICKED", { reason: "你已被房主移出房间" });
-			targetClient?.leave(4001);
-			this.removePlayerSession(targetSessionId);
-			this.updateMetadata();
-		});
-	}
-
-	/**
-	 * 游戏主循环 - 带死区检测优化
-	 *
-	 * 使用优化的 FluxState.dissipate() 方法
-	 */
-	private update(deltaTime: number) {
-		const changes: Array<{ type: string; data: any }> = [];
-		const currentShipPositions = new Map<string, { x: number; y: number; heading: number }>();
-		let hasSignificantChange = false;
-
-		const deltaSeconds = deltaTime / 1000;
-
-		this.state.ships.forEach((ship: ShipState) => {
-			if (ship.isDestroyed) {
-				changes.push({ type: "destroyed", data: { shipId: ship.id } });
-				return;
-			}
-
-			// 记录当前位置用于死区检测
-			currentShipPositions.set(ship.id, {
-				x: ship.transform.x,
-				y: ship.transform.y,
-				heading: ship.transform.heading,
-			});
-
-			// 检查位置变化是否显著（阈值：1 单位位置或 1 度角度）
-			const lastPos = this.lastUpdateState.shipPositions.get(ship.id);
-			if (lastPos) {
-				const dx = Math.abs(ship.transform.x - lastPos.x);
-				const dy = Math.abs(ship.transform.y - lastPos.y);
-				const dHeading = Math.abs(ship.transform.heading - lastPos.heading);
-
-				if (dx > 1 || dy > 1 || dHeading > 1) {
-					hasSignificantChange = true;
-				}
-			} else {
-				// 新舰船，标记为有变化
-				hasSignificantChange = true;
-			}
-
-			// 更新武器冷却（只在状态变化时记录）
-			ship.weapons.forEach((weapon: WeaponSlot) => {
-				if (weapon.cooldownRemaining > 0) {
-					const oldCooldown = weapon.cooldownRemaining;
-					weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaSeconds);
-
-					// 只在冷却完成时广播
-					if (oldCooldown > 0 && weapon.cooldownRemaining <= 0) {
-						changes.push({
-							type: "weapon_ready",
-							data: { shipId: ship.id, weaponId: weapon.mountId },
-						});
-					}
-				}
-			});
-
-			// 更新过载状态（使用优化的 FluxState）
-			if (ship.isOverloaded && ship.overloadTime > 0) {
-				const oldOverloadTime = ship.overloadTime;
-				ship.overloadTime -= deltaSeconds;
-
-				if (oldOverloadTime > 0 && ship.overloadTime <= 0) {
-					ship.isOverloaded = false;
-					ship.overloadTime = 0;
-					changes.push({ type: "overload_cleared", data: { shipId: ship.id } });
-				}
-			}
-
-			// 使用优化的 FluxState.dissipate() 方法消散辐能
-			ship.flux.dissipate(deltaSeconds);
-
-			// 检查是否从过载恢复
-			if (ship.isOverloaded && !ship.flux.isOverloaded) {
-				ship.isOverloaded = false;
-				ship.overloadTime = 0;
-				changes.push({ type: "overload_cleared", data: { shipId: ship.id } });
-			}
-		});
-
-		// 处理被摧毁的舰船
-		for (const change of changes) {
-			if (change.type === "destroyed") {
-				const ship = this.state.ships.get(change.data.shipId);
-				if (ship) {
-					// 记录战斗事件（使用 Schema）
-					this.eventLogger.addCombatMessage(`${ship.name || change.data.shipId} 被摧毁`);
-				}
-
-				this.state.ships.delete(change.data.shipId);
-
-				// 仍然广播摧毁事件（客户端需要播放动画/音效）
-				this.broadcast("ship_destroyed", {
-					shipId: change.data.shipId,
-					timestamp: Date.now(),
+		if (player) {
+			player.connected = false;
+			this.allowReconnection(client, 60)
+				.then(() => {
+					player.connected = true;
+					this.syncMetadata();
+				})
+				.catch(() => {
+					this.state.players.delete(client.sessionId);
+					this.assignOwner();
+					this.syncMetadata();
 				});
-			} else if (change.type === "weapon_ready") {
-				// 武器就绪不需要广播，客户端通过 Schema 自动同步
-			} else if (change.type === "overload_cleared") {
-				// 过载清除不需要广播，客户端通过 Schema 自动同步
-			}
-		}
-
-		// 只在有显著变化时更新位置缓存
-		if (hasSignificantChange) {
-			this.lastUpdateState.shipPositions = currentShipPositions;
 		}
 	}
 
-	/**
-	 * 检查是否自动进入下一阶段
-	 */
-	private checkAutoAdvancePhase(): void {
-		if (this.state.currentPhase !== "PLAYER_TURN") return;
-
-		let allReady = true;
-		let hasPlayers = false;
-
-		this.state.players.forEach((player: PlayerState) => {
-			if (player.role === PlayerRole.PLAYER && player.connected) {
-				hasPlayers = true;
-				if (!player.isReady) {
-					allReady = false;
-				}
-			}
-		});
-
-		if (hasPlayers && allReady) {
-			console.log("[BattleRoom] All players ready, advancing phase");
-			this.advancePhase();
-		}
-	}
-
-	/**
-	 * 推进游戏阶段
-	 */
-	private advancePhase(): void {
-		const phases: string[] = ["DEPLOYMENT", "PLAYER_TURN", "DM_TURN", "END_PHASE"];
-		const currentIndex = phases.indexOf(this.state.currentPhase as string);
-		let nextIndex = currentIndex + 1;
-
-		if (nextIndex >= phases.length) {
-			nextIndex = phases.indexOf("PLAYER_TURN");
-		}
-
-		const oldPhase = this.state.currentPhase;
-		this.state.currentPhase = phases[nextIndex];
-
-		// 重置所有玩家的 ready 状态
-		this.state.players.forEach((p: PlayerState) => (p.isReady = false));
-
-		// 处理阶段转换
-		if (this.state.currentPhase === "END_PHASE") {
-			this.handleEndPhase();
-			return this.advancePhase();
-		}
-
-		// 设置活跃阵营
-		this.state.activeFaction =
-			this.state.currentPhase === "PLAYER_TURN" ? Faction.PLAYER : Faction.DM;
-
-		// 广播阶段变更
-		this.broadcast("phase_change", {
-			phase: this.state.currentPhase,
-			oldPhase,
-			turnCount: this.state.turnCount,
-		});
-
-		// 更新元数据
-		this.updateMetadata();
-		console.log(`[BattleRoom] Phase changed: ${oldPhase} -> ${this.state.currentPhase}`);
-	}
-
-	/**
-	 * 处理结束阶段 - 使用优化的嵌套结构
-	 */
-	private handleEndPhase(): void {
+	private update(dt: number) {
 		this.state.ships.forEach((ship: ShipState) => {
 			if (ship.isDestroyed) return;
-
-			// 重置移动状态
-			ship.hasMoved = false;
-			ship.hasFired = false;
-
-			// 重置燃料池（新回合）
-			ship.fuelPhaseAForwardUsed = 0;
-			ship.fuelPhaseAStrafeUsed = 0;
-			ship.fuelPhaseBTurnUsed = 0;
-			ship.fuelPhaseCForwardUsed = 0;
-			ship.fuelPhaseCStrafeUsed = 0;
-			ship.currentMovementPhase = 0;
-
-			// 重置武器状态
-			ship.weapons.forEach((weapon: WeaponSlot) => {
-				weapon.hasFiredThisTurn = false;
-
-				if (
-					weapon.state === WeaponState.OUT_OF_AMMO &&
-					weapon.maxAmmo > 0 &&
-					weapon.reloadTime > 0
-				) {
-					weapon.currentAmmo = weapon.maxAmmo;
-					weapon.state = WeaponState.READY;
-					console.log(
-						`[EndPhase] ${ship.name || ship.id} 武器 ${weapon.name || weapon.mountId} 装填完成`
-					);
-				}
+			ship.weapons.forEach((w: WeaponSlot) => {
+				w.cooldownRemaining = Math.max(0, w.cooldownRemaining - dt);
 			});
-
-			// 使用优化的 FluxState 方法消散辐能
-			if (ship.shield.active) {
-				ship.flux.addSoft(ship.flux.dissipation * 0.2);
+			if (ship.isOverloaded && ship.overloadTime > 0) {
+				ship.overloadTime -= dt;
+				if (ship.overloadTime <= 0) ship.isOverloaded = false;
 			}
-			ship.flux.dissipate(1.0); // 1 秒的消散时间
-
-			// 检查过载
-			if (ship.flux.isOverloaded) {
-				ship.isOverloaded = true;
-				ship.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
-				ship.shield.deactivate();
-				console.log(`[EndPhase] ${ship.name || ship.id} 过载！`);
-			}
-		});
-
-		this.state.turnCount++;
-	}
-
-	/**
-	 * 创建测试舰船 - 使用优化的 ShipStateOptimized
-	 */
-	private createTestShip(faction: (typeof Faction)[keyof typeof Faction], x: number, y: number) {
-		const shipSpec = getShipHullSpec("frigate_assault");
-		if (!shipSpec) {
-			console.error("[BattleRoom] Test ship spec not found");
-			return;
-		}
-
-		const ship = new ShipState();
-		ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-		ship.faction = faction;
-		ship.hullType = "frigate_assault";
-		ship.name = shipSpec.name;
-		ship.width = shipSpec.width;
-		ship.length = shipSpec.length;
-		ship.ownerId = "";
-		ship.setPosition(x, y);
-		ship.setHeading(faction === Faction.PLAYER ? 0 : 180);
-
-		// 设置船体
-		ship.hull.max = shipSpec.hullPoints;
-		ship.hull.current = shipSpec.hullPoints;
-
-		// 设置护甲
-		ship.armor.maxPerQuadrant = shipSpec.armorValue;
-		const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-		armorDist.forEach((value, index) => {
-			ship.armor.setQuadrant(index, value);
-		});
-
-		// 设置辐能
-		ship.flux.max = shipSpec.fluxCapacity;
-		ship.flux.dissipation = shipSpec.fluxDissipation || 10;
-
-		// 设置机动性能
-		ship.maxSpeed = shipSpec.maxSpeed;
-		ship.maxTurnRate = shipSpec.maxTurnRate;
-		ship.acceleration = shipSpec.acceleration;
-
-		// 设置护盾
-		if (shipSpec.hasShield) {
-			ship.shield.active = false;
-			ship.shield.setOrientation(ship.transform.heading);
-			ship.shield.arc = shipSpec.shieldArc || 120;
-			ship.shield.radius = shipSpec.shieldRadius || 50;
-			ship.shield.efficiency = shipSpec.shieldEfficiency || 0.5;
-			ship.shield.maintenanceCost = shipSpec.shieldMaintenanceCost || 5;
-		}
-
-		// 设置武器
-		if (shipSpec.weaponMounts) {
-			for (const mount of shipSpec.weaponMounts) {
-				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
-				if (weaponSpec && shipSpec) {
-					const weapon = this.createWeaponSlotFromSpec(mount, weaponSpec);
-					ship.weapons.set(mount.id, weapon);
-				}
-			}
-		}
-
-		this.state.ships.set(ship.id, ship);
-		console.log(`[BattleRoom] Created test ship: ${shipSpec.name} at (${x}, ${y})`);
-
-		// 记录事件
-		this.eventLogger.addSystemMessage(`创建了测试舰船 ${shipSpec.name}`);
-
-		// 广播创建事件
-		this.broadcast("ship_created", {
-			shipId: ship.id,
-			hullType: "frigate_assault",
-			faction,
-			x,
-			y,
-			heading: ship.transform.heading,
-			timestamp: Date.now(),
+			ship.flux.dissipate(dt);
+			if (ship.isOverloaded && !ship.flux.isOverloaded) ship.isOverloaded = false;
 		});
 	}
 
-	/**
-	 * DM 创建对象（舰船/空间站/小行星）- 使用 ShipStateOptimized
-	 */
-	createObject(payload: CreateObjectPayload): void {
-		const { type, hullId, x, y, heading, faction, ownerId } = payload;
+	onDispose() {}
 
-		if (type === "ship" && hullId) {
-			const shipSpec = getShipHullSpec(hullId);
-			if (!shipSpec) {
-				console.error(`[BattleRoom] Ship hull not found: ${hullId}`);
-				return;
-			}
-
-			const ship = new ShipState();
-			ship.id = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-			ship.faction = faction;
-			ship.hullType = hullId;
-			ship.ownerId = ownerId || "";
-			ship.name = shipSpec.name;
-			ship.width = shipSpec.width;
-			ship.length = shipSpec.length;
-
-			// 设置位置
-			ship.setPosition(x, y);
-			ship.setHeading(heading);
-
-			// 设置船体
-			ship.hull.max = shipSpec.hullPoints;
-			ship.hull.current = shipSpec.hullPoints;
-
-			// 设置护甲
-			ship.armor.maxPerQuadrant = shipSpec.armorValue;
-			const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-			armorDist.forEach((value, index) => {
-				ship.armor.setQuadrant(index, value);
-			});
-
-			// 设置辐能
-			ship.flux.max = shipSpec.fluxCapacity;
-			ship.flux.dissipation = shipSpec.fluxDissipation || 10;
-
-			// 设置机动性能
-			ship.maxSpeed = shipSpec.maxSpeed;
-			ship.maxTurnRate = shipSpec.maxTurnRate;
-			ship.acceleration = shipSpec.acceleration;
-
-			// 设置护盾
-			if (shipSpec.hasShield) {
-				ship.shield.active = false;
-				ship.shield.setOrientation(heading);
-				ship.shield.arc = shipSpec.shieldArc || 120;
-				ship.shield.radius = shipSpec.shieldRadius || 50;
-				ship.shield.efficiency = shipSpec.shieldEfficiency || 0.5;
-				ship.shield.maintenanceCost = shipSpec.shieldMaintenanceCost || 5;
-			}
-
-			// 设置武器
-			for (const mount of shipSpec.weaponMounts) {
-				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
-				if (weaponSpec) {
-					ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
-				}
-			}
-
-			this.state.ships.set(ship.id, ship);
-			console.log(`[BattleRoom] Created ${hullId} for ${faction} at (${x}, ${y})`);
-
-			// 记录事件
-			this.eventLogger.addSystemMessage(`DM 创建了 ${shipSpec.name}`);
-
-			// 广播创建事件
-			this.broadcast("ship_created", {
-				shipId: ship.id,
-				hullType: hullId,
-				faction: faction,
-				x,
-				y,
-				heading: ship.transform.heading,
-				timestamp: Date.now(),
-			});
-		} else if (type === "station" || type === "asteroid") {
-			const ship = new ShipState();
-			ship.id = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-			ship.faction = faction;
-			ship.hullType = type;
-			ship.ownerId = ownerId || "";
-			ship.setPosition(x, y);
-			ship.setHeading(heading);
-
-			// 设置船体
-			ship.hull.max = type === "station" ? 5000 : 2000;
-			ship.hull.current = ship.hull.max;
-
-			// 设置护甲
-			ship.armor.maxPerQuadrant = 300;
-			[300, 300, 300, 200, 300, 300].forEach((value, index) => {
-				ship.armor.setQuadrant(index, value);
-			});
-
-			// 无辐能系统
-			ship.flux.max = 0;
-
-			// 固定物体
-			ship.maxSpeed = 0;
-			ship.maxTurnRate = 0;
-			ship.acceleration = 0;
-
-			this.state.ships.set(ship.id, ship);
-			console.log(`[BattleRoom] Created ${type} at (${x}, ${y})`);
-
-			// 记录事件（使用 Schema）
-			this.eventLogger.addSystemMessage(`DM 创建了 ${type}`);
-
-			// 广播创建事件（客户端需要播放动画/音效）
-			this.broadcast("ship_created", {
-				shipId: ship.id,
-				hullType: type,
-				faction: faction,
-				x,
-				y,
-				heading,
-				timestamp: Date.now(),
+	private assignOwner() {
+		if (!this.state.players.has(this.roomOwnerId ?? "")) {
+			const next = Array.from(
+				this.state.players.values() as IterableIterator<PlayerState>
+			).find((p) => p.connected);
+			this.roomOwnerId = next?.sessionId ?? null;
+			this.state.players.forEach((p: PlayerState) => {
+				p.role = p.sessionId === this.roomOwnerId ? PlayerRole.DM : PlayerRole.PLAYER;
 			});
 		}
 	}
 
-	private createWeaponSlotFromSpec(
-		mount: {
-			id: string;
-			mountType: string;
-			offsetX: number;
-			offsetY: number;
-			facing: number;
-			arcMin: number;
-			arcMax: number;
-		},
-		spec: {
-			id: string;
-			name: string;
-			category: string;
-			damageType: string;
-			mountType: string;
-			damage: number;
-			range: number;
-			cooldown: number;
-			fluxCost: number;
-			ammo: number;
-			reloadTime: number;
-			ignoresShields: boolean;
-		}
-	): WeaponSlot {
-		const weapon = new WeaponSlot();
-		weapon.mountId = mount.id;
-		weapon.weaponSpecId = spec.id;
-		weapon.name = spec.name;
-		weapon.category = spec.category;
-		weapon.damageType = spec.damageType;
-		weapon.mountType = spec.mountType;
-
-		weapon.offsetX = mount.offsetX;
-		weapon.offsetY = mount.offsetY;
-		weapon.mountFacing = mount.facing;
-		weapon.arcMin = mount.arcMin;
-		weapon.arcMax = mount.arcMax;
-
-		weapon.damage = spec.damage;
-		weapon.range = spec.range;
-		weapon.fluxCost = spec.fluxCost;
-
-		weapon.cooldownMax = spec.cooldown;
-		weapon.cooldownRemaining = 0;
-
-		weapon.maxAmmo = spec.ammo;
-		weapon.currentAmmo = spec.ammo;
-		weapon.reloadTime = spec.reloadTime;
-
-		weapon.state = WeaponState.READY;
-		weapon.ignoresShields = spec.ignoresShields;
-		weapon.hasFiredThisTurn = false;
-
-		return weapon;
+	private getOwnerProfile(): { sessionId: string; shortId: number } | null {
+		if (!this.roomOwnerId) return null;
+		const owner = this.state.players.get(this.roomOwnerId);
+		if (!owner) return null;
+		return { sessionId: owner.sessionId, shortId: owner.shortId };
 	}
 
-	/**
-	 * 将 Ping 值转换为连接质量
-	 */
-	private toQuality(pingMs: number): (typeof ConnectionQuality)[keyof typeof ConnectionQuality] {
-		if (pingMs < 0) return ConnectionQuality.OFFLINE;
-		if (pingMs <= 80) return ConnectionQuality.EXCELLENT;
-		if (pingMs <= 140) return ConnectionQuality.GOOD;
-		if (pingMs <= 220) return ConnectionQuality.FAIR;
-		return ConnectionQuality.POOR;
+	private syncMetadata(): void {
+		const owner = this.getOwnerProfile();
+		const metadata: RoomMetadata = {
+			roomType: "battle",
+			name: this.roomDisplayName,
+			phase: this.state.currentPhase,
+			ownerId: owner?.sessionId ?? null,
+			ownerShortId: owner?.shortId ?? null,
+			maxPlayers: this.maxClients,
+			isPrivate: false,
+			createdAt: this.createdAt,
+		};
+		this.setMetadata(metadata);
 	}
 
-	/**
-	 * 客户端离开房间
-	 * 实现断线重连机制
-	 *
-	 * 退出码说明：
-	 * - 1000: 正常退出（用户主动离开），立即清理，不允许重连
-	 * - 4000: 请求重连（客户端主动触发重连流程）
-	 * - 其他/undefined: 异常断开，尝试自动重连
-	 */
-	async onLeave(client: Client, code?: number) {
-		const player = this.state.players.get(client.sessionId);
-		const isNormalLeave = code === 1000;
-		const isReconnectRequest = code === 4000;
-
-		console.log(
-			`[BattleRoom] Player left: ${player?.name || "unknown"} (${client.sessionId}), ` +
-				`code: ${code}, normal: ${isNormalLeave}, reconnectRequest: ${isReconnectRequest}`
-		);
-
-		// 正常退出 - 立即清理，不等待重连
-		if (isNormalLeave) {
-			console.log(`[BattleRoom] Normal leave, cleaning up immediately`);
-			this.removePlayerSession(client.sessionId);
-			this.assignOwnerIfMissing();
-			this.updateMetadata();
-			this.checkRoomCleanup();
-			return;
-		}
-
-		// 客户端请求重连 - 保留会话数据，等待重新加入
-		if (isReconnectRequest && player) {
-			console.log(`[BattleRoom] Reconnect requested, keeping session for 60s`);
-			player.connected = false;
-			this.updateMetadata();
-
-			// 设置重连超时清理
-			setTimeout(() => {
-				const stillPlayer = this.state.players.get(client.sessionId);
-				if (stillPlayer && !stillPlayer.connected) {
-					console.log(`[BattleRoom] Reconnect timeout, removing player ${stillPlayer.name}`);
-					this.removePlayerSession(client.sessionId);
-					this.assignOwnerIfMissing();
-					this.updateMetadata();
-					this.checkRoomCleanup();
-				}
-			}, 60000);
-			return;
-		}
-
-		// 异常断开 - 使用 Colyseus 原生重连机制
-		if (player) {
-			try {
-				console.log(`[BattleRoom] Unexpected disconnect, allowing reconnection...`);
-				await this.allowReconnection(client, 60);
-				player.connected = true;
-				console.log(`[BattleRoom] Player ${player.name} reconnected successfully`);
-				return;
-			} catch (e) {
-				console.log(`[BattleRoom] Player ${player.name} reconnection failed`);
-			}
-		}
-
-		// 重连失败或无玩家数据 - 清理
-		this.removePlayerSession(client.sessionId);
-		this.assignOwnerIfMissing();
-		this.updateMetadata();
-		this.checkRoomCleanup();
-	}
-
-	/**
-	 * 检查是否需要清理房间
-	 */
-	private checkRoomCleanup() {
-		const hasConnectedClients = Array.from(this.state.players.values()).some((p) => p.connected);
-
-		if (!hasConnectedClients && this.clients.length === 0) {
-			// 给 5 分钟清理时间，防止短暂网络波动
-			console.log(`[BattleRoom] No connected clients, scheduling cleanup in 5 minutes`);
-			setTimeout(
-				() => {
-					if (this.clients.length === 0) {
-						console.log(`[BattleRoom] No clients after timeout, disconnecting`);
-						this.disconnect();
-					}
-				},
-				5 * 60 * 1000
-			);
-		}
-	}
-
-	private removePlayerSession(sessionId: string): void {
-		this.state.players.delete(sessionId);
-		this.playerIdentity.delete(sessionId);
-		this.pingEwma.delete(sessionId);
-		this.jitterEwma.delete(sessionId);
-	}
-
-	private assignOwnerIfMissing(): void {
-		if (this.roomOwnerId && this.state.players.has(this.roomOwnerId)) {
-			return;
-		}
-
-		const nextOwner = Array.from(this.state.players.values()).find((player) => player.connected);
-		if (!nextOwner) {
-			this.roomOwnerId = null;
-			return;
-		}
-
-		this.roomOwnerId = nextOwner.sessionId;
-		this.state.players.forEach((player) => {
-			player.role = player.sessionId === nextOwner.sessionId ? PlayerRole.DM : PlayerRole.PLAYER;
-		});
-	}
-
-	/**
-	 * 清理过期消息（Colyseus 推荐：保持状态精简）
-	 */
-	private cleanupOldMessages(): void {
-		const MAX_AGE_MS = 60 * 60 * 1000; // 1 小时
-		const now = Date.now();
-		let removed = 0;
-
-		for (let i = this.state.chatMessages.length - 1; i >= 0; i--) {
-			const msg = this.state.chatMessages[i];
-			if (now - msg.timestamp > MAX_AGE_MS) {
-				this.state.chatMessages.shift();
-				removed++;
-			}
-		}
-
-		if (removed > 0) {
-			console.log(`[BattleRoom] Cleaned up ${removed} old chat messages`);
-		}
-	}
-
-	/**
-	 * 自动保存游戏
-	 */
-	private autoSave(): void {
-		const saveName = `自动保存_${this.state.turnCount}回合`;
-		this.saveGame(saveName).catch((err) => {
-			console.error(`[BattleRoom] Auto save failed:`, err);
-		});
-	}
-
-	/**
-	 * 保存游戏（存档）
-	 *
-	 * 将当前游戏状态保存为存档数据
-	 */
-	async saveGame(saveName: string): Promise<string> {
-		const saveData: GameSave = serializeGameSave(
+	async saveGame(name: string): Promise<string> {
+		const save = serializeGameSave(
 			this.state,
 			this.roomId,
 			this.roomDisplayName,
 			this.maxClients,
-			this.isPrivateRoom,
-			saveName
+			false,
+			name
 		);
-
-		// 保存到存储
-		await saveStore.save(saveData);
-		this.lastSaveId = saveData.saveId;
-
-		console.log(`[BattleRoom] Game saved: ${saveName} (${saveData.saveId})`);
-
-		// 通知所有玩家已保存
-		this.broadcast("game_saved", {
-			saveId: saveData.saveId,
-			saveName,
-			timestamp: Date.now(),
-		});
-
-		return saveData.saveId;
+		await saveStore.save(save);
+		this.broadcast("game_saved", toGameSavedDto(save.saveId, name));
+		return save.saveId;
 	}
 
-	/**
-	 * 加载游戏（读档）
-	 *
-	 * 从存档数据恢复游戏状态
-	 * 注意：这需要所有玩家重新连接
-	 */
-	async loadGame(saveId: string): Promise<boolean> {
+	async loadGame(id: string): Promise<boolean> {
 		try {
-			const saveData = await saveStore.load(saveId);
-
-			// 验证版本兼容性
-			if (saveData.version !== "1.0.0") {
-				console.warn(`[BattleRoom] Save version mismatch: ${saveData.version}`);
-				// 可以添加版本迁移逻辑
-			}
-
-			// 恢复游戏状态
-			this.state.currentPhase = saveData.currentPhase;
-			this.state.turnCount = saveData.turnCount;
-			this.state.activeFaction = saveData.activeFaction;
-
-			// 清空当前舰船
+			const save = await saveStore.load(id);
+			const isEnumValue = <T extends Record<string, string>>(
+				enumObj: T,
+				value: unknown
+			): value is T[keyof T] => Object.values(enumObj).includes(value as T[keyof T]);
+			this.state.currentPhase = isEnumValue(GamePhase, save.currentPhase)
+				? save.currentPhase
+				: GamePhase.DEPLOYMENT;
+			this.state.turnCount = save.turnCount;
+			this.state.activeFaction = isEnumValue(Faction, save.activeFaction)
+				? save.activeFaction
+				: Faction.PLAYER;
 			this.state.ships.clear();
-
-			// 恢复舰船
-			for (const shipSave of saveData.ships) {
-				// TODO: 需要实现 deserializeShip 方法
-				// const ship = this.deserializeShip(shipSave);
-				// this.state.ships.set(ship.id, ship);
-			}
-
-			// 清空当前聊天消息
+			save.ships.forEach((s) => this.state.ships.set(s.id, deserializeShipSave(s)));
 			this.state.chatMessages.clear();
-
-			// 恢复聊天历史
-			for (const msg of saveData.chatHistory) {
-				const chatMsg = new ChatMessage(msg);
-				this.state.chatMessages.push(chatMsg);
-			}
-
-			console.log(`[BattleRoom] Game loaded: ${saveData.saveName}`);
-
-			// 通知所有玩家状态已恢复
-			this.broadcast("game_loaded", {
-				saveId,
-				saveName: saveData.saveName,
-				timestamp: Date.now(),
+			save.chatHistory.forEach((m) => {
+				const msg = new ChatMessage();
+				Object.assign(msg, m);
+				this.state.chatMessages.push(msg);
 			});
-
+			this.broadcast("game_loaded", toGameLoadedDto(id, save.saveName));
+			this.syncMetadata();
 			return true;
-		} catch (error) {
-			console.error(`[BattleRoom] Failed to load game:`, error);
+		} catch {
 			return false;
 		}
 	}
 
-	/**
-	 * 获取存档列表
-	 */
-	async getSaveList() {
-		return await saveStore.list();
-	}
-
-	/**
-	 * 删除存档
-	 */
-	async deleteSave(saveId: string): Promise<boolean> {
-		try {
-			await saveStore.delete(saveId);
-			console.log(`[BattleRoom] Save deleted: ${saveId}`);
-			return true;
-		} catch (error) {
-			console.error(`[BattleRoom] Failed to delete save:`, error);
-			return false;
+	createObject(p: CreateObjectPayload) {
+		const heading = p.heading ?? 0;
+		const faction = p.faction ?? Faction.PLAYER;
+		const ship =
+			p.type === "ship" && p.hullId
+				? createShip(p.hullId, p.x, p.y, heading, faction, p.ownerId)
+				: p.type === "station"
+					? createStation(p.x, p.y, heading)
+					: createAsteroid(p.x, p.y);
+		if (ship) {
+			ship.faction = faction;
+			this.state.ships.set(ship.id, ship);
+			this.broadcast(
+				"ship_created",
+				toShipCreatedDto(ship.id, p.hullId ?? p.type, p.x, p.y)
+			);
 		}
-	}
-
-	/**
-	 * 房间销毁
-	 */
-	onDispose() {
-		console.log(`[BattleRoom] Room ${this.roomId} disposed`);
-
-		// 清理定时器
-		if (this.chatCleanupInterval) {
-			clearInterval(this.chatCleanupInterval);
-			this.chatCleanupInterval = null;
-		}
-
-		if (this.autoSaveInterval) {
-			clearInterval(this.autoSaveInterval);
-			this.autoSaveInterval = null;
-		}
-
-		// Colyseus 会自动清理所有资源
 	}
 }

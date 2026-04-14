@@ -13,12 +13,12 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import {
 	type MovementCommand,
 	MovementPhase,
-	advancePhase,
 	clearMovement,
 	completeAnimation,
 	executeMove,
 	getRemainingFuel,
 	registerAttack,
+	setCurrentPhase,
 	startAnimation,
 	startMovement,
 	validateMove,
@@ -87,6 +87,22 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 		}
 	}, [movementState.currentPhase, ship, dispatch]);
 
+	// 与服务端阶段同步
+	useEffect(() => {
+		if (!ship) return;
+		if (movementState.currentPhase === MovementPhase.NONE) return;
+		const nextPhase = ship.hasMoved
+			? MovementPhase.COMPLETED
+			: ship.movePhase === "PHASE_B"
+				? MovementPhase.PHASE_B
+				: ship.movePhase === "PHASE_C"
+					? MovementPhase.PHASE_C
+					: MovementPhase.PHASE_A;
+		if (movementState.currentPhase !== nextPhase) {
+			dispatch(setCurrentPhase(nextPhase));
+		}
+	}, [ship, ship?.movePhase, ship?.hasMoved, movementState.currentPhase, dispatch]);
+
 	// 输入变化时验证
 	useEffect(() => {
 		const command: MovementCommand = {};
@@ -141,9 +157,6 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 			if (room) {
 				await room.send(ClientCommand.CMD_MOVE_TOKEN, {
 					shipId: ship.id,
-					x: ship.transform.x,
-					y: ship.transform.y,
-					heading: ship.transform.heading,
 					movementPlan: {
 						phaseAForward: command.forward || 0,
 						phaseAStrafe: command.strafe || 0,
@@ -197,11 +210,14 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 
 	// 切换阶段
 	const handleAdvancePhase = useCallback(() => {
-		dispatch(advancePhase());
+		const room = networkManager.getCurrentRoom();
+		if (room && ship) {
+			room.send(ClientCommand.CMD_ADVANCE_MOVE_PHASE, { shipId: ship.id });
+		}
 		setForwardInput(0);
 		setStrafeInput(0);
 		setTurnInput(0);
-	}, [dispatch]);
+	}, [networkManager, ship]);
 
 	// 取消移动
 	const handleCancel = useCallback(() => {
@@ -229,7 +245,6 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 		if (max <= 0) return null;
 
 		const percent = max > 0 ? ((value - -max) / (max * 2)) * 100 : 0;
-		const isNegative = value < 0;
 
 		return (
 			<div style={{ marginBottom: "12px" }}>

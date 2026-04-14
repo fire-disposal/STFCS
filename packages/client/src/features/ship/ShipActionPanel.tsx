@@ -66,13 +66,13 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 	const canFire = useMemo(() => canOperate && ship && !ship.hasFired, [canOperate, ship]);
 	const canVent = useMemo(() => {
 		if (!canOperate || !ship) return false;
-		if (ship.isShieldUp) return false;
-		if (ship.fluxHard + ship.fluxSoft <= 0) return false;
+		if (ship.shield.active) return false;
+		if (ship.flux.hard + ship.flux.soft <= 0) return false;
 		return true;
 	}, [canOperate, ship]);
 	const canToggleShield = useMemo(() => {
 		if (!canOperate || !ship) return false;
-		if (ship.isOverloaded && !ship.isShieldUp) return false;
+		if (ship.isOverloaded && !ship.shield.active) return false;
 		return true;
 	}, [canOperate, ship]);
 
@@ -136,7 +136,7 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 		if (!ship || !canToggleShield) return;
 		onSendCommand(CC.CMD_TOGGLE_SHIELD, {
 			shipId: ship.id,
-			isActive: !ship.isShieldUp,
+			isActive: !ship.shield.active,
 			orientation: ship.transform.heading,
 		});
 	}, [ship, canToggleShield, onSendCommand]);
@@ -311,12 +311,12 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 				</div>
 				<button
 					data-magnetic
-					className={`game-btn game-btn--full ${ship.isShieldUp ? "game-btn--active" : ""}`}
+					className={`game-btn game-btn--full ${ship.shield.active ? "game-btn--active" : ""}`}
 					onClick={handleToggleShield}
 					disabled={!canToggleShield}
 				>
 					<Shield className="game-btn__icon" />
-					{ship.isShieldUp ? "关闭护盾" : "开启护盾"}
+					{ship.shield.active ? "关闭护盾" : "开启护盾"}
 				</button>
 			</div>
 
@@ -405,7 +405,7 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 				</button>
 				{!canVent && ship && (
 					<div className="game-setting__hint game-setting__hint--centered">
-						{ship.isShieldUp ? "需要关闭护盾" : "没有辐能可排散"}
+						{ship.shield.active ? "需要关闭护盾" : "没有辐能可排散"}
 					</div>
 				)}
 			</div>

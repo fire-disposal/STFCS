@@ -217,14 +217,14 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
 
 	canVent: (ship) => {
 		if (!ship) return false;
-		if (ship.isShieldUp) return false; // 需要关闭护盾
-		if (ship.fluxHard + ship.fluxSoft <= 0) return false; // 没有辐能
+		if (ship.shield.active) return false; // 需要关闭护盾
+		if (ship.flux.hard + ship.flux.soft <= 0) return false; // 没有辐能
 		return true;
 	},
 
 	canToggleShield: (ship) => {
 		if (!ship) return false;
-		if (ship.isOverloaded && !ship.isShieldUp) return false; // 过载时不能开启
+		if (ship.isOverloaded && !ship.shield.active) return false; // 过载时不能开启
 		return true;
 	},
 }));
@@ -238,10 +238,13 @@ export function getSelectedShipDetails(ship: ShipState | null) {
 	return {
 		id: ship.id,
 		faction: ship.faction,
-		hullPercent: ship.hullMax > 0 ? (ship.hullCurrent / ship.hullMax) * 100 : 0,
-		fluxPercent: ship.fluxMax > 0 ? ((ship.fluxHard + ship.fluxSoft) / ship.fluxMax) * 100 : 0,
+		hullPercent: ship.hull.max > 0 ? (ship.hull.current / ship.hull.max) * 100 : 0,
+		fluxPercent:
+			ship.flux.max > 0
+				? ((ship.flux.hard + ship.flux.soft) / ship.flux.max) * 100
+				: 0,
 		isOverloaded: ship.isOverloaded,
-		isShieldUp: ship.isShieldUp,
+		shieldActive: ship.shield.active,
 		hasMoved: ship.hasMoved,
 		hasFired: ship.hasFired,
 		position: { x: ship.transform.x, y: ship.transform.y },

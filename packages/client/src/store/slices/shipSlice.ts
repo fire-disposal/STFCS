@@ -1,6 +1,5 @@
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 import type {
-	ArmorQuadrant,
 	FluxOverloadState,
 	ShipMovement,
 	ShipStatus,
@@ -61,7 +60,7 @@ const shipSlice = createSlice({
 			state,
 			action: PayloadAction<{
 				id: string;
-				quadrant: ArmorQuadrant;
+				quadrant: ArmorQuadrantValue;
 				value: number;
 			}>
 		) => {

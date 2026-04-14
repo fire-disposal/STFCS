@@ -39,10 +39,12 @@ export type MountTypeValue = (typeof MountType)[keyof typeof MountType];
 // ==================== 武器状态 ====================
 
 export const WeaponState = {
-	READY: "READY",
-	COOLDOWN: "COOLDOWN",
-	OUT_OF_AMMO: "OUT_OF_AMMO",
-	DISABLED: "DISABLED",
+	READY: "ready",
+	COOLDOWN: "cooldown",
+	CHARGING: "charging",
+	RELOADING: "reloading",
+	DISABLED: "disabled",
+	OUT_OF_AMMO: "out_of_ammo",
 } as const;
 
 export type WeaponStateValue = (typeof WeaponState)[keyof typeof WeaponState];
@@ -101,14 +103,25 @@ export type FluxStateValue = (typeof FluxStateType)[keyof typeof FluxStateType];
 
 // ==================== 游戏阶段 ====================
 
-export const GamePhaseType = {
+export const GamePhase = {
 	DEPLOYMENT: "DEPLOYMENT",
 	PLAYER_TURN: "PLAYER_TURN",
 	DM_TURN: "DM_TURN",
 	END_PHASE: "END_PHASE",
+	BATTLE: "BATTLE",
+	END: "END",
 } as const;
 
-export type GamePhaseValue = (typeof GamePhaseType)[keyof typeof GamePhaseType];
+export type GamePhaseValue = (typeof GamePhase)[keyof typeof GamePhase];
+
+export const TurnPhase = {
+	START: "START",
+	MOVEMENT: "MOVEMENT",
+	COMBAT: "COMBAT",
+	END: "END",
+} as const;
+
+export type TurnPhaseValue = (typeof TurnPhase)[keyof typeof TurnPhase];
 
 // ==================== 舰船尺寸 ====================
 
@@ -126,9 +139,12 @@ export type HullSizeValue = (typeof HullSize)[keyof typeof HullSize];
 
 export const ShipClass = {
 	STRIKE: "STRIKE",
+	ASSAULT: "ASSAULT",
+	COMBAT: "COMBAT",
 	SUPPORT: "SUPPORT",
-	LINE: "LINE",
+	HEAVY: "HEAVY",
 	CARRIER: "CARRIER",
+	INTERCEPTOR: "INTERCEPTOR",
 	BATTLESHIP: "BATTLESHIP",
 } as const;
 
@@ -140,6 +156,12 @@ export const Faction = {
 	PLAYER: "PLAYER",
 	DM: "DM",
 	NEUTRAL: "NEUTRAL",
+	HEGEMONY: "hegemony",
+	SINDRIAN: "sindrian",
+	PERSEAN: "persean",
+	TRI_TACHYON: "tri_tachyon",
+	PIRATE: "pirate",
+	INDEPENDENT: "independent",
 } as const;
 
 export type FactionValue = (typeof Faction)[keyof typeof Faction];
@@ -165,16 +187,15 @@ export const ConnectionQuality = {
 
 export type ConnectionQualityValue = (typeof ConnectionQuality)[keyof typeof ConnectionQuality];
 
-// ==================== 移动阶段 ====================
+// ==================== 聊天消息类型 ====================
 
-export const MovementPhase = {
-	NONE: 0,
-	PHASE_A: 1,
-	TURN: 2,
-	PHASE_B: 3,
+export const ChatMessageType = {
+	CHAT: "chat",
+	SYSTEM: "system",
+	COMBAT: "combat",
 } as const;
 
-export type MovementPhaseValue = (typeof MovementPhase)[keyof typeof MovementPhase];
+export type ChatMessageTypeValue = (typeof ChatMessageType)[keyof typeof ChatMessageType];
 
 // ==================== 客户端命令 ====================
 
@@ -187,6 +208,9 @@ export const ClientCommand = {
 	CMD_TOGGLE_READY: "CMD_TOGGLE_READY",
 	CMD_NEXT_PHASE: "CMD_NEXT_PHASE",
 	CMD_CREATE_OBJECT: "CMD_CREATE_OBJECT",
+	CMD_CLEAR_OVERLOAD: "CMD_CLEAR_OVERLOAD",
+	CMD_SET_ARMOR: "CMD_SET_ARMOR",
+	CMD_ADVANCE_MOVE_PHASE: "CMD_ADVANCE_MOVE_PHASE",
 } as const;
 
 export type ClientCommandValue = (typeof ClientCommand)[keyof typeof ClientCommand];

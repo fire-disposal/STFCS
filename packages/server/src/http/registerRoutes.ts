@@ -1,6 +1,9 @@
 import { matchMaker } from "@colyseus/core";
 import { monitor } from "@colyseus/monitor";
 import type { Express, Request, Response } from "express";
+import { toHealthDto, toMatchmakeRoomDto } from "../dto/index.js";
+import { toSaveDetailDto, toSaveListDto, toSaveSummaryDto } from "../dto/index.js";
+import { saveStore } from "../services/SaveStore.js";
 
 /**
  * 注册 HTTP 路由
@@ -14,10 +17,7 @@ import type { Express, Request, Response } from "express";
 export function registerHttpRoutes(app: Express): void {
 	// 健康检查
 	app.get("/health", (_req: Request, res: Response) => {
-		res.json({
-			status: "ok",
-			uptimeSec: Math.floor((Date.now() - app.get("startedAt")) / 1000),
-		});
+		res.json(toHealthDto(app.get("startedAt")));
 	});
 
 	// 房间列表（Colyseus 标准端点）
@@ -25,19 +25,7 @@ export function registerHttpRoutes(app: Express): void {
 		try {
 			const rooms = await matchMaker.query({ name: "battle" });
 
-			res.json(
-				rooms.map((room) => {
-					const metadata = (room.metadata as Record<string, unknown> | undefined) || {};
-					return {
-						roomId: room.roomId,
-						name: room.name,
-						clients: room.clients,
-						maxClients: room.maxClients,
-						roomType: room.name,
-						metadata,
-					};
-				})
-			);
+			res.json(rooms.map((room) => toMatchmakeRoomDto(room)));
 		} catch (error) {
 			console.error("[Server] Error in /matchmake:", error);
 			res.json([]);
@@ -90,7 +78,7 @@ export function registerHttpRoutes(app: Express): void {
 	app.get("/api/saves", async (_req: Request, res: Response) => {
 		try {
 			const saves = await saveStore.list();
-			res.json({ success: true, saves });
+			res.json({ success: true, saves: toSaveListDto(saves) });
 		} catch (error) {
 			console.error("[Server] List saves error:", error);
 			res.status(500).json({ success: false, message: "获取存档列表失败" });
@@ -106,7 +94,7 @@ export function registerHttpRoutes(app: Express): void {
 			}
 
 			const summary = await saveStore.getSummary(saveId);
-			res.json({ success: true, summary });
+			res.json({ success: true, summary: toSaveSummaryDto(summary) });
 		} catch (error) {
 			console.error("[Server] Get save error:", error);
 			res.status(404).json({ success: false, message: "存档不存在" });
@@ -138,10 +126,11 @@ export function registerHttpRoutes(app: Express): void {
 			}
 
 			const saveData = await saveStore.load(saveId);
+			const dto = toSaveDetailDto(saveData);
 
 			res.setHeader("Content-Type", "application/json");
-			res.setHeader("Content-Disposition", `attachment; filename="${saveData.saveName}.json"`);
-			res.json(saveData);
+			res.setHeader("Content-Disposition", `attachment; filename="${dto.saveName}.json"`);
+			res.json(dto);
 		} catch (error) {
 			console.error("[Server] Export save error:", error);
 			res.status(404).json({ success: false, message: "存档不存在" });

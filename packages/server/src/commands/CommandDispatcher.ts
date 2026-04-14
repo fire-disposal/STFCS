@@ -1,259 +1,216 @@
 /**
- * 命令分发器 - 处理所有客户端指令的验证与执行
- *
- * 使用优化的 ShipStateOptimized Schema
+ * 命令分发器
  */
 
 import { Client } from "@colyseus/core";
+import { DAMAGE_MODIFIERS, GAME_CONFIG } from "@vt/data";
 import { angleBetween, angleDifference, distance, validateThreePhaseMove } from "@vt/rules";
-import type {
-	FireWeaponPayload,
-	MoveTokenPayload,
-	ToggleShieldPayload,
-	VentFluxPayload,
-} from "@vt/types";
-import {
-	GAME_CONFIG_CONST as GAME_CONFIG,
-	GameRoomState,
-	PlayerRoleConst as PlayerRole,
-	ShipState,
-	WeaponStateConst as WeaponState,
-} from "../schema/GameSchema.js";
-import type { WeaponSlot } from "../schema/ShipStateSchema.js";
+import { PlayerRole, WeaponState } from "@vt/types";
+import type { MoveTokenPayload } from "@vt/types";
+import type { GameRoomState } from "../schema/GameSchema.js";
+import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
 
-/**
- * 命令分发器
- */
 export class CommandDispatcher {
-	constructor(private state: GameRoomState | any) {}
+	constructor(private state: GameRoomState) {}
 
-	/**
-	 * 验证客户端对特定舰船的操作权限
-	 */
+	private static readonly MOVE_PHASE_ORDER: Record<"PHASE_A" | "PHASE_B" | "PHASE_C", number> = {
+		PHASE_A: 0,
+		PHASE_B: 1,
+		PHASE_C: 2,
+	};
+
 	private validateAuthority(client: Client, ship: ShipState): void {
 		const player = this.state.players.get(client.sessionId);
-		if (!player) {
-			throw new Error("玩家未注册");
-		}
-
-		// DM 拥有最高权限
-		if (player.role === PlayerRole.DM) {
-			return;
-		}
-
-		// 检查阶段：玩家只能在 PLAYER_TURN 阶段操作
-		if (this.state.currentPhase !== "PLAYER_TURN") {
-			throw new Error("当前不是玩家行动回合");
-		}
-
-		// 检查拥有权
-		if (ship.ownerId !== client.sessionId) {
-			throw new Error("你没有权限操作这艘舰船");
-		}
-
-		// 检查是否已经结束回合
-		if (player.isReady) {
-			throw new Error("你已结束本回合，无法继续操作");
-		}
+		if (!player) throw new Error("玩家未注册");
+		if (player.role === PlayerRole.DM) return;
+		if (this.state.currentPhase !== "PLAYER_TURN") throw new Error("当前不是玩家行动回合");
+		if (ship.ownerId !== client.sessionId) throw new Error("没有权限操作此舰船");
+		if (player.isReady) throw new Error("已结束本回合");
 	}
 
-	/**
-	 * 处理移动指令
-	 */
-	dispatchMoveToken(client: Client, payload: MoveTokenPayload): void {
-		const { shipId, x, y, heading, movementPlan, phase, isIncremental } = payload;
+	private normalizeHeading(value: number): number {
+		return ((value % 360) + 360) % 360;
+	}
 
-		const ship = this.state.ships.get(shipId);
-		if (!ship) {
-			throw new Error(`Ship ${shipId} not found`);
-		}
+	private applyTranslation(
+		x: number,
+		y: number,
+		heading: number,
+		forward: number,
+		strafe: number
+	): { x: number; y: number } {
+		const rad = (heading * Math.PI) / 180;
+		const forwardX = Math.sin(rad);
+		const forwardY = -Math.cos(rad);
+		const rightX = Math.cos(rad);
+		const rightY = Math.sin(rad);
+		return {
+			x: x + forwardX * forward + rightX * strafe,
+			y: y + forwardY * forward + rightY * strafe,
+		};
+	}
 
+	private assertPhaseOrder(current: "PHASE_A" | "PHASE_B" | "PHASE_C", next: "PHASE_A" | "PHASE_B" | "PHASE_C"): void {
+		const cur = CommandDispatcher.MOVE_PHASE_ORDER[current];
+		const nxt = CommandDispatcher.MOVE_PHASE_ORDER[next];
+		if (nxt < cur) throw new Error("移动阶段顺序错误");
+	}
+
+	private getMovePhase(payloadPhase?: "PHASE_A" | "PHASE_B" | "PHASE_C", shipPhase?: "PHASE_A" | "PHASE_B" | "PHASE_C"): "PHASE_A" | "PHASE_B" | "PHASE_C" {
+		return payloadPhase ?? shipPhase ?? "PHASE_A";
+	}
+
+	dispatchAdvanceMovePhase(client: Client, ship: ShipState): void {
 		this.validateAuthority(client, ship);
-
-		if (ship.isOverloaded) {
-			throw new Error("Cannot move while overloaded");
-		}
-
-		if (!isIncremental && ship.hasMoved) {
-			throw new Error("Ship has already moved this turn");
-		}
-
-		const startX = ship.transform.x;
-		const startY = ship.transform.y;
-		const startHeading = ship.transform.heading;
-
-		if (movementPlan) {
-			const validation = validateThreePhaseMove(
-				startX,
-				startY,
-				startHeading,
-				movementPlan,
-				ship.maxSpeed,
-				ship.maxTurnRate
-			);
-
-			if (!validation.valid) {
-				throw new Error(validation.error || "Invalid movement");
-			}
-
-			ship.movePhaseAX = movementPlan.phaseAForward;
-			ship.movePhaseAStrafe = movementPlan.phaseAStrafe;
-			ship.turnAngle = movementPlan.turnAngle;
-			ship.movePhaseBX = movementPlan.phaseBForward;
-			ship.movePhaseBStrafe = movementPlan.phaseBStrafe;
-
-			ship.setPosition(x, y);
-			ship.setHeading(heading);
-
-			if (!isIncremental) {
+		if (ship.hasMoved) throw new Error("本回合已移动");
+		switch (ship.movePhase) {
+			case "PHASE_A":
+				ship.movePhase = "PHASE_B";
+				break;
+			case "PHASE_B":
+				ship.movePhase = "PHASE_C";
+				break;
+			case "PHASE_C":
 				ship.hasMoved = true;
-			}
-
-			console.log(
-				`Ship ${shipId} moved to (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`
-			);
-			return;
+				break;
 		}
-
-		if (isIncremental) {
-			const moveDistance = distance(startX, startY, x, y);
-			const headingDiff = angleDifference(startHeading, heading);
-			const currentPhase = phase || "PHASE_A";
-
-			if (currentPhase === "PHASE_A" || currentPhase === "PHASE_C") {
-				if (moveDistance > ship.maxSpeed) {
-					throw new Error(
-						`Incremental move distance ${moveDistance.toFixed(2)} exceeds single step limit ${ship.maxSpeed}`
-					);
-				}
-				ship.setPosition(x, y);
-			} else if (currentPhase === "PHASE_B") {
-				if (headingDiff > ship.maxTurnRate) {
-					throw new Error(
-						`Incremental turn angle ${headingDiff.toFixed(2)} exceeds limit ${ship.maxTurnRate}`
-					);
-				}
-				ship.setHeading(heading);
-			}
-
-			console.log(
-				`Ship ${shipId} incremental move in ${currentPhase}: (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`
-			);
-			return;
-		}
-
-		const moveDistance = distance(startX, startY, x, y);
-		const maxMoveDistance = ship.maxSpeed * 4;
-
-		if (moveDistance > maxMoveDistance) {
-			throw new Error(
-				`Move distance ${moveDistance.toFixed(2)} exceeds maximum ${maxMoveDistance}`
-			);
-		}
-
-		const headingDiff = angleDifference(startHeading, heading);
-		if (headingDiff > ship.maxTurnRate) {
-			throw new Error(`Turn angle ${headingDiff.toFixed(2)} exceeds maximum ${ship.maxTurnRate}`);
-		}
-
-		if (
-			x < -this.state.mapWidth / 2 ||
-			x > this.state.mapWidth / 2 ||
-			y < -this.state.mapHeight / 2 ||
-			y > this.state.mapHeight / 2
-		) {
-			throw new Error("Target position is outside map boundaries");
-		}
-
-		ship.setPosition(x, y);
-		ship.setHeading(heading);
-		ship.hasMoved = true;
-
-		console.log(
-			`Ship ${shipId} moved to (${x.toFixed(2)}, ${y.toFixed(2)}) heading ${heading.toFixed(2)}`
-		);
 	}
 
-	/**
-	 * 处理护盾切换指令
-	 */
-	dispatchToggleShield(client: Client, payload: ToggleShieldPayload): void {
-		const { shipId, isActive, orientation } = payload;
-
-		const ship = this.state.ships.get(shipId);
-		if (!ship) {
-			throw new Error(`Ship ${shipId} not found`);
-		}
-
+	dispatchMoveToken(client: Client, payload: MoveTokenPayload): void {
+		const ship = this.state.ships.get(payload.shipId);
+		if (!ship) throw new Error(`舰船不存在: ${payload.shipId}`);
 		this.validateAuthority(client, ship);
+		if (ship.isOverloaded) throw new Error("过载状态无法移动");
+		if (ship.hasMoved) throw new Error("本回合已移动");
+		if (!payload.movementPlan) throw new Error("缺少移动计划");
 
-		if (ship.isOverloaded && isActive) {
-			throw new Error("Cannot raise shield while overloaded");
-		}
+		if (payload.isIncremental) {
+			if (payload.phase && payload.phase !== ship.movePhase)
+				throw new Error("移动阶段未同步");
+			const phase = this.getMovePhase(payload.phase, ship.movePhase);
+			this.assertPhaseOrder(ship.movePhase, phase);
+			const plan = payload.movementPlan;
 
-		if (isActive && !ship.shield.active) {
-			const fluxCost = GAME_CONFIG.SHIELD_UP_FLUX_COST;
-			if (ship.flux.total + fluxCost > ship.flux.max) {
-				throw new Error("Not enough flux capacity to raise shield");
+			let forward = 0;
+			let strafe = 0;
+			let turn = 0;
+
+			switch (phase) {
+				case "PHASE_A":
+					forward = plan.phaseAForward;
+					strafe = plan.phaseAStrafe;
+					break;
+				case "PHASE_B":
+					turn = plan.turnAngle;
+					break;
+				case "PHASE_C":
+					forward = plan.phaseBForward;
+					strafe = plan.phaseBStrafe;
+					break;
 			}
-			ship.flux.addSoft(fluxCost);
-		}
 
-		if (isActive) {
-			ship.shield.activate();
-			if (orientation !== undefined) {
-				ship.shield.setOrientation(orientation);
+			if (forward === 0 && strafe === 0 && turn === 0) throw new Error("移动量不能为空");
+
+			const maxForward = ship.maxSpeed * 2;
+			const maxStrafe = ship.maxSpeed;
+			const maxTurn = ship.maxTurnRate;
+
+			if (phase === "PHASE_A") {
+				if (Math.abs(forward) + ship.phaseAForwardUsed > maxForward)
+					throw new Error("阶段A前进燃料不足");
+				if (Math.abs(strafe) + ship.phaseAStrafeUsed > maxStrafe)
+					throw new Error("阶段A横移燃料不足");
+				ship.phaseAForwardUsed += Math.abs(forward);
+				ship.phaseAStrafeUsed += Math.abs(strafe);
+			}
+			if (phase === "PHASE_B") {
+				if (Math.abs(turn) + ship.phaseTurnUsed > maxTurn)
+					throw new Error("阶段B转向燃料不足");
+				ship.phaseTurnUsed += Math.abs(turn);
+			}
+			if (phase === "PHASE_C") {
+				if (Math.abs(forward) + ship.phaseBForwardUsed > maxForward)
+					throw new Error("阶段C前进燃料不足");
+				if (Math.abs(strafe) + ship.phaseBStrafeUsed > maxStrafe)
+					throw new Error("阶段C横移燃料不足");
+				ship.phaseBForwardUsed += Math.abs(forward);
+				ship.phaseBStrafeUsed += Math.abs(strafe);
+			}
+
+			if (phase !== ship.movePhase) ship.movePhase = phase;
+
+			let nextX = ship.transform.x;
+			let nextY = ship.transform.y;
+			let nextHeading = ship.transform.heading;
+
+			if (phase === "PHASE_B") {
+				nextHeading = this.normalizeHeading(nextHeading + turn);
 			} else {
-				ship.shield.setOrientation(ship.transform.heading);
+				const next = this.applyTranslation(nextX, nextY, nextHeading, forward, strafe);
+				nextX = next.x;
+				nextY = next.y;
 			}
-		} else {
-			ship.shield.deactivate();
+
+			ship.setPosition(nextX, nextY);
+			ship.setHeading(nextHeading);
+			return;
 		}
 
-		console.log(`Ship ${shipId} shield ${isActive ? "raised" : "lowered"}`);
+		const v = validateThreePhaseMove(
+			ship.transform.x,
+			ship.transform.y,
+			ship.transform.heading,
+			payload.movementPlan,
+			ship.maxSpeed,
+			ship.maxTurnRate
+		);
+		if (!v.valid || !v.finalPosition || v.finalHeading === undefined)
+			throw new Error(v.error || "无效移动");
+
+		ship.movePhaseAX = payload.movementPlan.phaseAForward;
+		ship.movePhaseAStrafe = payload.movementPlan.phaseAStrafe;
+		ship.turnAngle = payload.movementPlan.turnAngle;
+		ship.movePhaseBX = payload.movementPlan.phaseBForward;
+		ship.movePhaseBStrafe = payload.movementPlan.phaseBStrafe;
+		ship.setPosition(v.finalPosition.x, v.finalPosition.y);
+		ship.setHeading(v.finalHeading);
+		ship.hasMoved = true;
 	}
 
-	/**
-	 * 处理开火指令
-	 */
-	dispatchFireWeapon(client: Client, payload: FireWeaponPayload): void {
-		const { attackerId, weaponId, targetId } = payload;
+	dispatchToggleShield(
+		client: Client,
+		payload: { shipId: string; isActive: boolean; orientation?: number }
+	): void {
+		const ship = this.state.ships.get(payload.shipId);
+		if (!ship) throw new Error(`舰船不存在: ${payload.shipId}`);
+		this.validateAuthority(client, ship);
+		if (ship.isOverloaded && payload.isActive) throw new Error("过载状态无法开启护盾");
 
-		const attacker = this.state.ships.get(attackerId);
-		const target = this.state.ships.get(targetId);
-
-		if (!attacker) {
-			throw new Error(`舰船 ${attackerId} 不存在`);
+		if (payload.isActive && !ship.shield.active) {
+			if (ship.flux.total + GAME_CONFIG.SHIELD_UP_FLUX_COST > ship.flux.max)
+				throw new Error("辐能容量不足");
+			ship.flux.addSoft(GAME_CONFIG.SHIELD_UP_FLUX_COST);
 		}
 
+		payload.isActive ? ship.shield.activate() : ship.shield.deactivate();
+		ship.shield.setOrientation(payload.orientation ?? ship.transform.heading);
+	}
+
+	dispatchFireWeapon(
+		client: Client,
+		payload: { attackerId: string; weaponId: string; targetId: string }
+	): void {
+		const attacker = this.state.ships.get(payload.attackerId);
+		const target = this.state.ships.get(payload.targetId);
+		if (!attacker) throw new Error(`攻击舰船不存在`);
+		if (!target) throw new Error(`目标舰船不存在`);
 		this.validateAuthority(client, attacker);
+		if (target.isDestroyed || target.hull.current <= 0) throw new Error("目标已被摧毁");
 
-		if (!target) {
-			throw new Error(`目标舰船 ${targetId} 不存在`);
-		}
-
-		if (target.hull.isDestroyed) {
-			throw new Error("目标已被摧毁");
-		}
-
-		const weapon = attacker.weapons.get(weaponId);
-		if (!weapon) {
-			throw new Error(`武器 ${weaponId} 不存在`);
-		}
-
-		if (weapon.state !== WeaponState.READY) {
-			if (weapon.state === WeaponState.COOLDOWN) {
-				throw new Error(`武器冷却中：剩余 ${weapon.cooldownRemaining.toFixed(1)} 秒`);
-			}
-			if (weapon.state === WeaponState.OUT_OF_AMMO) {
-				throw new Error("弹药耗尽");
-			}
-			throw new Error("武器不可用");
-		}
-
-		if (weapon.hasFiredThisTurn) {
-			throw new Error("该武器本回合已射击");
-		}
+		const weapon = attacker.weapons.get(payload.weaponId);
+		if (!weapon) throw new Error(`武器不存在`);
+		if (weapon.state !== WeaponState.READY) throw new Error(`武器状态: ${weapon.state}`);
+		if (weapon.hasFiredThisTurn) throw new Error("本回合已射击");
 
 		const dist = distance(
 			attacker.transform.x,
@@ -261,159 +218,71 @@ export class CommandDispatcher {
 			target.transform.x,
 			target.transform.y
 		);
-
-		if (dist > weapon.range) {
-			throw new Error(`目标超出射程：距离 ${dist.toFixed(0)} > 射程 ${weapon.range}`);
-		}
+		if (dist > weapon.range) throw new Error(`超出射程: ${dist} > ${weapon.range}`);
 
 		if (weapon.fluxCost > 0) {
-			const totalFlux = ship.flux.total + weapon.fluxCost;
-			if (totalFlux > ship.flux.max) {
-				throw new Error(
-					`辐能不足：需要 ${weapon.fluxCost}，当前容量 ${attacker.flux.max - attacker.flux.total}`
-				);
-			}
+			if (attacker.flux.total + weapon.fluxCost > attacker.flux.max) throw new Error("辐能不足");
 			attacker.flux.addSoft(weapon.fluxCost);
 		}
 
-		if (weapon.maxAmmo > 0) {
-			if (weapon.currentAmmo <= 0) {
-				weapon.state = WeaponState.OUT_OF_AMMO;
-				throw new Error("弹药耗尽");
-			}
-			weapon.currentAmmo -= 1;
-			if (weapon.currentAmmo <= 0) {
-				weapon.state = WeaponState.OUT_OF_AMMO;
-			}
-		}
-
-		const weaponWorldAngle = attacker.transform.heading + weapon.mountFacing;
-		const angleToTarget = angleBetween(
-			attacker.transform.x,
-			attacker.transform.y,
-			target.transform.x,
-			target.transform.y
-		);
-
-		const normalizedWeaponAngle = ((weaponWorldAngle % 360) + 360) % 360;
-		const normalizedTargetAngle = ((angleToTarget % 360) + 360) % 360;
-		const angleDiff = angleDifference(normalizedWeaponAngle, normalizedTargetAngle);
-
-		const arcCenter = (weapon.arcMin + weapon.arcMax) / 2;
-		const arcHalfWidth = (weapon.arcMax - weapon.arcMin) / 2;
-		const relativeArcDiff = angleDifference(arcCenter, normalizedTargetAngle);
-
-		if (Math.abs(relativeArcDiff) > arcHalfWidth) {
-			throw new Error(`目标不在射界内：角度偏差 ${relativeArcDiff.toFixed(0)}°`);
-		}
+		if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) throw new Error("弹药耗尽");
 
 		weapon.cooldownRemaining = weapon.cooldownMax || GAME_CONFIG.DEFAULT_COOLDOWN;
 		weapon.state = WeaponState.COOLDOWN;
 		weapon.hasFiredThisTurn = true;
-
 		this.applyDamage(attacker, weapon, target);
-
-		console.log(
-			`[Fire] ${attacker.name || attackerId} 使用 ${weapon.name || weaponId} 攻击 ${target.name || targetId}`
-		);
 	}
 
-	/**
-	 * 应用伤害 - 使用优化的 6 象限装甲机制
-	 */
-	private applyDamage(attacker: ShipState, weapon: WeaponSlot, target: ShipState): void {
-		const damageType = weapon.damageType;
-		const baseDamage = weapon.damage;
+	dispatchVentFlux(client: Client, payload: { shipId: string }): void {
+		const ship = this.state.ships.get(payload.shipId);
+		if (!ship) throw new Error(`舰船不存在`);
+		this.validateAuthority(client, ship);
+		ship.flux.vent(1.0);
+	}
 
+	dispatchAssignShip(client: Client, shipId: string, targetSessionId: string): void {
+		const player = this.state.players.get(client.sessionId);
+		if (!player || player.role !== PlayerRole.DM) throw new Error("仅 DM 可分配舰船");
+		const ship = this.state.ships.get(shipId);
+		if (!ship) throw new Error(`舰船不存在`);
+		ship.ownerId = targetSessionId;
+	}
+
+	private applyDamage(attacker: ShipState, weapon: WeaponSlot, target: ShipState): void {
 		const hitAngle = angleBetween(
 			target.transform.x,
 			target.transform.y,
 			attacker.transform.x,
 			attacker.transform.y
 		);
-		const relativeAngle = hitAngle - target.transform.heading;
-		const normalizedAngle = ((relativeAngle % 360) + 360) % 360;
-		const section = Math.floor(normalizedAngle / 60) % 6;
+		const relativeAngle = (((hitAngle - target.transform.heading) % 360) + 360) % 360;
+		const section = Math.floor(relativeAngle / 60) % 6;
 
-		let actualDamage = baseDamage;
-		let hitShield = false;
-
-		// 检查护盾
+		let damage = weapon.damage;
 		if (target.shield.active && !weapon.ignoresShields) {
-			const shieldAngleDiff = angleDifference(target.shield.orientation, hitAngle);
-			if (shieldAngleDiff <= target.shield.arc / 2) {
-				hitShield = true;
-
-				const shieldMultiplier = DAMAGE_MULTIPLIERS[damageType].shield;
-				const shieldDamage = baseDamage * shieldMultiplier;
-
-				target.flux.addHard(shieldDamage * GAME_CONFIG.SHIELD_FLUX_PER_DAMAGE);
-
+			const shieldDiff = angleDifference(target.shield.orientation, hitAngle);
+			if (shieldDiff <= target.shield.arc / 2) {
+				const shieldDmg = weapon.damage * DAMAGE_MODIFIERS[weapon.damageType].shield;
+				target.flux.addHard(shieldDmg * GAME_CONFIG.SHIELD_FLUX_PER_DAMAGE);
 				if (target.flux.isOverloaded) {
 					target.isOverloaded = true;
 					target.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
 					target.shield.deactivate();
-					console.log(`[Damage] ${target.name || target.id} 过载！`);
 				}
-
-				actualDamage = 0;
-				console.log(`[Damage] 护盾吸收 ${shieldDamage.toFixed(0)} → 硬辐能 +${shieldDamage}`);
+				damage = 0;
 			}
 		}
 
-		// 应用装甲和船体伤害
-		if (!hitShield && actualDamage > 0) {
-			const armorMultiplier = DAMAGE_MULTIPLIERS[damageType].armor;
-			const hullMultiplier = DAMAGE_MULTIPLIERS[damageType].hull;
-
-			const currentArmor = target.armor.getQuadrant(section);
-
-			const hitStrength = actualDamage * armorMultiplier;
-			const effectiveArmor = Math.max(currentArmor * 0.05, currentArmor);
-			const damageReduction = hitStrength / (hitStrength + effectiveArmor);
-			const armorDamage = Math.min(currentArmor, actualDamage * armorMultiplier);
-
-			if (currentArmor > 0) {
-				target.armor.takeDamage(section, armorDamage);
-
-				const hullDamage = actualDamage * hullMultiplier * (1 - damageReduction);
-				target.hull.takeDamage(hullDamage);
-
-				console.log(
-					`[Damage] 象限${section}: 装甲-${armorDamage.toFixed(0)}, 船体-${hullDamage.toFixed(0)}`
-				);
-			} else {
-				target.hull.takeDamage(actualDamage * hullMultiplier);
-				console.log(`[Damage] 直接船体伤害：${actualDamage * hullMultiplier}`);
-			}
-
-			if (target.hull.isDestroyed) {
+		if (damage > 0) {
+			const mult = DAMAGE_MODIFIERS[weapon.damageType];
+			const armorDmg = Math.min(target.armor.getQuadrant(section), damage * mult.armor);
+			target.armor.takeDamage(section, armorDmg);
+			const hullDmg = damage * mult.hull * (armorDmg > 0 ? 0.5 : 1);
+			target.hull.takeDamage(hullDmg);
+			if (target.hull.current <= 0) {
 				target.isDestroyed = true;
 				target.shield.deactivate();
-				console.log(`[Damage] ${target.name || target.id} 被摧毁！`);
 			}
 		}
-	}
-
-	/**
-	 * 处理辐能排散指令
-	 */
-	dispatchVentFlux(client: Client, payload: VentFluxPayload): void {
-		const { shipId } = payload;
-
-		const ship = this.state.ships.get(shipId);
-		if (!ship) {
-			throw new Error(`Ship ${shipId} not found`);
-		}
-
-		this.validateAuthority(client, ship);
-
-		if (ship.flux.isIdle) {
-			throw new Error("No flux to vent");
-		}
-
-		// 使用优化的 vent 方法
-		const ventAmount = ship.flux.vent(GAME_CONFIG.VENT_FLUX_RATE);
-		console.log(`Ship ${shipId} vented ${ventAmount.toFixed(0)} flux`);
 	}
 }

@@ -1,68 +1,26 @@
 /**
- * 服务端 Schema 定义（优化版）
- *
- * 使用嵌套对象结构提供更好的可读性和性能
- * Colyseus Schema 类必须使用装饰器
+ * 服务端 Schema
  */
 
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
+import { ChatMessageType, ConnectionQuality, Faction, GamePhase, PlayerRole } from "@vt/types";
+import type * as VT from "@vt/types";
+import { ShipState } from "./ShipStateSchema.js";
 
-import { DAMAGE_MODIFIERS, GAME_CONFIG } from "@vt/data";
-import {
-	ClientCommand,
-	ConnectionQuality,
-	Faction,
-	GamePhaseType,
-	PlayerRole,
-	WeaponState,
-} from "@vt/types";
-
-import {
+export {
+	ShipState,
+	WeaponSlot,
+	Transform,
+	HullState,
 	ArmorState,
 	FluxState,
-	HullState,
 	ShieldState,
-	ShipStateOptimized,
-	Transform,
-	WeaponSlot,
 } from "./ShipStateSchema.js";
 
-export {
-	ArraySchema,
-	Transform,
-	HullState,
-	ArmorState,
-	FluxState,
-	ShieldState,
-	ShipStateOptimized as ShipState,
-	WeaponSlot,
-};
-
-export const WeaponStateConst = WeaponState;
-export const ClientCommandConst = ClientCommand;
-export const FactionConst = Faction;
-export const PlayerRoleConst = PlayerRole;
-export const ConnectionQualityConst = ConnectionQuality;
-export const GamePhaseConst = GamePhaseType;
-export const GAME_CONFIG_CONST = GAME_CONFIG;
-
-export {
-	WeaponState,
-	ClientCommand,
-	Faction,
-	PlayerRole,
-	ConnectionQuality,
-	GamePhaseType as GamePhase,
-	GAME_CONFIG,
-	DAMAGE_MODIFIERS,
-};
-
-export type GamePhaseValue = (typeof GamePhaseType)[keyof typeof GamePhaseType];
-
-export class PlayerState extends Schema {
+export class PlayerState extends Schema implements VT.PlayerState {
 	@type("string") sessionId: string = "";
 	@type("number") shortId: number = 0;
-	@type("string") role: string = "PLAYER";
+	@type("string") role: VT.PlayerRoleValue = PlayerRole.PLAYER;
 	@type("string") name: string = "";
 	@type("string") nickname: string = "";
 	@type("string") avatar: string = "👤";
@@ -70,26 +28,31 @@ export class PlayerState extends Schema {
 	@type("boolean") connected: boolean = true;
 	@type("number") pingMs: number = -1;
 	@type("number") jitterMs: number = 0;
-	@type("string") connectionQuality: string = "OFFLINE";
+	@type("string") connectionQuality: VT.ConnectionQualityValue =
+		ConnectionQuality.OFFLINE;
 }
 
-export class ChatMessage extends Schema {
+export class ChatMessage extends Schema implements VT.ChatMessage {
 	@type("string") id: string = "";
 	@type("string") senderId: string = "";
 	@type("string") senderName: string = "";
 	@type("string") content: string = "";
 	@type("number") timestamp: number = 0;
-	@type("string") type: "chat" | "system" | "combat" = "chat";
+	@type("string") type: VT.ChatMessageTypeValue = ChatMessageType.CHAT;
+
+	constructor(init?: Partial<VT.ChatMessage>) {
+		super();
+		if (init) Object.assign(this, init);
+	}
 }
 
-export class GameRoomState extends Schema {
-	@type("string") currentPhase: string = "DEPLOYMENT";
+export class GameRoomState extends Schema implements VT.GameRoomState {
+	@type("string") currentPhase: VT.GamePhaseValue = GamePhase.DEPLOYMENT;
 	@type("number") turnCount: number = 1;
 	@type({ map: PlayerState }) players = new MapSchema<PlayerState>();
-	@type({ map: ShipStateOptimized }) ships = new MapSchema<ShipStateOptimized>();
-	@type("string") activeFaction: string = "PLAYER";
+	@type({ map: ShipState }) ships = new MapSchema<ShipState>();
+	@type("string") activeFaction: VT.FactionValue = Faction.PLAYER;
 	@type("number") mapWidth: number = 2000;
 	@type("number") mapHeight: number = 2000;
-
 	@type([ChatMessage]) chatMessages = new ArraySchema<ChatMessage>();
 }

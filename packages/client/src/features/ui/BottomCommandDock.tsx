@@ -7,7 +7,7 @@
  * - 右侧：武器操作区 / 舰船技能区
  */
 
-import type { ShipState } from "@vt/types";
+import type { ShipState, WeaponSlot } from "@vt/types";
 import { Faction } from "@vt/types";
 import {
 	Activity,
@@ -25,12 +25,10 @@ import React, { useMemo } from "react";
 
 interface BottomCommandDockProps {
 	selectedShip?: ShipState | null;
-	playerRole: string;
 	onMove?: () => void;
 	onToggleShield?: () => void;
 	onFire?: () => void;
 	onVent?: () => void;
-	onVentFlux?: () => void;
 	disabled?: boolean;
 }
 
@@ -38,12 +36,10 @@ const quadrantNames = ["前", "前右", "后右", "后", "后左", "前左"];
 
 export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 	selectedShip,
-	playerRole,
 	onMove,
 	onToggleShield,
 	onFire,
 	onVent,
-	onVentFlux,
 	disabled = false,
 }) => {
 	// 计算护甲百分比（使用新的 armor.averagePercent）
@@ -52,9 +48,16 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 		// 使用新的嵌套结构
 		return Array.from({ length: 6 }, (_, i) => {
 			const max = selectedShip.armor.maxPerQuadrant || 1;
-			const current = selectedShip.armor.getQuadrant(i);
+			const current = selectedShip.armor.quadrants[i] ?? 0;
 			return Math.round((current / max) * 100);
 		});
+	}, [selectedShip]);
+
+	const weapons = useMemo(() => {
+		if (!selectedShip) return [] as WeaponSlot[];
+		const list: WeaponSlot[] = [];
+		selectedShip.weapons.forEach((weapon) => list.push(weapon));
+		return list;
 	}, [selectedShip]);
 
 	// 计算辐能百分比（使用新的 flux.percent）
@@ -102,10 +105,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 	}
 
 	const isPlayer = selectedShip.faction === Faction.PLAYER;
-	// 使用新的 shield.active
-	const isShieldActive = selectedShip.shield.active;
-	// 使用新的 flux.isOverloaded
-	const isOverloaded = selectedShip.flux.isOverloaded;
 
 	return (
 		<div className="bottom-command-dock">
@@ -135,7 +134,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						<Heart className="info-block__icon" style={{ color: "#e74c3c" }} />
 						<span className="info-block__title">船体</span>
 						<span className="info-block__value">
-							{Math.round(selectedShip.hullCurrent)} / {selectedShip.hullMax}
+							{Math.round(selectedShip.hull.current)} / {selectedShip.hull.max}
 						</span>
 					</div>
 					<div className="info-block__bar">
@@ -152,7 +151,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						<Zap className="info-block__icon" style={{ color: "#f1c40f" }} />
 						<span className="info-block__title">辐能</span>
 						<span className="info-block__value">
-							{Math.round(selectedShip.fluxSoft + selectedShip.fluxHard)} / {selectedShip.fluxMax}
+							{Math.round(selectedShip.flux.soft + selectedShip.flux.hard)} /
+							{selectedShip.flux.max}
 						</span>
 					</div>
 					<div className="info-block__bar">
@@ -165,8 +165,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						/>
 					</div>
 					<div className="info-block__sub-stats">
-						<span className="sub-stat">软：{Math.round(selectedShip.fluxSoft)}</span>
-						<span className="sub-stat">硬：{Math.round(selectedShip.fluxHard)}</span>
+						<span className="sub-stat">软：{Math.round(selectedShip.flux.soft)}</span>
+						<span className="sub-stat">硬：{Math.round(selectedShip.flux.hard)}</span>
 						{selectedShip.isOverloaded && (
 							<span className="sub-stat sub-stat--warning">
 								过载 {Math.round(selectedShip.overloadTime)}s
@@ -187,10 +187,12 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 								key={i}
 								className="armor-cell"
 								style={{ borderColor: getArmorColor(percent) }}
-								title={`${quadrantNames[i]}: ${selectedShip.armorCurrent[i]}/${selectedShip.armorMax[i]}`}
+								title={`${quadrantNames[i]}: ${selectedShip.armor.quadrants[i] ?? 0}/${selectedShip.armor.maxPerQuadrant}`}
 							>
 								<span className="armor-cell__name">{quadrantNames[i]}</span>
-								<span className="armor-cell__value">{selectedShip.armorCurrent[i]}</span>
+								<span className="armor-cell__value">
+									{selectedShip.armor.quadrants[i] ?? 0}
+								</span>
 							</div>
 						))}
 					</div>
@@ -210,10 +212,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						<div className="movement-stat">
 							<span className="movement-stat__label">转向</span>
 							<span className="movement-stat__value">{selectedShip.maxTurnRate}°</span>
-						</div>
-						<div className="movement-stat">
-							<span className="movement-stat__label">加速</span>
-							<span className="movement-stat__value">{selectedShip.acceleration}</span>
 						</div>
 						<div className="movement-stat">
 							<span className="movement-stat__label">朝向</span>
@@ -243,15 +241,14 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 							<Bomb className="action-btn__icon" />
 							<span className="action-btn__label">开火</span>
 						</button>
-						{Array.from(selectedShip.weapons.values()).map((weapon, index) => {
-							const w = weapon as unknown as { mountId: string; name: string; damageType: string };
+						{weapons.map((weapon, index) => {
 							return (
 								<button
 									key={weapon.mountId}
 									data-magnetic
 									className="action-btn action-btn--weapon"
 									disabled={disabled}
-									title={w.name || weapon.mountId}
+									title={weapon.name || weapon.mountId}
 								>
 									<Target className="action-btn__icon" />
 									<span className="action-btn__label">武器 {index + 1}</span>
@@ -279,12 +276,14 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						</button>
 						<button
 							data-magnetic
-							className={`action-btn action-btn--shield ${selectedShip.isShieldUp ? "action-btn--active" : ""}`}
+							className={`action-btn action-btn--shield ${selectedShip.shield.active ? "action-btn--active" : ""}`}
 							onClick={onToggleShield}
-							disabled={disabled || (selectedShip.isOverloaded && !selectedShip.isShieldUp)}
+							disabled={disabled || (selectedShip.isOverloaded && !selectedShip.shield.active)}
 						>
 							<Shield className="action-btn__icon" />
-							<span className="action-btn__label">{selectedShip.isShieldUp ? "关盾" : "开盾"}</span>
+							<span className="action-btn__label">
+								{selectedShip.shield.active ? "关盾" : "开盾"}
+							</span>
 						</button>
 						<button
 							data-magnetic
@@ -292,8 +291,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 							onClick={onVent}
 							disabled={
 								disabled ||
-								selectedShip.isShieldUp ||
-								selectedShip.fluxHard + selectedShip.fluxSoft <= 0
+								selectedShip.shield.active ||
+								selectedShip.flux.hard + selectedShip.flux.soft <= 0
 							}
 						>
 							<Wind className="action-btn__icon" />
@@ -311,7 +310,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 						{selectedShip.hasFired && (
 							<span className="status-badge status-badge--used">已开火</span>
 						)}
-						{selectedShip.isShieldUp && (
+						{selectedShip.shield.active && (
 							<span className="status-badge status-badge--shield">护盾开启</span>
 						)}
 						{selectedShip.isOverloaded && (

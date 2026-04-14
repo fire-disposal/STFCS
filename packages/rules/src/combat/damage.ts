@@ -192,7 +192,8 @@ export function applyDamageToShield(
 	isOverloaded: boolean;
 } {
 	const newHardFlux = currentHardFlux + fluxGenerated;
-	const totalFlux = newHardFlux + currentSoftFlux;
+	const newSoftFlux = currentSoftFlux;
+	const totalFlux = newHardFlux + newSoftFlux;
 	const isOverloaded = totalFlux >= maxFlux;
 
 	return {

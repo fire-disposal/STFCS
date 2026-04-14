@@ -112,14 +112,12 @@ interface FluxSystemDisplayProps {
 	ship: ShipState | null;
 	onVentFlux?: () => void;
 	canVent?: boolean;
-	currentPhase?: string;
 }
 
 export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 	ship,
 	onVentFlux,
 	canVent = false,
-	currentPhase = "PLAYER_TURN",
 }) => {
 	if (!ship) {
 		return (
@@ -130,17 +128,17 @@ export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 		);
 	}
 
-	const totalFlux = ship.fluxHard + ship.fluxSoft;
-	const fluxPercent = Math.min(100, (totalFlux / ship.fluxMax) * 100);
-	const softFluxPercent = (ship.fluxSoft / ship.fluxMax) * 100;
-	const hardFluxPercent = (ship.fluxHard / ship.fluxMax) * 100;
+	const totalFlux = ship.flux.hard + ship.flux.soft;
+	const fluxPercent = Math.min(100, (totalFlux / ship.flux.max) * 100);
+	const softFluxPercent = (ship.flux.soft / ship.flux.max) * 100;
+	const hardFluxPercent = (ship.flux.hard / ship.flux.max) * 100;
 	const isOverloaded = ship.isOverloaded;
-	const isShieldUp = ship.isShieldUp;
+	const shieldActive = ship.shield.active;
 
 	// 计算下回合自然消散后的软辐能
-	const nextTurnSoftFlux = Math.max(0, ship.fluxSoft - ship.fluxDissipation);
-	const nextTurnTotal = nextTurnSoftFlux + ship.fluxHard;
-	const willBeOverloaded = nextTurnTotal >= ship.fluxMax;
+	const nextTurnSoftFlux = Math.max(0, ship.flux.soft - ship.flux.dissipation);
+	const nextTurnTotal = nextTurnSoftFlux + ship.flux.hard;
+	const willBeOverloaded = nextTurnTotal >= ship.flux.max;
 
 	return (
 		<div style={styles.container}>
@@ -157,7 +155,7 @@ export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 			{/* 总辐能条 */}
 			<div style={{ marginBottom: "10px" }}>
 				<div style={styles.statLabel}>
-					总辐能 {totalFlux.toFixed(0)} / {ship.fluxMax}
+					总辐能 {totalFlux.toFixed(0)} / {ship.flux.max}
 				</div>
 				<div style={styles.barContainer}>
 					<div
@@ -176,7 +174,7 @@ export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 				{/* 软辐能 */}
 				<div style={styles.statBox}>
 					<div style={styles.statLabel}>软辐能</div>
-					<div style={styles.statValue}>{ship.fluxSoft.toFixed(0)}</div>
+					<div style={styles.statValue}>{ship.flux.soft.toFixed(0)}</div>
 					<div style={{ ...styles.barContainer, height: "10px", marginTop: "4px" }}>
 						<div
 							style={{
@@ -192,7 +190,7 @@ export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 				{/* 硬辐能 */}
 				<div style={styles.statBox}>
 					<div style={styles.statLabel}>硬辐能</div>
-					<div style={styles.statValue}>{ship.fluxHard.toFixed(0)}</div>
+					<div style={styles.statValue}>{ship.flux.hard.toFixed(0)}</div>
 					<div style={{ ...styles.barContainer, height: "10px", marginTop: "4px" }}>
 						<div
 							style={{
@@ -210,17 +208,17 @@ export const FluxSystemDisplay: React.FC<FluxSystemDisplayProps> = ({
 			<div style={styles.grid}>
 				<div style={styles.statBox}>
 					<div style={styles.statLabel}>辐能消散</div>
-					<div style={styles.statValue}>{ship.fluxDissipation}/回合</div>
+					<div style={styles.statValue}>{ship.flux.dissipation}/回合</div>
 				</div>
 				<div style={styles.statBox}>
 					<div style={styles.statLabel}>护盾状态</div>
 					<div
 						style={{
 							...styles.statValue,
-							color: isShieldUp ? "#3ddb6f" : "#8ba4c7",
+							color: shieldActive ? "#3ddb6f" : "#8ba4c7",
 						}}
 					>
-						{isShieldUp ? "开启" : "关闭"}
+						{shieldActive ? "开启" : "关闭"}
 					</div>
 				</div>
 			</div>

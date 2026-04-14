@@ -4,10 +4,15 @@
  * 定义客户端发送到服务端的命令 Payload 结构
  */
 
-import type { FactionValue } from "./enums.js";
+import type { ConnectionQualityValue, FactionValue } from "./enums.js";
 import type { MovementPlan } from "./movement.js";
 
 // ==================== 移动命令 ====================
+
+export interface ChatPayload {
+	content: string;
+}
+
 
 export interface MoveTokenPayload {
 	shipId: string;
@@ -15,7 +20,7 @@ export interface MoveTokenPayload {
 	y: number;
 	heading: number;
 	movementPlan?: MovementPlan;
-	phase?: string;
+	phase?: "PHASE_A" | "PHASE_B" | "PHASE_C";
 	isIncremental?: boolean;
 }
 
@@ -41,16 +46,37 @@ export interface VentFluxPayload {
 	shipId: string;
 }
 
+// ==================== DM 指令 ====================
+
+export interface ClearOverloadPayload {
+	shipId: string;
+}
+
+export interface SetArmorPayload {
+	shipId: string;
+	section: number;
+	value: number;
+}
+
+// ==================== 移动阶段推进 ====================
+
+export interface AdvanceMovePhasePayload {
+	shipId: string;
+}
+
 // ==================== 舰船分配命令 ====================
 
 export interface AssignShipPayload {
 	shipId: string;
-	ownerId: string;
+	targetSessionId: string;
 }
 
 // ==================== 准备状态切换 ====================
 
 export interface ToggleReadyPayload {}
+export interface ToggleReadyPayload {
+	isReady: boolean;
+}
 
 // ==================== 阶段切换 ====================
 
@@ -72,10 +98,14 @@ export interface CreateObjectPayload {
 // ==================== 网络心跳 ====================
 
 export interface NetPingPayload {
-	clientTime: number;
+	seq: number;
+	clientSentAt: number;
 }
 
 export interface NetPongPayload {
-	clientTime: number;
+	seq: number;
 	serverTime: number;
+	pingMs: number;
+	jitterMs: number;
+	quality: ConnectionQualityValue;
 }

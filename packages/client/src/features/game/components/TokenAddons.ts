@@ -5,6 +5,7 @@
 
 import { ScalableText } from "@/features/game/utils/TextRenderer";
 import type { TokenInfo } from "@vt/types";
+import { TokenType } from "@vt/types";
 import { Container, Graphics } from "pixi.js";
 
 /**
@@ -89,7 +90,7 @@ export function createHeadingIndicator(
 		showCenterDot = true,
 	} = config;
 
-	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const tokenSize = token.type === TokenType.STATION ? token.size * 1.5 : token.size;
 	const indicatorSize = tokenSize * size;
 
 	if (style === "arrow") {
@@ -190,7 +191,7 @@ export function createAngleDisplay(
 		showCardinal = false,
 	} = config;
 
-	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const tokenSize = token.type === TokenType.STATION ? token.size * 1.5 : token.size;
 	const heading = Math.round(token.heading % 360);
 
 	// 计算基数方向
@@ -378,7 +379,7 @@ export function createArmorQuadrantsIndicator(
  * 创建选中光晕效果（保留用于向后兼容）
  */
 export function createSelectionGlow(token: TokenInfo, _zoom: number): Graphics {
-	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const tokenSize = token.type === TokenType.STATION ? token.size * 1.5 : token.size;
 	const glow = new Graphics();
 
 	// 外光晕
@@ -447,7 +448,7 @@ export function createSelectionLock(
 	const graphics = new Graphics();
 
 	// 根据 token 类型计算大小
-	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const tokenSize = token.type === TokenType.STATION ? token.size * 1.5 : token.size;
 	const halfSize = tokenSize + padding;
 
 	// 计算边界框
@@ -588,7 +589,7 @@ export function createControlLock(
 	const container = new Container();
 
 	// 根据 token 类型计算大小
-	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
+	const tokenSize = token.type === TokenType.STATION ? token.size * 1.5 : token.size;
 	const halfSize = tokenSize + padding;
 
 	// 计算边界框

@@ -4,7 +4,8 @@
  * 显示当前移动阶段状态的简洁指示器
  */
 
-import type { MovementPhase } from "@vt/types";
+import type { MovementPhase } from "@/store/slices/movementSlice";
+import { MovementPhase as MovementPhaseEnum } from "@/store/slices/movementSlice";
 import React from "react";
 
 // 样式
@@ -48,9 +49,11 @@ const styles = {
 
 // 阶段名称
 const phaseNames: Record<MovementPhase, string> = {
-	1: "平移A",
-	2: "转向",
-	3: "平移B",
+	[MovementPhaseEnum.PHASE_A]: "平移A",
+	[MovementPhaseEnum.PHASE_B]: "转向",
+	[MovementPhaseEnum.PHASE_C]: "平移B",
+	[MovementPhaseEnum.NONE]: "准备",
+	[MovementPhaseEnum.COMPLETED]: "完成",
 };
 
 interface MovementPhaseIndicatorProps {
@@ -69,9 +72,9 @@ export const MovementPhaseIndicator: React.FC<MovementPhaseIndicatorProps> = ({
 	compact = false,
 }) => {
 	const phases = [
-		{ phase: 1 as MovementPhase, complete: phase1Complete },
-		{ phase: 2 as MovementPhase, complete: phase2Complete },
-		{ phase: 3 as MovementPhase, complete: phase3Complete },
+		{ phase: MovementPhaseEnum.PHASE_A, complete: phase1Complete },
+		{ phase: MovementPhaseEnum.PHASE_B, complete: phase2Complete },
+		{ phase: MovementPhaseEnum.PHASE_C, complete: phase3Complete },
 	];
 
 	if (compact) {

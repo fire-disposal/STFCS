@@ -68,11 +68,11 @@ export const CommandDock: React.FC<CommandDockProps> = ({
 					{
 						id: "shield",
 						Icon: Shield,
-						label: selectedShip.isShieldUp ? "关盾" : "开盾",
+						label: selectedShip.shield.active ? "关盾" : "开盾",
 						shortcut: "S",
-						disabled: disabled || (selectedShip.isOverloaded && !selectedShip.isShieldUp),
-						active: selectedShip.isShieldUp,
-						variant: selectedShip.isShieldUp ? "active" : "default",
+						disabled: disabled || (selectedShip.isOverloaded && !selectedShip.shield.active),
+						active: selectedShip.shield.active,
+						variant: selectedShip.shield.active ? "active" : "default",
 						onClick: onToggleShield,
 					},
 					{
@@ -91,8 +91,8 @@ export const CommandDock: React.FC<CommandDockProps> = ({
 						shortcut: "V",
 						disabled:
 							disabled ||
-							selectedShip.isShieldUp ||
-							selectedShip.fluxHard + selectedShip.fluxSoft <= 0,
+							selectedShip.shield.active ||
+							selectedShip.flux.hard + selectedShip.flux.soft <= 0,
 						variant: "default",
 						onClick: onVent,
 					},

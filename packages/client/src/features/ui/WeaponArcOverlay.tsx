@@ -83,12 +83,11 @@ export const WeaponArcOverlay: React.FC<WeaponArcOverlayProps> = ({
 			});
 
 			// 绘制护盾范围
-			if (ship.isShieldUp) {
+			if (ship.shield.active) {
 				const shieldGraphics = new Graphics();
-				const shieldRadius = ship.transform.heading; // 使用朝向作为临时半径参考
 				// 护盾弧
-				const arcRad = (ship.shieldArc * Math.PI) / 180;
-				const baseAngle = ((ship.shieldOrientation - 90) * Math.PI) / 180;
+				const arcRad = (ship.shield.arc * Math.PI) / 180;
+				const baseAngle = ((ship.shield.orientation - 90) * Math.PI) / 180;
 
 				shieldGraphics.moveTo(0, 0);
 				for (let angle = baseAngle - arcRad / 2; angle <= baseAngle + arcRad / 2; angle += 0.05) {

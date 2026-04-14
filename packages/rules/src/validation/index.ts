@@ -6,7 +6,7 @@
 
 import { GAME_CONFIG } from "@vt/data";
 import type { GamePhaseValue, PlayerRoleValue } from "@vt/types";
-import { GamePhaseType } from "@vt/types";
+import { GamePhase } from "@vt/types";
 import { angleBetween, angleDifference, distance, validateThreePhaseMove } from "../math/index.js";
 import type { MovementPlan, MovementValidation } from "../math/index.js";
 
@@ -257,29 +257,29 @@ export function validatePhaseTransition(
 	allPlayersReady: boolean,
 	isDM: boolean
 ): PhaseTransitionValidation {
-	if (currentPhase === GamePhaseType.DEPLOYMENT) {
+	if (currentPhase === GamePhase.DEPLOYMENT) {
 		if (!isDM) {
 			return { valid: false, error: "只有 DM 可以结束部署阶段" };
 		}
-		return { valid: true, newPhase: GamePhaseType.PLAYER_TURN };
+		return { valid: true, newPhase: GamePhase.PLAYER_TURN };
 	}
 
-	if (currentPhase === GamePhaseType.PLAYER_TURN) {
+	if (currentPhase === GamePhase.PLAYER_TURN) {
 		if (!allPlayersReady) {
 			return { valid: false, error: "所有玩家必须准备完毕" };
 		}
-		return { valid: true, newPhase: GamePhaseType.DM_TURN };
+		return { valid: true, newPhase: GamePhase.DM_TURN };
 	}
 
-	if (currentPhase === GamePhaseType.DM_TURN) {
+	if (currentPhase === GamePhase.DM_TURN) {
 		if (!isDM) {
 			return { valid: false, error: "只有 DM 可以结束 DM 回合" };
 		}
-		return { valid: true, newPhase: GamePhaseType.END_PHASE };
+		return { valid: true, newPhase: GamePhase.END_PHASE };
 	}
 
-	if (currentPhase === GamePhaseType.END_PHASE) {
-		return { valid: true, newPhase: GamePhaseType.PLAYER_TURN };
+	if (currentPhase === GamePhase.END_PHASE) {
+		return { valid: true, newPhase: GamePhase.PLAYER_TURN };
 	}
 
 	return { valid: false, error: `未知阶段: ${currentPhase}` };
@@ -294,7 +294,7 @@ export function validatePlayerAction(
 		return { valid: true };
 	}
 
-	if (currentPhase !== GamePhaseType.PLAYER_TURN) {
+	if (currentPhase !== GamePhase.PLAYER_TURN) {
 		return { valid: false, error: "当前不是玩家行动回合" };
 	}
 

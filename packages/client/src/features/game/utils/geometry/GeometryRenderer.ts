@@ -1,22 +1,22 @@
-/**
- * 几何体绘制工具
- *
- * 提供简洁的示波器风格几何体绘制功能
- * 用于素材缺失时的回退渲染
- */
-
-import type { DamageType, HullSize, ShieldType } from "@vt/types";
+import { DamageType } from "@vt/types";
 import { Container, Graphics, Point } from "pixi.js";
 
 // ==================== 颜色配置 ====================
 
 /** 舰船尺寸颜色映射 */
-export const HULL_SIZE_COLORS: Record<HullSize, number> = {
-	FIGHTER: 0x88ff88, // 浅绿
-	FRIGATE: 0x4a9eff, // 蓝色
-	DESTROYER: 0xffaa4a, // 橙色
-	CRUISER: 0xff4a4a, // 红色
-	CAPITAL: 0xaa4aff, // 紫色
+export const HULL_SIZE_COLORS: Record<HullSizeValue, number> = {
+	FIGHTER: 0x88ff88,
+	FRIGATE: 0x4a9eff,
+	DESTROYER: 0xffaa4a,
+	CRUISER: 0xff4a4a,
+	CAPITAL: 0xaa4aff,
+};
+
+export const DAMAGE_TYPE_COLORS: Record<DamageTypeValue, number> = {
+	KINETIC: 0x4a9eff,
+	HIGH_EXPLOSIVE: 0xff4a4a,
+	FRAGMENTATION: 0xaaaaaa,
+	ENERGY: 0xffaa4a,
 };
 
 /** 伤害类型颜色映射 */
@@ -46,7 +46,7 @@ export const STATUS_COLORS = {
 
 /** 舰船几何体配置 */
 export interface ShipGeometryConfig {
-	size: HullSize;
+	size: HullSizeValue;
 	collisionRadius: number;
 	color?: number;
 	alpha?: number;
@@ -285,7 +285,7 @@ function drawCapitalShape(
 export interface WeaponGeometryConfig {
 	range: number;
 	arc: number;
-	damageType: DamageType;
+	damageType: DamageTypeValue;
 	mountType: "FIXED" | "TURRET" | "HYBRID";
 	showArc?: boolean;
 }
@@ -336,7 +336,7 @@ export function drawWeaponArcGeometry(graphics: Graphics, config: WeaponGeometry
 
 /** 护盾几何体配置 */
 export interface ShieldGeometryConfig {
-	type: ShieldType;
+	type: ShieldTypeValue;
 	radius: number;
 	coverageAngle: number;
 	active: boolean;

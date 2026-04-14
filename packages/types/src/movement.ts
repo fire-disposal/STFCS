@@ -29,5 +29,5 @@ export interface MovementFuelState {
 	phaseTurnUsed: number;
 	phaseBForwardUsed: number;
 	phaseBStrafeUsed: number;
-	currentPhase: number;
+	currentPhase: "PHASE_A" | "PHASE_B" | "PHASE_C";
 }

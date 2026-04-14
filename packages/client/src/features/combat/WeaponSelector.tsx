@@ -7,8 +7,7 @@
  * - 武器类型筛选
  */
 
-import type { WeaponInstanceState } from "@vt/types";
-import type { DamageType } from "@vt/types";
+import type { DamageTypeValue, WeaponInstanceState } from "@vt/types";
 import React from "react";
 
 // 样式
@@ -115,7 +114,7 @@ const styles = {
 };
 
 // 伤害类型颜色映射
-const damageTypeColors: Record<DamageType, string> = {
+const damageTypeColors: Record<DamageTypeValue, string> = {
 	KINETIC: "#4a90d9",
 	HIGH_EXPLOSIVE: "#e74c3c",
 	FRAGMENTATION: "#95a5a6",
@@ -123,7 +122,7 @@ const damageTypeColors: Record<DamageType, string> = {
 };
 
 // 伤害类型图标
-const damageTypeIcons: Record<DamageType, string> = {
+const damageTypeIcons: Record<DamageTypeValue, string> = {
 	KINETIC: "🔵",
 	HIGH_EXPLOSIVE: "🔴",
 	FRAGMENTATION: "⚪",

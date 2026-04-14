@@ -4,7 +4,8 @@
  * 绘制武器射界、弹道预览等
  */
 
-import type { DamageType, WeaponInstanceState, WeaponMountInstance } from "@vt/types";
+import type { WeaponInstanceState, WeaponMountInstance } from "@vt/types";
+import { DamageType } from "@vt/types";
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { DAMAGE_TYPE_COLORS, drawWaveform, drawWeaponArcGeometry } from "./GeometryRenderer";
 

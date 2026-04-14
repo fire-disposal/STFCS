@@ -5,7 +5,7 @@
  */
 
 import { getAssetRegistry } from "@/services/AssetRegistry";
-import type { HullSize, TokenInfo } from "@vt/types";
+import type { HullSizeValue, TokenInfo } from "@vt/types";
 import { Container, Graphics, Sprite, Texture } from "pixi.js";
 
 export interface ConfigurableTokenConfig {
@@ -14,23 +14,15 @@ export interface ConfigurableTokenConfig {
 	zoom: number;
 }
 
-/**
- * 舰船渲染配置
- */
 interface ShipRenderConfig {
 	spriteKey?: string;
 	spriteScale: number;
 	collisionRadius: number;
 	color: number;
-	size: HullSize;
+	size: HullSizeValue;
 }
 
-type HullSize = "FIGHTER" | "FRIGATE" | "DESTROYER" | "CRUISER" | "CAPITAL";
-
-/**
- * 舰船尺寸对应的颜色
- */
-const HULL_SIZE_COLORS: Record<HullSize, number> = {
+const HULL_SIZE_COLORS: Record<HullSizeValue, number> = {
 	FIGHTER: 0x88ff88,
 	FRIGATE: 0x4a9eff,
 	DESTROYER: 0xffaa4a,

@@ -46,9 +46,21 @@ export {
 	ARMOR_QUADRANT_NAMES,
 	QUADRANT_INDEX_MAP,
 	INDEX_TO_QUADRANT,
-	type ArmorQuadrantValue,
-	type DamageTypeValue,
 } from "./combat/armor.js";
+
+// ==================== 从 @vt/types 重导出 ====================
+export type {
+	ArmorQuadrantValue,
+	DamageTypeValue,
+	ShipHullSpec,
+} from "@vt/types";
+
+// ==================== 从 @vt/data 重导出 ====================
+export {
+	getAvailableShips,
+	getShipHullSpec,
+	PRESET_SHIPS,
+} from "@vt/data";
 
 // ==================== 伤害计算 ====================
 export {

@@ -143,7 +143,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			ownerId?: string;
 		}) => {
 			if (!room) return;
-			room.send("DM_CREATE_OBJECT", payload);
+			room.send(ClientCommand.CMD_CREATE_OBJECT, payload);
 		},
 		[room]
 	);
@@ -151,10 +151,13 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const createTestShip = useCallback(
 		(faction: "player" | "dm", x: number, y: number) => {
 			if (!room) return;
-			room.send("CREATE_TEST_SHIP", {
-				faction: faction === "player" ? Faction.PLAYER : Faction.DM,
+			room.send(ClientCommand.CMD_CREATE_OBJECT, {
+				type: "ship",
+				hullId: "frigate_assault",
 				x,
 				y,
+				heading: 0,
+				faction: faction === "player" ? Faction.PLAYER : Faction.DM,
 			});
 		},
 		[room]
@@ -163,7 +166,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const clearOverload = useCallback(
 		(shipId: string) => {
 			if (!room) return;
-			room.send("DM_CLEAR_OVERLOAD", { shipId });
+			room.send(ClientCommand.CMD_CLEAR_OVERLOAD, { shipId });
 		},
 		[room]
 	);
@@ -171,7 +174,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const setArmor = useCallback(
 		(shipId: string, section: number, value: number) => {
 			if (!room) return;
-			room.send("DM_SET_ARMOR", { shipId, section, value });
+			room.send(ClientCommand.CMD_SET_ARMOR, { shipId, section, value });
 		},
 		[room]
 	);
@@ -223,7 +226,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		if (!selectedShip) return;
 		sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, {
 			shipId: selectedShip.id,
-			isActive: !selectedShip.isShieldUp,
+			isActive: !selectedShip.shield.active,
 			orientation: selectedShip.transform.heading,
 		});
 	}, [selectedShip, sendCommand]);
@@ -341,7 +344,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			{/* 底部命令 Dock - 整合舰船信息/辐能/护甲 */}
 			<BottomCommandDock
 				selectedShip={selectedShip}
-				playerRole={currentPlayer?.role || PlayerRole.PLAYER}
 				onMove={handleOpenMovement}
 				onToggleShield={handleToggleShield}
 				onFire={handleFire}

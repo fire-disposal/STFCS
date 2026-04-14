@@ -7,7 +7,7 @@
  * - 象限选择
  */
 
-import type { ArmorInstanceState, ArmorQuadrant } from "@vt/types";
+import type { ArmorInstanceState, ArmorQuadrantValue } from "@vt/types";
 import React from "react";
 
 // 样式
@@ -73,7 +73,7 @@ const styles = {
 
 // 象限位置配置
 const quadrantPositions: Record<
-	ArmorQuadrant,
+	ArmorQuadrantValue,
 	{
 		top: string;
 		left: string;
@@ -127,7 +127,7 @@ const quadrantPositions: Record<
 };
 
 // 象限名称
-const quadrantNames: Record<ArmorQuadrant, string> = {
+const quadrantNames: Record<ArmorQuadrantValue, string> = {
 	FRONT_TOP: "前上",
 	FRONT_BOTTOM: "前下",
 	LEFT_TOP: "左上",
@@ -138,8 +138,8 @@ const quadrantNames: Record<ArmorQuadrant, string> = {
 
 interface QuadrantSelectorProps {
 	armor: ArmorInstanceState;
-	selectedQuadrant?: ArmorQuadrant;
-	onSelect: (quadrant: ArmorQuadrant) => void;
+	selectedQuadrant?: ArmorQuadrantValue;
+	onSelect: (quadrant: ArmorQuadrantValue) => void;
 	showValues?: boolean;
 }
 
@@ -149,7 +149,7 @@ export const QuadrantSelector: React.FC<QuadrantSelectorProps> = ({
 	onSelect,
 	showValues = true,
 }) => {
-	const [hoveredQuadrant, setHoveredQuadrant] = React.useState<ArmorQuadrant | null>(null);
+	const [hoveredQuadrant, setHoveredQuadrant] = React.useState<ArmorQuadrantValue | null>(null);
 
 	// 获取护甲颜色
 	const getArmorColor = (value: number, max: number): string => {
@@ -161,7 +161,7 @@ export const QuadrantSelector: React.FC<QuadrantSelectorProps> = ({
 	};
 
 	// 处理象限点击
-	const handleQuadrantClick = (quadrant: ArmorQuadrant) => {
+	const handleQuadrantClick = (quadrant: ArmorQuadrantValue) => {
 		onSelect(quadrant);
 	};
 
@@ -172,7 +172,7 @@ export const QuadrantSelector: React.FC<QuadrantSelectorProps> = ({
 			{/* 舰船象限图 */}
 			<div style={styles.shipDiagram}>
 				{Object.entries(quadrantPositions).map(([quadrant, position]) => {
-					const q = quadrant as ArmorQuadrant;
+					const q = quadrant as ArmorQuadrantValue;
 					const value = armor.quadrants[q];
 					const max = armor.maxPerQuadrant;
 					const percent = Math.round((value / max) * 100);

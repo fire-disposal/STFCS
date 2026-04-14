@@ -9,19 +9,12 @@
  */
 
 import { type PayloadAction, createSelector, createSlice } from "@reduxjs/toolkit";
-import type { ArmorQuadrant, AttackPreviewResult } from "@vt/types";
+import type { ArmorQuadrantValue, AttackPreviewResult } from "@vt/types";
 
-// ==================== 类型定义 ====================
-
-/** 战斗 UI 状态 */
 interface CombatUISliceState {
-	// 目标选择
 	selectedTargetId: string | null;
-	// 武器选择
 	selectedWeaponId: string | null;
-	// 象限选择
-	selectedQuadrant: ArmorQuadrant | null;
-	// 攻击预览
+	selectedQuadrant: ArmorQuadrantValue | null;
 	attackPreview: AttackPreviewResult | null;
 	// 是否正在加载预览
 	isLoadingPreview: boolean;
@@ -85,7 +78,7 @@ const combatUISlice = createSlice({
 		/**
 		 * 选择象限
 		 */
-		selectQuadrant: (state, action: PayloadAction<ArmorQuadrant | null>) => {
+		selectQuadrant: (state, action: PayloadAction<ArmorQuadrantValue | null>) => {
 			state.selectedQuadrant = action.payload;
 		},
 
