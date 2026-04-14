@@ -77,7 +77,7 @@ jobs:
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
             docker rm -f stfcs-server stfcs-client || true
             docker network create stfcs-network 2>/dev/null || true
-            docker run -d --name stfcs-server --restart unless-ststopped --network stfcs-network \
+            docker run -d --name stfcs-server --restart unless-stopped --network stfcs-network \
               -p 2567:2567 -e NODE_ENV=production -e PORT=2567 \
               ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
             docker run -d --name stfcs-client --restart unless-stopped --network stfcs-network \
