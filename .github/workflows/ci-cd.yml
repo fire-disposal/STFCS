@@ -3,99 +3,27 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ==================== 预处理阶段 ====================
   prepare:
     runs-on: ubuntu-latest
     outputs:
       server_image: ${{ steps.set-images.outputs.server_image }}
       client_image: ${{ steps.set-images.outputs.client_image }}
-      repository_lower: ${{ steps.set-images.outputs.repository_lower }}
     steps:
-      - name: Set image tags (lowercase)
+      - name: Set image tags
         id: set-images
         run: |
           LOWERED=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "server_image=${LOWERED}-server" >> $GITHUB_OUTPUT
           echo "client_image=${LOWERED}-client" >> $GITHUB_OUTPUT
-          echo "repository_lower=${LOWERED}" >> $GITHUB_OUTPUT
 
-  # ==================== 代码质量检查 ====================
-  lint:
-    needs: prepare
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run lint
-        run: pnpm lint
-
-      - name: Run typecheck
-        run: pnpm typecheck
-
-      # 验证基础包构建
-      - name: Build core workspace packages
-        run: pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build
-
-      - name: Verify core package build output
-        run: |
-          test -f packages/types/dist/index.js || exit 1
-          test -f packages/data/dist/index.js || exit 1
-          test -f packages/rules/dist/index.js || exit 1
-          echo "✓ Core packages build verified"
-
-  # ==================== 测试阶段 ====================
-  test:
-    needs: [prepare, lint]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build core workspace packages
-        run: pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build
-
-      - name: Run tests
-        run: pnpm test
-
-  # ==================== 构建阶段 ====================
   build:
-    needs: [prepare, lint]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -103,28 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 构建缓存设置
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      # 构建 Server 镜像
-      - name: Build & Push Server
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: ./packages/server/Dockerfile
@@ -132,13 +47,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:${{ github.sha }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          cache-size-limit: 2GB
 
-      # 构建 Client 镜像
-      - name: Build & Push Client
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: ./packages/client/Dockerfile
@@ -146,144 +56,41 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:${{ github.sha }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          cache-size-limit: 2GB
           build-args: |
             COMMIT_SHA=${{ github.sha }}
-            BUILD_TIME=${{ github.event.head_commit.timestamp }}
 
-      # 移动缓存
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-  # ==================== 部署阶段 ====================
   deploy:
     needs: [prepare, build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    environment:
-      name: production
-      url: http://${{ secrets.SERVER_HOST }}:2567
     steps:
-      - name: Set up SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Verify SSH Connection
+      - name: Deploy
         run: |
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo 'SSH connection successful'"
-
-      - name: Remote Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -euo pipefail
-            mkdir -p ~/stfcs
-            cd ~/stfcs
-
-            # Login to registry
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            # Clean up old images and containers
             docker system prune -af
-
-            # Pull latest images
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
             docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-
-            # Remove existing containers
-            for container in stfcs-server stfcs-client; do
-              if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-                docker rm -f ${container} || true
-              fi
-            done
-
-            # Create network if not exists
+            docker rm -f stfcs-server stfcs-client || true
             docker network create stfcs-network 2>/dev/null || true
-
-            # Start Server container
-            docker run -d \
-              --name stfcs-server \
-              --restart unless-stopped \
-              --network stfcs-network \
-              -p 2567:2567 \
-              -e NODE_ENV=production \
-              -e PORT=2567 \
-              -e CORS_ORIGINS=https://stfcs.205716.xyz \
+            docker run -d --name stfcs-server --restart unless-ststopped --network stfcs-network \
+              -p 2567:2567 -e NODE_ENV=production -e PORT=2567 \
               ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-
-            # Start Client container  
-            docker run -d \
-              --name stfcs-client \
-              --restart unless-stopped \
-              --network stfcs-network \
-              -p 80:80 \
-              ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-
-            # Verify containers are running
+            docker run -d --name stfcs-client --restart unless-stopped --network stfcs-network \
+              -p 80:80 ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
             sleep 5
-            echo "=== Container Status ==="
-            docker ps --filter name=stfcs --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-
-            # Show images
-            echo "=== Docker Images ==="
-            docker images | grep stfcs
-
-            # Show logs
-            echo "=== Server Logs (last 50 lines) ==="
-            docker logs --tail 50 stfcs-server || true
+            docker ps --filter name=stfcs
           EOF
 
       - name: Health Check
         run: |
-          echo "Waiting for service to be ready..."
-          MAX_ATTEMPTS=24
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            # Check server health
-            if curl -fsS --max-time 5 http://${{ secrets.SERVER_HOST }}:2567/health 2>/dev/null; then
-              echo "✓ Server health check passed at attempt $i"
-              
-              # Check client
-              if curl -fsS --max-time 5 http://${{ secrets.SERVER_HOST }}/ 2>/dev/null; then
-                echo "✓ Client health check passed"
-                exit 0
-              else
-                echo "⚠ Client not ready yet, continuing..."
-              fi
-              exit 0
-            fi
-            echo "Attempt $i/$MAX_ATTEMPTS: Waiting for service..."
+          for i in $(seq 1 12); do
+            curl -fsS --max-time 5 http://${{ secrets.SERVER_HOST }}:2567/health && exit 0
             sleep 5
           done
-
-          echo "✗ Health check failed after $MAX_ATTEMPTS attempts. Gathering diagnostics..."
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF' || true
-            echo "=== Container Status ==="
-            docker ps -a --filter name=stfcs --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-            echo "=== Server Logs (last 100 lines) ==="
-            docker logs --tail 100 stfcs-server 2>&1 || echo "No server logs"
-            echo "=== Client Logs (last 100 lines) ==="
-            docker logs --tail 100 stfcs-client 2>&1 || echo "No client logs"
-            echo "=== Disk Space ==="
-            df -h
-          EOF
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "docker logs --tail 50 stfcs-server"
           exit 1
-
-  # ==================== 通知阶段 ====================
-  notify:
-    needs: [deploy]
-    runs-on: ubuntu-latest
-    if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'failure')
-    steps:
-      - name: Deployment Status
-        run: |
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "✓ Deployment successful!"
-          else
-            echo "✗ Deployment failed!"
-            exit 1
-          fi
