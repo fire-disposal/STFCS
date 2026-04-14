@@ -2,6 +2,14 @@
  * 三阶段移动类型定义
  */
 
+export const MovePhase = {
+	PHASE_A: "PHASE_A",
+	PHASE_B: "PHASE_B",
+	PHASE_C: "PHASE_C",
+} as const;
+
+export type MovePhaseValue = (typeof MovePhase)[keyof typeof MovePhase];
+
 // ==================== 移动计划 ====================
 
 export interface MovementPlan {
@@ -29,5 +37,5 @@ export interface MovementFuelState {
 	phaseTurnUsed: number;
 	phaseBForwardUsed: number;
 	phaseBStrafeUsed: number;
-	currentPhase: "PHASE_A" | "PHASE_B" | "PHASE_C";
+	currentPhase: MovePhaseValue;
 }

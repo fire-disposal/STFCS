@@ -5,7 +5,7 @@
  */
 
 import type { ConnectionQualityValue, FactionValue } from "./enums.js";
-import type { MovementPlan } from "./movement.js";
+import type { MovementPlan, MovePhaseValue } from "./movement.js";
 
 // ==================== 移动命令 ====================
 
@@ -20,7 +20,7 @@ export interface MoveTokenPayload {
 	y: number;
 	heading: number;
 	movementPlan?: MovementPlan;
-	phase?: "PHASE_A" | "PHASE_B" | "PHASE_C";
+	phase?: MovePhaseValue;
 	isIncremental?: boolean;
 }
 
@@ -73,7 +73,6 @@ export interface AssignShipPayload {
 
 // ==================== 准备状态切换 ====================
 
-export interface ToggleReadyPayload {}
 export interface ToggleReadyPayload {
 	isReady: boolean;
 }
