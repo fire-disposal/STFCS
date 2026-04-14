@@ -21,13 +21,11 @@ export interface UseInteractionResult {
 
 export function useInteraction(
 	onPanDelta?: (deltaX: number, deltaY: number) => void,
-	onRotateDelta?: (delta: number) => void,
-	screenDeltaToWorldDelta?: (deltaX: number, deltaY: number) => { x: number; y: number }
+	onRotateDelta?: (delta: number) => void
 ): UseInteractionResult {
 	const spacePressedRef = useRef(false);
 	const onPanDeltaRef = useRef(onPanDelta);
 	const onRotateDeltaRef = useRef(onRotateDelta);
-	const screenDeltaToWorldDeltaRef = useRef(screenDeltaToWorldDelta);
 	const dragStateRef = useRef<DragState>({
 		active: false,
 		mode: null,
@@ -43,7 +41,6 @@ export function useInteraction(
 
 	onPanDeltaRef.current = onPanDelta;
 	onRotateDeltaRef.current = onRotateDelta;
-	screenDeltaToWorldDeltaRef.current = screenDeltaToWorldDelta;
 
 	const flushDragDelta = () => {
 		const dragState = dragStateRef.current;
@@ -51,14 +48,15 @@ export function useInteraction(
 			return;
 		}
 
-		const delta = screenDeltaToWorldDeltaRef.current?.(dragState.pendingDx, dragState.pendingDy);
+		const deltaX = dragState.pendingDx;
+		const deltaY = dragState.pendingDy;
 		const rotateDelta = dragState.pendingRotate;
 		dragState.pendingDx = 0;
 		dragState.pendingDy = 0;
 		dragState.pendingRotate = 0;
 
-		if (delta && (delta.x !== 0 || delta.y !== 0)) {
-			onPanDeltaRef.current?.(delta.x, delta.y);
+		if (deltaX !== 0 || deltaY !== 0) {
+			onPanDeltaRef.current?.(deltaX, deltaY);
 		}
 		if (rotateDelta !== 0) {
 			onRotateDeltaRef.current?.(rotateDelta);

@@ -105,9 +105,12 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	// 地图控制
 	const handleMapPan = useCallback(
 		(deltaX: number, deltaY: number) => {
-			setCameraPosition(cameraPosition.x + deltaX, cameraPosition.y + deltaY);
+			setCameraPosition(
+				cameraPosition.x - deltaX / zoom,
+				cameraPosition.y - deltaY / zoom
+			);
 		},
-		[cameraPosition.x, cameraPosition.y, setCameraPosition]
+		[cameraPosition.x, cameraPosition.y, setCameraPosition, zoom]
 	);
 
 	const handleMapRotate = useCallback(

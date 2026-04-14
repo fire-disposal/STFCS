@@ -69,7 +69,7 @@ export const CursorCoordinateInput: React.FC<CursorCoordinateInputProps> = ({
 			return `${Math.round(cameraX)},${Math.round(cameraY)}`;
 		}
 		// 显示 R 值（如果有）
-		const r = cursorR !== null ? cursorR : Math.round(viewRotation);
+		const r = cursorR !== null ? Number((-cursorR).toFixed(2)) : Number(viewRotation.toFixed(2));
 		return `${Math.round(cursorX)},${Math.round(cursorY)},${r}`;
 	}, [cursorX, cursorY, cursorR, cameraX, cameraY, viewRotation]);
 

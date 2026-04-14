@@ -92,8 +92,10 @@ export function useLayerSystem(): UseLayerSystemResult {
 		const currentLayers = layersRef.current;
 		if (!currentLayers) return;
 
-		currentLayers.world.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
-		currentLayers.ships.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+		const largeSize = Math.max(canvasSize.width, canvasSize.height, 10000) * 10;
+		const halfSize = largeSize / 2;
+		currentLayers.world.hitArea = new Rectangle(-halfSize, -halfSize, largeSize, largeSize);
+		currentLayers.ships.hitArea = new Rectangle(-halfSize, -halfSize, largeSize, largeSize);
 	}, []);
 
 	useEffect(() => {

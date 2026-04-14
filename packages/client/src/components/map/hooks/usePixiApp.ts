@@ -1,5 +1,5 @@
 import { screenToWorld } from "@/utils/mathUtils";
-import { Container, Rectangle } from "pixi.js";
+import { Container, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";
 import type { CameraState } from "./useCamera";
 import type { CanvasSize } from "./useCanvasResize";
@@ -52,23 +52,66 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 
 	const getWorldPoint = useCallback(
 		(event: any) => {
-			const screenX = event.global?.x ?? event.clientX ?? 0;
-			const screenY = event.global?.y ?? event.clientY ?? 0;
-			const { zoom, cameraX, cameraY, viewRotation } = cameraRef.current;
-			return screenToWorld(
-				screenX - canvasSize.width / 2,
-				screenY - canvasSize.height / 2,
-				zoom,
-				cameraX,
-				cameraY,
-				viewRotation
-			);
+			const app = pixiAppRef.current;
+			const screenWidth = app?.renderer?.screen?.width ?? canvasSize.width;
+			const screenHeight = app?.renderer?.screen?.height ?? canvasSize.height;
+			let screenX = event.global?.x;
+			let screenY = event.global?.y;
+			if (screenX === undefined || screenY === undefined) {
+				const rect = app?.view?.getBoundingClientRect();
+				const clientX = event.clientX ?? 0;
+				const clientY = event.clientY ?? 0;
+				if (rect) {
+					screenX = ((clientX - rect.left) / rect.width) * screenWidth;
+					screenY = ((clientY - rect.top) / rect.height) * screenHeight;
+				} else {
+					screenX = clientX;
+					screenY = clientY;
+				}
+			}
+
+		const world = layersRef.current?.world;
+		if (world && screenX !== undefined && screenY !== undefined) {
+			const local = world.toLocal(new Point(screenX, screenY));
+			return { x: local.x, y: local.y };
+		}
+
+		const { zoom, cameraX, cameraY, viewRotation } = cameraRef.current;
+		return screenToWorld(
+			screenX - screenWidth / 2,
+			screenY - screenHeight / 2,
+			zoom,
+			cameraX,
+			cameraY,
+			viewRotation
+		);
 		},
 		[canvasSize.width, canvasSize.height, cameraRef]
 	);
 
 	const handleInit = useCallback(
 		(app: any) => {
+			const getScreenCoords = (event: any) => {
+				const screenWidth = app?.renderer?.screen?.width ?? canvasSize.width;
+				const screenHeight = app?.renderer?.screen?.height ?? canvasSize.height;
+				const scaleX = screenWidth ? canvasSize.width / screenWidth : 1;
+				const scaleY = screenHeight ? canvasSize.height / screenHeight : 1;
+				let x = event.global?.x;
+				let y = event.global?.y;
+				if (x === undefined || y === undefined) {
+					const rect = app?.view?.getBoundingClientRect();
+					const clientX = event.clientX ?? 0;
+					const clientY = event.clientY ?? 0;
+					if (rect) {
+						x = ((clientX - rect.left) / rect.width) * screenWidth;
+						y = ((clientY - rect.top) / rect.height) * screenHeight;
+					} else {
+						return { x: clientX, y: clientY };
+					}
+				}
+				return { x: x * scaleX, y: y * scaleY };
+			};
+
 			const world = new Container();
 			world.sortableChildren = true;
 			world.eventMode = "static";
@@ -162,12 +205,30 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				shipIcons: shipIconsLayer,
 			};
 
+			const shipsLayerRef = newLayers.ships;
+			const isShipObject = (target: any) => {
+				let current = target;
+				while (current) {
+					if (current === shipsLayerRef) {
+						return target !== shipsLayerRef;
+					}
+					current = current.parent;
+				}
+				return false;
+			};
+
 			layersRef.current = newLayers;
 			setLayers?.(newLayers);
 
 			pixiAppRef.current = app;
 			app.stage.eventMode = "static";
-			app.stage.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+			if ((app.renderer as any)?.events) {
+				(app.renderer as any).events.eventMode = "static";
+			}
+			const initScreen = app?.renderer?.screen;
+			if (initScreen) {
+				app.stage.hitArea = new Rectangle(0, 0, initScreen.width, initScreen.height);
+			}
 			app.stage.cursor = "default";
 
 			const stage = app.stage;
@@ -175,6 +236,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			stage.on("pointerdown", (event: any) => {
 				const button = event.button ?? event.data?.button ?? 0;
 				const dragState = dragStateRef.current;
+				const screen = getScreenCoords(event);
 
 				if (button === 2) {
 					event.preventDefault();
@@ -184,8 +246,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				if (button === 1) {
 					dragState.active = true;
 					dragState.mode = "rotate";
-					dragState.startX = event.global?.x ?? event.clientX ?? 0;
-					dragState.startY = event.global?.y ?? event.clientY ?? 0;
+					dragState.startX = screen.x;
+					dragState.startY = screen.y;
 					dragState.lastX = dragState.startX;
 					dragState.lastY = dragState.startY;
 					dragState.moved = false;
@@ -197,17 +259,17 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 					if (spacePressedRef.current) {
 						dragState.active = true;
 						dragState.mode = "pan";
-						dragState.startX = event.global?.x ?? event.clientX ?? 0;
-						dragState.startY = event.global?.y ?? event.clientY ?? 0;
+						dragState.startX = screen.x;
+						dragState.startY = screen.y;
 						dragState.lastX = dragState.startX;
 						dragState.lastY = dragState.startY;
 						dragState.moved = false;
 						stage.cursor = "grabbing";
-					} else if (event.target === stage || event.target === world) {
+					} else if (!isShipObject(event.target)) {
 						dragState.active = true;
 						dragState.mode = "pan";
-						dragState.startX = event.global?.x ?? event.clientX ?? 0;
-						dragState.startY = event.global?.y ?? event.clientY ?? 0;
+						dragState.startX = screen.x;
+						dragState.startY = screen.y;
 						dragState.lastX = dragState.startX;
 						dragState.lastY = dragState.startY;
 						dragState.moved = false;
@@ -219,9 +281,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			stage.on("pointermove", (event: any) => {
 				const dragState = dragStateRef.current;
 				if (!dragState.active) return;
-
-				const currentX = event.global?.x ?? event.clientX ?? dragState.lastX;
-				const currentY = event.global?.y ?? event.clientY ?? dragState.lastY;
+				const screen = getScreenCoords(event);
+				const currentX = screen.x;
+				const currentY = screen.y;
 				const dx = currentX - dragState.lastX;
 				const dy = currentY - dragState.lastY;
 
@@ -243,10 +305,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			const finishDrag = (event: any) => {
 				const dragState = dragStateRef.current;
 
-				if (dragState.active && dragState.mode === "pan" && !dragState.moved && event.target === stage || event.target === world) {
+				if (dragState.active && dragState.mode === "pan" && !dragState.moved && !isShipObject(event.target)) {
 					const worldPoint = getWorldPoint(event);
 					const { viewRotation } = cameraRef.current;
-					setMapCursorRef.current?.(worldPoint.x, worldPoint.y, viewRotation);
+					setMapCursorRef.current?.(worldPoint.x, worldPoint.y, -viewRotation);
 					onClickRef.current?.(Math.round(worldPoint.x), Math.round(worldPoint.y));
 				}
 
@@ -326,8 +388,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 
 	useEffect(() => {
 		const app = pixiAppRef.current;
-		if (app?.stage && canvasSize.width > 0 && canvasSize.height > 0) {
-			app.stage.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
+		const screen = app?.renderer?.screen;
+		if (app?.stage && screen && screen.width > 0 && screen.height > 0) {
+			app.stage.hitArea = new Rectangle(0, 0, screen.width, screen.height);
 		}
 	}, [canvasSize.width, canvasSize.height]);
 

@@ -186,7 +186,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 
 	// 游标设置
-	setMapCursor: (x: number, y: number, r: number) => set({ mapCursor: { x, y, r } }),
+	setMapCursor: (x: number, y: number, r: number) =>
+		set({ mapCursor: { x, y, r: Math.round(r * 100) / 100 } }),
 	clearMapCursor: () => set({ mapCursor: null }),
 
 	// 坐标精度设置
@@ -197,8 +198,9 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setAngleMode: (mode: AngleMode) => set({ angleMode: mode }),
 
 	// 视图旋转
-	setViewRotation: (rotation) => set({ viewRotation: rotation }),
-	rotateViewToAngle: (angle) => set({ viewRotation: angle, isViewRotating: false }),
+	setViewRotation: (rotation) => set({ viewRotation: Math.round(rotation * 100) / 100 }),
+	rotateViewToAngle: (angle) =>
+		set({ viewRotation: Math.round(angle * 100) / 100, isViewRotating: false }),
 	resetViewRotation: () => set({ viewRotation: 0, isViewRotating: false }),
 
 	toggleStarfieldParallax: () =>

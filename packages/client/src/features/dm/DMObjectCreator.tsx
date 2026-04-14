@@ -298,7 +298,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						<div style={styles.cursorInfo}>
 							<div style={styles.cursorCoords}>
 								🎯 ({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) ·{" "}
-								{Math.round(mapCursor.r)}°
+								{Number((-mapCursor.r).toFixed(2))}°
 							</div>
 							<div style={styles.cursorHint}>提示：调整视图旋转可改变后续游标朝向</div>
 						</div>

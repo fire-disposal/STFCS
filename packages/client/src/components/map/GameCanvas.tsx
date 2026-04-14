@@ -79,7 +79,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const movementState = useAppSelector((state: any) => state.movement) as MovementState;
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
-	const interaction = useInteraction(onPanDelta, onRotateDelta, camera.screenDeltaToWorldDelta);
+	const interaction = useInteraction(onPanDelta, onRotateDelta);
 	const layerSystem = useLayerSystem();
 	const zoomInteraction = useZoomInteraction(camera, canvasSize);
 

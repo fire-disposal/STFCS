@@ -92,7 +92,7 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
 
 	// 格式化当前坐标
 	const formatCurrentCoords = useCallback(() => {
-		const r = Math.round(viewRotation);
+		const r = Number(viewRotation.toFixed(2));
 		const z = zoom.toFixed(2);
 		// 显示完整坐标 X,Y,R,Z
 		return `${Math.round(cameraX)},${Math.round(cameraY)},${r},${z}`;
