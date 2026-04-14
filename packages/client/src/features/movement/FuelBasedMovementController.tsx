@@ -23,8 +23,8 @@ import {
 	startMovement,
 	validateMove,
 } from "@/store/slices/movementSlice";
-import type { ShipState } from "@vt/contracts";
-import { ClientCommand } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
+import { ClientCommand } from "@vt/types";
 import React, { useCallback, useEffect } from "react";
 
 interface FuelBasedMovementControllerProps {

@@ -7,7 +7,7 @@ import type {
 	StarNode,
 	StarSystem,
 	TokenInfo,
-} from "@vt/contracts/types";
+} from "@vt/types";
 
 export interface MapTile {
 	x: number;
@@ -278,7 +278,7 @@ const mapSlice = createSlice({
 		 */
 		updateTokenTurnState: (
 			state,
-			action: PayloadAction<{ tokenId: string; turnState: TokenInfo['turnState'] }>
+			action: PayloadAction<{ tokenId: string; turnState: TokenInfo["turnState"] }>
 		) => {
 			const token = state.tokens[action.payload.tokenId];
 			if (token) {
@@ -293,7 +293,7 @@ const mapSlice = createSlice({
 			state,
 			action: PayloadAction<{
 				faction: string;
-				turnState: TokenInfo['turnState'];
+				turnState: TokenInfo["turnState"];
 				playerIds?: string[]; // 可选，指定玩家 ID 列表
 			}>
 		) => {
@@ -317,7 +317,7 @@ const mapSlice = createSlice({
 			Object.values(state.tokens).forEach((token) => {
 				token.remainingMovement = token.maxMovement;
 				token.remainingActions = token.actionsPerTurn;
-				token.turnState = 'waiting';
+				token.turnState = "waiting";
 			});
 		},
 		/**
@@ -330,12 +330,12 @@ const mapSlice = createSlice({
 			const { faction, playerIds } = action.payload;
 			// 先将所有 Token 设为 waiting
 			Object.values(state.tokens).forEach((token) => {
-				token.turnState = 'waiting';
+				token.turnState = "waiting";
 			});
 			// 然后将指定阵营的 Token 设为 active
 			Object.values(state.tokens).forEach((token) => {
 				if (playerIds.includes(token.ownerId) || token.faction === faction) {
-					token.turnState = 'active';
+					token.turnState = "active";
 				}
 			});
 		},

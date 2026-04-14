@@ -1,4 +1,4 @@
-import type { GameRoomState, PlayerRoleValue, ShipState } from "@vt/contracts";
+import type { GameRoomState, PlayerRoleValue, ShipState } from "@vt/types";
 import { create } from "zustand";
 
 // 交互模式枚举
@@ -201,7 +201,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	rotateViewToAngle: (angle) => set({ viewRotation: angle, isViewRotating: false }),
 	resetViewRotation: () => set({ viewRotation: 0, isViewRotating: false }),
 
-	toggleStarfieldParallax: () => set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
+	toggleStarfieldParallax: () =>
+		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 
 	toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 	setActivePanel: (panel) => set({ activePanel: panel }),

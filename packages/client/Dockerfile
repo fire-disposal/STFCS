@@ -12,7 +12,8 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Copy only package files for dependency installation
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/types/package.json ./packages/types/
+COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/client/package.json ./packages/client/
 
@@ -32,7 +33,8 @@ COPY --from=deps /app/.pnpm-store ./pnpm-store
 
 # Copy workspace configuration
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/types/package.json ./packages/types/
+COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/client/package.json ./packages/client/
 
@@ -40,12 +42,14 @@ COPY packages/client/package.json ./packages/client/
 RUN pnpm install --frozen-lockfile --offline
 
 # Copy source code
-COPY packages/contracts ./packages/contracts
+COPY packages/types ./packages/types
+COPY packages/data ./packages/data
 COPY packages/rules ./packages/rules
 COPY packages/client ./packages/client
 
 # Build dependency packages first
-RUN pnpm --filter @vt/contracts build
+RUN pnpm --filter @vt/types build
+RUN pnpm --filter @vt/data build
 RUN pnpm --filter @vt/rules build
 
 # Build client (Vite build)

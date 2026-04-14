@@ -1,36 +1,30 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@vt/contracts": ["../contracts/src/index.ts"],
-      "@vt/contracts/types": ["../contracts/src/types/index.ts"],
-      "@vt/contracts/protocol": ["../contracts/src/protocol/index.ts"],
-      "@vt/contracts/constants": ["../contracts/src/constants/index.ts"],
-      "@vt/contracts/core-types": ["../contracts/src/core-types.ts"],
-      "@vt/contracts/config": ["../contracts/src/config/index.ts"],
-      "@vt/rules": ["../rules/src/index.ts"],
-      "@vt/rules/math": ["../rules/src/math/index.ts"],
-      "@vt/rules/data/ShipHullSchema": ["../rules/src/data/ShipHullSchema.ts"],
-      "@vt/rules/data/WeaponSchema": ["../rules/src/data/WeaponSchema.ts"]
-    }
-  },
-  "include": ["src"]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"target": "ES2020",
+		"useDefineForClassFields": true,
+		"lib": ["ES2020", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"skipLibCheck": true,
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true,
+		"jsx": "react-jsx",
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedSideEffectImports": true,
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["src/*"],
+			"@vt/types": ["../types/src/index.ts"],
+			"@vt/data": ["../data/src/index.ts"],
+			"@vt/rules": ["../rules/src/index.ts"],
+			"@vt/rules/math": ["../rules/src/math/index.ts"]
+		}
+	},
+	"include": ["src"]
 }

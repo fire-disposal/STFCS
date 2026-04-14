@@ -1,5 +1,5 @@
-import react from "@vitejs/plugin-react";
 import { resolve } from "path";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -7,16 +7,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "src"),
-			"@vt/contracts": resolve(__dirname, "../contracts/src/index.ts"),
-			"@vt/contracts/types": resolve(__dirname, "../contracts/src/types/index.ts"),
-			"@vt/contracts/constants": resolve(__dirname, "../contracts/src/constants/index.ts"),
-			"@vt/contracts/protocol": resolve(__dirname, "../contracts/src/protocol/index.ts"),
-			"@vt/contracts/core-types": resolve(__dirname, "../contracts/src/core-types.ts"),
-			"@vt/contracts/config": resolve(__dirname, "../contracts/src/config/index.ts"),
+			"@vt/types": resolve(__dirname, "../types/src/index.ts"),
+			"@vt/data": resolve(__dirname, "../data/src/index.ts"),
 			"@vt/rules": resolve(__dirname, "../rules/src/index.ts"),
 			"@vt/rules/math": resolve(__dirname, "../rules/src/math/index.ts"),
-			"@vt/rules/data/ShipHullSchema": resolve(__dirname, "../rules/src/data/ShipHullSchema.ts"),
-			"@vt/rules/data/WeaponSchema": resolve(__dirname, "../rules/src/data/WeaponSchema.ts"),
 		},
 	},
 	server: {
@@ -51,13 +45,7 @@ export default defineConfig({
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "html"],
-			exclude: [
-				"node_modules/",
-				"src/test/",
-				"**/*.d.ts",
-				"**/*.config.*",
-				"**/index.ts",
-			],
+			exclude: ["node_modules/", "src/test/", "**/*.d.ts", "**/*.config.*", "**/index.ts"],
 		},
 	},
 });

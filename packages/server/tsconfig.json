@@ -18,8 +18,9 @@
 		"types": ["node", "vitest/globals"],
 		"baseUrl": "../..",
 		"paths": {
-			"@vt/rules": ["packages/rules/src/index.ts"],
-			"@vt/contracts": ["packages/contracts/src/index.ts"]
+			"@vt/types": ["packages/types/src/index.ts"],
+			"@vt/data": ["packages/data/src/index.ts"],
+			"@vt/rules": ["packages/rules/src/index.ts"]
 		}
 	},
 	"include": [

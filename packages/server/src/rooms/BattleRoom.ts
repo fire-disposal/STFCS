@@ -9,10 +9,9 @@
  */
 
 import { Client, Room } from "@colyseus/core";
-import { getShipHullSpec, getWeaponSpec } from "@vt/rules";
+import { getShipHullSpec, getWeaponSpec } from "@vt/data";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import {
-	ArraySchema,
 	ClientCommand,
 	ConnectionQuality,
 	Faction,
@@ -24,6 +23,7 @@ import {
 	WeaponSlot,
 	WeaponState,
 } from "../schema/GameSchema.js";
+import { RoomEventLogger } from "../utils/ColyseusMessaging.js";
 
 // ==================== 消息 Payload 类型定义 ====================
 
@@ -94,6 +94,7 @@ interface UpdateProfilePayload {
 export class BattleRoom extends Room<{ state: GameRoomState }> {
 	maxClients = 8;
 	private commandDispatcher!: CommandDispatcher;
+	private eventLogger!: RoomEventLogger;
 	private pingEwma = new Map<string, number>();
 	private jitterEwma = new Map<string, number>();
 	private playerIdentity = new Map<string, { userName: string; shortId: number }>();
@@ -101,6 +102,19 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	private roomOwnerId: string | null = null;
 	private isPrivateRoom = false;
 	private profileStore = new Map<number, { nickname: string; avatar: string }>();
+
+	// 死区检测：记录上次更新的舰船位置
+	private lastUpdateState: {
+		shipPositions: Map<string, { x: number; y: number; heading: number }>;
+		destroyedCount: number;
+	};
+
+	// 聊天消息自动清理（每 5 分钟清理一次超过 1 小时的消息）
+	private chatCleanupInterval: NodeJS.Timeout | null = null;
+
+	// 自动保存（每 5 分钟）
+	private autoSaveInterval: NodeJS.Timeout | null = null;
+	private lastSaveId: string | null = null;
 
 	/**
 	 * 房间创建初始化
@@ -133,9 +147,28 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 初始化命令分发器
 		this.commandDispatcher = new CommandDispatcher(this.state);
 
+		// 初始化事件日志器
+		this.eventLogger = new RoomEventLogger(this.state);
+
 		// 设置初始游戏阶段
 		this.state.currentPhase = "DEPLOYMENT";
 		this.state.turnCount = 1;
+
+		// 启动聊天消息自动清理（每 5 分钟清理一次）
+		this.chatCleanupInterval = setInterval(
+			() => {
+				this.cleanupOldMessages();
+			},
+			5 * 60 * 1000
+		);
+
+		// 启动自动保存（每 5 分钟）
+		this.autoSaveInterval = setInterval(
+			() => {
+				this.autoSave();
+			},
+			5 * 60 * 1000
+		);
 
 		// 设置初始元数据
 		this.setMetadata({
@@ -151,8 +184,14 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		// 注册所有消息处理器
 		this.registerMessageHandlers();
 
-		// 设置游戏循环 (60 FPS)
-		this.setSimulationInterval((deltaTime) => this.update(deltaTime), 16);
+		// 设置游戏循环 (20 FPS - 回合制游戏足够，减少带宽使用)
+		this.setSimulationInterval((deltaTime) => this.update(deltaTime), 50);
+
+		// 初始化状态缓存用于死区检测
+		this.lastUpdateState = {
+			shipPositions: new Map(),
+			destroyedCount: 0,
+		};
 
 		console.log(`[BattleRoom] Initialization complete, metadata set`);
 		console.log(`[BattleRoom] Room state type: ${this.state.constructor.name}`);
@@ -399,19 +438,13 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	 * 注册所有消息处理器
 	 */
 	private registerMessageHandlers() {
-		// 聊天消息
+		// 聊天消息 - 使用 Schema 状态同步（Colyseus 推荐方式）
 		this.onMessage("chat", (client, payload: { content: string; playerName?: string }) => {
 			const player = this.state.players.get(client.sessionId);
 			const senderName = payload.playerName || player?.nickname || player?.name || "Unknown";
 
-			// 广播聊天消息给所有客户端
-			this.broadcast("chat", {
-				senderId: client.sessionId,
-				senderName,
-				content: payload.content.trim(),
-			});
-
-			console.log(`[Chat] ${senderName}: ${payload.content}`);
+			// 直接修改 Schema 状态，Colyseus 会自动同步给所有客户端
+			this.eventLogger.addChatMessage(client.sessionId, senderName, payload.content);
 		});
 
 		// 移动指令
@@ -608,43 +641,110 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	}
 
 	/**
-	 * 游戏主循环
+	 * 游戏主循环 - 带死区检测优化
+	 *
+	 * 使用优化的 FluxState.dissipate() 方法
 	 */
 	private update(deltaTime: number) {
-		const destroyedShips: string[] = [];
+		const changes: Array<{ type: string; data: any }> = [];
+		const currentShipPositions = new Map<string, { x: number; y: number; heading: number }>();
+		let hasSignificantChange = false;
+
+		const deltaSeconds = deltaTime / 1000;
 
 		this.state.ships.forEach((ship: ShipState) => {
 			if (ship.isDestroyed) {
-				destroyedShips.push(ship.id);
+				changes.push({ type: "destroyed", data: { shipId: ship.id } });
 				return;
 			}
 
+			// 记录当前位置用于死区检测
+			currentShipPositions.set(ship.id, {
+				x: ship.transform.x,
+				y: ship.transform.y,
+				heading: ship.transform.heading,
+			});
+
+			// 检查位置变化是否显著（阈值：1 单位位置或 1 度角度）
+			const lastPos = this.lastUpdateState.shipPositions.get(ship.id);
+			if (lastPos) {
+				const dx = Math.abs(ship.transform.x - lastPos.x);
+				const dy = Math.abs(ship.transform.y - lastPos.y);
+				const dHeading = Math.abs(ship.transform.heading - lastPos.heading);
+
+				if (dx > 1 || dy > 1 || dHeading > 1) {
+					hasSignificantChange = true;
+				}
+			} else {
+				// 新舰船，标记为有变化
+				hasSignificantChange = true;
+			}
+
+			// 更新武器冷却（只在状态变化时记录）
 			ship.weapons.forEach((weapon: WeaponSlot) => {
 				if (weapon.cooldownRemaining > 0) {
-					weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaTime / 1000);
-					if (weapon.cooldownRemaining <= 0) {
-						if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
-							weapon.state = WeaponState.OUT_OF_AMMO;
-						} else {
-							weapon.state = WeaponState.READY;
-						}
+					const oldCooldown = weapon.cooldownRemaining;
+					weapon.cooldownRemaining = Math.max(0, weapon.cooldownRemaining - deltaSeconds);
+
+					// 只在冷却完成时广播
+					if (oldCooldown > 0 && weapon.cooldownRemaining <= 0) {
+						changes.push({
+							type: "weapon_ready",
+							data: { shipId: ship.id, weaponId: weapon.mountId },
+						});
 					}
 				}
 			});
 
+			// 更新过载状态（使用优化的 FluxState）
 			if (ship.isOverloaded && ship.overloadTime > 0) {
-				ship.overloadTime -= deltaTime / 1000;
-				if (ship.overloadTime <= 0) {
+				const oldOverloadTime = ship.overloadTime;
+				ship.overloadTime -= deltaSeconds;
+
+				if (oldOverloadTime > 0 && ship.overloadTime <= 0) {
 					ship.isOverloaded = false;
 					ship.overloadTime = 0;
+					changes.push({ type: "overload_cleared", data: { shipId: ship.id } });
 				}
+			}
+
+			// 使用优化的 FluxState.dissipate() 方法消散辐能
+			ship.flux.dissipate(deltaSeconds);
+
+			// 检查是否从过载恢复
+			if (ship.isOverloaded && !ship.flux.isOverloaded) {
+				ship.isOverloaded = false;
+				ship.overloadTime = 0;
+				changes.push({ type: "overload_cleared", data: { shipId: ship.id } });
 			}
 		});
 
-		for (const shipId of destroyedShips) {
-			this.state.ships.delete(shipId);
-			console.log(`[BattleRoom] Removed destroyed ship: ${shipId}`);
-			this.broadcast("ship_destroyed", { shipId, timestamp: Date.now() });
+		// 处理被摧毁的舰船
+		for (const change of changes) {
+			if (change.type === "destroyed") {
+				const ship = this.state.ships.get(change.data.shipId);
+				if (ship) {
+					// 记录战斗事件（使用 Schema）
+					this.eventLogger.addCombatMessage(`${ship.name || change.data.shipId} 被摧毁`);
+				}
+
+				this.state.ships.delete(change.data.shipId);
+
+				// 仍然广播摧毁事件（客户端需要播放动画/音效）
+				this.broadcast("ship_destroyed", {
+					shipId: change.data.shipId,
+					timestamp: Date.now(),
+				});
+			} else if (change.type === "weapon_ready") {
+				// 武器就绪不需要广播，客户端通过 Schema 自动同步
+			} else if (change.type === "overload_cleared") {
+				// 过载清除不需要广播，客户端通过 Schema 自动同步
+			}
+		}
+
+		// 只在有显著变化时更新位置缓存
+		if (hasSignificantChange) {
+			this.lastUpdateState.shipPositions = currentShipPositions;
 		}
 	}
 
@@ -713,13 +813,11 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	}
 
 	/**
-	 * 处理结束阶段
+	 * 处理结束阶段 - 使用优化的嵌套结构
 	 */
 	private handleEndPhase(): void {
 		this.state.ships.forEach((ship: ShipState) => {
 			if (ship.isDestroyed) return;
-
-			ship.fluxSoft = 0;
 
 			// 重置移动状态
 			ship.hasMoved = false;
@@ -733,6 +831,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			ship.fuelPhaseCStrafeUsed = 0;
 			ship.currentMovementPhase = 0;
 
+			// 重置武器状态
 			ship.weapons.forEach((weapon: WeaponSlot) => {
 				weapon.hasFiredThisTurn = false;
 
@@ -749,16 +848,17 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 				}
 			});
 
-			if (ship.isShieldUp) {
-				ship.fluxSoft += ship.fluxDissipation * 0.2;
+			// 使用优化的 FluxState 方法消散辐能
+			if (ship.shield.active) {
+				ship.flux.addSoft(ship.flux.dissipation * 0.2);
 			}
+			ship.flux.dissipate(1.0); // 1 秒的消散时间
 
-			ship.fluxHard = Math.max(0, ship.fluxHard - ship.fluxDissipation * 0.5);
-
-			if (ship.fluxSoft + ship.fluxHard >= ship.fluxMax) {
+			// 检查过载
+			if (ship.flux.isOverloaded) {
 				ship.isOverloaded = true;
 				ship.overloadTime = GAME_CONFIG.OVERLOAD_BASE_DURATION;
-				ship.isShieldUp = false;
+				ship.shield.deactivate();
 				console.log(`[EndPhase] ${ship.name || ship.id} 过载！`);
 			}
 		});
@@ -767,7 +867,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	}
 
 	/**
-	 * 创建测试舰船
+	 * 创建测试舰船 - 使用优化的 ShipStateOptimized
 	 */
 	private createTestShip(faction: (typeof Faction)[keyof typeof Faction], x: number, y: number) {
 		const shipSpec = getShipHullSpec("frigate_assault");
@@ -784,43 +884,57 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 		ship.width = shipSpec.width;
 		ship.length = shipSpec.length;
 		ship.ownerId = "";
-		ship.transform.x = x;
-		ship.transform.y = y;
-		ship.transform.heading = faction === Faction.PLAYER ? 0 : 180;
-		ship.isDestroyed = false;
+		ship.setPosition(x, y);
+		ship.setHeading(faction === Faction.PLAYER ? 0 : 180);
 
-		ship.hullMax = shipSpec.hullPoints;
-		ship.hullCurrent = shipSpec.hullPoints;
+		// 设置船体
+		ship.hull.max = shipSpec.hullPoints;
+		ship.hull.current = shipSpec.hullPoints;
 
+		// 设置护甲
+		ship.armor.maxPerQuadrant = shipSpec.armorValue;
 		const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-		ship.armorMax = new ArraySchema<number>(...armorDist);
-		ship.armorCurrent = new ArraySchema<number>(...armorDist);
+		armorDist.forEach((value, index) => {
+			ship.armor.setQuadrant(index, value);
+		});
 
-		ship.fluxMax = shipSpec.fluxCapacity;
-		ship.fluxDissipation = shipSpec.fluxDissipation;
-		ship.fluxHard = 0;
-		ship.fluxSoft = 0;
+		// 设置辐能
+		ship.flux.max = shipSpec.fluxCapacity;
+		ship.flux.dissipation = shipSpec.fluxDissipation || 10;
 
+		// 设置机动性能
 		ship.maxSpeed = shipSpec.maxSpeed;
 		ship.maxTurnRate = shipSpec.maxTurnRate;
 		ship.acceleration = shipSpec.acceleration;
 
+		// 设置护盾
 		if (shipSpec.hasShield) {
-			ship.isShieldUp = false;
-			ship.shieldOrientation = ship.transform.heading;
-			ship.shieldArc = shipSpec.shieldArc || 120;
-			ship.shieldRadius = shipSpec.shieldRadius || 0;
+			ship.shield.active = false;
+			ship.shield.setOrientation(ship.transform.heading);
+			ship.shield.arc = shipSpec.shieldArc || 120;
+			ship.shield.radius = shipSpec.shieldRadius || 50;
+			ship.shield.efficiency = shipSpec.shieldEfficiency || 0.5;
+			ship.shield.maintenanceCost = shipSpec.shieldMaintenanceCost || 5;
 		}
 
-		for (const mount of shipSpec.weaponMounts) {
-			const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
-			if (weaponSpec) {
-				ship.weapons.set(mount.id, this.createWeaponSlotFromSpec(mount, weaponSpec));
+		// 设置武器
+		if (shipSpec.weaponMounts) {
+			for (const mount of shipSpec.weaponMounts) {
+				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
+				if (weaponSpec && shipSpec) {
+					const weapon = this.createWeaponSlotFromSpec(mount, weaponSpec);
+					ship.weapons.set(mount.id, weapon);
+				}
 			}
 		}
 
 		this.state.ships.set(ship.id, ship);
-		console.log(`[BattleRoom] Created test ship: ${ship.id} at (${x}, ${y})`);
+		console.log(`[BattleRoom] Created test ship: ${shipSpec.name} at (${x}, ${y})`);
+
+		// 记录事件
+		this.eventLogger.addSystemMessage(`创建了测试舰船 ${shipSpec.name}`);
+
+		// 广播创建事件
 		this.broadcast("ship_created", {
 			shipId: ship.id,
 			hullType: "frigate_assault",
@@ -833,7 +947,7 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	}
 
 	/**
-	 * DM 创建对象（舰船/空间站/小行星）
+	 * DM 创建对象（舰船/空间站/小行星）- 使用 ShipStateOptimized
 	 */
 	createObject(payload: CreateObjectPayload): void {
 		const { type, hullId, x, y, heading, faction, ownerId } = payload;
@@ -850,37 +964,45 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			ship.faction = faction;
 			ship.hullType = hullId;
 			ship.ownerId = ownerId || "";
-			ship.transform.x = x;
-			ship.transform.y = y;
-			ship.transform.heading = heading;
+			ship.name = shipSpec.name;
+			ship.width = shipSpec.width;
+			ship.length = shipSpec.length;
 
-			ship.hullMax = shipSpec.hullPoints;
-			ship.hullCurrent = shipSpec.hullPoints;
+			// 设置位置
+			ship.setPosition(x, y);
+			ship.setHeading(heading);
 
+			// 设置船体
+			ship.hull.max = shipSpec.hullPoints;
+			ship.hull.current = shipSpec.hullPoints;
+
+			// 设置护甲
+			ship.armor.maxPerQuadrant = shipSpec.armorValue;
 			const armorDist = shipSpec.armorDistribution || Array(6).fill(shipSpec.armorValue);
-			ship.armorMax = new ArraySchema<number>(...armorDist);
-			ship.armorCurrent = new ArraySchema<number>(...armorDist);
+			armorDist.forEach((value, index) => {
+				ship.armor.setQuadrant(index, value);
+			});
 
-			ship.fluxMax = shipSpec.fluxCapacity;
-			ship.fluxDissipation = shipSpec.fluxDissipation || 10;
-			ship.fluxHard = 0;
-			ship.fluxSoft = 0;
+			// 设置辐能
+			ship.flux.max = shipSpec.fluxCapacity;
+			ship.flux.dissipation = shipSpec.fluxDissipation || 10;
 
+			// 设置机动性能
 			ship.maxSpeed = shipSpec.maxSpeed;
 			ship.maxTurnRate = shipSpec.maxTurnRate;
 			ship.acceleration = shipSpec.acceleration;
-			ship.width = shipSpec.width;
-			ship.length = shipSpec.length;
-			ship.name = shipSpec.name;
-			ship.isDestroyed = false;
 
+			// 设置护盾
 			if (shipSpec.hasShield) {
-				ship.isShieldUp = false;
-				ship.shieldOrientation = heading;
-				ship.shieldArc = shipSpec.shieldArc || 120;
-				ship.shieldRadius = shipSpec.shieldRadius || 0;
+				ship.shield.active = false;
+				ship.shield.setOrientation(heading);
+				ship.shield.arc = shipSpec.shieldArc || 120;
+				ship.shield.radius = shipSpec.shieldRadius || 50;
+				ship.shield.efficiency = shipSpec.shieldEfficiency || 0.5;
+				ship.shield.maintenanceCost = shipSpec.shieldMaintenanceCost || 5;
 			}
 
+			// 设置武器
 			for (const mount of shipSpec.weaponMounts) {
 				const weaponSpec = mount.defaultWeapon ? getWeaponSpec(mount.defaultWeapon) : null;
 				if (weaponSpec) {
@@ -890,13 +1012,18 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 
 			this.state.ships.set(ship.id, ship);
 			console.log(`[BattleRoom] Created ${hullId} for ${faction} at (${x}, ${y})`);
+
+			// 记录事件
+			this.eventLogger.addSystemMessage(`DM 创建了 ${shipSpec.name}`);
+
+			// 广播创建事件
 			this.broadcast("ship_created", {
 				shipId: ship.id,
 				hullType: hullId,
 				faction: faction,
 				x,
 				y,
-				heading,
+				heading: ship.transform.heading,
 				timestamp: Date.now(),
 			});
 		} else if (type === "station" || type === "asteroid") {
@@ -905,23 +1032,34 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 			ship.faction = faction;
 			ship.hullType = type;
 			ship.ownerId = ownerId || "";
-			ship.transform.x = x;
-			ship.transform.y = y;
-			ship.transform.heading = heading;
+			ship.setPosition(x, y);
+			ship.setHeading(heading);
 
-			ship.hullMax = type === "station" ? 5000 : 2000;
-			ship.hullCurrent = ship.hullMax;
-			ship.armorMax = new ArraySchema<number>(300, 300, 300, 200, 300, 300);
-			ship.armorCurrent = new ArraySchema<number>(300, 300, 300, 200, 300, 300);
-			ship.fluxMax = 0;
-			ship.fluxHard = 0;
-			ship.fluxSoft = 0;
+			// 设置船体
+			ship.hull.max = type === "station" ? 5000 : 2000;
+			ship.hull.current = ship.hull.max;
+
+			// 设置护甲
+			ship.armor.maxPerQuadrant = 300;
+			[300, 300, 300, 200, 300, 300].forEach((value, index) => {
+				ship.armor.setQuadrant(index, value);
+			});
+
+			// 无辐能系统
+			ship.flux.max = 0;
+
+			// 固定物体
 			ship.maxSpeed = 0;
 			ship.maxTurnRate = 0;
 			ship.acceleration = 0;
 
 			this.state.ships.set(ship.id, ship);
 			console.log(`[BattleRoom] Created ${type} at (${x}, ${y})`);
+
+			// 记录事件（使用 Schema）
+			this.eventLogger.addSystemMessage(`DM 创建了 ${type}`);
+
+			// 广播创建事件（客户端需要播放动画/音效）
 			this.broadcast("ship_created", {
 				shipId: ship.id,
 				hullType: type,
@@ -1117,10 +1255,161 @@ export class BattleRoom extends Room<{ state: GameRoomState }> {
 	}
 
 	/**
+	 * 清理过期消息（Colyseus 推荐：保持状态精简）
+	 */
+	private cleanupOldMessages(): void {
+		const MAX_AGE_MS = 60 * 60 * 1000; // 1 小时
+		const now = Date.now();
+		let removed = 0;
+
+		for (let i = this.state.chatMessages.length - 1; i >= 0; i--) {
+			const msg = this.state.chatMessages[i];
+			if (now - msg.timestamp > MAX_AGE_MS) {
+				this.state.chatMessages.shift();
+				removed++;
+			}
+		}
+
+		if (removed > 0) {
+			console.log(`[BattleRoom] Cleaned up ${removed} old chat messages`);
+		}
+	}
+
+	/**
+	 * 自动保存游戏
+	 */
+	private autoSave(): void {
+		const saveName = `自动保存_${this.state.turnCount}回合`;
+		this.saveGame(saveName).catch((err) => {
+			console.error(`[BattleRoom] Auto save failed:`, err);
+		});
+	}
+
+	/**
+	 * 保存游戏（存档）
+	 *
+	 * 将当前游戏状态保存为存档数据
+	 */
+	async saveGame(saveName: string): Promise<string> {
+		const saveData: GameSave = serializeGameSave(
+			this.state,
+			this.roomId,
+			this.roomDisplayName,
+			this.maxClients,
+			this.isPrivateRoom,
+			saveName
+		);
+
+		// 保存到存储
+		await saveStore.save(saveData);
+		this.lastSaveId = saveData.saveId;
+
+		console.log(`[BattleRoom] Game saved: ${saveName} (${saveData.saveId})`);
+
+		// 通知所有玩家已保存
+		this.broadcast("game_saved", {
+			saveId: saveData.saveId,
+			saveName,
+			timestamp: Date.now(),
+		});
+
+		return saveData.saveId;
+	}
+
+	/**
+	 * 加载游戏（读档）
+	 *
+	 * 从存档数据恢复游戏状态
+	 * 注意：这需要所有玩家重新连接
+	 */
+	async loadGame(saveId: string): Promise<boolean> {
+		try {
+			const saveData = await saveStore.load(saveId);
+
+			// 验证版本兼容性
+			if (saveData.version !== "1.0.0") {
+				console.warn(`[BattleRoom] Save version mismatch: ${saveData.version}`);
+				// 可以添加版本迁移逻辑
+			}
+
+			// 恢复游戏状态
+			this.state.currentPhase = saveData.currentPhase;
+			this.state.turnCount = saveData.turnCount;
+			this.state.activeFaction = saveData.activeFaction;
+
+			// 清空当前舰船
+			this.state.ships.clear();
+
+			// 恢复舰船
+			for (const shipSave of saveData.ships) {
+				// TODO: 需要实现 deserializeShip 方法
+				// const ship = this.deserializeShip(shipSave);
+				// this.state.ships.set(ship.id, ship);
+			}
+
+			// 清空当前聊天消息
+			this.state.chatMessages.clear();
+
+			// 恢复聊天历史
+			for (const msg of saveData.chatHistory) {
+				const chatMsg = new ChatMessage(msg);
+				this.state.chatMessages.push(chatMsg);
+			}
+
+			console.log(`[BattleRoom] Game loaded: ${saveData.saveName}`);
+
+			// 通知所有玩家状态已恢复
+			this.broadcast("game_loaded", {
+				saveId,
+				saveName: saveData.saveName,
+				timestamp: Date.now(),
+			});
+
+			return true;
+		} catch (error) {
+			console.error(`[BattleRoom] Failed to load game:`, error);
+			return false;
+		}
+	}
+
+	/**
+	 * 获取存档列表
+	 */
+	async getSaveList() {
+		return await saveStore.list();
+	}
+
+	/**
+	 * 删除存档
+	 */
+	async deleteSave(saveId: string): Promise<boolean> {
+		try {
+			await saveStore.delete(saveId);
+			console.log(`[BattleRoom] Save deleted: ${saveId}`);
+			return true;
+		} catch (error) {
+			console.error(`[BattleRoom] Failed to delete save:`, error);
+			return false;
+		}
+	}
+
+	/**
 	 * 房间销毁
 	 */
 	onDispose() {
 		console.log(`[BattleRoom] Room ${this.roomId} disposed`);
+
+		// 清理定时器
+		if (this.chatCleanupInterval) {
+			clearInterval(this.chatCleanupInterval);
+			this.chatCleanupInterval = null;
+		}
+
+		if (this.autoSaveInterval) {
+			clearInterval(this.autoSaveInterval);
+			this.autoSaveInterval = null;
+		}
+
 		// Colyseus 会自动清理所有资源
 	}
 }

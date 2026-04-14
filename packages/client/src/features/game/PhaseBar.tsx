@@ -8,8 +8,8 @@
  * - 阶段进度指示
  */
 
-import type { PlayerRoleValue } from "@vt/contracts";
-import { Faction } from "@vt/contracts";
+import type { PlayerRoleValue } from "@vt/types";
+import { Faction } from "@vt/types";
 import { Crown, MapPin, User, Zap } from "lucide-react";
 import React, { useMemo } from "react";
 

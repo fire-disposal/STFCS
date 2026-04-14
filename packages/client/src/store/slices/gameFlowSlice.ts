@@ -8,13 +8,9 @@
  * - 回合结算
  */
 
-import { createSlice, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { FactionId } from '@vt/contracts/types';
-import type {
-	GamePhase,
-	TurnPhase,
-	ShipActionState,
-} from '@vt/contracts/protocol';
+import { type PayloadAction, createSelector, createSlice } from "@reduxjs/toolkit";
+import type { FactionId } from "@vt/types";
+import type { GamePhase, ShipActionState, TurnPhase } from "@vt/types";
 
 /**
  * 回合结算结果
@@ -53,8 +49,8 @@ interface GameFlowSliceState {
 }
 
 const initialState: GameFlowSliceState = {
-	phase: 'lobby',
-	turnPhase: 'player_action',
+	phase: "lobby",
+	turnPhase: "player_action",
 	roundNumber: 0,
 	currentFaction: null,
 	deploymentReady: {},
@@ -64,26 +60,32 @@ const initialState: GameFlowSliceState = {
 };
 
 const gameFlowSlice = createSlice({
-	name: 'gameFlow',
+	name: "gameFlow",
 	initialState,
 	reducers: {
 		/**
 		 * 设置游戏阶段
 		 */
-		setGamePhase: (state, action: PayloadAction<{
-			phase: GamePhase;
-			previousPhase?: GamePhase;
-		}>) => {
+		setGamePhase: (
+			state,
+			action: PayloadAction<{
+				phase: GamePhase;
+				previousPhase?: GamePhase;
+			}>
+		) => {
 			state.phase = action.payload.phase;
 		},
 
 		/**
 		 * 设置回合阶段
 		 */
-		setTurnPhase: (state, action: PayloadAction<{
-			turnPhase: TurnPhase;
-			roundNumber?: number;
-		}>) => {
+		setTurnPhase: (
+			state,
+			action: PayloadAction<{
+				turnPhase: TurnPhase;
+				roundNumber?: number;
+			}>
+		) => {
 			state.turnPhase = action.payload.turnPhase;
 			if (action.payload.roundNumber !== undefined) {
 				state.roundNumber = action.payload.roundNumber;
@@ -93,23 +95,27 @@ const gameFlowSlice = createSlice({
 		/**
 		 * 开始部署阶段
 		 */
-		startDeployment: (state, action: PayloadAction<{
-			factions: FactionId[];
-		}>) => {
-			state.phase = 'deployment';
-			state.deploymentReady = Object.fromEntries(
-				action.payload.factions.map(f => [f, false])
-			);
+		startDeployment: (
+			state,
+			action: PayloadAction<{
+				factions: FactionId[];
+			}>
+		) => {
+			state.phase = "deployment";
+			state.deploymentReady = Object.fromEntries(action.payload.factions.map((f) => [f, false]));
 		},
 
 		/**
 		 * 设置部署准备状态
 		 */
-		setDeploymentReady: (state, action: PayloadAction<{
-			faction: FactionId;
-			playerId: string;
-			ready: boolean;
-		}>) => {
+		setDeploymentReady: (
+			state,
+			action: PayloadAction<{
+				faction: FactionId;
+				playerId: string;
+				ready: boolean;
+			}>
+		) => {
 			state.deploymentReady[action.payload.faction] = action.payload.ready;
 		},
 
@@ -117,22 +123,25 @@ const gameFlowSlice = createSlice({
 		 * 完成部署
 		 */
 		completeDeployment: (state) => {
-			state.phase = 'playing';
+			state.phase = "playing";
 			state.roundNumber = 1;
-			state.turnPhase = 'player_action';
+			state.turnPhase = "player_action";
 		},
 
 		/**
 		 * 开始游戏
 		 */
-		startGame: (state, action: PayloadAction<{
-			roundNumber: number;
-			currentFaction: FactionId;
-		}>) => {
-			state.phase = 'playing';
+		startGame: (
+			state,
+			action: PayloadAction<{
+				roundNumber: number;
+				currentFaction: FactionId;
+			}>
+		) => {
+			state.phase = "playing";
 			state.roundNumber = action.payload.roundNumber;
 			state.currentFaction = action.payload.currentFaction;
-			state.turnPhase = 'player_action';
+			state.turnPhase = "player_action";
 			state.isInitialized = true;
 		},
 
@@ -153,10 +162,13 @@ const gameFlowSlice = createSlice({
 		/**
 		 * 更新舰船行动状态
 		 */
-		updateShipActionState: (state, action: PayloadAction<{
-			shipId: string;
-			state: Partial<ShipActionState>;
-		}>) => {
+		updateShipActionState: (
+			state,
+			action: PayloadAction<{
+				shipId: string;
+				state: Partial<ShipActionState>;
+			}>
+		) => {
 			const { shipId, state: updates } = action.payload;
 			if (state.shipActionStates[shipId]) {
 				Object.assign(state.shipActionStates[shipId], updates);
@@ -188,10 +200,13 @@ const gameFlowSlice = createSlice({
 		/**
 		 * 设置过载重置可用状态
 		 */
-		setOverloadResetAvailable: (state, action: PayloadAction<{
-			shipId: string;
-			available: boolean;
-		}>) => {
+		setOverloadResetAvailable: (
+			state,
+			action: PayloadAction<{
+				shipId: string;
+				available: boolean;
+			}>
+		) => {
 			const { shipId, available } = action.payload;
 			if (state.shipActionStates[shipId]) {
 				state.shipActionStates[shipId].overloadResetAvailable = available;
@@ -236,23 +251,26 @@ const gameFlowSlice = createSlice({
 		 * 暂停游戏
 		 */
 		pauseGame: (state) => {
-			state.phase = 'paused';
+			state.phase = "paused";
 		},
 
 		/**
 		 * 恢复游戏
 		 */
 		resumeGame: (state) => {
-			state.phase = 'playing';
+			state.phase = "playing";
 		},
 
 		/**
 		 * 结束游戏
 		 */
-		endGame: (state, action: PayloadAction<{
-			winner?: FactionId;
-		}>) => {
-			state.phase = 'ended';
+		endGame: (
+			state,
+			action: PayloadAction<{
+				winner?: FactionId;
+			}>
+		) => {
+			state.phase = "ended";
 		},
 
 		/**
@@ -289,8 +307,7 @@ export const {
 const selectGameFlowState = (state: { gameFlow: GameFlowSliceState }) => state.gameFlow;
 
 // 简单选择器
-export const selectGamePhase = (state: { gameFlow: GameFlowSliceState }) =>
-	state.gameFlow.phase;
+export const selectGamePhase = (state: { gameFlow: GameFlowSliceState }) => state.gameFlow.phase;
 
 export const selectTurnPhase = (state: { gameFlow: GameFlowSliceState }) =>
 	state.gameFlow.turnPhase;
@@ -317,42 +334,34 @@ export const selectShipActionStates = createSelector(
 );
 
 export const selectShipActionState = (shipId: string) =>
-	createSelector(
-		[selectShipActionStates],
-		(states) => states[shipId]
-	);
+	createSelector([selectShipActionStates], (states) => states[shipId]);
 
-export const selectIsDeploymentComplete = createSelector(
-	[selectDeploymentReady],
-	(ready) => Object.values(ready).every(r => r)
+export const selectIsDeploymentComplete = createSelector([selectDeploymentReady], (ready) =>
+	Object.values(ready).every((r) => r)
 );
 
 export const selectIsPlayerTurn = (playerFaction: FactionId | null) =>
 	createSelector(
 		[selectCurrentFaction, selectGamePhase],
-		(currentFaction, phase) => phase === 'playing' && currentFaction === playerFaction
+		(currentFaction, phase) => phase === "playing" && currentFaction === playerFaction
 	);
 
 export const selectCanShipAct = (shipId: string) =>
-	createSelector(
-		[selectShipActionState(shipId)],
-		(state) => {
-			if (!state) return false;
-			if (state.isOverloaded) return false;
-			if (state.hasVented) return false;
-			if (state.remainingActions <= 0) return false;
-			return true;
-		}
-	);
+	createSelector([selectShipActionState(shipId)], (state) => {
+		if (!state) return false;
+		if (state.isOverloaded) return false;
+		if (state.hasVented) return false;
+		if (state.remainingActions <= 0) return false;
+		return true;
+	});
 
-export const selectOverloadedShips = createSelector(
-	[selectShipActionStates],
-	(states) => Object.values(states).filter(s => s.isOverloaded)
+export const selectOverloadedShips = createSelector([selectShipActionStates], (states) =>
+	Object.values(states).filter((s) => s.isOverloaded)
 );
 
 export const selectShipsWithAvailableOverloadReset = createSelector(
 	[selectShipActionStates],
-	(states) => Object.values(states).filter(s => s.isOverloaded && s.overloadResetAvailable)
+	(states) => Object.values(states).filter((s) => s.isOverloaded && s.overloadResetAvailable)
 );
 
 export default gameFlowSlice.reducer;

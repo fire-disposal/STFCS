@@ -56,11 +56,12 @@ jobs:
 
       # 验证基础包构建
       - name: Build core workspace packages
-        run: pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build
+        run: pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build
 
       - name: Verify core package build output
         run: |
-          test -f packages/contracts/dist/index.js || exit 1
+          test -f packages/types/dist/index.js || exit 1
+          test -f packages/data/dist/index.js || exit 1
           test -f packages/rules/dist/index.js || exit 1
           echo "✓ Core packages build verified"
 
@@ -86,7 +87,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build core workspace packages
-        run: pnpm --filter @vt/contracts build && pnpm --filter @vt/rules build
+        run: pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build
 
       - name: Run tests
         run: pnpm test

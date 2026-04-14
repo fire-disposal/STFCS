@@ -1,12 +1,12 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 import type {
 	ArmorQuadrant,
 	FluxOverloadState,
-	ShipStatus,
 	ShipMovement,
-	WeaponSpec,
+	ShipStatus,
 	WeaponMount,
-} from "@vt/contracts/types";
+	WeaponSpec,
+} from "@vt/types";
 
 export type FluxType = "soft" | "hard";
 
@@ -33,10 +33,7 @@ const shipSlice = createSlice({
 		addShip: (state, action: PayloadAction<ShipStatus>) => {
 			state.ships[action.payload.id] = action.payload;
 		},
-		updateShip: (
-			state,
-			action: PayloadAction<{ id: string; updates: Partial<ShipStatus> }>,
-		) => {
+		updateShip: (state, action: PayloadAction<{ id: string; updates: Partial<ShipStatus> }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				state.ships[action.payload.id] = {
@@ -54,16 +51,10 @@ const shipSlice = createSlice({
 		selectShip: (state, action: PayloadAction<string | null>) => {
 			state.selectedShipId = action.payload;
 		},
-		updateHull: (
-			state,
-			action: PayloadAction<{ id: string; current: number }>,
-		) => {
+		updateHull: (state, action: PayloadAction<{ id: string; current: number }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
-				ship.hull.current = Math.max(
-					0,
-					Math.min(ship.hull.max, action.payload.current),
-				);
+				ship.hull.current = Math.max(0, Math.min(ship.hull.max, action.payload.current));
 			}
 		},
 		updateArmor: (
@@ -72,32 +63,23 @@ const shipSlice = createSlice({
 				id: string;
 				quadrant: ArmorQuadrant;
 				value: number;
-			}>,
+			}>
 		) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.armor.quadrants[action.payload.quadrant] = Math.max(
 					0,
-					Math.min(ship.armor.maxQuadArmor, action.payload.value),
+					Math.min(ship.armor.maxQuadArmor, action.payload.value)
 				);
 			}
 		},
-		updateFlux: (
-			state,
-			action: PayloadAction<{ id: string; current: number }>,
-		) => {
+		updateFlux: (state, action: PayloadAction<{ id: string; current: number }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
-				ship.flux.current = Math.max(
-					0,
-					Math.min(ship.flux.capacity, action.payload.current),
-				);
+				ship.flux.current = Math.max(0, Math.min(ship.flux.capacity, action.payload.current));
 			}
 		},
-		addFlux: (
-			state,
-			action: PayloadAction<{ id: string; amount: number; type: FluxType }>,
-		) => {
+		addFlux: (state, action: PayloadAction<{ id: string; amount: number; type: FluxType }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				const newFlux = ship.flux.current + action.payload.amount;
@@ -110,33 +92,21 @@ const shipSlice = createSlice({
 				}
 			}
 		},
-		dissipateFlux: (
-			state,
-			action: PayloadAction<{ id: string; amount: number }>,
-		) => {
+		dissipateFlux: (state, action: PayloadAction<{ id: string; amount: number }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
-				const softFluxToRemove = Math.min(
-					ship.flux.softFlux,
-					action.payload.amount,
-				);
+				const softFluxToRemove = Math.min(ship.flux.softFlux, action.payload.amount);
 				const hardFluxToRemove = Math.min(
 					ship.flux.hardFlux,
-					action.payload.amount - softFluxToRemove,
+					action.payload.amount - softFluxToRemove
 				);
 
 				ship.flux.softFlux -= softFluxToRemove;
 				ship.flux.hardFlux -= hardFluxToRemove;
-				ship.flux.current = Math.max(
-					0,
-					ship.flux.current - (softFluxToRemove + hardFluxToRemove),
-				);
+				ship.flux.current = Math.max(0, ship.flux.current - (softFluxToRemove + hardFluxToRemove));
 			}
 		},
-		setFluxState: (
-			state,
-			action: PayloadAction<{ id: string; state: FluxOverloadState }>,
-		) => {
+		setFluxState: (state, action: PayloadAction<{ id: string; state: FluxOverloadState }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.fluxState = action.payload.state;
@@ -150,35 +120,26 @@ const shipSlice = createSlice({
 		},
 		updatePosition: (
 			state,
-			action: PayloadAction<{ id: string; position: { x: number; y: number } }>,
+			action: PayloadAction<{ id: string; position: { x: number; y: number } }>
 		) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.position = action.payload.position;
 			}
 		},
-		updateHeading: (
-			state,
-			action: PayloadAction<{ id: string; heading: number }>,
-		) => {
+		updateHeading: (state, action: PayloadAction<{ id: string; heading: number }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.heading = action.payload.heading;
 			}
 		},
-		updateSpeed: (
-			state,
-			action: PayloadAction<{ id: string; speed: number }>,
-		) => {
+		updateSpeed: (state, action: PayloadAction<{ id: string; speed: number }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.speed = Math.max(0, action.payload.speed);
 			}
 		},
-		setDisabled: (
-			state,
-			action: PayloadAction<{ id: string; disabled: boolean }>,
-		) => {
+		setDisabled: (state, action: PayloadAction<{ id: string; disabled: boolean }>) => {
 			const ship = state.ships[action.payload.id];
 			if (ship) {
 				ship.disabled = action.payload.disabled;
@@ -198,7 +159,7 @@ const shipSlice = createSlice({
 		},
 		removeMovement: (state, action: PayloadAction<string>) => {
 			state.movementQueue = state.movementQueue.filter(
-				(movement) => movement.shipId !== action.payload,
+				(movement) => movement.shipId !== action.payload
 			);
 		},
 		clearShips: (state) => {

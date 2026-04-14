@@ -3,10 +3,10 @@
  * 在独立图层上绘制所有 Token 的控制权限状态
  */
 
-import { Container } from "pixi.js";
-import type { TokenInfo } from "@vt/contracts/types";
-import type { SelectionRecord } from "@/store/slices/selectionSlice";
 import { createControlLock } from "@/features/game/components/TokenAddons";
+import type { SelectionRecord } from "@/store/slices/selectionSlice";
+import type { TokenInfo } from "@vt/types";
+import { Container } from "pixi.js";
 
 /**
  * 选中状态图层配置
@@ -28,10 +28,7 @@ export interface SelectionLayerConfig {
  * 渲染选中状态图层
  * 在独立图层上绘制所有选中状态，便于图层管理
  */
-export function renderSelectionLayer(
-	layer: Container,
-	config: SelectionLayerConfig
-): void {
+export function renderSelectionLayer(layer: Container, config: SelectionLayerConfig): void {
 	layer.removeChildren();
 
 	const { selections, tokens, selectedTokenId, currentPlayerId, zoom } = config;
@@ -61,35 +58,41 @@ export function renderSelectionLayer(
 
 		// 判断是否是本地玩家控制的 Token
 		const isControlledByLocal = selection.selectedBy?.id === currentPlayerId;
-		
+
 		// 绘制控制权限锁定标识
 		// 如果是本地玩家选中但不是本地玩家控制（被其他玩家控制），显示控制者
 		// 如果是本地玩家控制，也显示锁定框
 		const shouldShowLock = selectedTokenId === tokenId || selection.selectedBy;
-		
+
 		if (shouldShowLock) {
 			// 如果是本地选中的 Token，使用绿色；否则使用控制者的颜色
 			const lockColor = isControlledByLocal ? 0x00ff88 : 0xffaa00;
-			
-			const lockHighlight = createControlLock(token, {
-				color: lockColor,
-				lineWidth: 2,
-				alpha: 0.95,
-				cornerSize: 24,
-				cornerExtension: 10,
-				showConnectLines: true,
-				connectLineAlpha: 0.4,
-				padding: 10,
-				showPlayerName: !isControlledByLocal, // 只显示非本地玩家的控制者名称
-				showDMBadge: true,
-				nameFontSize: 11,
-				nameBackgroundAlpha: 0.7,
-				controller: selection.selectedBy ? {
-					playerId: selection.selectedBy.id,
-					playerName: selection.selectedBy.name,
-					isDMMode: selection.selectedBy.isDMMode,
-				} : null,
-			}, zoom);
+
+			const lockHighlight = createControlLock(
+				token,
+				{
+					color: lockColor,
+					lineWidth: 2,
+					alpha: 0.95,
+					cornerSize: 24,
+					cornerExtension: 10,
+					showConnectLines: true,
+					connectLineAlpha: 0.4,
+					padding: 10,
+					showPlayerName: !isControlledByLocal, // 只显示非本地玩家的控制者名称
+					showDMBadge: true,
+					nameFontSize: 11,
+					nameBackgroundAlpha: 0.7,
+					controller: selection.selectedBy
+						? {
+								playerId: selection.selectedBy.id,
+								playerName: selection.selectedBy.name,
+								isDMMode: selection.selectedBy.isDMMode,
+							}
+						: null,
+				},
+				zoom
+			);
 			tokenContainer.addChild(lockHighlight);
 		}
 

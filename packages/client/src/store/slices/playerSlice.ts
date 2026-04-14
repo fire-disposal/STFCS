@@ -1,5 +1,5 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { PlayerInfo } from "@vt/contracts/types";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
+import type { PlayerInfo } from "@vt/types";
 
 // 扩展PlayerInfo接口以包含游戏状态
 export interface ExtendedPlayerInfo extends PlayerInfo {
@@ -40,7 +40,7 @@ const playerSlice = createSlice({
 		},
 		updatePlayer: (
 			state,
-			action: PayloadAction<{ id: string; updates: Partial<ExtendedPlayerInfo> }>,
+			action: PayloadAction<{ id: string; updates: Partial<ExtendedPlayerInfo> }>
 		) => {
 			const player = state.players[action.payload.id];
 			if (player) {
@@ -70,41 +70,29 @@ const playerSlice = createSlice({
 		playerLeft: (state, action: PayloadAction<string>) => {
 			delete state.players[action.payload];
 		},
-		setPlayerReady: (
-			state,
-			action: PayloadAction<{ id: string; isReady: boolean }>,
-		) => {
+		setPlayerReady: (state, action: PayloadAction<{ id: string; isReady: boolean }>) => {
 			const player = state.players[action.payload.id];
 			if (player) {
 				player.isReady = action.payload.isReady;
 			}
 		},
-		setPlayerShip: (
-			state,
-			action: PayloadAction<{ id: string; shipId: string | null }>,
-		) => {
+		setPlayerShip: (state, action: PayloadAction<{ id: string; shipId: string | null }>) => {
 			const player = state.players[action.payload.id];
 			if (player) {
 				player.currentShipId = action.payload.shipId;
 			}
 		},
-		addSelectedTarget: (
-			state,
-			action: PayloadAction<{ id: string; targetId: string }>,
-		) => {
+		addSelectedTarget: (state, action: PayloadAction<{ id: string; targetId: string }>) => {
 			const player = state.players[action.payload.id];
 			if (player && !player.selectedTargets.includes(action.payload.targetId)) {
 				player.selectedTargets.push(action.payload.targetId);
 			}
 		},
-		removeSelectedTarget: (
-			state,
-			action: PayloadAction<{ id: string; targetId: string }>,
-		) => {
+		removeSelectedTarget: (state, action: PayloadAction<{ id: string; targetId: string }>) => {
 			const player = state.players[action.payload.id];
 			if (player) {
 				player.selectedTargets = player.selectedTargets.filter(
-					(targetId) => targetId !== action.payload.targetId,
+					(targetId) => targetId !== action.payload.targetId
 				);
 			}
 		},
@@ -128,17 +116,14 @@ const playerSlice = createSlice({
 		},
 		setGamePhase: (
 			state,
-			action: PayloadAction<{ id: string; phase: ExtendedPlayerInfo["gamePhase"] }>,
+			action: PayloadAction<{ id: string; phase: ExtendedPlayerInfo["gamePhase"] }>
 		) => {
 			const player = state.players[action.payload.id];
 			if (player) {
 				player.gamePhase = action.payload.phase;
 			}
 		},
-		setFluxVenting: (
-			state,
-			action: PayloadAction<{ id: string; active: boolean }>,
-		) => {
+		setFluxVenting: (state, action: PayloadAction<{ id: string; active: boolean }>) => {
 			const player = state.players[action.payload.id];
 			if (player) {
 				player.fluxVentingActive = action.payload.active;
@@ -171,8 +156,7 @@ export const {
 export const selectCurrentPlayerId = (state: { player: PlayerState }) =>
 	state.player.currentPlayerId;
 
-export const selectPlayers = (state: { player: PlayerState }) =>
-	state.player.players;
+export const selectPlayers = (state: { player: PlayerState }) => state.player.players;
 
 export const selectCurrentPlayer = (state: { player: PlayerState }) =>
 	state.player.currentPlayerId ? state.player.players[state.player.currentPlayerId] : null;

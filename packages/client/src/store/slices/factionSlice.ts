@@ -4,8 +4,8 @@
  * 管理玩家阵营选择和房间内阵营信息
  */
 
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { FactionId, PlayerFactionInfo } from '@vt/contracts/types';
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
+import type { FactionId, PlayerFactionInfo } from "@vt/types";
 
 interface FactionState {
 	/** 当前玩家选择的阵营 */
@@ -23,7 +23,7 @@ const initialState: FactionState = {
 };
 
 const factionSlice = createSlice({
-	name: 'faction',
+	name: "faction",
 	initialState,
 	reducers: {
 		/**

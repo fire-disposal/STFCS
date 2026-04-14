@@ -1,5 +1,9 @@
 /**
- * 模块导出索引
+ * 服务导出
  */
 
-// 所有服务已移除，使用 Colyseus 内置功能
+export { MemorySaveStore } from "./SaveStore.js";
+import { MemorySaveStore } from "./SaveStore.js";
+
+// 单例存档存储实例
+export const saveStore = new MemorySaveStore();

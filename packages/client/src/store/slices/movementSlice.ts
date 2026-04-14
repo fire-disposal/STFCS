@@ -14,7 +14,7 @@
  */
 
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
-import type { Point } from "@vt/contracts/types";
+import type { Point } from "@vt/types";
 
 // 移动指令
 export interface MovementCommand {

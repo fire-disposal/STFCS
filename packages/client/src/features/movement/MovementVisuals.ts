@@ -8,7 +8,7 @@
  */
 
 import type { MovementCommand } from "@/store/slices/movementSlice";
-import type { ShipState } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
 import type { Graphics } from "pixi.js";
 
 // 颜色配置

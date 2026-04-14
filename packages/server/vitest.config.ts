@@ -1,16 +1,17 @@
-import { defineConfig } from 'vitest/config';
-import path from 'path';
+import path from "path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    include: ['src/**/*.{test,spec}.{ts,js}'],
-  },
-  resolve: {
-    alias: {
-      '@vt/contracts': path.resolve(__dirname, '../contracts/src'),
-      '@vt/rules': path.resolve(__dirname, '../rules/src'),
-    },
-  },
+	test: {
+		globals: true,
+		environment: "node",
+		include: ["src/**/*.{test,spec}.{ts,js}"],
+	},
+	resolve: {
+		alias: {
+			"@vt/types": path.resolve(__dirname, "../types/src"),
+			"@vt/data": path.resolve(__dirname, "../data/src"),
+			"@vt/rules": path.resolve(__dirname, "../rules/src"),
+		},
+	},
 });

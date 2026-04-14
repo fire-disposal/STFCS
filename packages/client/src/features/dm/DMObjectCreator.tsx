@@ -5,9 +5,9 @@
  * 游标朝向通过调整视图旋转控制，放置时自动继承
  */
 
-import type { FactionValue } from "@vt/contracts";
-import { Faction } from "@vt/contracts";
-import { getAvailableShips } from "@vt/rules";
+import { getAvailableShips } from "@vt/data";
+import type { FactionValue } from "@vt/types";
+import { Faction } from "@vt/types";
 import { ChevronDown, ChevronRight, Palette, Rocket, Sparkles, Users } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
 
@@ -297,16 +297,13 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 					{mapCursor ? (
 						<div style={styles.cursorInfo}>
 							<div style={styles.cursorCoords}>
-								🎯 ({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) · {Math.round(mapCursor.r)}°
+								🎯 ({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) ·{" "}
+								{Math.round(mapCursor.r)}°
 							</div>
-							<div style={styles.cursorHint}>
-								提示：调整视图旋转可改变后续游标朝向
-							</div>
+							<div style={styles.cursorHint}>提示：调整视图旋转可改变后续游标朝向</div>
 						</div>
 					) : (
-						<div style={styles.noCursorHint}>
-							🎯 左键点击地图空白处放置游标
-						</div>
+						<div style={styles.noCursorHint}>🎯 左键点击地图空白处放置游标</div>
 					)}
 
 					<div style={styles.section}>

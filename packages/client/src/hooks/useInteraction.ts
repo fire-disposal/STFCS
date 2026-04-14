@@ -1,7 +1,7 @@
 /**
  * 交互管理 Hook
  * 统一的交互操作接口，处理画布和 Token 的交互逻辑
- * 
+ *
  * 优化内容：
  * - 仅保留中键拖拽画布
  * - 移除空格键等特殊逻辑
@@ -9,25 +9,24 @@
  * - 添加边界约束
  */
 
-import { useCallback, useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
+import { updateCamera } from "@/store/slices/cameraSlice";
 import {
-	setCursor,
-	startDrag,
-	updateDrag,
-	endDrag,
-	keyDown,
-	hoverToken,
-	leaveToken,
-	resetInteraction,
+	type CursorType,
 	type DragState,
 	type InteractionMode,
 	type KeyboardState,
-	type CursorType,
+	endDrag,
+	hoverToken,
+	keyDown,
+	leaveToken,
+	resetInteraction,
+	startDrag,
+	updateDrag,
 } from "@/store/slices/interactionSlice";
-import { updateCamera } from "@/store/slices/cameraSlice";
-import type { CameraState } from "@vt/contracts/types";
-import { clampCameraCenter, calculateCameraBounds } from "@/utils/cameraBounds";
+import { calculateCameraBounds, clampCameraCenter } from "@/utils/cameraBounds";
+import type { CameraState } from "@vt/types";
+import { useCallback, useEffect, useRef } from "react";
 
 export interface UseInteractionReturn {
 	// 状态
@@ -69,7 +68,11 @@ export function useInteraction(
 		onCanvasPan?: (dx: number, dy: number) => void;
 		onTokenDragStart?: (tokenId: string) => void;
 		onTokenDrag?: (tokenId: string, newPosition: { x: number; y: number }) => void;
-		onTokenDragEnd?: (tokenId: string, finalPosition: { x: number; y: number }, cancelled: boolean) => void;
+		onTokenDragEnd?: (
+			tokenId: string,
+			finalPosition: { x: number; y: number },
+			cancelled: boolean
+		) => void;
 	}
 ): UseInteractionReturn {
 	const dispatch = useAppDispatch();

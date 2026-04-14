@@ -3,9 +3,9 @@
  * 在地图上显示其他玩家的相机位置和视野范围
  */
 
-import { Container, Graphics } from "pixi.js";
-import type { PlayerCamera } from "@vt/contracts/types";
 import { ScalableText } from "@/features/game/utils/TextRenderer";
+import type { PlayerCamera } from "@vt/types";
+import { Container, Graphics } from "pixi.js";
 
 /**
  * 相机指示器配置
@@ -157,9 +157,7 @@ export function renderAllOtherPlayersCameras(
 	layer.removeChildren();
 
 	// 过滤掉当前玩家的相机
-	const otherCameras = Object.values(cameras).filter(
-		(cam) => cam.playerId !== currentPlayerId
-	);
+	const otherCameras = Object.values(cameras).filter((cam) => cam.playerId !== currentPlayerId);
 
 	otherCameras.forEach((camera) => {
 		const indicator = renderCameraIndicator(camera, viewportSize, config);

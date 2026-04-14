@@ -3,7 +3,7 @@ import { useAppSelector } from "@/store";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
 import { Application } from "@pixi/react";
-import type { ShipState } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
 import React, { useEffect, useMemo, useRef } from "react";
 import {
 	useCamera,
@@ -102,7 +102,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		layerSystem.layers,
 		ships,
 		selectedShipId,
-		{ zoom, cameraX, cameraY, canvasWidth: canvasSize.width, canvasHeight: canvasSize.height, viewRotation },
+		{
+			zoom,
+			cameraX,
+			cameraY,
+			canvasWidth: canvasSize.width,
+			canvasHeight: canvasSize.height,
+			viewRotation,
+		},
 		{ onSelectShip, setMouseWorldPosition, storeSelectShip }
 	);
 	useMovementRendering(layerSystem.layers, ships, selectedShipId, movementState);
@@ -114,7 +121,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useEffect(() => {
 		camera.cameraRef.current = { cameraX, cameraY, zoom, viewRotation };
-		layerSystem.updateLayerTransforms(zoom, cameraX, cameraY, canvasSize, viewRotation, showBackground);
+		layerSystem.updateLayerTransforms(
+			zoom,
+			cameraX,
+			cameraY,
+			canvasSize,
+			viewRotation,
+			showBackground
+		);
 		layerSystem.updateHitAreas(canvasSize);
 	}, [camera, cameraX, cameraY, zoom, viewRotation, layerSystem, canvasSize, showBackground]);
 

@@ -4,8 +4,8 @@
  * 显示实时的战斗日志和事件记录
  */
 
-import type { CombatLogEntry, LogLevel, LogType } from "@vt/contracts";
-import { type LogFilter, combatLog } from "@vt/contracts";
+import type { CombatLogEntry, LogLevel, LogType } from "@/utils/CombatLog";
+import { type LogFilter, combatLog } from "@/utils/CombatLog";
 import {
 	AlertTriangle,
 	CheckCircle,

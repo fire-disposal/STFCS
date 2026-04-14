@@ -9,7 +9,7 @@
  */
 
 import { Client, Room } from "@colyseus/sdk";
-import type { GameRoomState } from "@vt/contracts";
+import type { GameRoomState } from "@vt/types";
 
 export interface RoomInfo {
 	id: string;
@@ -181,6 +181,9 @@ export class NetworkManager {
 
 	/**
 	 * 获取房间列表
+	 *
+	 * 直接请求最新列表，不使用 HTTP 缓存
+	 * 因为房间状态变化频繁，缓存意义不大
 	 */
 	async getRooms(): Promise<RoomInfo[]> {
 		if (this.roomsRequestInFlight) {
@@ -278,6 +281,9 @@ export class NetworkManager {
 
 	/**
 	 * 开始定期更新房间列表
+	 *
+	 * 固定 5 秒轮询一次，保持房间列表实时性
+	 * 因为房间状态变化频繁，不适合使用复杂的缓存策略
 	 */
 	private startRoomsPolling(intervalMs: number = 5000): void {
 		if (this.roomsInterval !== null) {

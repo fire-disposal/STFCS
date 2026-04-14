@@ -13,7 +13,8 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Copy only package files for dependency installation
 COPY pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/types/package.json ./packages/types/
+COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/server/package.json ./packages/server/
 COPY packages/client/package.json ./packages/client/
@@ -34,7 +35,8 @@ COPY --from=deps /app/.pnpm-store ./pnpm-store
 
 # Copy workspace configuration
 COPY pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/types/package.json ./packages/types/
+COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/server/package.json ./packages/server/
 COPY packages/client/package.json ./packages/client/
@@ -43,13 +45,15 @@ COPY packages/client/package.json ./packages/client/
 RUN pnpm install --frozen-lockfile --offline
 
 # Copy source code
-COPY packages/contracts ./packages/contracts
+COPY packages/types ./packages/types
+COPY packages/data ./packages/data
 COPY packages/rules ./packages/rules
 COPY packages/server ./packages/server
 COPY packages/client ./packages/client
 
 # Build with tsup (fast compilation)
-RUN pnpm --filter @vt/contracts build
+RUN pnpm --filter @vt/types build
+RUN pnpm --filter @vt/data build
 RUN pnpm --filter @vt/rules build
 RUN pnpm --filter server build
 RUN pnpm --filter client build
@@ -66,12 +70,14 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Copy package files for production install
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/types/package.json ./packages/types/
+COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/server/package.json ./packages/server/
 
 # Copy built artifacts from builder
-COPY --from=builder /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
+COPY --from=builder /app/packages/data/dist ./packages/data/dist
 COPY --from=builder /app/packages/rules/dist ./packages/rules/dist
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
 COPY --from=builder /app/packages/client/dist ./packages/server/dist/public

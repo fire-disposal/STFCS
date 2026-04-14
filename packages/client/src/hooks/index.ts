@@ -17,3 +17,22 @@ export { useInteraction } from "./useInteraction";
 export type { UseInteractionReturn } from "./useInteraction";
 
 export { useCurrentGameRoom } from "./useCurrentGameRoom";
+
+// Colyseus 响应式状态 Hooks
+export {
+	useMultiplayerState,
+	usePlayers,
+	useShips,
+	useCurrentPlayer,
+	useGamePhase,
+	useTurnCount,
+	useActiveFaction,
+} from "./useMultiplayerState";
+
+// Colyseus 聊天消息 Hooks
+export {
+	useChatMessages,
+	useSystemMessages,
+	useSendChatMessage,
+	type ChatMessage,
+} from "./useChatMessages";

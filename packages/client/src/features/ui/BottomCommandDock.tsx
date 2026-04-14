@@ -7,8 +7,8 @@
  * - 右侧：武器操作区 / 舰船技能区
  */
 
-import type { ShipState } from "@vt/contracts";
-import { Faction } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
+import { Faction } from "@vt/types";
 import {
 	Activity,
 	Bomb,
@@ -46,27 +46,27 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 	onVentFlux,
 	disabled = false,
 }) => {
-	// 计算护甲百分比
+	// 计算护甲百分比（使用新的 armor.averagePercent）
 	const armorPercentages = useMemo(() => {
 		if (!selectedShip) return [];
-		return selectedShip.armorCurrent.map((current: number, i: number) => {
-			const max = selectedShip.armorMax[i] || 1;
+		// 使用新的嵌套结构
+		return Array.from({ length: 6 }, (_, i) => {
+			const max = selectedShip.armor.maxPerQuadrant || 1;
+			const current = selectedShip.armor.getQuadrant(i);
 			return Math.round((current / max) * 100);
 		});
 	}, [selectedShip]);
 
-	// 计算辐能百分比
+	// 计算辐能百分比（使用新的 flux.percent）
 	const fluxPercentage = useMemo(() => {
-		if (!selectedShip || selectedShip.fluxMax <= 0) return 0;
-		return Math.round(
-			((selectedShip.fluxHard + selectedShip.fluxSoft) / selectedShip.fluxMax) * 100
-		);
+		if (!selectedShip || selectedShip.flux.max <= 0) return 0;
+		return Math.round(selectedShip.flux.percent);
 	}, [selectedShip]);
 
-	// 计算船体百分比
+	// 计算船体百分比（使用新的 hull.percent）
 	const hullPercentage = useMemo(() => {
-		if (!selectedShip || selectedShip.hullMax <= 0) return 0;
-		return Math.round((selectedShip.hullCurrent / selectedShip.hullMax) * 100);
+		if (!selectedShip || selectedShip.hull.max <= 0) return 0;
+		return Math.round(selectedShip.hull.percent);
 	}, [selectedShip]);
 
 	// 获取颜色
@@ -102,6 +102,10 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 	}
 
 	const isPlayer = selectedShip.faction === Faction.PLAYER;
+	// 使用新的 shield.active
+	const isShieldActive = selectedShip.shield.active;
+	// 使用新的 flux.isOverloaded
+	const isOverloaded = selectedShip.flux.isOverloaded;
 
 	return (
 		<div className="bottom-command-dock">

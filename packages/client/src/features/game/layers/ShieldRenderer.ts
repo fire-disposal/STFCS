@@ -1,5 +1,5 @@
+import type { ShieldSpec } from "@vt/types";
 import { Container, Graphics } from "pixi.js";
-import type { ShieldSpec } from "@vt/contracts/types";
 
 /**
  * 护盾渲染器配置
@@ -163,9 +163,6 @@ export function clearShield(layer: Container): void {
 /**
  * 更新护盾
  */
-export function updateShield(
-	layer: Container,
-	config: ShieldRenderConfig
-): void {
+export function updateShield(layer: Container, config: ShieldRenderConfig): void {
 	renderShield(layer, config);
 }

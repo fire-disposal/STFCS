@@ -3,15 +3,15 @@
  * 管理 Token 的选择状态和相关操作
  */
 
-import { useCallback, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
+	removeToken as removeTokenAction,
 	selectToken as selectTokenAction,
 	updateToken as updateTokenAction,
-	removeToken as removeTokenAction,
 } from "@/store/slices/mapSlice";
 import { selectShip } from "@/store/slices/shipSlice";
-import type { TokenInfo, TokenType } from "@vt/contracts/types";
+import type { TokenInfo, TokenType } from "@vt/types";
+import { useCallback, useMemo } from "react";
 
 export function useTokenSelection() {
 	const dispatch = useAppDispatch();

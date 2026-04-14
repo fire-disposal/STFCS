@@ -3,9 +3,9 @@
  * 提供可扩展的组件化附加组件架构
  */
 
-import { Container, Graphics } from "pixi.js";
-import type { TokenInfo } from "@vt/contracts/types";
 import { ScalableText } from "@/features/game/utils/TextRenderer";
+import type { TokenInfo } from "@vt/types";
+import { Container, Graphics } from "pixi.js";
 
 /**
  * 附加组件类型
@@ -344,7 +344,7 @@ export function createArmorQuadrantsIndicator(
 
 		// 添加数值标签
 		if (showValues) {
-			const midAngle = ((start + end) / 2 * Math.PI) / 180;
+			const midAngle = (((start + end) / 2) * Math.PI) / 180;
 			const labelRadius = ringRadius * 0.7;
 			const labelX = Math.cos(midAngle) * labelRadius;
 			const labelY = Math.sin(midAngle) * labelRadius;
@@ -445,7 +445,7 @@ export function createSelectionLock(
 	} = config;
 
 	const graphics = new Graphics();
-	
+
 	// 根据 token 类型计算大小
 	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
 	const halfSize = tokenSize + padding;
@@ -463,29 +463,29 @@ export function createSelectionLock(
 	graphics.moveTo(left, top + cornerExtension);
 	graphics.lineTo(left, top);
 	graphics.lineTo(left + cornerExtension, top);
-	
+
 	// 右上角
 	graphics.moveTo(right - cornerExtension, top);
 	graphics.lineTo(right, top);
 	graphics.lineTo(right, top + cornerExtension);
-	
+
 	// 左下角
 	graphics.moveTo(left, bottom - cornerExtension);
 	graphics.lineTo(left, bottom);
 	graphics.lineTo(left + cornerExtension, bottom);
-	
+
 	// 右下角
 	graphics.moveTo(right - cornerExtension, bottom);
 	graphics.lineTo(right, bottom);
 	graphics.lineTo(right, bottom - cornerExtension);
-	
+
 	graphics.stroke();
 
 	// 绘制连接虚线（可选）
 	if (showConnectLines) {
-		graphics.setStrokeStyle({ 
-			width: 1, 
-			color, 
+		graphics.setStrokeStyle({
+			width: 1,
+			color,
 			alpha: connectLineAlpha,
 			alignment: 0.5,
 		});
@@ -493,19 +493,19 @@ export function createSelectionLock(
 		// 上边虚线
 		graphics.moveTo(left + cornerSize, top);
 		graphics.lineTo(right - cornerSize, top);
-		
+
 		// 下边虚线
 		graphics.moveTo(left + cornerSize, bottom);
 		graphics.lineTo(right - cornerSize, bottom);
-		
+
 		// 左边虚线
 		graphics.moveTo(left, top + cornerSize);
 		graphics.lineTo(left, bottom - cornerSize);
-		
+
 		// 右边虚线
 		graphics.moveTo(right, top + cornerSize);
 		graphics.lineTo(right, bottom - cornerSize);
-		
+
 		graphics.stroke();
 	}
 
@@ -586,7 +586,7 @@ export function createControlLock(
 	} = config;
 
 	const container = new Container();
-	
+
 	// 根据 token 类型计算大小
 	const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
 	const halfSize = tokenSize + padding;
@@ -605,29 +605,29 @@ export function createControlLock(
 	lockGraphics.moveTo(left, top + cornerExtension);
 	lockGraphics.lineTo(left, top);
 	lockGraphics.lineTo(left + cornerExtension, top);
-	
+
 	// 右上角
 	lockGraphics.moveTo(right - cornerExtension, top);
 	lockGraphics.lineTo(right, top);
 	lockGraphics.lineTo(right, top + cornerExtension);
-	
+
 	// 左下角
 	lockGraphics.moveTo(left, bottom - cornerExtension);
 	lockGraphics.lineTo(left, bottom);
 	lockGraphics.lineTo(left + cornerExtension, bottom);
-	
+
 	// 右下角
 	lockGraphics.moveTo(right - cornerExtension, bottom);
 	lockGraphics.lineTo(right, bottom);
 	lockGraphics.lineTo(right, bottom - cornerExtension);
-	
+
 	lockGraphics.stroke();
 
 	// 绘制连接虚线（可选）
 	if (showConnectLines) {
-		lockGraphics.setStrokeStyle({ 
-			width: 1, 
-			color, 
+		lockGraphics.setStrokeStyle({
+			width: 1,
+			color,
 			alpha: connectLineAlpha,
 			alignment: 0.5,
 		});
@@ -635,19 +635,19 @@ export function createControlLock(
 		// 上边虚线
 		lockGraphics.moveTo(left + cornerSize, top);
 		lockGraphics.lineTo(right - cornerSize, top);
-		
+
 		// 下边虚线
 		lockGraphics.moveTo(left + cornerSize, bottom);
 		lockGraphics.lineTo(right - cornerSize, bottom);
-		
+
 		// 左边虚线
 		lockGraphics.moveTo(left, top + cornerSize);
 		lockGraphics.lineTo(left, bottom - cornerSize);
-		
+
 		// 右边虚线
 		lockGraphics.moveTo(right, top + cornerSize);
 		lockGraphics.lineTo(right, bottom - cornerSize);
-		
+
 		lockGraphics.stroke();
 	}
 
@@ -656,7 +656,7 @@ export function createControlLock(
 	// 添加控制者名称标签
 	if (showPlayerName && controller) {
 		const nameLabelContainer = new Container();
-		
+
 		// 名称文本
 		const nameText = new ScalableText(controller.playerName, {
 			baseFontSize: nameFontSize,
@@ -667,7 +667,7 @@ export function createControlLock(
 				fontWeight: "bold",
 			},
 		});
-		
+
 		// DM 标识
 		let dmBadge: ScalableText | null = null;
 		if (showDMBadge && controller.isDMMode) {
@@ -681,13 +681,13 @@ export function createControlLock(
 				},
 			});
 		}
-		
+
 		// 计算标签尺寸
 		const nameBounds = nameText.getBounds();
 		const dmWidth = dmBadge ? dmBadge.getBounds().width + 4 : 0;
 		const totalWidth = nameBounds.width + dmWidth;
 		const totalHeight = Math.max(nameBounds.height, dmBadge ? dmBadge.getBounds().height : 0) + 8;
-		
+
 		// 背景框
 		const bg = new Graphics();
 		bg.roundRect(-totalWidth / 2 - 6, -totalHeight / 2 - 4, totalWidth + 12, totalHeight + 8, 4);
@@ -695,18 +695,18 @@ export function createControlLock(
 		bg.setStrokeStyle({ width: 1, color, alpha: 0.5 });
 		bg.stroke();
 		nameLabelContainer.addChild(bg);
-		
+
 		// 放置文本
 		nameText.anchor.set(0.5, 0.5);
 		nameText.position.set(-dmWidth / 2, 0);
 		nameLabelContainer.addChild(nameText);
-		
+
 		if (dmBadge) {
 			dmBadge.anchor.set(0.5, 0.5);
 			dmBadge.position.set(totalWidth / 2 - dmWidth / 2 + 2, 0);
 			nameLabelContainer.addChild(dmBadge);
 		}
-		
+
 		// 放置在顶部
 		nameLabelContainer.position.set(0, -halfSize - totalHeight / 2 - 8);
 		container.addChild(nameLabelContainer);
@@ -758,11 +758,7 @@ export const AddonRegistry: Record<AddonType, AddonRenderer> = {
 /**
  * 渲染所有启用的附加组件
  */
-export function renderAddons(
-	token: TokenInfo,
-	addons: AddonConfig[],
-	zoom: number
-): Container {
+export function renderAddons(token: TokenInfo, addons: AddonConfig[], zoom: number): Container {
 	const container = new Container();
 
 	addons.forEach((addon) => {

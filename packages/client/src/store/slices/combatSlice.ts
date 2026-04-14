@@ -1,9 +1,5 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type {
-	ExplosionData,
-	AttackCommand,
-	CombatResult,
-} from "@vt/contracts/types";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
+import type { AttackCommand, CombatResult, ExplosionData } from "@vt/types";
 
 export interface DamageNumber {
 	id: string;
@@ -53,9 +49,7 @@ const combatSlice = createSlice({
 			state.explosions.push(action.payload);
 		},
 		removeExplosion: (state, action: PayloadAction<string>) => {
-			state.explosions = state.explosions.filter(
-				(explosion) => explosion.id !== action.payload,
-			);
+			state.explosions = state.explosions.filter((explosion) => explosion.id !== action.payload);
 		},
 		clearExplosions: (state) => {
 			state.explosions = [];
@@ -65,7 +59,7 @@ const combatSlice = createSlice({
 		},
 		removeAttack: (state, action: PayloadAction<string>) => {
 			state.attackQueue = state.attackQueue.filter(
-				(attack) => attack.weaponMountId !== action.payload,
+				(attack) => attack.weaponMountId !== action.payload
 			);
 		},
 		clearAttackQueue: (state) => {
@@ -81,9 +75,7 @@ const combatSlice = createSlice({
 			state.damageNumbers.push(action.payload);
 		},
 		removeDamageNumber: (state, action: PayloadAction<string>) => {
-			state.damageNumbers = state.damageNumbers.filter(
-				(damage) => damage.id !== action.payload,
-			);
+			state.damageNumbers = state.damageNumbers.filter((damage) => damage.id !== action.payload);
 		},
 		clearDamageNumbers: (state) => {
 			state.damageNumbers = [];
@@ -91,16 +83,13 @@ const combatSlice = createSlice({
 		addFiringArc: (state, action: PayloadAction<FiringArc>) => {
 			state.firingArcs.push(action.payload);
 		},
-		removeFiringArc: (
-			state,
-			action: PayloadAction<{ shipId: string; weaponMountId: string }>,
-		) => {
+		removeFiringArc: (state, action: PayloadAction<{ shipId: string; weaponMountId: string }>) => {
 			state.firingArcs = state.firingArcs.filter(
 				(arc) =>
 					!(
 						arc.shipId === action.payload.shipId &&
 						arc.weaponMountId === action.payload.weaponMountId
-					),
+					)
 			);
 		},
 		clearFiringArcs: (state) => {
@@ -109,10 +98,7 @@ const combatSlice = createSlice({
 		setSelectedWeaponMount: (state, action: PayloadAction<string | null>) => {
 			state.selectedWeaponMountId = action.payload;
 		},
-		setCombatPhase: (
-			state,
-			action: PayloadAction<CombatState["combatPhase"]>,
-		) => {
+		setCombatPhase: (state, action: PayloadAction<CombatState["combatPhase"]>) => {
 			state.combatPhase = action.payload;
 		},
 		incrementRound: (state) => {

@@ -1,23 +1,23 @@
 /**
  * 相机控制 Hook
  * 统一的相机操作接口
- * 
+ *
  * 优化内容：
  * - 改进缩放比率 (1.15x 每档)
  * - 支持边界约束
  * - RTS 风格的平移控制
  */
 
-import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
-	setCamera,
-	updateCamera,
 	panCamera,
 	resetCamera as resetCameraAction,
+	setCamera,
+	updateCamera,
 } from "@/store/slices/cameraSlice";
-import type { CameraState } from "@vt/contracts/types";
 import { clampZoom } from "@/utils/cameraBounds";
+import type { CameraState } from "@vt/types";
+import { useCallback } from "react";
 
 export interface UseCameraReturn extends CameraState {
 	// 设置相机（完全替换）

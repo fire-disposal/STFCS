@@ -1,24 +1,14 @@
 import {
-	Container,
-	Graphics,
-	Point,
-	type FederatedPointerEvent,
-} from "pixi.js";
-import type { TokenInfo } from "@vt/contracts/types";
-import { ScalableText } from "@/features/game/utils/TextRenderer";
-import {
-	createHeadingIndicator,
+	type AddonConfig,
 	createAngleDisplay,
 	createArmorQuadrantsIndicator,
+	createHeadingIndicator,
 	createSelectionLock,
-	type AddonConfig,
 } from "@/features/game/components/TokenAddons";
-// 几何体渲染器（素材缺失时的回退）
-import {
-	renderShipGeometry,
-	HULL_SIZE_COLORS,
-} from "@/features/game/utils/geometry";
+import { ScalableText } from "@/features/game/utils/TextRenderer";
 import { getAssetRegistry } from "@/services/AssetRegistry";
+import type { TokenInfo } from "@vt/types";
+import { Container, type FederatedPointerEvent, Graphics, Point } from "pixi.js";
 
 /**
  * Token 渲染器配置
@@ -28,7 +18,11 @@ export interface TokenRendererConfig {
 	onTokenClick?: (token: TokenInfo, event: FederatedPointerEvent) => void;
 	onTokenDragStart?: (token: TokenInfo) => void;
 	onTokenDrag?: (token: TokenInfo, newPosition: { x: number; y: number }) => void;
-	onTokenDragEnd?: (token: TokenInfo, finalPosition: { x: number; y: number }, cancelled: boolean) => void;
+	onTokenDragEnd?: (
+		token: TokenInfo,
+		finalPosition: { x: number; y: number },
+		cancelled: boolean
+	) => void;
 	zoom: number;
 	/** 用于存储可缩放文本的数组（外部管理更新） */
 	scalableTexts?: ScalableText[];
@@ -96,10 +90,7 @@ const STATUS_BAR_COLORS = {
  * - 舰船名称固定显示，不随旋转
  * - 支持组件化附加组件
  */
-export function renderToken(
-	token: TokenInfo,
-	config: TokenRendererConfig
-): Container {
+export function renderToken(token: TokenInfo, config: TokenRendererConfig): Container {
 	// 创建主容器（位置在 token 中心，但不旋转）
 	const rootContainer = new Container();
 	rootContainer.position.set(token.position.x, token.position.y);
@@ -181,16 +172,20 @@ export function renderToken(
 	// 如果是本地选中的 Token，添加四角锁定高亮（在根容器中）
 	// 注意：控制权限锁定在 SelectionLayer 中绘制，这里只绘制本地选中高亮
 	if (token.id === config.selectedTokenId) {
-		const lockHighlight = createSelectionLock(token, {
-			color: 0x00ff88, // 绿色表示本地选中
-			lineWidth: 2,
-			alpha: 0.95,
-			cornerSize: 24,
-			cornerExtension: 10,
-			showConnectLines: true,
-			connectLineAlpha: 0.4,
-			padding: 10,
-		}, config.zoom);
+		const lockHighlight = createSelectionLock(
+			token,
+			{
+				color: 0x00ff88, // 绿色表示本地选中
+				lineWidth: 2,
+				alpha: 0.95,
+				cornerSize: 24,
+				cornerExtension: 10,
+				showConnectLines: true,
+				connectLineAlpha: 0.4,
+				padding: 10,
+			},
+			config.zoom
+		);
 		rootContainer.addChild(lockHighlight);
 	}
 
@@ -202,10 +197,15 @@ export function renderToken(
 
 /**
  * 绘制舰船主体
- * 
+ *
  * 优先使用素材，如果素材不存在则使用几何体绘制
  */
-function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship, token?: TokenInfo): void {
+function drawShipBody(
+	graphics: Graphics,
+	size: number,
+	colors: typeof TOKEN_COLORS.ship,
+	token?: TokenInfo
+): void {
 	// 尝试从 AssetRegistry 获取素材
 	const registry = getAssetRegistry();
 	let hasSprite = false;
@@ -234,10 +234,14 @@ function drawShipBody(graphics: Graphics, size: number, colors: typeof TOKEN_COL
 
 /**
  * 舰船几何体绘制回退方案
- * 
+ *
  * 使用简洁的几何体绘制舰船形状
  */
-function drawShipGeometryFallback(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.ship): void {
+function drawShipGeometryFallback(
+	graphics: Graphics,
+	size: number,
+	colors: typeof TOKEN_COLORS.ship
+): void {
 	// 主体 - 箭头形状
 	const points = [
 		new Point(size, 0),
@@ -266,7 +270,11 @@ function drawShipGeometryFallback(graphics: Graphics, size: number, colors: type
 /**
  * 绘制空间站主体
  */
-function drawStationBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.station): void {
+function drawStationBody(
+	graphics: Graphics,
+	size: number,
+	colors: typeof TOKEN_COLORS.station
+): void {
 	graphics.circle(0, 0, size);
 	graphics.fill({ color: colors.body, alpha: colors.bodyAlpha });
 
@@ -284,7 +292,11 @@ function drawStationBody(graphics: Graphics, size: number, colors: typeof TOKEN_
 /**
  * 绘制小行星主体
  */
-function drawAsteroidBody(graphics: Graphics, size: number, colors: typeof TOKEN_COLORS.asteroid): void {
+function drawAsteroidBody(
+	graphics: Graphics,
+	size: number,
+	colors: typeof TOKEN_COLORS.asteroid
+): void {
 	const points: Point[] = [];
 	const segments = 8;
 	for (let i = 0; i < segments; i++) {
@@ -436,13 +448,7 @@ function renderFluxBar(
 		const softStart = hardFlux / capacity;
 		const softPercent = softFlux / capacity;
 		const softFill = new Graphics();
-		softFill.roundRect(
-			-width / 2 + width * softStart,
-			-height / 2,
-			width * softPercent,
-			height,
-			2
-		);
+		softFill.roundRect(-width / 2 + width * softStart, -height / 2, width * softPercent, height, 2);
 		softFill.fill({ color: STATUS_BAR_COLORS.flux.soft, alpha: 0.9 });
 		container.addChild(softFill);
 	}
@@ -478,11 +484,7 @@ function renderFluxBar(
 /**
  * 渲染 Token 标签（固定显示，不随旋转）
  */
-function renderTokenLabel(
-	token: TokenInfo,
-	tokenSize: number,
-	zoom: number
-): Container {
+function renderTokenLabel(token: TokenInfo, tokenSize: number, zoom: number): Container {
 	const container = new Container();
 
 	// 使用 ScalableText 避免缩放模糊
@@ -539,14 +541,14 @@ function setupTokenInteraction(
 	// 创建拖拽预览（半透明虚影）
 	const createDragPreview = () => {
 		if (dragPreview) return;
-		
+
 		dragPreview = new Graphics();
 		dragPreview.alpha = 0.5;
 		dragPreview.zIndex = 100; // 确保在最上层
-		
+
 		// 根据 token 类型绘制预览形状
 		const tokenSize = token.type === "station" ? token.size * 1.5 : token.size;
-		
+
 		if (token.type === "ship") {
 			dragPreview.circle(0, 0, tokenSize);
 			dragPreview.fill({ color: 0xffffff, alpha: 0.3 });
@@ -563,7 +565,7 @@ function setupTokenInteraction(
 			dragPreview.setStrokeStyle({ width: 2, color: 0x888888, alpha: 0.8 });
 			dragPreview.stroke();
 		}
-		
+
 		container.parent?.addChild(dragPreview);
 	};
 
@@ -620,7 +622,7 @@ function setupTokenInteraction(
 				y: tokenStartPos.y + dy,
 			};
 			config.onTokenDrag(token, newPosition);
-			
+
 			// 更新预览位置
 			if (dragPreview) {
 				updateDragPreview(event.global.x, event.global.y);
@@ -636,7 +638,7 @@ function setupTokenInteraction(
 			const dy = finalPosition.y - tokenStartPos.y;
 			const distance = Math.sqrt(dx * dx + dy * dy);
 			const cancelled = distance < 5; // 小于 5 像素视为取消
-			
+
 			removeDragPreview();
 			config.onTokenDragEnd(token, finalPosition, cancelled);
 		}

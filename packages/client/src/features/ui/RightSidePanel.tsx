@@ -1,11 +1,11 @@
+import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 import { useCameraAnimation } from "@/hooks/useCameraAnimation";
 import { useUIStore } from "@/store/uiStore";
-import type { FactionValue, PlayerState, ShipState } from "@vt/contracts";
+import type { FactionValue, PlayerState, ShipState } from "@vt/types";
 import { ChevronLeft, ChevronRight, FileText, Monitor, Palette } from "lucide-react";
 import React, { useState } from "react";
 import { CombatLogPanel } from "./CombatLogPanel";
 import { ViewControlPanel } from "./ViewControlPanel";
-import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 
 type TabId = "view" | "log" | "dm";
 
@@ -50,7 +50,8 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 }) => {
 	const [activeTab, setActiveTab] = useState<TabId>("view");
 	const [isCollapsed, setIsCollapsed] = useState(false);
-	const { cameraPosition, zoom, viewRotation, setCameraPosition, setViewRotation, setZoom } = useUIStore();
+	const { cameraPosition, zoom, viewRotation, setCameraPosition, setViewRotation, setZoom } =
+		useUIStore();
 
 	const cameraAnimation = useCameraAnimation({
 		onCameraChange: setCameraPosition,
@@ -128,10 +129,7 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 
 			<div className="right-side-panel__content">
 				{activeTab === "view" && (
-					<ViewControlPanel
-						cameraAnimation={cameraAnimation}
-						onResetView={onResetView}
-					/>
+					<ViewControlPanel cameraAnimation={cameraAnimation} onResetView={onResetView} />
 				)}
 
 				{activeTab === "log" && (

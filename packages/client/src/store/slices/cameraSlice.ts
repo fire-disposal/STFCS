@@ -1,16 +1,16 @@
 /**
  * 相机 Redux Slice
  * 统一管理本地和远程玩家相机状态
- * 
+ *
  * 优化内容：
  * - 改进缩放比率 (1.15x 每档，更平滑)
  * - 支持部分出界查看 (屏幕中心点不能离开地图)
  * - RTS 风格的边界软限制
  */
 
-import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
-import type { CameraState, PlayerCamera } from "@vt/contracts/types";
 import { clampZoom } from "@/utils/cameraBounds";
+import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
+import type { CameraState, PlayerCamera } from "@vt/types";
 
 interface CameraSliceState {
 	// 本地玩家相机

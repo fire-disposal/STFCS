@@ -22,10 +22,10 @@ import { useCurrentGameRoom } from "@/hooks";
 import { NetworkManager } from "@/network/NetworkManager";
 import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
-import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/contracts";
-import { ClientCommand, Faction, PlayerRole } from "@vt/contracts";
+import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/types";
+import { ClientCommand, Faction, PlayerRole } from "@vt/types";
 import { LogOut, Rocket, Settings, Users } from "lucide-react";
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
 
 interface GameViewProps {
@@ -41,77 +41,40 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const [showMovementPanel, setShowMovementPanel] = useState(false);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
 
-	// 监听 ship_created 广播，更新本地舰船列表
-	useEffect(() => {
-		if (!room) return;
+	// 注意：不需要手动监听 ship_created/ship_destroyed
+	// Colyseus 的 MapSchema 会自动同步状态变化并触发 React 更新
+	// 只在需要播放动画或音效时才监听这些事件
 
-		const handleShipCreated = (payload: {
-			shipId: string;
-			hullType: string;
-			faction: number;
-			x: number;
-			y: number;
-			heading: number;
-			timestamp: number;
-		}) => {
-			console.log("[GameView] Ship created:", payload);
-			// 强制更新舰船列表
-			setVersion((v) => v + 1);
-		};
-
-		const handleShipDestroyed = (payload: { shipId: string; timestamp: number }) => {
-			console.log("[GameView] Ship destroyed:", payload.shipId);
-			setVersion((v) => v + 1);
-		};
-
-		(room as any).on("ship_created", handleShipCreated);
-		(room as any).on("ship_destroyed", handleShipDestroyed);
-
-		return () => {
-			(room as any).off("ship_created", handleShipCreated);
-			(room as any).off("ship_destroyed", handleShipDestroyed);
-		};
-	}, [room]);
-
-	const [version, setVersion] = useState(0);
-
-	// 玩家列表
+	// 玩家列表 - 简化版，信任服务端去重逻辑
 	const players = useMemo(() => {
-		const rosterByIdentity = new Map<string, PlayerState>();
-		const playersMap = room?.state?.players as Map<string, PlayerState> | undefined;
-		if (!playersMap) {
-			return [];
-		}
-		playersMap.forEach((value: PlayerState) => {
-			const shortId = (value as PlayerState & { shortId?: number }).shortId ?? 0;
-			const identityKey = shortId > 0 ? `short:${shortId}` : `session:${value.sessionId}`;
-			const current = rosterByIdentity.get(identityKey);
-			if (!current) {
-				rosterByIdentity.set(identityKey, value);
-				return;
-			}
-			if ((value.connected && !current.connected) || value.sessionId === room?.sessionId) {
-				rosterByIdentity.set(identityKey, value);
+		const playersMap = room?.state?.players;
+		if (!playersMap) return [];
+
+		// 只过滤掉断开的玩家，去重逻辑由服务端处理
+		const result: PlayerState[] = [];
+		playersMap.forEach((player) => {
+			if (player.connected) {
+				result.push(player);
 			}
 		});
-		return Array.from(rosterByIdentity.values());
-	}, [room?.state?.players, room?.sessionId]);
-
-	// 当前玩家
-	const currentPlayer = useMemo(() => {
-		return players.find((p) => p.sessionId === room?.sessionId) || null;
-	}, [players, room?.sessionId]);
-
-	// 舰船列表
-	const ships = useMemo(() => {
-		const result: ShipState[] = [];
-		const shipsMap = room?.state?.ships as Map<string, ShipState> | undefined;
-		if (!shipsMap) {
-			return [];
-		}
-		shipsMap.forEach((value: ShipState) => result.push(value));
 		return result;
-	}, [room?.state?.ships, version]);
+	}, [room?.state?.players]);
+
+	// 当前玩家 - 直接使用 sessionId 查找
+	const currentPlayer = useMemo(() => {
+		if (!room) return null;
+		return room.state.players.get(room.sessionId) || null;
+	}, [room, room?.sessionId]);
+
+	// 舰船列表 - 移除 version 依赖，Colyseus 会自动触发更新
+	const ships = useMemo(() => {
+		const shipsMap = room?.state?.ships;
+		if (!shipsMap) return [];
+
+		const result: ShipState[] = [];
+		shipsMap.forEach((ship) => result.push(ship));
+		return result;
+	}, [room?.state?.ships]);
 
 	// 选中的舰船
 	const selectedShipId = useMemo(() => {

@@ -7,7 +7,7 @@
  * - 包含移动、护盾、武器、辐能等操作
  */
 
-import type { PlayerRoleValue, ShipState } from "@vt/contracts";
+import type { PlayerRoleValue, ShipState } from "@vt/types";
 import { Bomb, Rocket, RotateCcw, Shield, Zap, ZoomIn, ZoomOut } from "lucide-react";
 import React, { useMemo } from "react";
 

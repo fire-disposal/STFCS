@@ -1,4 +1,4 @@
-import type { ShipState } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "./useLayerSystem";
@@ -37,7 +37,8 @@ export function useWeaponArcsRendering(
 			const weaponRange = weaponSlot.range || 300;
 
 			let arcGraphics = arcGraphicsRef.current.find(
-				(g) => g.position.x === selectedShip.transform.x && g.position.y === selectedShip.transform.y
+				(g) =>
+					g.position.x === selectedShip.transform.x && g.position.y === selectedShip.transform.y
 			);
 			if (!arcGraphics) {
 				arcGraphics = new Graphics();
@@ -88,7 +89,10 @@ export function useWeaponArcsRendering(
 					layers.weaponArcs.removeChild(g);
 				}
 			});
-			if (moveGraphicsRef.current && layers?.weaponArcs.children.includes(moveGraphicsRef.current)) {
+			if (
+				moveGraphicsRef.current &&
+				layers?.weaponArcs.children.includes(moveGraphicsRef.current)
+			) {
 				layers.weaponArcs.removeChild(moveGraphicsRef.current);
 			}
 		};

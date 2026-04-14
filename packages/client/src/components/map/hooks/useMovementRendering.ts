@@ -5,7 +5,7 @@ import {
 	drawTurnArc,
 } from "@/features/movement/MovementVisuals";
 import type { MovementPhase, PhaseFuelState } from "@/store/slices/movementSlice";
-import type { ShipState } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "./useLayerSystem";

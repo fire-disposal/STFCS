@@ -8,7 +8,7 @@
  */
 
 import type { MovementCommand, MovementPhase } from "@/store/slices/movementSlice";
-import type { ShipState } from "@vt/contracts";
+import type { ShipState } from "@vt/types";
 import { Graphics } from "pixi.js";
 
 interface RenderOptions {
