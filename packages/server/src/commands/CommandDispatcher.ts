@@ -60,6 +60,95 @@ export class CommandDispatcher {
 		return payloadPhase ?? shipPhase ?? "PHASE_A";
 	}
 
+	private updateMovementBudget(ship: ShipState, phase: "PHASE_A" | "PHASE_B" | "PHASE_C", forward: number, strafe: number, turn: number): void {
+		const maxForward = ship.maxSpeed * 2;
+		const maxStrafe = ship.maxSpeed;
+		const maxTurn = ship.maxTurnRate;
+
+		if (phase === "PHASE_A") {
+			if (Math.abs(forward) + ship.phaseAForwardUsed > maxForward) {
+				throw new Error("阶段A前进燃料不足");
+			}
+			if (Math.abs(strafe) + ship.phaseAStrafeUsed > maxStrafe) {
+				throw new Error("阶段A横移燃料不足");
+			}
+			ship.phaseAForwardUsed += Math.abs(forward);
+			ship.phaseAStrafeUsed += Math.abs(strafe);
+		}
+
+		if (phase === "PHASE_B") {
+			if (Math.abs(turn) + ship.phaseTurnUsed > maxTurn) {
+				throw new Error("阶段B转向燃料不足");
+			}
+			ship.phaseTurnUsed += Math.abs(turn);
+		}
+
+		if (phase === "PHASE_C") {
+			if (Math.abs(forward) + ship.phaseBForwardUsed > maxForward) {
+				throw new Error("阶段C前进燃料不足");
+			}
+			if (Math.abs(strafe) + ship.phaseBStrafeUsed > maxStrafe) {
+				throw new Error("阶段C横移燃料不足");
+			}
+			ship.phaseBForwardUsed += Math.abs(forward);
+			ship.phaseBStrafeUsed += Math.abs(strafe);
+		}
+	}
+
+	private applyIncrementalMovement(ship: ShipState, payload: MoveTokenPayload): void {
+		const plan = payload.movementPlan;
+		if (!plan) {
+			throw new Error("缺少移动计划");
+		}
+		if (payload.phase && payload.phase !== ship.movePhase) {
+			throw new Error("移动阶段未同步");
+		}
+		const phase = this.getMovePhase(payload.phase, ship.movePhase);
+		this.assertPhaseOrder(ship.movePhase, phase);
+
+		let forward = 0;
+		let strafe = 0;
+		let turn = 0;
+
+		switch (phase) {
+			case "PHASE_A":
+				forward = plan.phaseAForward;
+				strafe = plan.phaseAStrafe;
+				break;
+			case "PHASE_B":
+				turn = plan.turnAngle;
+				break;
+			case "PHASE_C":
+				forward = plan.phaseBForward;
+				strafe = plan.phaseBStrafe;
+				break;
+		}
+
+		if (forward === 0 && strafe === 0 && turn === 0) {
+			throw new Error("移动量不能为空");
+		}
+
+		this.updateMovementBudget(ship, phase, forward, strafe, turn);
+		if (phase !== ship.movePhase) {
+			ship.movePhase = phase;
+		}
+
+		let nextX = ship.transform.x;
+		let nextY = ship.transform.y;
+		let nextHeading = ship.transform.heading;
+
+		if (phase === "PHASE_B") {
+			nextHeading = this.normalizeHeading(nextHeading + turn);
+		} else {
+			const next = this.applyTranslation(nextX, nextY, nextHeading, forward, strafe);
+			nextX = next.x;
+			nextY = next.y;
+		}
+
+		ship.setPosition(nextX, nextY);
+		ship.setHeading(nextHeading);
+	}
+
 	dispatchAdvanceMovePhase(client: Client, ship: ShipState): void {
 		this.validateAuthority(client, ship);
 		if (ship.hasMoved) throw new Error("本回合已移动");
@@ -85,74 +174,7 @@ export class CommandDispatcher {
 		if (!payload.movementPlan) throw new Error("缺少移动计划");
 
 		if (payload.isIncremental) {
-			if (payload.phase && payload.phase !== ship.movePhase)
-				throw new Error("移动阶段未同步");
-			const phase = this.getMovePhase(payload.phase, ship.movePhase);
-			this.assertPhaseOrder(ship.movePhase, phase);
-			const plan = payload.movementPlan;
-
-			let forward = 0;
-			let strafe = 0;
-			let turn = 0;
-
-			switch (phase) {
-				case "PHASE_A":
-					forward = plan.phaseAForward;
-					strafe = plan.phaseAStrafe;
-					break;
-				case "PHASE_B":
-					turn = plan.turnAngle;
-					break;
-				case "PHASE_C":
-					forward = plan.phaseBForward;
-					strafe = plan.phaseBStrafe;
-					break;
-			}
-
-			if (forward === 0 && strafe === 0 && turn === 0) throw new Error("移动量不能为空");
-
-			const maxForward = ship.maxSpeed * 2;
-			const maxStrafe = ship.maxSpeed;
-			const maxTurn = ship.maxTurnRate;
-
-			if (phase === "PHASE_A") {
-				if (Math.abs(forward) + ship.phaseAForwardUsed > maxForward)
-					throw new Error("阶段A前进燃料不足");
-				if (Math.abs(strafe) + ship.phaseAStrafeUsed > maxStrafe)
-					throw new Error("阶段A横移燃料不足");
-				ship.phaseAForwardUsed += Math.abs(forward);
-				ship.phaseAStrafeUsed += Math.abs(strafe);
-			}
-			if (phase === "PHASE_B") {
-				if (Math.abs(turn) + ship.phaseTurnUsed > maxTurn)
-					throw new Error("阶段B转向燃料不足");
-				ship.phaseTurnUsed += Math.abs(turn);
-			}
-			if (phase === "PHASE_C") {
-				if (Math.abs(forward) + ship.phaseBForwardUsed > maxForward)
-					throw new Error("阶段C前进燃料不足");
-				if (Math.abs(strafe) + ship.phaseBStrafeUsed > maxStrafe)
-					throw new Error("阶段C横移燃料不足");
-				ship.phaseBForwardUsed += Math.abs(forward);
-				ship.phaseBStrafeUsed += Math.abs(strafe);
-			}
-
-			if (phase !== ship.movePhase) ship.movePhase = phase;
-
-			let nextX = ship.transform.x;
-			let nextY = ship.transform.y;
-			let nextHeading = ship.transform.heading;
-
-			if (phase === "PHASE_B") {
-				nextHeading = this.normalizeHeading(nextHeading + turn);
-			} else {
-				const next = this.applyTranslation(nextX, nextY, nextHeading, forward, strafe);
-				nextX = next.x;
-				nextY = next.y;
-			}
-
-			ship.setPosition(nextX, nextY);
-			ship.setHeading(nextHeading);
+			this.applyIncrementalMovement(ship, payload);
 			return;
 		}
 
