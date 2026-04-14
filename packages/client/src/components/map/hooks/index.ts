@@ -10,5 +10,3 @@ export * from "./useMovementRendering";
 export * from "./useZoomInteraction";
 export * from "./usePixiApp";
 export * from "./useCursorRendering";
-export * from "./useMapCursor";
-export * from "./useMapInteraction";

@@ -239,7 +239,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 							<Bomb className="action-btn__icon" />
 							<span className="action-btn__label">开火</span>
 						</button>
-						{selectedShip.weapons.map((weapon, index) => {
+						{Array.from(selectedShip.weapons.values()).map((weapon, index) => {
 							const w = weapon as unknown as { mountId: string; name: string; damageType: string };
 							return (
 								<button

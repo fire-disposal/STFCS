@@ -1,5 +1,5 @@
 import { screenToWorld } from "@/utils/mathUtils";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import type { UseCameraResult } from "./useCamera";
 import type { CanvasSize } from "./useCanvasResize";
 
@@ -9,18 +9,9 @@ export interface UseZoomInteractionResult {
 
 export function useZoomInteraction(
 	camera: UseCameraResult,
-	canvasSize: CanvasSize,
-	setZoom: (zoom: number) => void,
-	setCameraPosition: (x: number, y: number) => void
+	canvasSize: CanvasSize
 ): UseZoomInteractionResult {
-	const {
-		clampZoom,
-		screenToWorldPoint,
-		cameraRef,
-		animateZoomToTarget,
-		zoomTargetRef,
-		zoomAnimationRef,
-	} = camera;
+	const { clampZoom, screenToWorldPoint, cameraRef, queueZoomToTarget } = camera;
 
 	const queueZoom = useCallback(
 		(event: WheelEvent) => {
@@ -45,7 +36,6 @@ export function useZoomInteraction(
 				current.viewRotation
 			);
 
-			// 使用统一的坐标转换计算新相机位置
 			const centerX = canvasSize.width / 2;
 			const centerY = canvasSize.height / 2;
 			const relativeX = screenX - centerX;
@@ -59,56 +49,14 @@ export function useZoomInteraction(
 				current.viewRotation
 			);
 
-			zoomTargetRef.current = {
+			queueZoomToTarget({
 				zoom: nextZoom,
 				cameraX: worldPoint.x - newWorldPoint.x,
 				cameraY: worldPoint.y - newWorldPoint.y,
-			};
-
-			if (zoomAnimationRef.current !== null) {
-				cancelAnimationFrame(zoomAnimationRef.current);
-			}
-			zoomAnimationRef.current = requestAnimationFrame(animateZoomToTarget);
+			});
 		},
-		[
-			animateZoomToTarget,
-			clampZoom,
-			screenToWorldPoint,
-			canvasSize.width,
-			canvasSize.height,
-			cameraRef,
-			zoomTargetRef,
-			zoomAnimationRef,
-		]
+		[clampZoom, screenToWorldPoint, canvasSize.width, canvasSize.height, cameraRef, queueZoomToTarget]
 	);
 
-	return {
-		queueZoom,
-	};
-}
-
-export function useWheelZoom(
-	containerRef: React.RefObject<HTMLDivElement | null>,
-	queueZoom: (event: WheelEvent) => void
-) {
-	const queueZoomRef = useRef(queueZoom);
-
-	useEffect(() => {
-		queueZoomRef.current = queueZoom;
-	}, [queueZoom]);
-
-	useEffect(() => {
-		const node = containerRef.current;
-		if (!node) return;
-
-		const handleWheel = (event: WheelEvent) => {
-			queueZoomRef.current(event);
-		};
-
-		node.addEventListener("wheel", handleWheel, { passive: false });
-
-		return () => {
-			node.removeEventListener("wheel", handleWheel);
-		};
-	}, [containerRef]);
+	return { queueZoom };
 }

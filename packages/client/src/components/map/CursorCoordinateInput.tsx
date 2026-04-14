@@ -24,7 +24,7 @@ export interface CursorCoordinateInputProps {
 	cameraY: number;
 	viewRotation: number;
 	onCameraChange: (x: number, y: number) => void;
-	onSetMapCursor: (x: number, y: number, heading: number) => void;
+	onSetMapCursor: (x: number, y: number, r: number) => void;
 	onClearMapCursor: () => void;
 	worldBounds?: {
 		minX: number;

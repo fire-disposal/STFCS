@@ -1,91 +1,75 @@
-/**
- * 游标渲染 Hook
- *
- * 作为独立图层挂载到 LayerRegistry，由 useLayerSystem 统一管理
- * 游标位置是世界坐标，由图层系统自动处理坐标变换
- */
-
-import { Container, Graphics } from "pixi.js";
+import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "./useLayerSystem";
 
 export interface CursorState {
 	x: number;
 	y: number;
-	heading: number;
+	r: number;
 }
 
+const COLOR = 0x4a9eff;
+const COLOR_DIM = 0x2b4261;
+
 export function useCursorRendering(layers: LayerRegistry | null, cursor: CursorState | null) {
-	const cursorContainerRef = useRef<Container | null>(null);
+	const graphicsRef = useRef<Graphics | null>(null);
 
 	useEffect(() => {
 		if (!layers || !layers.cursor) return;
 
-		if (!cursorContainerRef.current) {
-			cursorContainerRef.current = new Container();
-			layers.cursor.addChild(cursorContainerRef.current);
+		let graphics = graphicsRef.current;
+		if (!graphics) {
+			graphics = new Graphics();
+			graphicsRef.current = graphics;
+			layers.cursor.addChild(graphics);
 		}
 
-		const cursorContainer = cursorContainerRef.current;
+		graphics.clear();
 
 		if (!cursor) {
-			cursorContainer.removeChildren();
-			cursorContainer.visible = false;
+			graphics.visible = false;
 			return;
 		}
 
-		cursorContainer.visible = true;
-		cursorContainer.removeChildren();
-
-		const graphics = new Graphics();
-
-		// 使用图层系统的坐标变换，直接使用世界坐标
+		graphics.visible = true;
 		graphics.position.set(cursor.x, cursor.y);
-		graphics.rotation = (cursor.heading * Math.PI) / 180;
+		graphics.rotation = (cursor.r * Math.PI) / 180;
 
-		// 绘制游标十字线
-		const crossSize = 25;
-		const crossThickness = 2;
+		drawCursor(graphics);
+	}, [layers, cursor]);
 
-		graphics
-			.moveTo(-crossSize, 0)
-			.lineTo(crossSize, 0)
-			.moveTo(0, -crossSize)
-			.lineTo(0, crossSize)
-			.stroke({
-				color: 0x4a9eff,
-				width: crossThickness,
-				alpha: 0.9,
-			});
-
-		// 绘制游标圆环
-		const ringRadius = 35;
-		graphics.circle(0, 0, ringRadius).stroke({
-			color: 0x4a9eff,
-			width: 2,
-			alpha: 0.6,
-		});
-
-		// 绘制方向指示器
-		const arrowSize = 12;
-		graphics
-			.moveTo(0, -ringRadius - 5)
-			.lineTo(-arrowSize / 2, -ringRadius + 5)
-			.lineTo(arrowSize / 2, -ringRadius + 5)
-			.closePath()
-			.fill({
-				color: 0x4a9eff,
-				alpha: 0.9,
-			});
-
-		cursorContainer.addChild(graphics);
-
+	useEffect(() => {
 		return () => {
-			if (cursorContainer && layers.cursor.children.includes(cursorContainer)) {
-				cursorContainer.removeChildren();
+			if (graphicsRef.current && layers?.cursor.children.includes(graphicsRef.current)) {
+				layers.cursor.removeChild(graphicsRef.current);
 			}
 		};
-	}, [layers, cursor]);
+	}, [layers]);
 }
 
-export default useCursorRendering;
+function drawCursor(g: Graphics) {
+	const size = 30;
+	const armLen = 20;
+	const armWidth = 2;
+	const arrowSize = 8;
+
+	g.moveTo(0, -size).lineTo(0, -armLen).stroke({ color: COLOR, width: armWidth });
+	g.moveTo(0, size).lineTo(0, armLen).stroke({ color: COLOR, width: armWidth });
+	g.moveTo(-size, 0).lineTo(-armLen, 0).stroke({ color: COLOR, width: armWidth });
+	g.moveTo(size, 0).lineTo(armLen, 0).stroke({ color: COLOR, width: armWidth });
+
+	g.moveTo(0, -size - arrowSize / 2).lineTo(-arrowSize / 2, -size + arrowSize / 2).stroke({ color: COLOR, width: armWidth });
+	g.moveTo(0, -size - arrowSize / 2).lineTo(arrowSize / 2, -size + arrowSize / 2).stroke({ color: COLOR, width: armWidth });
+	g.poly([0, -size - arrowSize / 2, -arrowSize / 2, -size + arrowSize / 2, arrowSize / 2, -size + arrowSize / 2]).fill({ color: COLOR });
+
+	g.moveTo(-armLen, -armLen).lineTo(-armLen + 6, -armLen).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(-armLen, -armLen).lineTo(-armLen, -armLen + 6).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(armLen, -armLen).lineTo(armLen - 6, -armLen).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(armLen, -armLen).lineTo(armLen, -armLen + 6).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(-armLen, armLen).lineTo(-armLen + 6, armLen).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(-armLen, armLen).lineTo(-armLen, armLen - 6).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(armLen, armLen).lineTo(armLen - 6, armLen).stroke({ color: COLOR_DIM, width: 1 });
+	g.moveTo(armLen, armLen).lineTo(armLen, armLen - 6).stroke({ color: COLOR_DIM, width: 1 });
+
+	g.circle(0, 0, 4).fill({ color: COLOR });
+}

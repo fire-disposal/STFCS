@@ -2,18 +2,17 @@
  * DM 对象创建面板
  *
  * 提供舰船、小行星、空间站等对象的创建和摆放功能
- * 样式与 DMControlPanel 保持一致
+ * 游标朝向通过调整视图旋转控制，放置时自动继承
  */
 
 import type { FactionValue } from "@vt/contracts";
 import { Faction } from "@vt/contracts";
 import { getAvailableShips } from "@vt/rules";
-import { ChevronDown, ChevronRight, MapPin, Palette, Rocket, Sparkles, Users } from "lucide-react";
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { ChevronDown, ChevronRight, Palette, Rocket, Sparkles, Users } from "lucide-react";
+import React, { useState, useMemo, useCallback } from "react";
 
 type TokenType = "ship" | "station" | "asteroid";
 
-// 样式定义 - 与 DMControlPanel 保持一致
 const styles = {
 	panel: {
 		backgroundColor: "rgba(6, 16, 26, 0.95)",
@@ -130,21 +129,6 @@ const styles = {
 		flexDirection: "column" as const,
 		gap: "2px",
 	},
-	inputRow: {
-		display: "grid",
-		gridTemplateColumns: "1fr 1fr 80px",
-		gap: "6px",
-	},
-	input: {
-		width: "100%",
-		padding: "8px",
-		borderRadius: "0",
-		border: "1px solid rgba(90, 42, 58, 0.8)",
-		backgroundColor: "rgba(26, 45, 66, 0.8)",
-		color: "#cfe8ff",
-		fontSize: "10px",
-		boxSizing: "border-box" as const,
-	},
 	select: {
 		width: "100%",
 		padding: "8px",
@@ -154,14 +138,32 @@ const styles = {
 		color: "#cfe8ff",
 		fontSize: "10px",
 	},
-	modeHint: {
-		padding: "8px",
+	cursorInfo: {
+		padding: "10px",
 		borderRadius: "0",
-		backgroundColor: "rgba(255, 111, 143, 0.2)",
+		backgroundColor: "rgba(74, 158, 255, 0.15)",
+		border: "1px solid rgba(74, 158, 255, 0.3)",
+		display: "flex",
+		flexDirection: "column" as const,
+		gap: "6px",
+	},
+	cursorCoords: {
+		color: "#4a9eff",
+		fontSize: "11px",
+		fontWeight: "bold" as const,
+	},
+	cursorHint: {
+		color: "#8ba4c7",
+		fontSize: "9px",
+	},
+	noCursorHint: {
+		padding: "10px",
+		borderRadius: "0",
+		backgroundColor: "rgba(255, 111, 143, 0.15)",
+		border: "1px dashed rgba(255, 111, 143, 0.4)",
 		color: "#ff6f8f",
 		fontSize: "10px",
 		textAlign: "center" as const,
-		border: "1px dashed rgba(255, 111, 143, 0.4)",
 	},
 };
 
@@ -190,39 +192,22 @@ interface DMObjectCreatorProps {
 		ownerId?: string;
 	}) => void;
 	players: Array<{ sessionId: string; name: string; role: string }>;
-	mapCursor: { x: number; y: number; heading: number } | null;
+	mapCursor: { x: number; y: number; r: number } | null;
 }
-
-// 移除未使用的样式
 
 export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 	onCreateObject,
 	players,
 	mapCursor,
 }) => {
-	// 折叠状态
 	const [collapsed, setCollapsed] = useState(false);
-	// 对象类型
 	const [objectType, setObjectType] = useState<TokenType>("ship");
-	// 选中的舰船 ID
 	const [selectedHullId, setSelectedHullId] = useState<string>("frigate_assault");
-	// 朝向（从游标继承，可手动调整）
-	const [heading, setHeading] = useState(0);
-	// 阵营和归属
 	const [faction, setFaction] = useState<FactionValue>(Faction.DM);
 	const [ownerId, setOwnerId] = useState<string>("");
 
-	// 可用舰船列表
 	const availableShips = useMemo(() => getAvailableShips(), []);
 
-	// 当游标更新时，自动同步 heading
-	useEffect(() => {
-		if (mapCursor && mapCursor.heading !== undefined) {
-			setHeading(mapCursor.heading);
-		}
-	}, [mapCursor]);
-
-	// 处理创建对象 - 使用 heading 状态（可手动调整）而非直接使用 mapCursor.heading
 	const handleCreate = useCallback(() => {
 		if (!mapCursor) return;
 
@@ -231,15 +216,14 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 			hullId: objectType === "ship" ? selectedHullId : undefined,
 			x: mapCursor.x,
 			y: mapCursor.y,
-			heading: heading,
+			heading: mapCursor.r,
 			faction,
 			ownerId: ownerId || undefined,
 		});
-	}, [objectType, selectedHullId, mapCursor, heading, faction, ownerId, onCreateObject]);
+	}, [objectType, selectedHullId, mapCursor, faction, ownerId, onCreateObject]);
 
 	return (
 		<div style={styles.panel}>
-			{/* 可折叠头部 */}
 			<div style={styles.header} onClick={() => setCollapsed(!collapsed)}>
 				<div style={styles.headerTitle}>
 					<Sparkles className="game-icon--sm" />
@@ -254,10 +238,8 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 				</button>
 			</div>
 
-			{/* 内容区 */}
 			{!collapsed && (
 				<div style={styles.content}>
-					{/* 对象类型选择 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
 							<Palette className="game-icon--xs" />
@@ -281,7 +263,6 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						</div>
 					</div>
 
-					{/* 舰船选择（仅当类型为 ship 时） */}
 					{objectType === "ship" && (
 						<div style={styles.section}>
 							<div style={styles.sectionTitle}>
@@ -313,34 +294,21 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						</div>
 					)}
 
-					{/* 游标位置提示 */}
 					{mapCursor ? (
-						<div style={styles.modeHint}>
-							🎯 游标位置：({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) 朝向：
-							{Math.round(mapCursor.heading)}°
+						<div style={styles.cursorInfo}>
+							<div style={styles.cursorCoords}>
+								🎯 ({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) · {Math.round(mapCursor.r)}°
+							</div>
+							<div style={styles.cursorHint}>
+								提示：调整视图旋转可改变后续游标朝向
+							</div>
 						</div>
 					) : (
-						<div style={styles.modeHint}>🎯 右键点击地图设置游标位置</div>
+						<div style={styles.noCursorHint}>
+							🎯 左键点击地图空白处放置游标
+						</div>
 					)}
 
-					{/* 朝向设置 */}
-					<div style={styles.section}>
-						<div style={styles.sectionTitle}>
-							<MapPin className="game-icon--xs" />
-							朝向调整
-						</div>
-						<input
-							style={styles.input}
-							type="number"
-							placeholder="朝向 (0-359)"
-							value={heading}
-							onChange={(e) => setHeading(Number(e.target.value))}
-							min={0}
-							max={359}
-						/>
-					</div>
-
-					{/* 阵营和归属权 */}
 					<div style={styles.section}>
 						<div style={styles.sectionTitle}>
 							<Users className="game-icon--xs" />
@@ -349,7 +317,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						<select
 							style={styles.select}
 							value={faction}
-							onChange={(e) => setFaction(e.target.value as FactionValue)}
+							onChange={(e) => setFaction(Number(e.target.value) as unknown as FactionValue)}
 						>
 							<option value={Faction.PLAYER}>玩家阵营</option>
 							<option value={Faction.DM}>DM 阵营（敌方）</option>
@@ -360,9 +328,9 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 								value={ownerId}
 								onChange={(e) => setOwnerId(e.target.value)}
 							>
-								<option value="">未分配（自由控制）</option>
+								<option value="">未分配</option>
 								{players
-									.filter((p) => p.role !== "dm")
+									.filter((p) => p.role !== "DM")
 									.map((player) => (
 										<option key={player.sessionId} value={player.sessionId}>
 											{player.name}
@@ -372,7 +340,6 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						)}
 					</div>
 
-					{/* 创建按钮 */}
 					<button
 						data-magnetic
 						className="game-btn game-btn--primary game-btn--full"
@@ -380,7 +347,7 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
 						disabled={!mapCursor}
 					>
 						<Sparkles className="game-icon--xs" />
-						{mapCursor ? "创建对象" : "请先设置游标位置"}
+						{mapCursor ? "在游标位置创建" : "需要先放置游标"}
 					</button>
 				</div>
 			)}

@@ -25,7 +25,7 @@ import { normalizeRotation } from "@/utils/angleSystem";
 import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/contracts";
 import { ClientCommand, Faction, PlayerRole } from "@vt/contracts";
 import { LogOut, Rocket, Settings, Users } from "lucide-react";
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import "@/styles/game-layout.css";
 
 interface GameViewProps {
@@ -40,14 +40,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
 	const [showMovementPanel, setShowMovementPanel] = useState(false);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
-	const [pendingPlacement, setPendingPlacement] = useState<{
-		type: "ship" | "station" | "asteroid";
-		hullId?: string;
-		heading: number;
-		faction: FactionValue;
-		ownerId?: string;
-	} | null>(null);
-	const [isPlacementMode, setIsPlacementMode] = useState(false);
 
 	// 监听 ship_created 广播，更新本地舰船列表
 	useEffect(() => {
@@ -72,16 +64,16 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			setVersion((v) => v + 1);
 		};
 
-		room.on("ship_created", handleShipCreated);
-		room.on("ship_destroyed", handleShipDestroyed);
+		(room as any).on("ship_created", handleShipCreated);
+		(room as any).on("ship_destroyed", handleShipDestroyed);
 
 		return () => {
-			room.off("ship_created", handleShipCreated);
-			room.off("ship_destroyed", handleShipDestroyed);
+			(room as any).off("ship_created", handleShipCreated);
+			(room as any).off("ship_destroyed", handleShipDestroyed);
 		};
 	}, [room]);
 
-	const [, setVersion] = useState(0);
+	const [version, setVersion] = useState(0);
 
 	// 玩家列表
 	const players = useMemo(() => {
@@ -162,23 +154,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		[viewRotation, setViewRotation]
 	);
 
-	const handleMapClick = useCallback(
-		(x: number, y: number) => {
-			// 点击摆放模式
-			if (isPlacementMode && pendingPlacement) {
-				// 使用点击的坐标发送创建命令
-				room?.send("DM_CREATE_OBJECT", {
-					...pendingPlacement,
-					x,
-					y,
-				});
-				setPendingPlacement(null);
-				setIsPlacementMode(false);
-			}
-		},
-		[isPlacementMode, pendingPlacement, room]
-	);
-
 	// 命令发送
 	const sendCommand = useCallback(
 		async (command: ClientCommandValue, payload: unknown) => {
@@ -193,7 +168,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		[room]
 	);
 
-	// DM 操作 - 手动模式直接创建
+	// DM 操作 - 直接创建对象
 	const createObject = useCallback(
 		(payload: {
 			type: "ship" | "station" | "asteroid";
@@ -205,22 +180,10 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			ownerId?: string;
 		}) => {
 			if (!room) return;
-			if (isPlacementMode) {
-				// 摆放模式：保存数据等待地图点击
-				setPendingPlacement(payload);
-			} else {
-				// 手动模式：直接创建
-				room.send("DM_CREATE_OBJECT", payload);
-			}
+			room.send("DM_CREATE_OBJECT", payload);
 		},
-		[room, isPlacementMode]
+		[room]
 	);
-
-	// 切换摆放模式
-	const togglePlacementMode = useCallback(() => {
-		setIsPlacementMode((prev) => !prev);
-		setPendingPlacement(null);
-	}, []);
 
 	const createTestShip = useCallback(
 		(faction: "player" | "dm", x: number, y: number) => {
@@ -389,40 +352,21 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 							onSelectShip={(id) => console.log("[GameView] Select:", id)}
 							onPanDelta={handleMapPan}
 							onRotateDelta={handleMapRotate}
-							onClick={isPlacementMode && isDM ? handleMapClick : undefined}
 						/>
 					</div>
 				</div>
 
 				{/* 右侧面板 - 视图/日志/DM */}
 				<RightSidePanel
-					room={room}
 					isDM={isDM}
 					ships={ships}
 					players={players}
 					onCreateObject={createObject}
-					isPlacementMode={isPlacementMode}
-					onTogglePlacementMode={togglePlacementMode}
 					onCreateTestShip={createTestShip}
 					onClearOverload={clearOverload}
 					onSetArmor={setArmor}
 					onAssignShip={assignShip}
 					onNextPhase={nextPhase}
-					zoom={zoom}
-					cameraX={cameraPosition.x}
-					cameraY={cameraPosition.y}
-					viewRotation={viewRotation}
-					showGrid={showGrid}
-					showBackground={showBackground}
-					showWeaponArcs={showWeaponArcs}
-					showMovementRange={showMovementRange}
-					onZoomChange={(newZoom) => useUIStore.getState().setZoom(newZoom)}
-					onCameraChange={(x, y) => setCameraPosition(x, y)}
-					onViewRotationChange={(rotation) => setViewRotation(rotation)}
-					onToggleGrid={() => useUIStore.getState().toggleGrid()}
-					onToggleBackground={() => useUIStore.getState().toggleBackground()}
-					onToggleWeaponArcs={() => useUIStore.getState().toggleWeaponArcs()}
-					onToggleMovementRange={() => useUIStore.getState().toggleMovementRange()}
 					onResetView={() => {
 						setCameraPosition(0, 0);
 						setViewRotation(0);

@@ -94,7 +94,6 @@ export function useLayerSystem(): UseLayerSystemResult {
 
 		currentLayers.world.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
 		currentLayers.ships.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
-		currentLayers.cursor.hitArea = new Rectangle(0, 0, canvasSize.width, canvasSize.height);
 	}, []);
 
 	useEffect(() => {

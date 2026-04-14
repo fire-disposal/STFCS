@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useRef } from "react";
 
 export interface DragState {
 	active: boolean;
@@ -11,14 +11,12 @@ export interface DragState {
 	pendingDx: number;
 	pendingDy: number;
 	pendingRotate: number;
-	rafId: number | null;
 }
 
 export interface UseInteractionResult {
 	spacePressedRef: React.MutableRefObject<boolean>;
 	dragStateRef: React.MutableRefObject<DragState>;
 	flushDragDelta: () => void;
-	scheduleDragFlush: () => void;
 }
 
 export function useInteraction(
@@ -41,28 +39,14 @@ export function useInteraction(
 		pendingDx: 0,
 		pendingDy: 0,
 		pendingRotate: 0,
-		rafId: null,
 	});
 
-	useEffect(() => {
-		onPanDeltaRef.current = onPanDelta;
-	}, [onPanDelta]);
+	onPanDeltaRef.current = onPanDelta;
+	onRotateDeltaRef.current = onRotateDelta;
+	screenDeltaToWorldDeltaRef.current = screenDeltaToWorldDelta;
 
-	useEffect(() => {
-		onRotateDeltaRef.current = onRotateDelta;
-	}, [onRotateDelta]);
-
-	useEffect(() => {
-		screenDeltaToWorldDeltaRef.current = screenDeltaToWorldDelta;
-	}, [screenDeltaToWorldDelta]);
-
-	const flushDragDelta = useCallback(() => {
+	const flushDragDelta = () => {
 		const dragState = dragStateRef.current;
-		if (dragState.rafId !== null) {
-			cancelAnimationFrame(dragState.rafId);
-			dragState.rafId = null;
-		}
-
 		if (dragState.pendingDx === 0 && dragState.pendingDy === 0 && dragState.pendingRotate === 0) {
 			return;
 		}
@@ -79,53 +63,11 @@ export function useInteraction(
 		if (rotateDelta !== 0) {
 			onRotateDeltaRef.current?.(rotateDelta);
 		}
-	}, [dragStateRef]);
-
-	const scheduleDragFlush = useCallback(() => {
-		const dragState = dragStateRef.current;
-		if (dragState.rafId !== null) {
-			return;
-		}
-
-		dragState.rafId = requestAnimationFrame(() => {
-			dragState.rafId = null;
-			flushDragDelta();
-		});
-	}, [flushDragDelta, dragStateRef]);
-
-	useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.code === "Space") {
-				spacePressedRef.current = true;
-				event.preventDefault();
-			}
-		};
-
-		const handleKeyUp = (event: KeyboardEvent) => {
-			if (event.code === "Space") {
-				spacePressedRef.current = false;
-			}
-		};
-
-		const handleBlur = () => {
-			spacePressedRef.current = false;
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		window.addEventListener("keyup", handleKeyUp);
-		window.addEventListener("blur", handleBlur);
-
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-			window.removeEventListener("keyup", handleKeyUp);
-			window.removeEventListener("blur", handleBlur);
-		};
-	}, []);
+	};
 
 	return {
 		spacePressedRef,
 		dragStateRef,
 		flushDragDelta,
-		scheduleDragFlush,
 	};
 }

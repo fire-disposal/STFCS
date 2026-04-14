@@ -38,9 +38,8 @@ interface UIState {
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 
-	// 地图游标状态
-	mapCursor: { x: number; y: number; heading: number } | null;
-	showMapCursor: boolean;
+	// 地图游标状态 (世界坐标，真实朝向)
+	mapCursor: { x: number; y: number; r: number } | null;
 
 	// 坐标精度设置（用于太空环境）
 	coordinatePrecision: "exact" | "rounded10" | "rounded100";
@@ -87,9 +86,8 @@ interface UIActions {
 	toggleStarfieldParallax: () => void;
 
 	// 游标相关
-	setMapCursor: (x: number, y: number, heading: number) => void;
+	setMapCursor: (x: number, y: number, r: number) => void;
 	clearMapCursor: () => void;
-	toggleMapCursor: (show: boolean) => void;
 
 	// 坐标精度相关
 	setCoordinatePrecision: (precision: CoordinatePrecision) => void;
@@ -134,7 +132,6 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	// 地图游标初始状态
 	mapCursor: null,
-	showMapCursor: false,
 
 	// 坐标精度默认为 10 的倍数（适合太空环境）
 	coordinatePrecision: "rounded10",
@@ -189,9 +186,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 
 	// 游标设置
-	setMapCursor: (x, y, heading) => set({ mapCursor: { x, y, heading }, showMapCursor: true }),
-	clearMapCursor: () => set({ mapCursor: null, showMapCursor: false }),
-	toggleMapCursor: (show) => set({ showMapCursor: show }),
+	setMapCursor: (x: number, y: number, r: number) => set({ mapCursor: { x, y, r } }),
+	clearMapCursor: () => set({ mapCursor: null }),
 
 	// 坐标精度设置
 	setCoordinatePrecision: (precision: CoordinatePrecision) =>
@@ -204,6 +200,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setViewRotation: (rotation) => set({ viewRotation: rotation }),
 	rotateViewToAngle: (angle) => set({ viewRotation: angle, isViewRotating: false }),
 	resetViewRotation: () => set({ viewRotation: 0, isViewRotating: false }),
+
+	toggleStarfieldParallax: () => set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 
 	toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 	setActivePanel: (panel) => set({ activePanel: panel }),

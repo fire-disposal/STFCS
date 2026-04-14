@@ -1,22 +1,11 @@
-/**
- * 右侧面板组件
- *
- * 包含三个栏目：
- * - 视图：坐标、角度、缩放控制和图层显示
- * - 日志：战斗日志
- * - DM：DM 控制中心
- *
- * 支持向右折叠收缩
- */
-
 import { useCameraAnimation } from "@/hooks/useCameraAnimation";
 import { useUIStore } from "@/store/uiStore";
-import type { Room } from "@colyseus/sdk";
-import type { FactionValue, GameRoomState, PlayerState, ShipState } from "@vt/contracts";
+import type { FactionValue, PlayerState, ShipState } from "@vt/contracts";
 import { ChevronLeft, ChevronRight, FileText, Monitor, Palette } from "lucide-react";
 import React, { useState } from "react";
 import { CombatLogPanel } from "./CombatLogPanel";
 import { ViewControlPanel } from "./ViewControlPanel";
+import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 
 type TabId = "view" | "log" | "dm";
 
@@ -27,7 +16,6 @@ interface TabDef {
 }
 
 interface RightSidePanelProps {
-	room: Room<GameRoomState> | null;
 	isDM: boolean;
 	ships: ShipState[];
 	players: PlayerState[];
@@ -40,79 +28,41 @@ interface RightSidePanelProps {
 		faction: FactionValue;
 		ownerId?: string;
 	}) => void;
-	isPlacementMode: boolean;
-	onTogglePlacementMode: () => void;
 	onCreateTestShip: (faction: "player" | "dm", x: number, y: number) => void;
 	onClearOverload: (shipId: string) => void;
 	onSetArmor: (shipId: string, section: number, value: number) => void;
 	onAssignShip: (shipId: string, targetSessionId: string) => void;
 	onNextPhase: () => void;
-	// 视图控制相关
-	zoom: number;
-	cameraX: number;
-	cameraY: number;
-	viewRotation: number;
-	showGrid: boolean;
-	showBackground: boolean;
-	showWeaponArcs: boolean;
-	showMovementRange: boolean;
-	onZoomChange: (zoom: number) => void;
-	onCameraChange: (x: number, y: number) => void;
-	onViewRotationChange: (rotation: number) => void;
-	onToggleGrid: () => void;
-	onToggleBackground: () => void;
-	onToggleWeaponArcs: () => void;
-	onToggleMovementRange: () => void;
 	onResetView: () => void;
 }
 
 export const RightSidePanel: React.FC<RightSidePanelProps> = ({
-	room,
 	isDM,
 	ships,
 	players,
 	onCreateObject,
-	isPlacementMode,
-	onTogglePlacementMode,
 	onCreateTestShip,
 	onClearOverload,
 	onSetArmor,
 	onAssignShip,
 	onNextPhase,
-	// 视图控制
-	zoom,
-	cameraX,
-	cameraY,
-	viewRotation,
-	showGrid,
-	showBackground,
-	showWeaponArcs,
-	showMovementRange,
-	onZoomChange,
-	onCameraChange,
-	onViewRotationChange,
-	onToggleGrid,
-	onToggleBackground,
-	onToggleWeaponArcs,
-	onToggleMovementRange,
 	onResetView,
 }) => {
 	const [activeTab, setActiveTab] = useState<TabId>("view");
 	const [isCollapsed, setIsCollapsed] = useState(false);
+	const { cameraPosition, zoom, viewRotation, setCameraPosition, setViewRotation, setZoom } = useUIStore();
 
-	// 摄像机动画 Hook
 	const cameraAnimation = useCameraAnimation({
-		onCameraChange,
-		onViewRotationChange,
-		onZoomChange,
-		currentX: cameraX,
-		currentY: cameraY,
+		onCameraChange: setCameraPosition,
+		onViewRotationChange: setViewRotation,
+		onZoomChange: setZoom,
+		currentX: cameraPosition.x,
+		currentY: cameraPosition.y,
 		currentRotation: viewRotation,
 		currentZoom: zoom,
 	});
 
-	// 游标状态
-	const { mapCursor, setMapCursor, clearMapCursor } = useUIStore();
+	const { mapCursor } = useUIStore();
 
 	const tabs: TabDef[] = [
 		{ id: "view", label: "视图", Icon: Monitor },
@@ -153,7 +103,6 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 
 	return (
 		<div className="right-side-panel">
-			{/* 折叠按钮 */}
 			<button
 				data-magnetic
 				className="right-side-panel__collapse-btn"
@@ -163,7 +112,6 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 				<ChevronRight className="game-icon--md" />
 			</button>
 
-			{/* Tab 头部 */}
 			<div className="right-side-panel__tabs">
 				{tabs.map((tab) => (
 					<button
@@ -178,31 +126,11 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 				))}
 			</div>
 
-			{/* Tab 内容 */}
 			<div className="right-side-panel__content">
 				{activeTab === "view" && (
 					<ViewControlPanel
-						zoom={zoom}
-						cameraX={cameraX}
-						cameraY={cameraY}
-						viewRotation={viewRotation}
-						showGrid={showGrid}
-						showBackground={showBackground}
-						showWeaponArcs={showWeaponArcs}
-						showMovementRange={showMovementRange}
-						onZoomChange={onZoomChange}
-						onCameraChange={onCameraChange}
-						onViewRotationChange={onViewRotationChange}
-						onToggleGrid={onToggleGrid}
-						onToggleBackground={onToggleBackground}
-						onToggleWeaponArcs={onToggleWeaponArcs}
-						onToggleMovementRange={onToggleMovementRange}
 						cameraAnimation={cameraAnimation}
 						onResetView={onResetView}
-						mapCursor={mapCursor}
-						onSetMapCursor={setMapCursor}
-						onClearMapCursor={clearMapCursor}
-						cursorR={mapCursor?.heading ?? null}
 					/>
 				)}
 
@@ -240,8 +168,5 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 		</div>
 	);
 };
-
-// DM 组件导入（复用现有组件）
-import { DMControlPanel, DMObjectCreator } from "@/features/dm";
 
 export default RightSidePanel;

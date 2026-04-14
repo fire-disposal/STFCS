@@ -1,17 +1,8 @@
-/**
- * 视图控制面板组件
- *
- * 提供详细的视图控制功能：
- * - 坐标显示和输入调整
- * - 角度显示和旋转控制
- * - 缩放级别显示和控制
- * - 图层显示控制（网格、背景、武器弧、移动范围）
- * - 视图操作（重置、归零等）
- */
-
+import type { UseCameraAnimationResult } from "@/hooks/useCameraAnimation";
+import { useUIStore } from "@/store/uiStore";
+import React from "react";
 import { CursorCoordinateInput } from "@/components/map/CursorCoordinateInput";
 import { CoordinateInput } from "@/components/ui/CoordinateInput";
-import type { UseCameraAnimationResult } from "@/hooks/useCameraAnimation";
 import {
 	Crosshair,
 	Grid3X3,
@@ -26,89 +17,50 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import React from "react";
 
 interface ViewControlPanelProps {
-	zoom: number;
-	cameraX: number;
-	cameraY: number;
-	viewRotation: number;
-	showGrid: boolean;
-	showBackground: boolean;
-	showWeaponArcs: boolean;
-	showMovementRange: boolean;
-	onZoomChange: (zoom: number) => void;
-	onCameraChange: (x: number, y: number) => void;
-	onViewRotationChange: (rotation: number) => void;
-	onToggleGrid: () => void;
-	onToggleBackground: () => void;
-	onToggleWeaponArcs: () => void;
-	onToggleMovementRange: () => void;
-	onResetView: () => void;
 	cameraAnimation?: UseCameraAnimationResult;
-	mapCursor?: { x: number; y: number; heading: number } | null;
-	onSetMapCursor: (x: number, y: number, heading: number) => void;
-	onClearMapCursor: () => void;
-	cursorR?: number | null;
+	onResetView: () => void;
 }
 
 export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
-	zoom,
-	cameraX,
-	cameraY,
-	viewRotation,
-	showGrid,
-	showBackground,
-	showWeaponArcs,
-	showMovementRange,
-	onZoomChange,
-	onCameraChange,
-	onViewRotationChange,
-	onToggleGrid,
-	onToggleBackground,
-	onToggleWeaponArcs,
-	onToggleMovementRange,
-	onResetView,
 	cameraAnimation,
-	mapCursor,
-	onSetMapCursor,
-	onClearMapCursor,
-	cursorR,
+	onResetView,
 }) => {
-	// 缩放控制
-	const handleZoomIn = () => {
-		onZoomChange(Math.min(zoom * 1.2, 5));
-	};
+	const {
+		zoom,
+		cameraPosition,
+		viewRotation,
+		showGrid,
+		showBackground,
+		showWeaponArcs,
+		showMovementRange,
+		mapCursor,
+		setZoom,
+		setCameraPosition,
+		setViewRotation,
+		toggleGrid,
+		toggleBackground,
+		toggleWeaponArcs,
+		toggleMovementRange,
+		setMapCursor,
+		clearMapCursor,
+	} = useUIStore();
 
-	const handleZoomOut = () => {
-		onZoomChange(Math.max(zoom / 1.2, 0.1));
-	};
+	const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));
+	const handleZoomOut = () => setZoom(Math.max(zoom / 1.2, 0.5));
+	const handleZoomReset = () => setZoom(1);
 
-	const handleZoomReset = () => {
-		onZoomChange(1);
-	};
+	const handleRotateLeft = () => setViewRotation((viewRotation - 15 + 360) % 360);
+	const handleRotateRight = () => setViewRotation((viewRotation + 15) % 360);
+	const handleRotateReset = () => setViewRotation(0);
 
-	// 旋转控制
-	const handleRotateLeft = () => {
-		onViewRotationChange((viewRotation - 15 + 360) % 360);
-	};
-
-	const handleRotateRight = () => {
-		onViewRotationChange((viewRotation + 15) % 360);
-	};
-
-	const handleRotateReset = () => {
-		onViewRotationChange(0);
-	};
-
-	// 视图归零
 	const handleResetAll = () => {
-		onCameraChange(0, 0);
-		onViewRotationChange(0);
-		onZoomChange(1);
+		setCameraPosition(0, 0);
+		setViewRotation(0);
+		setZoom(1);
 	};
 
-	// 视图预设
 	const viewPresets = [
 		{ name: "全局", zoom: 0.5, x: 0, y: 0, rotation: 0 },
 		{ name: "标准", zoom: 1, x: 0, y: 0, rotation: 0 },
@@ -116,20 +68,19 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		{ name: "细节", zoom: 3, x: 0, y: 0, rotation: 0 },
 	];
 
-	const applyPreset = (preset: (typeof viewPresets)[0]) => {
-		onZoomChange(preset.zoom);
-		onCameraChange(preset.x, preset.y);
-		onViewRotationChange(preset.rotation);
+	const applyPreset = (preset: typeof viewPresets[0]) => {
+		setZoom(preset.zoom);
+		setCameraPosition(preset.x, preset.y);
+		setViewRotation(preset.rotation);
 	};
 
 	return (
 		<div className="view-control-panel">
-			{/* 视图状态概览 */}
 			<div className="view-status-bar">
 				<div className="view-status-item">
 					<span className="view-status-label">坐标</span>
 					<span className="view-status-value">
-						({Math.round(cameraX)}, {Math.round(cameraY)})
+						({Math.round(cameraPosition.x)}, {Math.round(cameraPosition.y)})
 					</span>
 				</div>
 				<div className="view-status-divider" />
@@ -144,41 +95,37 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				</div>
 			</div>
 
-			{/* 视图信息区块 */}
 			<div className="view-section">
 				<div className="view-section__title">
 					<Monitor className="view-section__icon" />
 					<span>视图信息</span>
 				</div>
 
-				{/* 坐标信息 */}
 				<div className="view-field-group">
 					<div className="view-field__label">
 						<Navigation2 className="view-field__icon" />
 						<span>相机坐标</span>
 					</div>
-					{/* 一体化坐标输入组件 */}
 					<CoordinateInput
-						cameraX={cameraX}
-						cameraY={cameraY}
+						cameraX={cameraPosition.x}
+						cameraY={cameraPosition.y}
 						viewRotation={viewRotation}
 						zoom={zoom}
-						onCameraChange={onCameraChange}
-						onViewRotationChange={onViewRotationChange}
-						onZoomChange={onZoomChange}
+						onCameraChange={setCameraPosition}
+						onViewRotationChange={setViewRotation}
+						onZoomChange={setZoom}
 						animateToCoords={cameraAnimation?.animateToCoords}
 						worldBounds={{
 							minX: -10000,
 							maxX: 10000,
 							minY: -10000,
 							maxY: 10000,
-							minZoom: 0.1,
+							minZoom: 0.5,
 							maxZoom: 5,
 						}}
 					/>
 				</div>
 
-				{/* 游标坐标 */}
 				<div className="view-field-group">
 					<div className="view-field__label">
 						<Move className="view-field__icon" />
@@ -187,13 +134,13 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 					<CursorCoordinateInput
 						cursorX={mapCursor?.x ?? null}
 						cursorY={mapCursor?.y ?? null}
-						cursorR={cursorR ?? null}
-						cameraX={cameraX}
-						cameraY={cameraY}
+						cursorR={mapCursor?.r ?? null}
+						cameraX={cameraPosition.x}
+						cameraY={cameraPosition.y}
 						viewRotation={viewRotation}
-						onCameraChange={onCameraChange}
-						onSetMapCursor={onSetMapCursor}
-						onClearMapCursor={onClearMapCursor}
+						onCameraChange={setCameraPosition}
+						onSetMapCursor={setMapCursor}
+						onClearMapCursor={clearMapCursor}
 						worldBounds={{
 							minX: -10000,
 							maxX: 10000,
@@ -203,7 +150,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 					/>
 				</div>
 
-				{/* 缩放信息 */}
 				<div className="view-field-group">
 					<div className="view-field__label">
 						<ZoomIn className="view-field__icon" />
@@ -244,20 +190,19 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<input
 							type="range"
 							className="view-field__slider"
-							min="0.1"
+							min="0.5"
 							max="5"
 							step="0.1"
 							value={zoom}
-							onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+							onChange={(e) => setZoom(parseFloat(e.target.value))}
 						/>
 					</div>
 				</div>
 
-				{/* 旋转角度信息 */}
 				<div className="view-field-group">
 					<div className="view-field__label">
 						<RotateCcw className="view-field__icon" />
-						<span>视图旋转（已在坐标组件中控制）</span>
+						<span>视图旋转</span>
 					</div>
 					<div className="view-field__buttons view-field__buttons--spread">
 						<button
@@ -291,7 +236,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				</div>
 			</div>
 
-			{/* 图层控制 */}
 			<div className="view-section">
 				<div className="view-section__title">
 					<Grid3X3 className="view-section__icon" />
@@ -300,28 +244,28 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 
 				<div className="view-toggles">
 					<label className="view-toggle">
-						<input type="checkbox" checked={showGrid} onChange={onToggleGrid} />
+						<input type="checkbox" checked={showGrid} onChange={toggleGrid} />
 						<span className="view-toggle__indicator" />
 						<Grid3X3 className="view-toggle__icon" />
 						<span className="view-toggle__label">网格</span>
 					</label>
 
 					<label className="view-toggle">
-						<input type="checkbox" checked={showBackground} onChange={onToggleBackground} />
+						<input type="checkbox" checked={showBackground} onChange={toggleBackground} />
 						<span className="view-toggle__indicator" />
 						<Image className="view-toggle__icon" />
 						<span className="view-toggle__label">背景</span>
 					</label>
 
 					<label className="view-toggle">
-						<input type="checkbox" checked={showWeaponArcs} onChange={onToggleWeaponArcs} />
+						<input type="checkbox" checked={showWeaponArcs} onChange={toggleWeaponArcs} />
 						<span className="view-toggle__indicator" />
 						<Crosshair className="view-toggle__icon" />
 						<span className="view-toggle__label">武器弧</span>
 					</label>
 
 					<label className="view-toggle">
-						<input type="checkbox" checked={showMovementRange} onChange={onToggleMovementRange} />
+						<input type="checkbox" checked={showMovementRange} onChange={toggleMovementRange} />
 						<span className="view-toggle__indicator" />
 						<Navigation2 className="view-toggle__icon" />
 						<span className="view-toggle__label">移动范围</span>
@@ -329,7 +273,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				</div>
 			</div>
 
-			{/* 视图预设 */}
 			<div className="view-section">
 				<div className="view-section__title">
 					<Monitor className="view-section__icon" />
@@ -350,7 +293,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				</div>
 			</div>
 
-			{/* 视图操作 */}
 			<div className="view-section">
 				<div className="view-section__title">
 					<Move className="view-section__icon" />
@@ -369,7 +311,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 				</div>
 			</div>
 
-			{/* 快捷键提示 */}
 			<div className="view-section view-section--hints">
 				<div className="view-hints">
 					<div className="view-hint">

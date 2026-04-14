@@ -1,5 +1,5 @@
 import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/mathUtils";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { CanvasSize } from "./useCanvasResize";
 
 export interface CameraState {
@@ -11,8 +11,6 @@ export interface CameraState {
 
 export interface UseCameraResult {
 	cameraRef: React.MutableRefObject<CameraState>;
-	zoomTargetRef: React.MutableRefObject<{ zoom: number; cameraX: number; cameraY: number } | null>;
-	zoomAnimationRef: React.MutableRefObject<number | null>;
 	clampZoom: (value: number) => number;
 	screenToWorldPoint: (
 		screenX: number,
@@ -23,7 +21,9 @@ export interface UseCameraResult {
 		rotationValue: number
 	) => { x: number; y: number };
 	screenDeltaToWorldDelta: (deltaX: number, deltaY: number) => { x: number; y: number };
-	animateZoomToTarget: () => void;
+	queueZoomToTarget: (target: { zoom: number; cameraX: number; cameraY: number }) => void;
+	cancelZoomAnimation: () => void;
+	tickZoomAnimation: () => void;
 }
 
 export function useCamera(
@@ -32,8 +32,8 @@ export function useCamera(
 	setCameraPosition: (x: number, y: number) => void
 ): UseCameraResult {
 	const cameraRef = useRef<CameraState>({ cameraX: 0, cameraY: 0, zoom: 1, viewRotation: 0 });
-	const zoomAnimationRef = useRef<number | null>(null);
 	const zoomTargetRef = useRef<{ zoom: number; cameraX: number; cameraY: number } | null>(null);
+	const isZoomAnimatingRef = useRef(false);
 
 	const clampZoom = useCallback((value: number) => {
 		return Math.max(0.5, Math.min(3, value));
@@ -52,29 +52,30 @@ export function useCamera(
 			const centerY = canvasSize.height / 2;
 			const relativeX = screenX - centerX;
 			const relativeY = screenY - centerY;
-			// 使用统一的坐标转换工具
-			return screenToWorld(
-				relativeX,
-				relativeY,
-				zoomValue,
-				cameraXValue,
-				cameraYValue,
-				rotationValue
-			);
+			return screenToWorld(relativeX, relativeY, zoomValue, cameraXValue, cameraYValue, rotationValue);
 		},
 		[canvasSize.width, canvasSize.height]
 	);
 
 	const screenDeltaToWorldDelta = useCallback((deltaX: number, deltaY: number) => {
 		const { zoom: currentZoom, viewRotation: currentRotation } = cameraRef.current;
-		// 使用统一的向量转换工具
 		return deltaUtil(deltaX, deltaY, currentZoom, currentRotation);
 	}, []);
 
-	const animateZoomToTarget = useCallback(() => {
+	const cancelZoomAnimation = useCallback(() => {
+		zoomTargetRef.current = null;
+		isZoomAnimatingRef.current = false;
+	}, []);
+
+	const queueZoomToTarget = useCallback((target: { zoom: number; cameraX: number; cameraY: number }) => {
+		zoomTargetRef.current = target;
+		isZoomAnimatingRef.current = true;
+	}, []);
+
+	const tickZoomAnimation = useCallback(() => {
 		const target = zoomTargetRef.current;
 		if (!target) {
-			zoomAnimationRef.current = null;
+			isZoomAnimatingRef.current = false;
 			return;
 		}
 
@@ -91,34 +92,26 @@ export function useCamera(
 			setZoom(target.zoom);
 			setCameraPosition(target.cameraX, target.cameraY);
 			zoomTargetRef.current = null;
-			zoomAnimationRef.current = null;
+			isZoomAnimatingRef.current = false;
 			return;
 		}
 
-		const nextZoom = clampZoom(current.zoom + zoomDiff * 0.18);
-		const nextCameraX = current.cameraX + cameraXDiff * 0.18;
-		const nextCameraY = current.cameraY + cameraYDiff * 0.18;
+		const speed = 0.18;
+		const nextZoom = clampZoom(current.zoom + zoomDiff * speed);
+		const nextCameraX = current.cameraX + cameraXDiff * speed;
+		const nextCameraY = current.cameraY + cameraYDiff * speed;
 
 		setZoom(nextZoom);
 		setCameraPosition(nextCameraX, nextCameraY);
-		zoomAnimationRef.current = requestAnimationFrame(animateZoomToTarget);
 	}, [clampZoom, setCameraPosition, setZoom]);
-
-	useEffect(() => {
-		return () => {
-			if (zoomAnimationRef.current !== null) {
-				cancelAnimationFrame(zoomAnimationRef.current);
-			}
-		};
-	}, []);
 
 	return {
 		cameraRef,
-		zoomTargetRef,
-		zoomAnimationRef,
 		clampZoom,
 		screenToWorldPoint,
 		screenDeltaToWorldDelta,
-		animateZoomToTarget,
+		queueZoomToTarget,
+		cancelZoomAnimation,
+		tickZoomAnimation,
 	};
 }
