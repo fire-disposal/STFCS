@@ -21,6 +21,7 @@ COPY packages/client ./packages/client
 RUN pnpm --filter @vt/types build
 RUN pnpm --filter @vt/data build
 RUN pnpm --filter @vt/rules build
+RUN pnpm --filter client build
 RUN pnpm --filter server build
 
 FROM node:24-alpine AS runner
