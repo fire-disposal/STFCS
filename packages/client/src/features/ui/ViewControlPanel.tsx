@@ -14,6 +14,8 @@ import {
 	Navigation2,
 	RotateCcw,
 	RotateCw,
+	Sparkles,
+	Tag,
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
@@ -35,6 +37,9 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		showBackground,
 		showWeaponArcs,
 		showMovementRange,
+		showLabels,
+		showEffects,
+		showShipIcons,
 		mapCursor,
 		setZoom,
 		setCameraPosition,
@@ -43,6 +48,9 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		toggleBackground,
 		toggleWeaponArcs,
 		toggleMovementRange,
+		toggleLabels,
+		toggleEffects,
+		toggleShipIcons,
 		setMapCursor,
 		clearMapCursor,
 	} = useUIStore();
@@ -269,6 +277,27 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<span className="view-toggle__indicator" />
 						<Navigation2 className="view-toggle__icon" />
 						<span className="view-toggle__label">移动范围</span>
+					</label>
+
+					<label className="view-toggle">
+						<input type="checkbox" checked={showLabels} onChange={toggleLabels} />
+						<span className="view-toggle__indicator" />
+						<Tag className="view-toggle__icon" />
+						<span className="view-toggle__label">标签</span>
+					</label>
+
+					<label className="view-toggle">
+						<input type="checkbox" checked={showEffects} onChange={toggleEffects} />
+						<span className="view-toggle__indicator" />
+						<Sparkles className="view-toggle__icon" />
+						<span className="view-toggle__label">特效</span>
+					</label>
+
+					<label className="view-toggle">
+						<input type="checkbox" checked={showShipIcons} onChange={toggleShipIcons} />
+						<span className="view-toggle__indicator" />
+						<Monitor className="view-toggle__icon" />
+						<span className="view-toggle__label">图标</span>
 					</label>
 				</div>
 			</div>

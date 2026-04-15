@@ -35,6 +35,9 @@ interface UIState {
 	showBackground: boolean;
 	showWeaponArcs: boolean;
 	showMovementRange: boolean;
+	showLabels: boolean;
+	showEffects: boolean;
+	showShipIcons: boolean;
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 
@@ -82,6 +85,9 @@ interface UIActions {
 	toggleBackground: () => void;
 	toggleWeaponArcs: () => void;
 	toggleMovementRange: () => void;
+	toggleLabels: () => void;
+	toggleEffects: () => void;
+	toggleShipIcons: () => void;
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
 
@@ -127,6 +133,9 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showBackground: true,
 	showWeaponArcs: true,
 	showMovementRange: true,
+	showLabels: true,
+	showEffects: true,
+	showShipIcons: true,
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
 
@@ -183,7 +192,12 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleBackground: () => set((state) => ({ showBackground: !state.showBackground })),
 	toggleWeaponArcs: () => set((state) => ({ showWeaponArcs: !state.showWeaponArcs })),
 	toggleMovementRange: () => set((state) => ({ showMovementRange: !state.showMovementRange })),
+	toggleLabels: () => set((state) => ({ showLabels: !state.showLabels })),
+	toggleEffects: () => set((state) => ({ showEffects: !state.showEffects })),
+	toggleShipIcons: () => set((state) => ({ showShipIcons: !state.showShipIcons })),
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
+	toggleStarfieldParallax: () =>
+		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 
 	// 游标设置
 	setMapCursor: (x: number, y: number, r: number) =>
@@ -202,9 +216,6 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	rotateViewToAngle: (angle) =>
 		set({ viewRotation: Math.round(angle * 100) / 100, isViewRotating: false }),
 	resetViewRotation: () => set({ viewRotation: 0, isViewRotating: false }),
-
-	toggleStarfieldParallax: () =>
-		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 
 	toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 	setActivePanel: (panel) => set({ activePanel: panel }),

@@ -80,18 +80,39 @@ export function usePlayers(room: Room | null) {
 }
 
 /**
- * 订阅舰船列表
+ * 订阅舰船列表 - 使用 MapSchema 原生事件
  */
 export function useShips(room: Room | null) {
-	return useMultiplayerState(room, (state: any) => {
-		if (!state?.ships) return [];
+	const [ships, setShips] = useState<any[]>([]);
 
-		const result: any[] = [];
-		state.ships.forEach((ship: any) => {
-			result.push(ship);
-		});
-		return result;
-	});
+	useEffect(() => {
+		if (!room?.state?.ships) {
+			setShips([]);
+			return;
+		}
+
+		const shipsMap = room.state.ships;
+
+		const getShipsArray = (): any[] => {
+			const arr: any[] = [];
+			shipsMap.forEach((ship: any) => arr.push(ship));
+			return arr;
+		};
+
+		setShips(getShipsArray());
+
+		const handleStateChange = (state: any) => {
+			setShips(getShipsArray());
+		};
+
+		room.onStateChange(handleStateChange);
+
+		return () => {
+			room.onStateChange.remove(handleStateChange);
+		};
+	}, [room?.state?.ships]);
+
+	return ships;
 }
 
 /**

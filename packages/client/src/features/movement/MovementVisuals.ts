@@ -11,13 +11,13 @@ import type { MovementCommand } from "@/store/slices/movementSlice";
 import type { ShipState } from "@vt/types";
 import type { Graphics } from "pixi.js";
 
-// 颜色配置
+// 颜色配置 (PixiJS v8 不支持带 alpha 的颜色值)
 const COLORS = {
-	rangeRing: 0x4a9eff, // 蓝色 - 范围圈
-	rangeFill: 0x4a9eff40, // 半透明填充
-	turnArc: 0xf1c40f, // 黄色 - 转向弧
-	movePath: 0x2ecc71, // 绿色 - 移动路径
-	invalid: 0xff4a4a, // 红色 - 无效区域
+	rangeRing: 0x4a9eff,
+	rangeFill: 0x4a9eff,
+	turnArc: 0xf1c40f,
+	movePath: 0x2ecc71,
+	invalid: 0xff4a4a,
 };
 
 export interface MovementVisualsConfig {

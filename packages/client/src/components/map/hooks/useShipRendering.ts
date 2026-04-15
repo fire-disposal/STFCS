@@ -300,5 +300,17 @@ function createNewShip(
 	layers.ships.addChild(token);
 	layers.labels.addChild(hpBar);
 	layers.labels.addChild(label);
-	cache.set(ship.id, { token, label, hpBar, isSelected });
+	cache.set(ship.id, {
+		token,
+		label,
+		hpBar,
+		isSelected,
+		lastState: {
+			x: ship.transform.x,
+			y: ship.transform.y,
+			heading: ship.transform.heading,
+			hp: ship.hull.current,
+			flux: ship.flux.total,
+		},
+	});
 }

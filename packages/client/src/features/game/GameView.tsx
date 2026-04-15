@@ -19,6 +19,7 @@ import { BottomCommandDock } from "@/features/ui/BottomCommandDock";
 import { RightSidePanel } from "@/features/ui/RightSidePanel";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { useCurrentGameRoom } from "@/hooks";
+import { useShips } from "@/hooks";
 import { NetworkManager } from "@/network/NetworkManager";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
@@ -65,19 +66,12 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 
 	// 当前玩家 - 直接使用 sessionId 查找
 	const currentPlayer = useMemo(() => {
-		if (!room) return null;
+		if (!room?.state?.players) return null;
 		return room.state.players.get(room.sessionId) || null;
-	}, [room, room?.sessionId]);
+	}, [room?.state?.players, room?.sessionId]);
 
-	// 舰船列表 - 移除 version 依赖，Colyseus 会自动触发更新
-	const ships = useMemo(() => {
-		const shipsMap = room?.state?.ships;
-		if (!shipsMap) return [];
-
-		const result: ShipState[] = [];
-		shipsMap.forEach((ship) => result.push(ship));
-		return result;
-	}, [room?.state?.ships]);
+	// 舰船列表 - 使用 Colyseus MapSchema 原生事件
+	const ships = useShips(room);
 
 	const selectedShip = useMemo(() => {
 		return ships.find((s) => s.id === selectedShipId) || null;

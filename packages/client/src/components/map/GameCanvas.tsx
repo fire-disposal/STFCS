@@ -75,7 +75,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
 	const { selectShip: storeSelectShip, setMouseWorldPosition } = useSelectionStore();
-	const { setZoom, setCameraPosition, setMapCursor, mapCursor } = useUIStore();
+	const { setZoom, setCameraPosition, setMapCursor, mapCursor, showLabels, showEffects, showShipIcons } = useUIStore();
 	const movementState = useAppSelector((state: any) => state.movement) as MovementState;
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
@@ -118,6 +118,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		showMovementRange,
 	});
 	useGridRendering(layerSystem.layers, showGrid);
+
+	useEffect(() => {
+		if (!layerSystem.layers) return;
+		layerSystem.layers.labels.visible = showLabels;
+		layerSystem.layers.effects.visible = showEffects;
+		layerSystem.layers.shipIcons.visible = showShipIcons;
+	}, [layerSystem.layers, showLabels, showEffects, showShipIcons]);
 
 	useEffect(() => {
 		camera.cameraRef.current = { cameraX, cameraY, zoom, viewRotation };

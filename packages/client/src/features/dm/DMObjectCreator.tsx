@@ -130,9 +130,9 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({ onCreateObject
 	const [form, setForm] = useState<FormState>({
 		type: "ship",
 		hullId: "frigate",
-		heading: "0",
-		x: "0",
-		y: "0",
+		heading: "",
+		x: "",
+		y: "",
 		faction: Faction.DM,
 		ownerId: "",
 		name: "",
@@ -141,12 +141,13 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({ onCreateObject
 	const availableShips = useMemo(() => getAvailableShips(), []);
 	const selectedShip = useMemo(() => availableShips.find((s) => s.id === form.hullId), [availableShips, form.hullId]);
 
-	const heading = parseFinite(form.heading);
-	const x = parseFinite(form.x);
-	const y = parseFinite(form.y);
 	const cursorX = mapCursor ? Number(mapCursor.x.toFixed(1)) : null;
 	const cursorY = mapCursor ? Number(mapCursor.y.toFixed(1)) : null;
 	const cursorHeading = mapCursor ? Number(mapCursor.r.toFixed(2)) : null;
+
+	const x = form.x.trim() === "" ? null : parseFinite(form.x);
+	const y = form.y.trim() === "" ? null : parseFinite(form.y);
+	const heading = form.heading.trim() === "" ? null : parseFinite(form.heading);
 
 	const effectiveX = x ?? cursorX;
 	const effectiveY = y ?? cursorY;

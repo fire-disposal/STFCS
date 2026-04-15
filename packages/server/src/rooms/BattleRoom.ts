@@ -6,7 +6,7 @@ import { Client, Room } from "@colyseus/core";
 import type { CreateObjectPayload, FactionValue, RoomMetadata } from "@vt/types";
 import { Faction, GamePhase, PlayerRole, WeaponState } from "@vt/types";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
-import { toGameLoadedDto, toGameSavedDto, toIdentityDto, toRoleDto, toShipCreatedDto } from "../dto/index.js";
+import { toGameLoadedDto, toGameSavedDto, toIdentityDto, toRoleDto } from "../dto/index.js";
 import { createAsteroid, createShip, createStation } from "../factory/ShipFactory.js";
 import { registerMessageHandlers } from "../handlers/BattleRoomHandlers.js";
 import { deserializeShipSave, serializeGameSave } from "../schema/GameSave.js";
@@ -210,10 +210,6 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 				ship.name = p.name;
 			}
 			this.state.ships.set(ship.id, ship);
-			this.broadcast(
-				"ship_created",
-				toShipCreatedDto(ship.id, p.hullId ?? p.type, p.x, p.y)
-			);
 		}
 	}
 }
