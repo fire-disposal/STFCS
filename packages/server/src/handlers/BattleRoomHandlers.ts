@@ -5,8 +5,9 @@
 import type { Client } from "@colyseus/core";
 import {
 	ClientCommand,
-	PlayerRole,
 	type CreateObjectPayload,
+	type MoveTokenPayload,
+	PlayerRole,
 } from "@vt/types";
 import type { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { toErrorDto, toNetPongDto, toRoomKickedDto } from "../dto/index.js";
@@ -39,6 +40,7 @@ interface Context {
 	setMetadata: () => void;
 	profileStore: Map<number, { nickname: string; avatar: string }>;
 	createObject: (payload: CreateObjectPayload) => void;
+	enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) => void;
 }
 
 export function registerMessageHandlers(
@@ -91,7 +93,7 @@ export function registerMessageHandlers(
 	onMessage(ClientCommand.CMD_MOVE_TOKEN, (client, payload) => {
 		handleMessage(client, () => {
 			const p = parseMoveTokenPayload(payload);
-			ctx.dispatcher.dispatchMoveToken(client, p);
+			ctx.enqueueMoveCommand(client, p);
 		});
 	});
 
@@ -211,13 +213,7 @@ export function registerMessageHandlers(
 				rtt <= 80 ? "EXCELLENT" : rtt <= 140 ? "GOOD" : rtt <= 220 ? "FAIR" : "POOR";
 			client.send(
 				"NET_PONG",
-				toNetPongDto(
-					p.seq,
-					Date.now(),
-					player.pingMs,
-					player.jitterMs,
-					player.connectionQuality
-				)
+				toNetPongDto(p.seq, Date.now(), player.pingMs, player.jitterMs, player.connectionQuality)
 			);
 		});
 	});

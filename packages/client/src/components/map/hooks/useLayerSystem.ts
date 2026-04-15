@@ -11,12 +11,24 @@ export interface LayerRegistry {
 	starfieldNebula: Container;
 	grid: Container;
 	cursor: Container;
-	ships: Container;
-	labels: Container;
+	/** 舰船素材图层（预留：后续加载 Sprite 资源） */
+	shipSprites: Container;
+	/** 战术视图图层（线条化 token） */
+	tacticalTokens: Container;
+	/** 标签图层（血条/名称，保持清晰可读） */
+	shipLabels: Container;
 	effects: Container;
 	weaponArcs: Container;
 	movementVisuals: Container;
 	shipIcons: Container;
+	/**
+	 * @deprecated 兼容旧代码，指向 tacticalTokens
+	 */
+	ships: Container;
+	/**
+	 * @deprecated 兼容旧代码，指向 shipLabels
+	 */
+	labels: Container;
 }
 
 export interface UseLayerSystemResult {
@@ -95,7 +107,12 @@ export function useLayerSystem(): UseLayerSystemResult {
 		const largeSize = Math.max(canvasSize.width, canvasSize.height, 10000) * 10;
 		const halfSize = largeSize / 2;
 		currentLayers.world.hitArea = new Rectangle(-halfSize, -halfSize, largeSize, largeSize);
-		currentLayers.ships.hitArea = new Rectangle(-halfSize, -halfSize, largeSize, largeSize);
+		currentLayers.tacticalTokens.hitArea = new Rectangle(
+			-halfSize,
+			-halfSize,
+			largeSize,
+			largeSize
+		);
 	}, []);
 
 	useEffect(() => {

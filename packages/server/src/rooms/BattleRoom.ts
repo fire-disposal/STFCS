@@ -3,10 +3,16 @@
  */
 
 import { Client, Room } from "@colyseus/core";
-import type { CreateObjectPayload, FactionValue, RoomMetadata } from "@vt/types";
+import type { CreateObjectPayload, MoveTokenPayload, RoomMetadata } from "@vt/types";
 import { Faction, GamePhase, PlayerRole, WeaponState } from "@vt/types";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
-import { toGameLoadedDto, toGameSavedDto, toIdentityDto, toRoleDto } from "../dto/index.js";
+import {
+	toErrorDto,
+	toGameLoadedDto,
+	toGameSavedDto,
+	toIdentityDto,
+	toRoleDto,
+} from "../dto/index.js";
 import { createAsteroid, createShip, createStation } from "../factory/ShipFactory.js";
 import { registerMessageHandlers } from "../handlers/BattleRoomHandlers.js";
 import { deserializeShipSave, serializeGameSave } from "../schema/GameSave.js";
@@ -22,6 +28,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 	private pingEwma = new Map<string, number>();
 	private jitterEwma = new Map<string, number>();
 	private roomOwnerId: string | null = null;
+	private moveCommandBuffer = new Map<string, { client: Client; payload: MoveTokenPayload }>();
 	private roomDisplayName = "";
 	private profileStore = new Map<number, { nickname: string; avatar: string }>();
 	private createdAt = Date.now();
@@ -45,6 +52,8 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			setMetadata: () => this.syncMetadata(),
 			profileStore: this.profileStore,
 			createObject: (payload: CreateObjectPayload) => this.createObject(payload),
+			enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) =>
+				this.enqueueMoveCommand(client, payload),
 		});
 
 		this.syncMetadata();
@@ -94,16 +103,32 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		}
 	}
 
+	private enqueueMoveCommand(client: Client, payload: MoveTokenPayload): void {
+		this.moveCommandBuffer.set(payload.shipId, { client, payload });
+	}
+
+	private flushMoveCommands(): void {
+		if (this.moveCommandBuffer.size === 0) return;
+		const commands = Array.from(this.moveCommandBuffer.values());
+		this.moveCommandBuffer.clear();
+		for (const command of commands) {
+			try {
+				this.dispatcher.dispatchMoveToken(command.client, command.payload);
+			} catch (error) {
+				command.client.send("error", toErrorDto((error as Error).message));
+			}
+		}
+	}
+
 	private update(dt: number) {
+		this.flushMoveCommands();
 		this.state.ships.forEach((ship: ShipState) => {
 			if (ship.isDestroyed) return;
 			ship.weapons.forEach((w: WeaponSlot) => {
 				w.cooldownRemaining = Math.max(0, w.cooldownRemaining - dt);
 				if (w.state === WeaponState.COOLDOWN && w.cooldownRemaining <= 0) {
 					w.state =
-						w.currentAmmo === 0 && w.maxAmmo > 0
-							? WeaponState.OUT_OF_AMMO
-							: WeaponState.READY;
+						w.currentAmmo === 0 && w.maxAmmo > 0 ? WeaponState.OUT_OF_AMMO : WeaponState.READY;
 				}
 			});
 			if (ship.isOverloaded && ship.overloadTime > 0) {
@@ -119,9 +144,9 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 
 	private assignOwner() {
 		if (!this.state.players.has(this.roomOwnerId ?? "")) {
-			const next = Array.from(
-				this.state.players.values() as IterableIterator<PlayerState>
-			).find((p) => p.connected);
+			const next = Array.from(this.state.players.values() as IterableIterator<PlayerState>).find(
+				(p) => p.connected
+			);
 			this.roomOwnerId = next?.sessionId ?? null;
 			this.state.players.forEach((p: PlayerState) => {
 				p.role = p.sessionId === this.roomOwnerId ? PlayerRole.DM : PlayerRole.PLAYER;

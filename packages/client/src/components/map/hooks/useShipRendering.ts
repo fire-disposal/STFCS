@@ -1,18 +1,31 @@
 import { screenToWorld } from "@/utils/mathUtils";
 import type { ShipState } from "@vt/types";
 import { Faction } from "@vt/types";
-import { Circle, Graphics, Text, TextStyle } from "pixi.js";
+import { Circle, Container, type FederatedPointerEvent, Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "./useLayerSystem";
 
-// 变化检测阈值
 const POSITION_THRESHOLD = 0.5;
-const HEADING_THRESHOLD = 1;
-const HP_THRESHOLD = 1;
-const FLUX_THRESHOLD = 1;
+const HEADING_THRESHOLD = 0.8;
+const HP_THRESHOLD = 0.5;
+const FLUX_THRESHOLD = 0.5;
+
+const labelStyle = new TextStyle({
+	fill: 0xcfe8ff,
+	fontSize: 12,
+	fontFamily: "Arial",
+	fontWeight: "600",
+	stroke: { color: 0x081423, width: 3 },
+});
+
+const FACTION_COLORS: Record<string, number> = {
+	[Faction.PLAYER]: 0x4fc3ff,
+	[Faction.DM]: 0xff7f9f,
+};
 
 export interface ShipCacheItem {
-	token: Graphics;
+	root: Container;
+	tacticalToken: Graphics;
 	label: Text;
 	hpBar: Graphics;
 	isSelected: boolean;
@@ -40,13 +53,6 @@ export interface ShipRenderOptions {
 	storeSelectShip?: (shipId: string) => void;
 }
 
-const labelStyle = new TextStyle({
-	fill: 0xcfe8ff,
-	fontSize: 11,
-	fontFamily: "Arial",
-	stroke: { color: 0x10263e, width: 2 },
-});
-
 export function useShipRendering(
 	layers: LayerRegistry | null,
 	ships: ShipState[],
@@ -57,7 +63,6 @@ export function useShipRendering(
 	const cacheRef = useRef<Map<string, ShipCacheItem>>(new Map());
 	const optionsRef = useRef(options);
 	const contextRef = useRef(context);
-	const lastSelectedShipIdRef = useRef<string | null>(null);
 
 	optionsRef.current = options;
 	contextRef.current = context;
@@ -67,81 +72,32 @@ export function useShipRendering(
 
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.id));
-		const selectedShipIdStr = selectedShipId ?? null;
-		const selectedShipChanged = selectedShipIdStr !== lastSelectedShipIdRef.current;
-		lastSelectedShipIdRef.current = selectedShipIdStr;
+		const selectedId = selectedShipId ?? null;
 
-		// 清理不存在的舰船
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
-				layers.ships.removeChild(item.token);
-				layers.labels.removeChild(item.label);
-				layers.labels.removeChild(item.hpBar);
+				layers.tacticalTokens.removeChild(item.root);
+				layers.shipLabels.removeChild(item.hpBar);
+				layers.shipLabels.removeChild(item.label);
 				cache.delete(id);
 			}
 		}
 
-		// 批量更新舰船
-		const updates: Array<{ ship: ShipState; cached?: ShipCacheItem }> = [];
-		let hasChanges = false;
-
 		for (const ship of ships) {
-			const isSelected = ship.id === selectedShipIdStr;
+			const isSelected = ship.id === selectedId;
 			const cached = cache.get(ship.id);
-			const lastState = cached?.lastState;
-
 			if (!cached) {
-				// 新舰船，需要创建
-				hasChanges = true;
-				updates.push({ ship, cached: undefined });
-			} else if (lastState) {
-				// 检查变化是否超过阈值（使用新的嵌套结构）
-				const dx = Math.abs(ship.transform.x - lastState.x);
-				const dy = Math.abs(ship.transform.y - lastState.y);
-				const dHeading = Math.abs(ship.transform.heading - lastState.heading);
-				const dHp = Math.abs(ship.hull.current - lastState.hp);
-				const dFlux = Math.abs(ship.flux.total - lastState.flux);
-				const isSelectedChanged = isSelected !== cached.isSelected;
+				createShipEntities(layers, cache, ship, isSelected, optionsRef, contextRef);
+				continue;
+			}
 
-				// 视图旋转变化也需要更新（血条朝向补偿）
-				const dViewRotation = Math.abs(
-					(context.viewRotation ?? 0) - (cached.hpBar.rotation * 180) / Math.PI * -1
-				);
-
-				// 只有显著变化才更新
-				if (
-					dx > POSITION_THRESHOLD ||
-					dy > POSITION_THRESHOLD ||
-					dHeading > HEADING_THRESHOLD ||
-					dHp > HP_THRESHOLD ||
-					dFlux > FLUX_THRESHOLD ||
-					isSelectedChanged ||
-					dViewRotation > 0.2
-				) {
-					hasChanges = true;
-					updates.push({ ship, cached });
-				}
-			} else {
-				// 没有上次状态，强制更新
-				hasChanges = true;
-				updates.push({ ship, cached });
+			if (shouldUpdate(cached, ship, isSelected, contextRef.current.viewRotation ?? 0)) {
+				updateShipEntities(cached, ship, isSelected, contextRef.current.viewRotation ?? 0);
 			}
 		}
 
-		// 执行批量更新
-		if (hasChanges) {
-			for (const { ship, cached } of updates) {
-				const isSelected = ship.id === selectedShipIdStr;
-				const color = ship.faction === Faction.PLAYER ? 0x43c1ff : 0xff6f8f;
-				const radius = 20;
-
-				if (cached) {
-					updateExistingShip(cached, ship, isSelected, color, radius, contextRef);
-				} else {
-					createNewShip(layers, cache, ship, isSelected, color, radius, optionsRef, contextRef);
-				}
-			}
-		}
+		// 预留：素材层入口，当前不绘制，仅确保图层存在且可扩展。
+		layers.shipSprites.visible = true;
 	}, [layers, ships, selectedShipId]);
 
 	useEffect(() => {
@@ -151,52 +107,58 @@ export function useShipRendering(
 	}, []);
 }
 
-function updateExistingShip(
+function shouldUpdate(
 	cached: ShipCacheItem,
 	ship: ShipState,
 	isSelected: boolean,
-	color: number,
-	radius: number,
-	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
-) {
-	// 更新位置（总是需要）
-	cached.token.position.set(ship.transform.x, ship.transform.y);
-	cached.token.rotation = (ship.transform.heading * Math.PI) / 180;
-	cached.label.position.set(ship.transform.x, ship.transform.y - radius - 8);
+	viewRotation: number
+): boolean {
+	if (!cached.lastState) return true;
+	const dx = Math.abs(ship.transform.x - cached.lastState.x);
+	const dy = Math.abs(ship.transform.y - cached.lastState.y);
+	const dHeading = Math.abs(ship.transform.heading - cached.lastState.heading);
+	const dHp = Math.abs(ship.hull.current - cached.lastState.hp);
+	const dFlux = Math.abs(ship.flux.total - cached.lastState.flux);
+	const selectedChanged = cached.isSelected !== isSelected;
+	const labelRotationTarget = -((viewRotation * Math.PI) / 180);
+	const dLabelRotation = Math.abs(cached.hpBar.rotation - labelRotationTarget);
 
-	// 只在选中状态变化时重绘
-	if (isSelected !== cached.isSelected) {
+	return (
+		dx > POSITION_THRESHOLD ||
+		dy > POSITION_THRESHOLD ||
+		dHeading > HEADING_THRESHOLD ||
+		dHp > HP_THRESHOLD ||
+		dFlux > FLUX_THRESHOLD ||
+		selectedChanged ||
+		dLabelRotation > 0.002
+	);
+}
+
+function updateShipEntities(
+	cached: ShipCacheItem,
+	ship: ShipState,
+	isSelected: boolean,
+	viewRotation: number
+): void {
+	const color = FACTION_COLORS[ship.faction] ?? 0xcfd8e3;
+	const radius = 20;
+
+	cached.root.position.set(ship.transform.x, ship.transform.y);
+	cached.root.rotation = (ship.transform.heading * Math.PI) / 180;
+	cached.label.position.set(ship.transform.x, ship.transform.y - radius - 10);
+	cached.hpBar.position.set(ship.transform.x, ship.transform.y - radius - 28);
+	cached.hpBar.rotation = -((viewRotation * Math.PI) / 180);
+	cached.label.rotation = -((viewRotation * Math.PI) / 180);
+
+	if (cached.isSelected !== isSelected) {
 		cached.isSelected = isSelected;
-		cached.token.clear();
-		cached.token
-			.poly([0, -radius, radius * 0.7, radius, 0, radius * 0.45, -radius * 0.7, radius])
-			.fill({ color, alpha: 0.88 })
-			.stroke({
-				color: isSelected ? 0xffffff : 0x10263e,
-				alpha: isSelected ? 0.95 : 0.7,
-				width: isSelected ? 3 : 2,
-			});
+		drawTacticalToken(cached.tacticalToken, color, radius, isSelected);
 	}
 
-	// 只在 HP 变化超过阈值时更新血条（屏幕空间保持水平，不跟随舰船旋转）
 	const hpPercent = ship.hull.percent / 100;
-	const hpBarWidth = 48 * hpPercent;
+	drawHpBar(cached.hpBar, hpPercent);
+	cached.label.text = `${ship.name || ship.id.slice(-6)}  HP:${Math.round(ship.hull.current)}/${Math.round(ship.hull.max)}`;
 
-	// 检查血条是否需要更新
-	const currentHpBar = cached.hpBar.children[1] as any;
-	if (!currentHpBar || Math.abs(currentHpBar.width - hpBarWidth) > HP_THRESHOLD) {
-		drawHpBar(cached.hpBar, hpPercent);
-	}
-	cached.hpBar.position.set(ship.transform.x, ship.transform.y - radius - 24);
-	cached.hpBar.rotation = -((contextRef.current.viewRotation ?? 0) * Math.PI) / 180;
-
-	// 只在文本变化时更新标签（使用新的 flux.total）
-	const newText = `${ship.id.slice(-6)}  F:${Math.round(ship.flux.total)}/${Math.round(ship.flux.max)}`;
-	if (cached.label.text !== newText) {
-		cached.label.text = newText;
-	}
-
-	// 更新上次状态
 	cached.lastState = {
 		x: ship.transform.x,
 		y: ship.transform.y,
@@ -206,102 +168,77 @@ function updateExistingShip(
 	};
 }
 
-function drawHpBar(target: Graphics, hpPercent: number): void {
-	target.clear();
-	const width = 58;
-	const height = 8;
-	const fillWidth = Math.max(0, Math.min(1, hpPercent)) * width;
-	const hpColor = hpPercent <= 0.3 ? 0xff6f8f : hpPercent <= 0.6 ? 0xffd166 : 0x49f88f;
-
-	// 背景
-	target.roundRect(-width / 2, -height / 2, width, height, 3).fill({ color: 0x040914, alpha: 0.9 });
-	// 主填充
-	target.roundRect(-width / 2, -height / 2, fillWidth, height, 3).fill({ color: hpColor, alpha: 0.96 });
-	// 扫描线高光
-	target.rect(-width / 2, -height / 2, fillWidth, Math.max(2, height * 0.25)).fill({
-		color: 0xffffff,
-		alpha: 0.22,
-	});
-	// 边框
-	target.roundRect(-width / 2, -height / 2, width, height, 3).stroke({
-		color: 0xb9dbff,
-		alpha: 0.75,
-		width: 1.3,
-	});
-}
-
-function createNewShip(
+function createShipEntities(
 	layers: LayerRegistry,
 	cache: Map<string, ShipCacheItem>,
 	ship: ShipState,
 	isSelected: boolean,
-	color: number,
-	radius: number,
 	optionsRef: React.MutableRefObject<ShipRenderOptions>,
 	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
-) {
-	const token = new Graphics();
-	token
-		.poly([0, -radius, radius * 0.7, radius, 0, radius * 0.45, -radius * 0.7, radius])
-		.fill({ color, alpha: 0.88 })
-		.stroke({
-			color: isSelected ? 0xffffff : 0x10263e,
-			alpha: isSelected ? 0.95 : 0.7,
-			width: isSelected ? 3 : 2,
-		});
-	token.position.set(ship.transform.x, ship.transform.y);
-	token.rotation = (ship.transform.heading * Math.PI) / 180;
-	token.eventMode = "static";
-	token.cursor = "pointer";
-	token.hitArea = new Circle(0, 0, radius + 15);
+): void {
+	const radius = 20;
+	const color = FACTION_COLORS[ship.faction] ?? 0xcfd8e3;
 
-	const shipId = ship.id;
-	token.on("pointertap", () => {
-		optionsRef.current.storeSelectShip?.(shipId);
-		optionsRef.current.onSelectShip?.(shipId);
+	const root = new Container();
+	root.position.set(ship.transform.x, ship.transform.y);
+	root.rotation = (ship.transform.heading * Math.PI) / 180;
+	root.eventMode = "static";
+	root.cursor = "pointer";
+	root.hitArea = new Circle(0, 0, radius + 14);
+
+	const tacticalToken = new Graphics();
+	drawTacticalToken(tacticalToken, color, radius, isSelected);
+	root.addChild(tacticalToken);
+
+	root.on("pointertap", () => {
+		optionsRef.current.storeSelectShip?.(ship.id);
+		optionsRef.current.onSelectShip?.(ship.id);
 	});
 
-	token.on("pointermove", (e: any) => {
+	root.on("pointermove", (e: FederatedPointerEvent) => {
 		const ctx = contextRef.current;
 		if (
-			optionsRef.current.setMouseWorldPosition &&
-			ctx.canvasWidth &&
-			ctx.canvasHeight &&
-			ctx.zoom &&
-			ctx.cameraX &&
-			ctx.cameraY
+			!optionsRef.current.setMouseWorldPosition ||
+			ctx.canvasWidth === undefined ||
+			ctx.canvasHeight === undefined ||
+			ctx.zoom === undefined ||
+			ctx.cameraX === undefined ||
+			ctx.cameraY === undefined
 		) {
-			const { x, y } = screenToWorld(
-				e.global.x - ctx.canvasWidth / 2,
-				e.global.y - ctx.canvasHeight / 2,
-				ctx.zoom,
-				ctx.cameraX,
-				ctx.cameraY,
-				ctx.viewRotation || 0
-			);
-			optionsRef.current.setMouseWorldPosition(x, y);
+			return;
 		}
+
+		const world = screenToWorld(
+			e.global.x - ctx.canvasWidth / 2,
+			e.global.y - ctx.canvasHeight / 2,
+			ctx.zoom,
+			ctx.cameraX,
+			ctx.cameraY,
+			ctx.viewRotation || 0
+		);
+		optionsRef.current.setMouseWorldPosition(world.x, world.y);
 	});
 
-	// 使用新的 hull.percent
-	const hpPercent = ship.hull.percent / 100;
 	const hpBar = new Graphics();
-	drawHpBar(hpBar, hpPercent);
-	hpBar.position.set(ship.transform.x, ship.transform.y - radius - 24);
-	hpBar.rotation = -((contextRef.current.viewRotation ?? 0) * Math.PI) / 180;
+	drawHpBar(hpBar, ship.hull.percent / 100);
+	hpBar.position.set(ship.transform.x, ship.transform.y - radius - 28);
+	hpBar.rotation = -(((contextRef.current.viewRotation ?? 0) * Math.PI) / 180);
 
 	const label = new Text({
-		text: `${ship.id.slice(-6)}  F:${Math.round(ship.flux.total)}/${Math.round(ship.flux.max)}`,
+		text: `${ship.name || ship.id.slice(-6)}  HP:${Math.round(ship.hull.current)}/${Math.round(ship.hull.max)}`,
 		style: labelStyle,
 	});
 	label.anchor.set(0.5, 1);
-	label.position.set(ship.transform.x, ship.transform.y - radius - 8);
+	label.position.set(ship.transform.x, ship.transform.y - radius - 10);
+	label.rotation = -(((contextRef.current.viewRotation ?? 0) * Math.PI) / 180);
 
-	layers.ships.addChild(token);
-	layers.labels.addChild(hpBar);
-	layers.labels.addChild(label);
+	layers.tacticalTokens.addChild(root);
+	layers.shipLabels.addChild(hpBar);
+	layers.shipLabels.addChild(label);
+
 	cache.set(ship.id, {
-		token,
+		root,
+		tacticalToken,
 		label,
 		hpBar,
 		isSelected,
@@ -312,5 +249,48 @@ function createNewShip(
 			hp: ship.hull.current,
 			flux: ship.flux.total,
 		},
+	});
+}
+
+function drawTacticalToken(
+	target: Graphics,
+	color: number,
+	radius: number,
+	isSelected: boolean
+): void {
+	target.clear();
+	const outline = isSelected ? 0xffffff : color;
+	const alpha = isSelected ? 0.98 : 0.9;
+
+	// 战术视图：线框箭头 + 中心点，突出方向与中心位置
+	target
+		.poly([0, -radius, radius * 0.7, radius, 0, radius * 0.35, -radius * 0.7, radius])
+		.stroke({ color: outline, width: isSelected ? 3 : 2, alpha });
+	target
+		.moveTo(0, -radius * 0.7)
+		.lineTo(0, radius * 0.4)
+		.stroke({ color, width: 1.2, alpha: 0.8 });
+	target.circle(0, 0, 3.2).fill({ color: 0xffffff, alpha: 0.92 });
+}
+
+function drawHpBar(target: Graphics, hpPercent: number): void {
+	target.clear();
+	const width = 62;
+	const height = 8;
+	const fill = Math.max(0, Math.min(1, hpPercent)) * width;
+	const color = hpPercent <= 0.3 ? 0xff5d7e : hpPercent <= 0.6 ? 0xffce66 : 0x57e38d;
+
+	target
+		.roundRect(-width / 2, -height / 2, width, height, 3)
+		.fill({ color: 0x050c17, alpha: 0.95 });
+	target.roundRect(-width / 2, -height / 2, fill, height, 3).fill({ color, alpha: 0.95 });
+	target.rect(-width / 2, -height / 2, fill, Math.max(2, height * 0.28)).fill({
+		color: 0xffffff,
+		alpha: 0.2,
+	});
+	target.roundRect(-width / 2, -height / 2, width, height, 3).stroke({
+		color: 0xb9dbff,
+		alpha: 0.8,
+		width: 1,
 	});
 }
