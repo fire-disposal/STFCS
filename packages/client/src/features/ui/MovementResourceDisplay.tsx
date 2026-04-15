@@ -126,8 +126,8 @@ interface MovementResources {
   phaseAForward: number;
   phaseAStrafe: number;
   turnAngle: number;
-  phaseBForward: number;
-  phaseBStrafe: number;
+  phaseCForward: number;
+  phaseCStrafe: number;
 }
 
 interface MovementResourceDisplayProps {
@@ -149,7 +149,7 @@ export const MovementResourceDisplay: React.FC<MovementResourceDisplayProps> = (
   );
   const phaseBUsed = Math.abs(resources.turnAngle);
   const phaseCUsed = Math.sqrt(
-    Math.pow(resources.phaseBForward, 2) + Math.pow(resources.phaseBStrafe, 2)
+    Math.pow(resources.phaseCForward, 2) + Math.pow(resources.phaseCStrafe, 2)
   );
 
   // 阶段 A 最大移动距离（2 倍速度）
@@ -232,7 +232,7 @@ export const MovementResourceDisplay: React.FC<MovementResourceDisplayProps> = (
         <ResourceBar
           label="前进/后退"
           icon="⬆️"
-          current={resources.phaseBForward}
+          current={resources.phaseCForward}
           max={phaseCMax}
           unit=""
           color="#4a9eff"
@@ -241,7 +241,7 @@ export const MovementResourceDisplay: React.FC<MovementResourceDisplayProps> = (
         <ResourceBar
           label="侧移"
           icon="➡️"
-          current={resources.phaseBStrafe}
+          current={resources.phaseCStrafe}
           max={maxSpeed}
           unit=""
           color="#2ecc71"

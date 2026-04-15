@@ -21,6 +21,8 @@ export function advancePhase(
 	broadcast: (type: string, data: unknown) => void
 ): void {
 	const idx = PHASES.indexOf(state.currentPhase);
+	// 设计意图：DEPLOYMENT 阶段仅在游戏首轮使用，后续回合循环为
+	// PLAYER_TURN → DM_TURN → END_PHASE → PLAYER_TURN，故跳回索引 1
 	const next = idx + 1 >= PHASES.length ? 1 : idx + 1;
 	state.currentPhase = PHASES[next];
 	state.players.forEach((p: PlayerState) => (p.isReady = false));
@@ -45,14 +47,14 @@ export function handleEndPhase(state: GameRoomState): void {
 		ship.movePhaseAX = 0;
 		ship.movePhaseAStrafe = 0;
 		ship.turnAngle = 0;
-		ship.movePhaseBX = 0;
-		ship.movePhaseBStrafe = 0;
+		ship.movePhaseCX = 0;
+		ship.movePhaseCStrafe = 0;
 		ship.movePhase = "PHASE_A";
 		ship.phaseAForwardUsed = 0;
 		ship.phaseAStrafeUsed = 0;
 		ship.phaseTurnUsed = 0;
-		ship.phaseBForwardUsed = 0;
-		ship.phaseBStrafeUsed = 0;
+		ship.phaseCForwardUsed = 0;
+		ship.phaseCStrafeUsed = 0;
 
 		ship.weapons.forEach((w: WeaponSlot) => {
 			w.hasFiredThisTurn = false;

@@ -54,15 +54,15 @@ const parseMovementPlan = (value: unknown): MoveTokenPayload["movementPlan"] | n
 	const phaseAForward = asFiniteNumber(value.phaseAForward);
 	const phaseAStrafe = asFiniteNumber(value.phaseAStrafe);
 	const turnAngle = asFiniteNumber(value.turnAngle);
-	const phaseBForward = asFiniteNumber(value.phaseBForward);
-	const phaseBStrafe = asFiniteNumber(value.phaseBStrafe);
+	const phaseCForward = asFiniteNumber(value.phaseCForward);
+	const phaseCStrafe = asFiniteNumber(value.phaseCStrafe);
 
 	if (
 		phaseAForward === null ||
 		phaseAStrafe === null ||
 		turnAngle === null ||
-		phaseBForward === null ||
-		phaseBStrafe === null
+		phaseCForward === null ||
+		phaseCStrafe === null
 	) {
 		return null;
 	}
@@ -71,8 +71,8 @@ const parseMovementPlan = (value: unknown): MoveTokenPayload["movementPlan"] | n
 		phaseAForward,
 		phaseAStrafe,
 		turnAngle,
-		phaseBForward,
-		phaseBStrafe,
+		phaseCForward,
+		phaseCStrafe,
 	};
 };
 

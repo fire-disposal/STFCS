@@ -34,14 +34,18 @@ export function useCurrentGameRoom({
 
 		// 只监听房间离开事件，不需要监听状态变化
 		// Colyseus Schema 的响应式会自动触发 React 更新
+		const isActive = { current: true };
 		const handleLeave = () => {
-			onLeaveRoom();
+			if (isActive.current) onLeaveRoom();
 		};
 
 		currentRoom.onLeave(handleLeave);
 
 		return () => {
-			currentRoom.onLeave.remove(handleLeave);
+			isActive.current = false;
+			if (typeof currentRoom.onLeave?.remove === "function") {
+				currentRoom.onLeave.remove(handleLeave);
+			}
 		};
 	}, [networkManager, onLeaveRoom, room]);
 

@@ -2,7 +2,7 @@
  * 战斗房间
  */
 
-import { Client, Room } from "@colyseus/core";
+import { Client, matchMaker, Room } from "@colyseus/core";
 import type { CreateObjectPayload, MoveTokenPayload, RoomMetadata } from "@vt/types";
 import { Faction, GamePhase, PlayerRole, WeaponState } from "@vt/types";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
@@ -23,6 +23,7 @@ import { RoomEventLogger } from "../utils/ColyseusMessaging.js";
 
 export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetadata }> {
 	maxClients = 8;
+	autoDispose = false;
 	private dispatcher!: CommandDispatcher;
 	private logger!: RoomEventLogger;
 	private pingEwma = new Map<string, number>();
@@ -32,6 +33,9 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 	private roomDisplayName = "";
 	private profileStore = new Map<number, { nickname: string; avatar: string }>();
 	private createdAt = Date.now();
+	/** 房间空置时的自动销毁定时器（10 分钟） */
+	private emptyDisposeTimeout: ReturnType<typeof setTimeout> | null = null;
+	private static readonly EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
 
 	onCreate(options: { roomName?: string; maxPlayers?: number }) {
 		this.maxClients = Math.min(16, Math.max(2, options.maxPlayers ?? 8));
@@ -54,15 +58,33 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			createObject: (payload: CreateObjectPayload) => this.createObject(payload),
 			enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) =>
 				this.enqueueMoveCommand(client, payload),
+			dissolveRoom: () => this.disconnect(),
 		});
 
 		this.syncMetadata();
 		this.setSimulationInterval((dt) => this.update(dt / 1000), 50);
 	}
 
-	onJoin(client: Client, options: { playerName?: string; shortId?: number }) {
+	async onJoin(client: Client, options: { playerName?: string; shortId?: number }) {
+		// 有人加入，取消空置销毁定时器
+		this.cancelEmptyDisposeTimer();
+
 		const name = options.playerName?.trim() || `Player-${client.sessionId.substring(0, 4)}`;
 		const shortId = options.shortId ?? Math.floor(100000 + Math.random() * 900000);
+		const isFirstClient = this.clients.length === 1;
+
+		// 第一个加入的客户端会成为房主（DM），检查是否已经拥有其他房间
+		if (isFirstClient) {
+			const existingRooms = await matchMaker.query({ name: "battle" });
+			const alreadyOwns = existingRooms.some((r) => {
+				if (r.roomId === this.roomId) return false;
+				const meta = (r.metadata as Record<string, unknown> | undefined) || {};
+				return Number(meta.ownerShortId) === shortId;
+			});
+			if (alreadyOwns) {
+				throw new Error("您已经拥有一个房间，请先解散后再创建新房间");
+			}
+		}
 
 		const player = new PlayerState();
 		player.sessionId = client.sessionId;
@@ -86,6 +108,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			this.state.players.delete(client.sessionId);
 			this.assignOwner();
 			this.syncMetadata();
+			this.scheduleEmptyDisposeIfNeeded();
 			return;
 		}
 		if (player) {
@@ -99,6 +122,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 					this.state.players.delete(client.sessionId);
 					this.assignOwner();
 					this.syncMetadata();
+					this.scheduleEmptyDisposeIfNeeded();
 				});
 		}
 	}
@@ -140,7 +164,38 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		});
 	}
 
-	onDispose() {}
+	onDispose() {
+		this.cancelEmptyDisposeTimer();
+	}
+
+	/**
+	 * 当房间为空时，启动 10 分钟自动销毁定时器。
+	 * 如果在此期间有人加入，则取消定时器。
+	 */
+	private scheduleEmptyDisposeIfNeeded(): void {
+		if (this.clients.length > 0) return;
+		if (this.emptyDisposeTimeout) return;
+
+		console.log(
+			`[BattleRoom] Room ${this.roomId} is empty, scheduling dispose in ${BattleRoom.EMPTY_ROOM_TTL_MS / 1000}s`
+		);
+
+		this.emptyDisposeTimeout = setTimeout(() => {
+			if (this.clients.length === 0) {
+				console.log(`[BattleRoom] Room ${this.roomId} has been empty for 10 minutes, disposing`);
+				this.disconnect();
+			}
+			this.emptyDisposeTimeout = null;
+		}, BattleRoom.EMPTY_ROOM_TTL_MS);
+	}
+
+	private cancelEmptyDisposeTimer(): void {
+		if (this.emptyDisposeTimeout) {
+			clearTimeout(this.emptyDisposeTimeout);
+			this.emptyDisposeTimeout = null;
+			console.log(`[BattleRoom] Room ${this.roomId} empty dispose timer cancelled`);
+		}
+	}
 
 	private assignOwner() {
 		if (!this.state.players.has(this.roomOwnerId ?? "")) {

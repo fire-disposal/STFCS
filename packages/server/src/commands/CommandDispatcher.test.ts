@@ -38,7 +38,7 @@ describe("CommandDispatcher 核心业务", () => {
 			heading: 0,
 			isIncremental: true,
 			phase: "PHASE_A",
-			movementPlan: { phaseAForward: 120, phaseAStrafe: 0, turnAngle: 0, phaseBForward: 0, phaseBStrafe: 0 },
+			movementPlan: { phaseAForward: 120, phaseAStrafe: 0, turnAngle: 0, phaseCForward: 0, phaseCStrafe: 0 },
 		});
 		dispatcher.dispatchMoveToken(client, {
 			shipId: s.id,
@@ -47,7 +47,7 @@ describe("CommandDispatcher 核心业务", () => {
 			heading: 0,
 			isIncremental: true,
 			phase: "PHASE_A",
-			movementPlan: { phaseAForward: 80, phaseAStrafe: 0, turnAngle: 0, phaseBForward: 0, phaseBStrafe: 0 },
+			movementPlan: { phaseAForward: 80, phaseAStrafe: 0, turnAngle: 0, phaseCForward: 0, phaseCStrafe: 0 },
 		});
 
 		expect(s.phaseAForwardUsed).toBe(200);
@@ -64,8 +64,8 @@ describe("CommandDispatcher 核心业务", () => {
 					phaseAForward: 1,
 					phaseAStrafe: 0,
 					turnAngle: 0,
-					phaseBForward: 0,
-					phaseBStrafe: 0,
+					phaseCForward: 0,
+					phaseCStrafe: 0,
 				},
 			})
 		).toThrow("阶段A前进燃料不足");

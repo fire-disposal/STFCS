@@ -182,15 +182,15 @@ export class ShipState extends Schema implements VT.ShipState {
 	@type("boolean") hasFired: boolean = false;
 	@type("number") movePhaseAX: number = 0;
 	@type("number") movePhaseAStrafe: number = 0;
-	@type("number") movePhaseBX: number = 0;
-	@type("number") movePhaseBStrafe: number = 0;
+	@type("number") movePhaseCX: number = 0;
+	@type("number") movePhaseCStrafe: number = 0;
 	@type("number") turnAngle: number = 0;
 	@type("string") movePhase: "PHASE_A" | "PHASE_B" | "PHASE_C" = "PHASE_A";
 	@type("number") phaseAForwardUsed: number = 0;
 	@type("number") phaseAStrafeUsed: number = 0;
 	@type("number") phaseTurnUsed: number = 0;
-	@type("number") phaseBForwardUsed: number = 0;
-	@type("number") phaseBStrafeUsed: number = 0;
+	@type("number") phaseCForwardUsed: number = 0;
+	@type("number") phaseCStrafeUsed: number = 0;
 
 	setPosition(x: number, y: number) {
 		this.transform.setPosition(x, y);

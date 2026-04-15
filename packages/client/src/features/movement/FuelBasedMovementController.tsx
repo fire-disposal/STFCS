@@ -161,8 +161,8 @@ export const FuelBasedMovementController: React.FC<FuelBasedMovementControllerPr
 						phaseAForward: command.forward || 0,
 						phaseAStrafe: command.strafe || 0,
 						turnAngle: command.turn || 0,
-						phaseBForward: 0,
-						phaseBStrafe: 0,
+						phaseCForward: 0,
+						phaseCStrafe: 0,
 					},
 					phase: movementState.currentPhase,
 					isIncremental: true, // 标记为增量移动

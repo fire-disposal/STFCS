@@ -46,8 +46,8 @@ export interface ShipSave {
 	hasFired: boolean;
 	movePhaseAX: number;
 	movePhaseAStrafe: number;
-	movePhaseBX: number;
-	movePhaseBStrafe: number;
+	movePhaseCX: number;
+	movePhaseCStrafe: number;
 	turnAngle: number;
 	weapons: WeaponSave[];
 }
