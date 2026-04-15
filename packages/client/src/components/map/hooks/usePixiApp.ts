@@ -146,29 +146,33 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			cursorLayer.eventMode = "none";
 			cursorLayer.sortableChildren = true;
 
-			const shipsLayer = new Container();
-			shipsLayer.zIndex = 6;
-			shipsLayer.eventMode = "static";
-			shipsLayer.hitArea = new Rectangle(-10000, -10000, 20000, 20000);
+			const shipSpritesLayer = new Container();
+			shipSpritesLayer.zIndex = 6;
+			shipSpritesLayer.eventMode = "none";
 
-			const labels = new Container();
-			labels.zIndex = 7;
-			labels.eventMode = "none";
+			const tacticalTokensLayer = new Container();
+			tacticalTokensLayer.zIndex = 7;
+			tacticalTokensLayer.eventMode = "static";
+			tacticalTokensLayer.hitArea = new Rectangle(-10000, -10000, 20000, 20000);
+
+			const shipLabelsLayer = new Container();
+			shipLabelsLayer.zIndex = 8;
+			shipLabelsLayer.eventMode = "none";
 
 			const effects = new Container();
-			effects.zIndex = 8;
+			effects.zIndex = 9;
 			effects.eventMode = "none";
 
 			const weaponArcsLayer = new Container();
-			weaponArcsLayer.zIndex = 9;
+			weaponArcsLayer.zIndex = 10;
 			weaponArcsLayer.eventMode = "none";
 
 			const movementVisualsLayer = new Container();
-			movementVisualsLayer.zIndex = 10;
+			movementVisualsLayer.zIndex = 11;
 			movementVisualsLayer.eventMode = "none";
 
 			const shipIconsLayer = new Container();
-			shipIconsLayer.zIndex = 11;
+			shipIconsLayer.zIndex = 12;
 			shipIconsLayer.eventMode = "none";
 
 			world.addChild(
@@ -179,8 +183,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				starfieldNear,
 				grid,
 				cursorLayer,
-				shipsLayer,
-				labels,
+				shipSpritesLayer,
+				tacticalTokensLayer,
+				shipLabelsLayer,
 				effects,
 				weaponArcsLayer,
 				movementVisualsLayer,
@@ -197,15 +202,18 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				starfieldNear,
 				grid,
 				cursor: cursorLayer,
-				ships: shipsLayer,
-				labels,
+				shipSprites: shipSpritesLayer,
+				tacticalTokens: tacticalTokensLayer,
+				shipLabels: shipLabelsLayer,
+				ships: tacticalTokensLayer,
+				labels: shipLabelsLayer,
 				effects,
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,
 				shipIcons: shipIconsLayer,
 			};
 
-			const shipsLayerRef = newLayers.ships;
+			const shipsLayerRef = newLayers.tacticalTokens;
 			const isShipObject = (target: any) => {
 				let current = target;
 				while (current) {
