@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useRef } from "react";
+import type { CameraState } from "@vt/types";
 
 interface UseCanvasInteractionOptions {
 	minZoom: number;
@@ -14,19 +15,13 @@ interface UseCanvasInteractionOptions {
 
 export type { UseCanvasInteractionOptions };
 
-interface CameraState {
-	x: number;
-	y: number;
-	zoom: number;
-}
-
 export function useCanvasInteraction(options: UseCanvasInteractionOptions) {
 	const { minZoom, maxZoom, rotation = 0, onCameraChange } = options;
 
-	const [camera, setCamera] = useState<CameraState>({ x: 0, y: 0, zoom: 1 });
+	const [camera, setCamera] = useState<CameraState>({ x: 0, y: 0, zoom: 1, viewRotation: 0 });
 	const [isDragging, setIsDragging] = useState(false);
 	const dragStartRef = useRef({ x: 0, y: 0 });
-	const lastCameraRef = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
+	const lastCameraRef = useRef<CameraState>({ x: 0, y: 0, zoom: 1, viewRotation: 0 });
 
 	const screenDeltaToWorldDelta = useCallback(
 		(deltaX: number, deltaY: number) => {

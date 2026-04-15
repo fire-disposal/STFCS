@@ -6,6 +6,7 @@
  * - 改进缩放比率 (1.15x 每档，更平滑)
  * - 支持部分出界查看 (屏幕中心点不能离开地图)
  * - RTS 风格的边界软限制
+ * - 统一的 viewRotation 支持
  */
 
 import { clampZoom } from "@/utils/cameraBounds";
@@ -30,6 +31,7 @@ const defaultCamera: CameraState = {
 	x: 2048, // 地图中心（地图大小 4096）
 	y: 2048,
 	zoom: 1,
+	viewRotation: 0,
 };
 
 const initialState: CameraSliceState = {
@@ -57,12 +59,23 @@ const cameraSlice = createSlice({
 			if (action.payload.zoom !== undefined) {
 				state.local.zoom = clampZoom(action.payload.zoom, MIN_ZOOM, MAX_ZOOM);
 			}
+			if (action.payload.viewRotation !== undefined) {
+				state.local.viewRotation = action.payload.viewRotation;
+			}
+			if (action.payload.followingShipId !== undefined) {
+				state.local.followingShipId = action.payload.followingShipId;
+			}
 		},
 
 		// 相对移动相机
 		panCamera: (state, action: PayloadAction<{ dx: number; dy: number }>) => {
 			state.local.x += action.payload.dx;
 			state.local.y += action.payload.dy;
+		},
+
+		// 设置视图旋转
+		setViewRotation: (state, action: PayloadAction<number>) => {
+			state.local.viewRotation = action.payload;
 		},
 
 		// 重置相机到默认状态
@@ -72,7 +85,7 @@ const cameraSlice = createSlice({
 
 		// 更新远程玩家相机
 		updateRemoteCamera: (state, action: PayloadAction<PlayerCamera>) => {
-			state.remote[action.payload.ownerId] = action.payload;
+			state.remote[action.payload.playerId] = action.payload;
 		},
 
 		// 移除远程玩家相机
@@ -91,6 +104,7 @@ export const {
 	setCamera,
 	updateCamera,
 	panCamera,
+	setViewRotation,
 	resetCamera,
 	updateRemoteCamera,
 	removeRemoteCamera,

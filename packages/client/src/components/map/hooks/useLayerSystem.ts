@@ -36,8 +36,8 @@ export interface UseLayerSystemResult {
 	setLayers: (layers: LayerRegistry) => void;
 	updateLayerTransforms: (
 		zoom: number,
-		cameraX: number,
-		cameraY: number,
+		x: number,
+		y: number,
 		canvasSize: CanvasSize,
 		viewRotation: number,
 		showBackground: boolean
@@ -57,8 +57,8 @@ export function useLayerSystem(): UseLayerSystemResult {
 	const updateLayerTransforms = useCallback(
 		(
 			zoom: number,
-			cameraX: number,
-			cameraY: number,
+			x: number,
+			y: number,
 			canvasSize: CanvasSize,
 			viewRotation: number,
 			showBackground: boolean
@@ -67,7 +67,7 @@ export function useLayerSystem(): UseLayerSystemResult {
 			if (!currentLayers) return;
 
 			currentLayers.world.scale.set(zoom);
-			currentLayers.world.pivot.set(cameraX, cameraY);
+			currentLayers.world.pivot.set(x, y);
 			currentLayers.world.position.set(canvasSize.width * 0.5, canvasSize.height * 0.5);
 			currentLayers.world.rotation = (viewRotation * Math.PI) / 180;
 			currentLayers.background.visible = showBackground;
@@ -83,20 +83,20 @@ export function useLayerSystem(): UseLayerSystemResult {
 			const nebulaFactor = parallaxFactor * 0.2;
 
 			currentLayers.starfieldDeep.position.set(
-				cameraX * (1 - deepFactor),
-				cameraY * (1 - deepFactor)
+				x * (1 - deepFactor),
+				y * (1 - deepFactor)
 			);
 			currentLayers.starfieldMid.position.set(
-				cameraX * (1 - midFactor),
-				cameraY * (1 - midFactor)
+				x * (1 - midFactor),
+				y * (1 - midFactor)
 			);
 			currentLayers.starfieldNear.position.set(
-				cameraX * (1 - nearFactor),
-				cameraY * (1 - nearFactor)
+				x * (1 - nearFactor),
+				y * (1 - nearFactor)
 			);
 			currentLayers.starfieldNebula.position.set(
-				cameraX * (1 - nebulaFactor),
-				cameraY * (1 - nebulaFactor)
+				x * (1 - nebulaFactor),
+				y * (1 - nebulaFactor)
 			);
 		},
 		[]

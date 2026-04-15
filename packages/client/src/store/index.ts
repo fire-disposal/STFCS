@@ -9,7 +9,6 @@ import deploymentReducer from "./slices/deploymentSlice";
 import factionReducer from "./slices/factionSlice";
 import factionTurnReducer from "./slices/factionTurnSlice";
 import gameFlowReducer from "./slices/gameFlowSlice";
-import interactionReducer from "./slices/interactionSlice";
 import mapReducer from "./slices/mapSlice";
 import movementReducer from "./slices/movementSlice";
 import playerReducer from "./slices/playerSlice";
@@ -27,7 +26,6 @@ export const store = configureStore({
 		faction: factionReducer,
 		factionTurn: factionTurnReducer,
 		gameFlow: gameFlowReducer,
-		interaction: interactionReducer,
 		map: mapReducer,
 		movement: movementReducer,
 		player: playerReducer,

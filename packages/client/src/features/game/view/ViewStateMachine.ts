@@ -47,6 +47,7 @@ export class ViewStateMachine {
 				x: options.initialCamera?.x ?? 0,
 				y: options.initialCamera?.y ?? 0,
 				zoom: options.initialCamera?.zoom ?? 1,
+				viewRotation: options.initialCamera?.viewRotation ?? 0,
 			},
 			viewport: {
 				width: options.initialViewport?.width ?? 1920,

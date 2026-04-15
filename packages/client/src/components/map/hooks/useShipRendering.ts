@@ -1,4 +1,4 @@
-import { screenToWorld } from "@/utils/mathUtils";
+import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipState } from "@vt/types";
 import { Faction } from "@vt/types";
 import { Circle, Container, type FederatedPointerEvent, Graphics, Text, TextStyle } from "pixi.js";
@@ -40,8 +40,8 @@ export interface ShipCacheItem {
 
 export interface ShipRenderContext {
 	zoom: number;
-	cameraX: number;
-	cameraY: number;
+	x: number;
+	y: number;
 	canvasWidth: number;
 	canvasHeight: number;
 	viewRotation: number;
@@ -202,8 +202,8 @@ function createShipEntities(
 			ctx.canvasWidth === undefined ||
 			ctx.canvasHeight === undefined ||
 			ctx.zoom === undefined ||
-			ctx.cameraX === undefined ||
-			ctx.cameraY === undefined
+			ctx.x === undefined ||
+			ctx.y === undefined
 		) {
 			return;
 		}
@@ -212,8 +212,8 @@ function createShipEntities(
 			e.global.x - ctx.canvasWidth / 2,
 			e.global.y - ctx.canvasHeight / 2,
 			ctx.zoom,
-			ctx.cameraX,
-			ctx.cameraY,
+			ctx.x,
+			ctx.y,
 			ctx.viewRotation || 0
 		);
 		optionsRef.current.setMouseWorldPosition(world.x, world.y);

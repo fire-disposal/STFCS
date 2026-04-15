@@ -8,7 +8,7 @@
  */
 
 import { useUIStore } from "@/store/uiStore";
-import { calculateViewRotationForAlignment, formatAngle } from "@/utils/angleSystem";
+import { calculateViewRotationForAlignment, formatAngle } from "@/utils/coordinateSystem";
 import type { ShipState } from "@vt/types";
 import React, { useState, useCallback } from "react";
 

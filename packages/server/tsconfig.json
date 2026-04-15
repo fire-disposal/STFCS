@@ -5,7 +5,7 @@
 		"moduleResolution": "bundler",
 		"experimentalDecorators": true,
 		"useDefineForClassFields": false,
-		"lib": ["ES2022"],
+		"lib": ["ES2022", "ES2023.Array"],
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
@@ -20,7 +20,8 @@
 		"paths": {
 			"@vt/types": ["packages/types/src/index.ts"],
 			"@vt/data": ["packages/data/src/index.ts"],
-			"@vt/rules": ["packages/rules/src/index.ts"]
+			"@vt/rules": ["packages/rules/src/index.ts"],
+			"@vt/rules/math": ["packages/rules/src/math/index.ts"]
 		}
 	},
 	"include": [

@@ -1,7 +1,7 @@
-import { screenToWorld } from "@/utils/mathUtils";
+import { screenToWorld } from "@/utils/coordinateSystem";
 import { Container, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";
-import type { CameraState } from "./useCamera";
+import type { CameraState } from "@vt/types";
 import type { CanvasSize } from "./useCanvasResize";
 import type { DragState } from "./useInteraction";
 import type { LayerRegistry } from "./useLayerSystem";
@@ -76,13 +76,13 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				return { x: local.x, y: local.y };
 			}
 
-			const { zoom, cameraX, cameraY, viewRotation } = cameraRef.current;
+			const { zoom, x, y, viewRotation } = cameraRef.current;
 			return screenToWorld(
 				screenX - screenWidth / 2,
 				screenY - screenHeight / 2,
 				zoom,
-				cameraX,
-				cameraY,
+				x,
+				y,
 				viewRotation
 			);
 		},

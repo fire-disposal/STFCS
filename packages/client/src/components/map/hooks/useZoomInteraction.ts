@@ -1,4 +1,4 @@
-import { screenToWorld } from "@/utils/mathUtils";
+import { screenToWorld } from "@/utils/coordinateSystem";
 import { useCallback } from "react";
 import type { UseCameraResult } from "./useCamera";
 import type { CanvasSize } from "./useCanvasResize";
@@ -31,8 +31,8 @@ export function useZoomInteraction(
 				screenX,
 				screenY,
 				current.zoom,
-				current.cameraX,
-				current.cameraY,
+				current.x,
+				current.y,
 				current.viewRotation
 			);
 
@@ -51,8 +51,8 @@ export function useZoomInteraction(
 
 			queueZoomToTarget({
 				zoom: nextZoom,
-				cameraX: worldPoint.x - newWorldPoint.x,
-				cameraY: worldPoint.y - newWorldPoint.y,
+				x: worldPoint.x - newWorldPoint.x,
+				y: worldPoint.y - newWorldPoint.y,
 			});
 		},
 		[clampZoom, screenToWorldPoint, canvasSize.width, canvasSize.height, cameraRef, queueZoomToTarget]

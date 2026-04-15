@@ -104,8 +104,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		selectedShipId,
 		{
 			zoom,
-			cameraX,
-			cameraY,
+			x: cameraX,
+			y: cameraY,
 			canvasWidth: canvasSize.width,
 			canvasHeight: canvasSize.height,
 			viewRotation,
@@ -127,7 +127,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	}, [layerSystem.layers, showLabels, showEffects, showShipIcons]);
 
 	useEffect(() => {
-		camera.cameraRef.current = { cameraX, cameraY, zoom, viewRotation };
+		camera.cameraRef.current = { x: cameraX, y: cameraY, zoom, viewRotation };
 		layerSystem.updateLayerTransforms(
 			zoom,
 			cameraX,

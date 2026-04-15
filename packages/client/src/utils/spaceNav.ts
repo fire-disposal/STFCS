@@ -1,9 +1,9 @@
 /**
  * 太空导航工具 - 坐标系统
- * 
+ *
  * 提供坐标精度控制、坐标转换、网格吸附等功能
- * 
- * 注意：角度计算请使用 angleSystem.ts（有清晰的参考系定义）
+ *
+ * 注意：角度计算请使用 coordinateSystem.ts（统一的坐标与角度处理模块）
  * 本文件仅处理坐标相关的实用函数
  */
 
@@ -119,7 +119,7 @@ export function applyPositionSettings(
 }
 
 // ============================================================================
-// 导出 angleSystem.ts 中的角度函数，方便统一导入
+// 导出 coordinateSystem.ts 中的角度函数，方便统一导入
 // ============================================================================
 export {
   normalizeAngle,
@@ -138,4 +138,4 @@ export {
   getCompassDirection,
   type AngleDisplayMode,
   type AngleDisplayOptions,
-} from './angleSystem';
+} from './coordinateSystem';

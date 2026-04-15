@@ -1,13 +1,7 @@
-import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/mathUtils";
+import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/coordinateSystem";
 import { useCallback, useRef } from "react";
+import type { CameraState } from "@vt/types";
 import type { CanvasSize } from "./useCanvasResize";
-
-export interface CameraState {
-	cameraX: number;
-	cameraY: number;
-	zoom: number;
-	viewRotation: number;
-}
 
 export interface UseCameraResult {
 	cameraRef: React.MutableRefObject<CameraState>;
@@ -16,12 +10,12 @@ export interface UseCameraResult {
 		screenX: number,
 		screenY: number,
 		zoomValue: number,
-		cameraXValue: number,
-		cameraYValue: number,
+		xValue: number,
+		yValue: number,
 		rotationValue: number
 	) => { x: number; y: number };
 	screenDeltaToWorldDelta: (deltaX: number, deltaY: number) => { x: number; y: number };
-	queueZoomToTarget: (target: { zoom: number; cameraX: number; cameraY: number }) => void;
+	queueZoomToTarget: (target: { zoom: number; x: number; y: number }) => void;
 	cancelZoomAnimation: () => void;
 	tickZoomAnimation: () => void;
 }
@@ -31,8 +25,8 @@ export function useCamera(
 	setZoom: (zoom: number) => void,
 	setCameraPosition: (x: number, y: number) => void
 ): UseCameraResult {
-	const cameraRef = useRef<CameraState>({ cameraX: 0, cameraY: 0, zoom: 1, viewRotation: 0 });
-	const zoomTargetRef = useRef<{ zoom: number; cameraX: number; cameraY: number } | null>(null);
+	const cameraRef = useRef<CameraState>({ x: 0, y: 0, zoom: 1, viewRotation: 0 });
+	const zoomTargetRef = useRef<{ zoom: number; x: number; y: number } | null>(null);
 	const isZoomAnimatingRef = useRef(false);
 
 	const clampZoom = useCallback((value: number) => {
@@ -44,22 +38,22 @@ export function useCamera(
 			screenX: number,
 			screenY: number,
 			zoomValue: number,
-			cameraXValue: number,
-			cameraYValue: number,
+			xValue: number,
+			yValue: number,
 			rotationValue: number
 		) => {
 			const centerX = canvasSize.width / 2;
 			const centerY = canvasSize.height / 2;
 			const relativeX = screenX - centerX;
 			const relativeY = screenY - centerY;
-			return screenToWorld(relativeX, relativeY, zoomValue, cameraXValue, cameraYValue, rotationValue);
+			return screenToWorld(relativeX, relativeY, zoomValue, xValue, yValue, rotationValue);
 		},
 		[canvasSize.width, canvasSize.height]
 	);
 
 	const screenDeltaToWorldDelta = useCallback((deltaX: number, deltaY: number) => {
-		const { zoom: currentZoom, viewRotation: currentRotation } = cameraRef.current;
-		return deltaUtil(deltaX, deltaY, currentZoom, currentRotation);
+		const { zoom, viewRotation: currentRotation } = cameraRef.current;
+		return deltaUtil(deltaX, deltaY, zoom, currentRotation);
 	}, []);
 
 	const cancelZoomAnimation = useCallback(() => {
@@ -67,7 +61,7 @@ export function useCamera(
 		isZoomAnimatingRef.current = false;
 	}, []);
 
-	const queueZoomToTarget = useCallback((target: { zoom: number; cameraX: number; cameraY: number }) => {
+	const queueZoomToTarget = useCallback((target: { zoom: number; x: number; y: number }) => {
 		zoomTargetRef.current = target;
 		isZoomAnimatingRef.current = true;
 	}, []);
@@ -81,16 +75,16 @@ export function useCamera(
 
 		const current = cameraRef.current;
 		const zoomDiff = target.zoom - current.zoom;
-		const cameraXDiff = target.cameraX - current.cameraX;
-		const cameraYDiff = target.cameraY - current.cameraY;
+		const xDiff = target.x - current.x;
+		const yDiff = target.y - current.y;
 
 		if (
 			Math.abs(zoomDiff) < 0.001 &&
-			Math.abs(cameraXDiff) < 0.05 &&
-			Math.abs(cameraYDiff) < 0.05
+			Math.abs(xDiff) < 0.05 &&
+			Math.abs(yDiff) < 0.05
 		) {
 			setZoom(target.zoom);
-			setCameraPosition(target.cameraX, target.cameraY);
+			setCameraPosition(target.x, target.y);
 			zoomTargetRef.current = null;
 			isZoomAnimatingRef.current = false;
 			return;
@@ -98,11 +92,11 @@ export function useCamera(
 
 		const speed = 0.18;
 		const nextZoom = clampZoom(current.zoom + zoomDiff * speed);
-		const nextCameraX = current.cameraX + cameraXDiff * speed;
-		const nextCameraY = current.cameraY + cameraYDiff * speed;
+		const nextX = current.x + xDiff * speed;
+		const nextY = current.y + yDiff * speed;
 
 		setZoom(nextZoom);
-		setCameraPosition(nextCameraX, nextCameraY);
+		setCameraPosition(nextX, nextY);
 	}, [clampZoom, setCameraPosition, setZoom]);
 
 	return {

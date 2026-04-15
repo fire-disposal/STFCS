@@ -324,19 +324,44 @@ export type FactionId = FactionValue;
 
 // ==================== 相机状态 ====================
 
+/**
+ * 通用相机状态接口
+ * 用于本地玩家和其他玩家的相机状态
+ * 
+ * 字段说明：
+ * - x/y: 相机中心点的世界坐标
+ * - zoom: 缩放级别（0.3 ~ 6.0）
+ * - viewRotation: 视图旋转角度（度数，0=北向朝上）
+ * - followingShipId: 可选，跟随的舰船 ID
+ */
 export interface CameraState {
 	x: number;
 	y: number;
 	zoom: number;
+	viewRotation: number;
 	followingShipId?: string;
 }
 
+/**
+ * 其他玩家相机状态
+ * 用于在地图上显示其他玩家的相机位置和视野
+ * 
+ * 字段说明：
+ * - playerId: 玩家会话 ID
+ * - playerName: 玩家显示名称
+ * - x/y: 相机中心点的世界坐标
+ * - zoom: 缩放级别
+ * - viewRotation: 视图旋转角度
+ * - followingShipId: 可选，跟随的舰船 ID
+ */
 export interface PlayerCamera {
-	id: string;
-	ownerId: string;
+	playerId: string;
+	playerName: string;
 	x: number;
 	y: number;
 	zoom: number;
+	viewRotation: number;
+	followingShipId?: string;
 }
 
 // ==================== Token 信息 ====================

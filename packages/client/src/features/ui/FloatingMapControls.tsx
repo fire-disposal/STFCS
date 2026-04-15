@@ -20,7 +20,7 @@ import {
 	calculateViewRotationForAlignment,
 	normalizeAngle,
 	normalizeRotation,
-} from "@/utils/angleSystem";
+} from "@/utils/coordinateSystem";
 import { formatPosition } from "@/utils/spaceNav";
 
 const STORAGE_KEY = "stfcs_floating_map_controls_open";
