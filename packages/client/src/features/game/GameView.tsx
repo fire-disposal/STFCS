@@ -24,7 +24,8 @@ import { NetworkManager } from "@/network/NetworkManager";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
-import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/types";
+import { screenDeltaToWorldDelta } from "@/utils/mathUtils";
+import type { ClientCommandValue, FactionValue, PlayerState } from "@vt/types";
 import { ClientCommand, Faction, GamePhase, PlayerRole } from "@vt/types";
 import { LogOut, Rocket, Settings, Users } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
@@ -105,12 +106,10 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	// 地图控制
 	const handleMapPan = useCallback(
 		(deltaX: number, deltaY: number) => {
-			setCameraPosition(
-				cameraPosition.x - deltaX / zoom,
-				cameraPosition.y - deltaY / zoom
-			);
+			const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotation);
+			setCameraPosition(cameraPosition.x - worldDelta.x, cameraPosition.y - worldDelta.y);
 		},
-		[cameraPosition.x, cameraPosition.y, setCameraPosition, zoom]
+		[cameraPosition.x, cameraPosition.y, setCameraPosition, zoom, viewRotation]
 	);
 
 	const handleMapRotate = useCallback(

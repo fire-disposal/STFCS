@@ -23,13 +23,13 @@ interface CameraSliceState {
 // - minZoom: 0.3 允许看到更多地图
 // - maxZoom: 6 允许详细检查
 // - zoomStep: 1.15 每档缩放比率（比 1.1 快，比 1.2 慢，更平滑）
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 6;
+
 const defaultCamera: CameraState = {
-	centerX: 2048, // 地图中心（地图大小 4096）
-	centerY: 2048,
+	x: 2048, // 地图中心（地图大小 4096）
+	y: 2048,
 	zoom: 1,
-	rotation: 0,
-	minZoom: 0.3,
-	maxZoom: 6,
 };
 
 const initialState: CameraSliceState = {
@@ -48,26 +48,21 @@ const cameraSlice = createSlice({
 
 		// 更新本地相机（增量更新）
 		updateCamera: (state, action: PayloadAction<Partial<CameraState>>) => {
-			if (action.payload.centerX !== undefined) {
-				state.local.centerX = action.payload.centerX;
+			if (action.payload.x !== undefined) {
+				state.local.x = action.payload.x;
 			}
-			if (action.payload.centerY !== undefined) {
-				state.local.centerY = action.payload.centerY;
+			if (action.payload.y !== undefined) {
+				state.local.y = action.payload.y;
 			}
 			if (action.payload.zoom !== undefined) {
-				const minZoom = state.local.minZoom ?? defaultCamera.minZoom!;
-				const maxZoom = state.local.maxZoom ?? defaultCamera.maxZoom!;
-				state.local.zoom = clampZoom(action.payload.zoom, minZoom, maxZoom);
-			}
-			if (action.payload.rotation !== undefined) {
-				state.local.rotation = action.payload.rotation;
+				state.local.zoom = clampZoom(action.payload.zoom, MIN_ZOOM, MAX_ZOOM);
 			}
 		},
 
 		// 相对移动相机
 		panCamera: (state, action: PayloadAction<{ dx: number; dy: number }>) => {
-			state.local.centerX += action.payload.dx;
-			state.local.centerY += action.payload.dy;
+			state.local.x += action.payload.dx;
+			state.local.y += action.payload.dy;
 		},
 
 		// 重置相机到默认状态
@@ -77,7 +72,7 @@ const cameraSlice = createSlice({
 
 		// 更新远程玩家相机
 		updateRemoteCamera: (state, action: PayloadAction<PlayerCamera>) => {
-			state.remote[action.payload.playerId] = action.payload;
+			state.remote[action.payload.ownerId] = action.payload;
 		},
 
 		// 移除远程玩家相机

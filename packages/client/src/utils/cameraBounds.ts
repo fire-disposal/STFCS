@@ -224,13 +224,13 @@ export function calculateZoomTowardsMouse(
  */
 export function updateCameraWithConstraints(
   updates: {
-    centerX?: number;
-    centerY?: number;
+  x?: number;
+  y?: number;
     zoom?: number;
   },
   current: {
-    centerX: number;
-    centerY: number;
+  x: number;
+  y: number;
     zoom: number;
   },
   config: CameraBoundsConfig,
@@ -243,8 +243,8 @@ export function updateCameraWithConstraints(
     enableSoftBoundary?: boolean;
   }
 ): {
-  centerX: number;
-  centerY: number;
+  x: number;
+  y: number;
   zoom: number;
 } {
   const {
@@ -258,8 +258,8 @@ export function updateCameraWithConstraints(
     ? clampZoom(updates.zoom, minZoom, maxZoom)
     : current.zoom;
 
-  let newCenterX = updates.centerX ?? current.centerX;
-  let newCenterY = updates.centerY ?? current.centerY;
+  let newCenterX = updates.x ?? current.x;
+  let newCenterY = updates.y ?? current.y;
 
   // If zooming towards mouse, recalculate center
   if (updates.zoom !== undefined && options?.mousePosition) {
@@ -268,8 +268,8 @@ export function updateCameraWithConstraints(
       options.mousePosition.y,
       current.zoom,
       newZoom,
-      current.centerX,
-      current.centerY,
+      current.x,
+      current.y,
       viewportWidth,
       viewportHeight
     );
@@ -283,8 +283,8 @@ export function updateCameraWithConstraints(
   // Apply soft boundary if enabled
   if (options?.enableSoftBoundary !== false) {
     const softResult = applySoftBoundary(
-      current.centerX,
-      current.centerY,
+      current.x,
+      current.y,
       newCenterX,
       newCenterY,
       bounds,
@@ -300,8 +300,8 @@ export function updateCameraWithConstraints(
   }
 
   return {
-    centerX: newCenterX,
-    centerY: newCenterY,
+    x: newCenterX,
+    y: newCenterY,
     zoom: newZoom,
   };
 }

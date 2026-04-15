@@ -44,12 +44,9 @@ export class ViewStateMachine {
 			mode: options.initialMode ?? ViewMode.TACTICAL,
 			layers: {} as ViewState["layers"],
 			camera: {
-				centerX: options.initialCamera?.centerX ?? 0,
-				centerY: options.initialCamera?.centerY ?? 0,
+				x: options.initialCamera?.x ?? 0,
+				y: options.initialCamera?.y ?? 0,
 				zoom: options.initialCamera?.zoom ?? 1,
-				rotation: options.initialCamera?.rotation ?? 0,
-				minZoom: options.initialCamera?.minZoom ?? 0.1,
-				maxZoom: options.initialCamera?.maxZoom ?? 4,
 			},
 			viewport: {
 				width: options.initialViewport?.width ?? 1920,

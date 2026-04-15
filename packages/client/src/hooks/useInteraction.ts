@@ -182,8 +182,8 @@ export function useInteraction(
 				const dx = (screenX - startScreen.x) / startCamera.zoom;
 				const dy = (screenY - startScreen.y) / startCamera.zoom;
 
-				let newCenterX = startCamera.centerX - dx;
-				let newCenterY = startCamera.centerY - dy;
+				let newCenterX = startCamera.x - dx;
+				let newCenterY = startCamera.y - dy;
 
 				// 应用边界约束（允许部分出界，但屏幕中心点不能离开地图）
 				if (mapBounds) {
@@ -204,7 +204,7 @@ export function useInteraction(
 					newCenterY = clamped.y;
 				}
 
-				dispatch(updateCamera({ centerX: newCenterX, centerY: newCenterY }));
+				dispatch(updateCamera({ x: newCenterX, y: newCenterY }));
 
 				callbacks?.onCanvasPan?.(dx, dy);
 			} else if (type === "token" && tokenId && tokenOriginalPosition) {

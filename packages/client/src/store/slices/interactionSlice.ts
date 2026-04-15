@@ -38,7 +38,7 @@ export interface DragState {
 	/** 拖拽开始时的世界坐标 */
 	startWorld: { x: number; y: number };
 	/** 拖拽开始时的相机位置 */
-	startCamera: { centerX: number; centerY: number; zoom: number };
+	startCamera: { x: number; y: number; zoom: number };
 	/** 被拖拽的 Token ID（如果是 Token 拖拽） */
 	tokenId?: string;
 	/** Token 原始位置（如果是 Token 拖拽） */

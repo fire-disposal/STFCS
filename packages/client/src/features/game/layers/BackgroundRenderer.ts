@@ -46,12 +46,12 @@ const STAR_LAYERS = [
 export function renderBackground(
 	layer: Container,
 	config: BackgroundConfig,
-	cameraPosition?: { centerX: number; centerY: number; zoom: number }
+	cameraPosition?: { x: number; y: number; zoom: number }
 ): void {
 	layer.removeChildren();
 
 	const cfg = { ...DEFAULT_BACKGROUND_CONFIG, ...config };
-	const camera = cameraPosition || { centerX: 0, centerY: 0, zoom: 1 };
+	const camera = cameraPosition || { x: 0, y: 0, zoom: 1 };
 
 	// 1. 创建深空渐变背景
 	const background = createDeepSpaceBackground(cfg);
@@ -59,15 +59,15 @@ export function renderBackground(
 
 	// 2. 创建星云层（底层）
 	const nebulaLayer = createNebulaLayer(cfg);
-	nebulaLayer.position.x = -camera.centerX * 0.1;
-	nebulaLayer.position.y = -camera.centerY * 0.1;
+	nebulaLayer.position.x = -camera.x * 0.1;
+	nebulaLayer.position.y = -camera.y * 0.1;
 	layer.addChild(nebulaLayer);
 
 	// 3. 创建多层星空（带视差）
 	STAR_LAYERS.forEach((starLayer) => {
 		const stars = createStarLayer(starLayer, cfg);
-		stars.position.x = -camera.centerX * starLayer.parallax;
-		stars.position.y = -camera.centerY * starLayer.parallax;
+		stars.position.x = -camera.x * starLayer.parallax;
+		stars.position.y = -camera.y * starLayer.parallax;
 		layer.addChild(stars);
 	});
 
@@ -194,7 +194,7 @@ function addStarTwinkling(layer: Container): void {
 export function updateBackground(
 	layer: Container,
 	config: BackgroundConfig,
-	cameraPosition?: { centerX: number; centerY: number; zoom: number }
+	cameraPosition?: { x: number; y: number; zoom: number }
 ): void {
 	renderBackground(layer, config, cameraPosition);
 }
@@ -205,22 +205,22 @@ export function updateBackground(
  */
 export function updateParallax(
 	layer: Container,
-	cameraPosition: { centerX: number; centerY: number; zoom: number },
+	cameraPosition: { x: number; y: number; zoom: number },
 	config: BackgroundConfig
 ): void {
 	// 更新星云层位置（非常远的背景，几乎不动）
 	const nebulaLayer = layer.children[1] as Container;
 	if (nebulaLayer) {
-		nebulaLayer.position.x = -cameraPosition.centerX * 0.02;
-		nebulaLayer.position.y = -cameraPosition.centerY * 0.02;
+		nebulaLayer.position.x = -cameraPosition.x * 0.02;
+		nebulaLayer.position.y = -cameraPosition.y * 0.02;
 	}
 
 	// 更新各层星空位置（视差系数很小，营造深远空间感）
 	STAR_LAYERS.forEach((starLayer) => {
 		const starContainer = layer.children[2] as Container;
 		if (starContainer) {
-			starContainer.position.x = -cameraPosition.centerX * starLayer.parallax;
-			starContainer.position.y = -cameraPosition.centerY * starLayer.parallax;
+			starContainer.position.x = -cameraPosition.x * starLayer.parallax;
+			starContainer.position.y = -cameraPosition.y * starLayer.parallax;
 		}
 	});
 }

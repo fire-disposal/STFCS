@@ -1,8 +1,8 @@
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
-import type { PlayerInfo } from "@vt/types";
+import type { PlayerState as ServerPlayerState } from "@vt/types";
 
-// 扩展PlayerInfo接口以包含游戏状态
-export interface ExtendedPlayerInfo extends PlayerInfo {
+// 扩展 PlayerState 接口以包含客户端状态
+export interface ExtendedPlayerInfo extends ServerPlayerState {
 	isConnected: boolean;
 	isReady: boolean;
 	currentShipId: string | null;
@@ -36,15 +36,15 @@ const playerSlice = createSlice({
 			state.currentPlayerId = action.payload;
 		},
 		addPlayer: (state, action: PayloadAction<ExtendedPlayerInfo>) => {
-			state.players[action.payload.id] = action.payload;
+			state.players[action.payload.sessionId] = action.payload;
 		},
 		updatePlayer: (
 			state,
-			action: PayloadAction<{ id: string; updates: Partial<ExtendedPlayerInfo> }>
+			action: PayloadAction<{ sessionId: string; updates: Partial<ExtendedPlayerInfo> }>
 		) => {
-			const player = state.players[action.payload.id];
+			const player = state.players[action.payload.sessionId];
 			if (player) {
-				state.players[action.payload.id] = {
+				state.players[action.payload.sessionId] = {
 					...player,
 					...action.payload.updates,
 				};
@@ -65,31 +65,31 @@ const playerSlice = createSlice({
 			state.roomId = null;
 		},
 		playerJoined: (state, action: PayloadAction<ExtendedPlayerInfo>) => {
-			state.players[action.payload.id] = action.payload;
+			state.players[action.payload.sessionId] = action.payload;
 		},
 		playerLeft: (state, action: PayloadAction<string>) => {
 			delete state.players[action.payload];
 		},
-		setPlayerReady: (state, action: PayloadAction<{ id: string; isReady: boolean }>) => {
-			const player = state.players[action.payload.id];
+		setPlayerReady: (state, action: PayloadAction<{ sessionId: string; isReady: boolean }>) => {
+			const player = state.players[action.payload.sessionId];
 			if (player) {
 				player.isReady = action.payload.isReady;
 			}
 		},
-		setPlayerShip: (state, action: PayloadAction<{ id: string; shipId: string | null }>) => {
-			const player = state.players[action.payload.id];
+		setPlayerShip: (state, action: PayloadAction<{ sessionId: string; shipId: string | null }>) => {
+			const player = state.players[action.payload.sessionId];
 			if (player) {
 				player.currentShipId = action.payload.shipId;
 			}
 		},
-		addSelectedTarget: (state, action: PayloadAction<{ id: string; targetId: string }>) => {
-			const player = state.players[action.payload.id];
+		addSelectedTarget: (state, action: PayloadAction<{ sessionId: string; targetId: string }>) => {
+			const player = state.players[action.payload.sessionId];
 			if (player && !player.selectedTargets.includes(action.payload.targetId)) {
 				player.selectedTargets.push(action.payload.targetId);
 			}
 		},
-		removeSelectedTarget: (state, action: PayloadAction<{ id: string; targetId: string }>) => {
-			const player = state.players[action.payload.id];
+		removeSelectedTarget: (state, action: PayloadAction<{ sessionId: string; targetId: string }>) => {
+			const player = state.players[action.payload.sessionId];
 			if (player) {
 				player.selectedTargets = player.selectedTargets.filter(
 					(targetId) => targetId !== action.payload.targetId
@@ -116,15 +116,15 @@ const playerSlice = createSlice({
 		},
 		setGamePhase: (
 			state,
-			action: PayloadAction<{ id: string; phase: ExtendedPlayerInfo["gamePhase"] }>
+			action: PayloadAction<{ sessionId: string; phase: ExtendedPlayerInfo["gamePhase"] }>
 		) => {
-			const player = state.players[action.payload.id];
+			const player = state.players[action.payload.sessionId];
 			if (player) {
 				player.gamePhase = action.payload.phase;
 			}
 		},
-		setFluxVenting: (state, action: PayloadAction<{ id: string; active: boolean }>) => {
-			const player = state.players[action.payload.id];
+		setFluxVenting: (state, action: PayloadAction<{ sessionId: string; active: boolean }>) => {
+			const player = state.players[action.payload.sessionId];
 			if (player) {
 				player.fluxVentingActive = action.payload.active;
 			}

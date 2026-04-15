@@ -57,6 +57,7 @@ const App: React.FC = () => {
 
 		roomsUnsubscribeRef.current?.();
 		roomsUnsubscribeRef.current = networkManager.subscribeRooms(setRooms);
+		networkManager.getRooms();
 
 		return () => {
 			roomsUnsubscribeRef.current?.();

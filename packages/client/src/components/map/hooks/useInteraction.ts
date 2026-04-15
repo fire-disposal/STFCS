@@ -2,7 +2,7 @@ import { useRef } from "react";
 
 export interface DragState {
 	active: boolean;
-	mode: "pan" | "rotate" | null;
+	mode: "pan" | "rotate" | "click" | null;
 	startX: number;
 	startY: number;
 	lastX: number;

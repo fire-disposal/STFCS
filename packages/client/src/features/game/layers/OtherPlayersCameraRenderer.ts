@@ -51,15 +51,15 @@ export function renderCameraIndicator(
 	const container = new Container();
 	const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
-	const { centerX, centerY, zoom } = camera;
+	const { x, y, zoom } = camera;
 
 	// 计算视野范围（世界坐标）
 	const viewWidth = viewportSize.width / zoom;
 	const viewHeight = viewportSize.height / zoom;
-	const left = centerX - viewWidth / 2;
-	const right = centerX + viewWidth / 2;
-	const top = centerY - viewHeight / 2;
-	const bottom = centerY + viewHeight / 2;
+	const left = x - viewWidth / 2;
+	const right = x + viewWidth / 2;
+	const top = y - viewHeight / 2;
+	const bottom = y + viewHeight / 2;
 
 	// 绘制视野范围（半透明矩形）
 	if (finalConfig.showViewFrustum) {
@@ -114,7 +114,7 @@ export function renderCameraIndicator(
 
 	// 添加玩家名称标签
 	if (finalConfig.showPlayerName) {
-		const nameLabel = new ScalableText(camera.playerName, {
+		const nameLabel = new ScalableText(camera.ownerId ?? camera.id, {
 			baseFontSize: finalConfig.nameFontSize!,
 			keepSize: true,
 			styleOptions: {
@@ -124,7 +124,7 @@ export function renderCameraIndicator(
 			},
 		});
 		nameLabel.anchor.set(0.5, 0);
-		nameLabel.position.set(centerX, top - 10);
+		nameLabel.position.set(x, top - 10);
 		container.addChild(nameLabel);
 	}
 
@@ -157,7 +157,7 @@ export function renderAllOtherPlayersCameras(
 	layer.removeChildren();
 
 	// 过滤掉当前玩家的相机
-	const otherCameras = Object.values(cameras).filter((cam) => cam.playerId !== currentPlayerId);
+	const otherCameras = Object.values(cameras).filter((cam) => cam.ownerId !== currentPlayerId);
 
 	otherCameras.forEach((camera) => {
 		const indicator = renderCameraIndicator(camera, viewportSize, config);

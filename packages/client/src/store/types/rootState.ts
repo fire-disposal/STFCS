@@ -8,7 +8,7 @@
  */
 
 import type { SelectionRecord } from "@/store/slices/selectionSlice";
-import type { PlayerInfo, ShipStatus, TokenInfo } from "@vt/types";
+import type { CameraState, PlayerCamera, PlayerState, ShipState, TokenInfo } from "@vt/types";
 
 /**
  * 领域状态层
@@ -20,9 +20,7 @@ export interface DomainState {
 	/** 玩家实体 */
 	players: Record<
 		string,
-		PlayerInfo & {
-			isConnected: boolean;
-			isReady: boolean;
+		PlayerState & {
 			currentShipId: string | null;
 		}
 	>;
@@ -31,7 +29,7 @@ export interface DomainState {
 	tokens: Record<string, TokenInfo>;
 
 	/** 舰船状态实体 */
-	ships: Record<string, ShipStatus>;
+	ships: Record<string, ShipState>;
 
 	/** 选中状态 */
 	selections: Record<string, SelectionRecord>;
@@ -45,27 +43,9 @@ export interface DomainState {
 export interface UIState {
 	/** 相机状态 */
 	camera: {
-		local: {
-			centerX: number;
-			centerY: number;
-			zoom: number;
-			rotation: number;
-			minZoom?: number;
-			maxZoom?: number;
-		};
+		local: CameraState;
 		/** 其他玩家的相机 */
-		remote: Record<
-			string,
-			{
-				playerId: string;
-				playerName: string;
-				centerX: number;
-				centerY: number;
-				zoom: number;
-				rotation: number;
-				timestamp: number;
-			}
-		>;
+		remote: Record<string, PlayerCamera>;
 	};
 
 	/** 交互状态 */

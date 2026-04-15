@@ -275,13 +275,12 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 						stage.cursor = "grabbing";
 					} else if (!isShipObject(event.target)) {
 						dragState.active = true;
-						dragState.mode = "pan";
+						dragState.mode = "click";
 						dragState.startX = screen.x;
 						dragState.startY = screen.y;
 						dragState.lastX = dragState.startX;
 						dragState.lastY = dragState.startY;
 						dragState.moved = false;
-						stage.cursor = "grabbing";
 					}
 				}
 			});
@@ -306,19 +305,21 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				dragState.lastY = currentY;
 				if (dragState.mode === "rotate") {
 					dragState.pendingRotate += dx * 0.25;
-				} else {
+				} else if (dragState.mode === "pan") {
 					dragState.pendingDx += dx;
 					dragState.pendingDy += dy;
 				}
-				flushDragDelta();
+				if (dragState.mode === "pan" || dragState.mode === "rotate") {
+					flushDragDelta();
+				}
 			});
 
 			const finishDrag = (event: any) => {
 				const dragState = dragStateRef.current;
 
 				if (
-					dragState.active &&
-					dragState.mode === "pan" &&
+												dragState.active &&
+												(dragState.mode === "pan" || dragState.mode === "click") &&
 					!dragState.moved &&
 					!isShipObject(event.target)
 				) {

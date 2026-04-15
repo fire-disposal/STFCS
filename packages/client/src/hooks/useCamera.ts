@@ -42,6 +42,8 @@ export interface UseCameraReturn extends CameraState {
 export function useCamera(): UseCameraReturn {
 	const dispatch = useAppDispatch();
 	const camera = useAppSelector((state) => state.camera.local);
+	const MIN_ZOOM = 0.3;
+	const MAX_ZOOM = 6;
 
 	// 设置相机
 	const setCameraCallback = useCallback(
@@ -70,12 +72,10 @@ export function useCamera(): UseCameraReturn {
 	// 缩放
 	const zoomTo = useCallback(
 		(zoom: number) => {
-			const minZoom = camera.minZoom ?? 0.3;
-			const maxZoom = camera.maxZoom ?? 6;
-			const clamped = clampZoom(zoom, minZoom, maxZoom);
+			const clamped = clampZoom(zoom, MIN_ZOOM, MAX_ZOOM);
 			dispatch(updateCamera({ zoom: clamped }));
 		},
-		[dispatch, camera.minZoom, camera.maxZoom]
+		[dispatch]
 	);
 
 	const zoomIn = useCallback(
@@ -95,7 +95,7 @@ export function useCamera(): UseCameraReturn {
 	// 居中到点
 	const centerOn = useCallback(
 		(x: number, y: number) => {
-			dispatch(setCamera({ centerX: x, centerY: y }));
+			dispatch(setCamera({ x, y }));
 		},
 		[dispatch]
 	);
@@ -108,19 +108,19 @@ export function useCamera(): UseCameraReturn {
 	// 屏幕坐标转世界坐标
 	const screenToWorld = useCallback(
 		(screenX: number, screenY: number) => ({
-			x: screenX / camera.zoom + camera.centerX,
-			y: screenY / camera.zoom + camera.centerY,
+			x: screenX / camera.zoom + camera.x,
+			y: screenY / camera.zoom + camera.y,
 		}),
-		[camera.zoom, camera.centerX, camera.centerY]
+		[camera.zoom, camera.x, camera.y]
 	);
 
 	// 世界坐标转屏幕坐标
 	const worldToScreen = useCallback(
 		(worldX: number, worldY: number) => ({
-			x: (worldX - camera.centerX) * camera.zoom,
-			y: (worldY - camera.centerY) * camera.zoom,
+			x: (worldX - camera.x) * camera.zoom,
+			y: (worldY - camera.y) * camera.zoom,
 		}),
-		[camera.zoom, camera.centerX, camera.centerY]
+		[camera.zoom, camera.x, camera.y]
 	);
 
 	return {
