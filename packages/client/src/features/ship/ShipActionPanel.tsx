@@ -47,8 +47,8 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 	const [movePhaseA, setMovePhaseA] = useState(0);
 	const [movePhaseAStrafe, setMovePhaseAStrafe] = useState(0);
 	const [turnAngle, setTurnAngle] = useState(0);
-	const [movePhaseB, setMovePhaseB] = useState(0);
-	const [movePhaseBStrafe, setMovePhaseBStrafe] = useState(0);
+	const [movePhaseC, setMovePhaseC] = useState(0);
+	const [movePhaseCStrafe, setMovePhaseCStrafe] = useState(0);
 	const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
 	const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
 
@@ -101,8 +101,8 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 		let newY = ship.transform.y + forwardYA * movePhaseA + rightYA * movePhaseAStrafe;
 		const newHeading = (((ship.transform.heading + turnAngle) % 360) + 360) % 360;
 		const radB = (newHeading * Math.PI) / 180;
-		newX += Math.sin(radB) * movePhaseB + Math.cos(radB) * movePhaseBStrafe;
-		newY += -Math.cos(radB) * movePhaseB + Math.sin(radB) * movePhaseBStrafe;
+		newX += Math.sin(radB) * movePhaseC + Math.cos(radB) * movePhaseCStrafe;
+		newY += -Math.cos(radB) * movePhaseC + Math.sin(radB) * movePhaseCStrafe;
 		onSendCommand(CC.CMD_MOVE_TOKEN, {
 			shipId: ship.id,
 			x: newX,
@@ -112,23 +112,23 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 				phaseAForward: movePhaseA,
 				phaseAStrafe: movePhaseAStrafe,
 				turnAngle,
-				phaseBForward: movePhaseB,
-				phaseBStrafe: movePhaseBStrafe,
+				phaseCForward: movePhaseC,
+				phaseCStrafe: movePhaseCStrafe,
 			},
 		});
 		setMovePhaseA(0);
 		setMovePhaseAStrafe(0);
 		setTurnAngle(0);
-		setMovePhaseB(0);
-		setMovePhaseBStrafe(0);
+		setMovePhaseC(0);
+		setMovePhaseCStrafe(0);
 	}, [
 		ship,
 		canMove,
 		movePhaseA,
 		movePhaseAStrafe,
 		turnAngle,
-		movePhaseB,
-		movePhaseBStrafe,
+		movePhaseC,
+		movePhaseCStrafe,
 		onSendCommand,
 	]);
 
@@ -261,17 +261,17 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 						className="action-slider__input"
 						min={-ship.maxSpeed * 2}
 						max={ship.maxSpeed * 2}
-						value={movePhaseB}
-						onChange={(e) => setMovePhaseB(Number(e.target.value))}
+						value={movePhaseC}
+						onChange={(e) => setMovePhaseC(Number(e.target.value))}
 						disabled={!canMove}
 					/>
 				</div>
 
 				<div className="action-slider">
 					<div className="action-slider__label">
-						<span>阶段B 横移</span>
+						<span>阶段C 横移</span>
 						<span>
-							{movePhaseBStrafe} / {ship.maxSpeed}
+							{movePhaseCStrafe} / {ship.maxSpeed}
 						</span>
 					</div>
 					<input
@@ -279,8 +279,8 @@ export const ShipActionPanel: React.FC<ShipActionPanelProps> = ({
 						className="action-slider__input"
 						min={-ship.maxSpeed}
 						max={ship.maxSpeed}
-						value={movePhaseBStrafe}
-						onChange={(e) => setMovePhaseBStrafe(Number(e.target.value))}
+						value={movePhaseCStrafe}
+						onChange={(e) => setMovePhaseCStrafe(Number(e.target.value))}
 						disabled={!canMove}
 					/>
 				</div>

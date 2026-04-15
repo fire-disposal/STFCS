@@ -41,6 +41,7 @@ interface Context {
 	profileStore: Map<number, { nickname: string; avatar: string }>;
 	createObject: (payload: CreateObjectPayload) => void;
 	enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) => void;
+	dissolveRoom: () => void;
 }
 
 export function registerMessageHandlers(
@@ -244,5 +245,13 @@ export function registerMessageHandlers(
 			target?.send("ROOM_KICKED", toRoomKickedDto("被移出"));
 			target?.leave(4001);
 		});
+	});
+
+	onMessage("ROOM_DISSOLVE", (client) => {
+		if (client.sessionId !== ctx.getRoomOwnerId()) {
+			client.send("error", toErrorDto("仅房主可解散房间"));
+			return;
+		}
+		ctx.dissolveRoom();
 	});
 }

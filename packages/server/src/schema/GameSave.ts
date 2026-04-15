@@ -78,8 +78,8 @@ export function serializeGameSave(
 			hasFired: ship.hasFired,
 			movePhaseAX: ship.movePhaseAX,
 			movePhaseAStrafe: ship.movePhaseAStrafe,
-			movePhaseBX: ship.movePhaseBX,
-			movePhaseBStrafe: ship.movePhaseBStrafe,
+			movePhaseCX: ship.movePhaseCX,
+			movePhaseCStrafe: ship.movePhaseCStrafe,
 			turnAngle: ship.turnAngle,
 			weapons,
 		});
@@ -144,8 +144,8 @@ export function deserializeShipSave(data: ShipSave): ShipState {
 	ship.hasFired = data.hasFired;
 	ship.movePhaseAX = data.movePhaseAX;
 	ship.movePhaseAStrafe = data.movePhaseAStrafe;
-	ship.movePhaseBX = data.movePhaseBX;
-	ship.movePhaseBStrafe = data.movePhaseBStrafe;
+	ship.movePhaseCX = data.movePhaseCX;
+	ship.movePhaseCStrafe = data.movePhaseCStrafe;
 	ship.turnAngle = data.turnAngle;
 	return ship;
 }

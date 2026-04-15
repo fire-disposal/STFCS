@@ -11,8 +11,8 @@ export interface MovementPlan {
   phaseAForward: number;   // 阶段A前进距离 (正前/负后)
   phaseAStrafe: number;    // 阶段A侧移距离 (正右/负左)
   turnAngle: number;       // 转向角度 (正右/负左)
-  phaseBForward: number;   // 阶段B前进距离
-  phaseBStrafe: number;    // 阶段B侧移距离
+  phaseCForward: number;   // 阶段C前进距离 (转向后平移)
+  phaseCStrafe: number;    // 阶段C侧移距离 (转向后平移)
 }
 
 /**
@@ -122,8 +122,8 @@ export function calculateThreePhaseMove(
   const forwardB = getForwardVector(newHeading);
   const rightB = getRightVector(newHeading);
   
-  x = x + forwardB[0] * plan.phaseBForward + rightB[0] * plan.phaseBStrafe;
-  y = y + forwardB[1] * plan.phaseBForward + rightB[1] * plan.phaseBStrafe;
+  x = x + forwardB[0] * plan.phaseCForward + rightB[0] * plan.phaseCStrafe;
+  y = y + forwardB[1] * plan.phaseCForward + rightB[1] * plan.phaseCStrafe;
   
   return { x, y, heading: newHeading };
 }
@@ -171,19 +171,19 @@ export function validateThreePhaseMove(
     };
   }
   
-  // 验证阶段B前进/后退距离 (最大2X)
-  if (Math.abs(plan.phaseBForward) > maxForward) {
+  // 验证阶段C前进/后退距离 (最大2X)
+  if (Math.abs(plan.phaseCForward) > maxForward) {
     return { 
       valid: false, 
-      error: `Phase B forward distance ${Math.abs(plan.phaseBForward).toFixed(2)} exceeds maximum ${maxForward}` 
+      error: `Phase C forward distance ${Math.abs(plan.phaseCForward).toFixed(2)} exceeds maximum ${maxForward}` 
     };
   }
   
-  // 验证阶段B横移距离 (最大X)
-  if (Math.abs(plan.phaseBStrafe) > maxSpeed) {
+  // 验证阶段C横移距离 (最大X)
+  if (Math.abs(plan.phaseCStrafe) > maxSpeed) {
     return { 
       valid: false, 
-      error: `Phase B strafe distance ${Math.abs(plan.phaseBStrafe).toFixed(2)} exceeds maximum ${maxSpeed}` 
+      error: `Phase C strafe distance ${Math.abs(plan.phaseCStrafe).toFixed(2)} exceeds maximum ${maxSpeed}` 
     };
   }
   
@@ -222,8 +222,8 @@ export function calculateMovementPlan(
     phaseAForward: distance * 0.5,
     phaseAStrafe: 0,
     turnAngle: normalizeAngle(targetHeading - startHeading),
-    phaseBForward: distance * 0.5,
-    phaseBStrafe: 0
+    phaseCForward: distance * 0.5,
+    phaseCStrafe: 0
   };
   
   // 验证计划是否可行
@@ -394,8 +394,8 @@ export function calculateMovementRange(
       phaseAForward: maxForward,
       phaseAStrafe: 0,
       turnAngle: turn,
-      phaseBForward: maxForward,
-      phaseBStrafe: 0
+      phaseCForward: maxForward,
+      phaseCStrafe: 0
     };
     const result = calculateThreePhaseMove(x, y, heading, plan);
     points.push({ x: result.x, y: result.y });
@@ -406,8 +406,8 @@ export function calculateMovementRange(
         phaseAForward: maxForward * 0.5,
         phaseAStrafe: maxSpeed * strafeDir,
         turnAngle: turn,
-        phaseBForward: maxForward * 0.5,
-        phaseBStrafe: maxSpeed * strafeDir
+        phaseCForward: maxForward * 0.5,
+        phaseCStrafe: maxSpeed * strafeDir
       };
       const resultStrafe = calculateThreePhaseMove(x, y, heading, planStrafe);
       points.push({ x: resultStrafe.x, y: resultStrafe.y });

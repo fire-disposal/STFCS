@@ -111,14 +111,14 @@ export class CommandDispatcher {
 		}
 
 		if (phase === "PHASE_C") {
-			if (Math.abs(forward) + ship.phaseBForwardUsed > maxForward) {
+			if (Math.abs(forward) + ship.phaseCForwardUsed > maxForward) {
 				throw new Error("阶段C前进燃料不足");
 			}
-			if (Math.abs(strafe) + ship.phaseBStrafeUsed > maxStrafe) {
+			if (Math.abs(strafe) + ship.phaseCStrafeUsed > maxStrafe) {
 				throw new Error("阶段C横移燃料不足");
 			}
-			ship.phaseBForwardUsed += Math.abs(forward);
-			ship.phaseBStrafeUsed += Math.abs(strafe);
+			ship.phaseCForwardUsed += Math.abs(forward);
+			ship.phaseCStrafeUsed += Math.abs(strafe);
 		}
 	}
 
@@ -146,8 +146,8 @@ export class CommandDispatcher {
 				turn = plan.turnAngle;
 				break;
 			case "PHASE_C":
-				forward = plan.phaseBForward;
-				strafe = plan.phaseBStrafe;
+				forward = plan.phaseCForward;
+				strafe = plan.phaseCStrafe;
 				break;
 		}
 
@@ -219,8 +219,8 @@ export class CommandDispatcher {
 		ship.movePhaseAX = payload.movementPlan.phaseAForward;
 		ship.movePhaseAStrafe = payload.movementPlan.phaseAStrafe;
 		ship.turnAngle = payload.movementPlan.turnAngle;
-		ship.movePhaseBX = payload.movementPlan.phaseBForward;
-		ship.movePhaseBStrafe = payload.movementPlan.phaseBStrafe;
+		ship.movePhaseCX = payload.movementPlan.phaseCForward;
+		ship.movePhaseCStrafe = payload.movementPlan.phaseCStrafe;
 		ship.setPosition(v.finalPosition.x, v.finalPosition.y);
 		ship.setHeading(v.finalHeading);
 		ship.hasMoved = true;

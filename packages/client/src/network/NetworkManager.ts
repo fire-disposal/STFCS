@@ -372,10 +372,8 @@ export class NetworkManager {
 		});
 
 		this.activeRoomOperation = (async () => {
-			// 异步离开前一个房间，不阻塞创建流程
-			this.leaveCurrentRoomIfNeeded().catch((e) => {
-				console.warn("[NetworkManager] Failed to leave previous room during create:", e);
-			});
+			// 等待前一个房间完全离开后再创建新房间
+			await this.leaveCurrentRoomIfNeeded();
 
 			// 确保有默认值
 			const createOptions = {
@@ -437,10 +435,8 @@ export class NetworkManager {
 		console.log("[NetworkManager] Joining room:", roomId, { playerName, shortId });
 
 		this.activeRoomOperation = (async () => {
-			// 异步离开前一个房间，不阻塞加入流程
-			this.leaveCurrentRoomIfNeeded().catch((e) => {
-				console.warn("[NetworkManager] Failed to leave previous room during join:", e);
-			});
+			// 等待前一个房间完全离开后再加入新房间
+			await this.leaveCurrentRoomIfNeeded();
 
 			const room = await this.withRoomOperationTimeout(
 				this.client.joinById<GameRoomState>(roomId, { playerName, shortId }),
@@ -555,18 +551,13 @@ export class NetworkManager {
 				console.log("[NetworkManager] Calling room.leave(1000)...");
 
 				// 传递 1000 表示正常退出，不触发重连
-				// 不等待完成，因为服务器会异步处理
-				roomToLeave.leave(1000).catch((e: unknown) => {
-					console.warn("[NetworkManager] room.leave() error:", e);
-				});
+				await roomToLeave.leave(1000);
 
-				// 等待短暂延迟确保服务器收到退出通知
-				await new Promise((resolve) => setTimeout(resolve, 100));
-				console.log("[NetworkManager] room.leave() sent");
+				console.log("[NetworkManager] room.leave() completed");
 			} catch (error) {
 				console.warn("[NetworkManager] Failed to leave previous room:", error);
 			} finally {
-				// 立即清理状态，不等待服务器确认
+				// 清理状态
 				if (this.currentRoom === roomToLeave) {
 					console.log("[NetworkManager] Clearing current room state");
 					this.currentRoom = null;
@@ -576,8 +567,7 @@ export class NetworkManager {
 			}
 		})();
 
-		// 不等待完成，立即返回
-		console.log("[NetworkManager] leaveCurrentRoomIfNeeded returning immediately");
+		await this.roomLeaveOperation;
 	}
 
 	private bindRoomLifecycle(room: Room<GameRoomState>): void {

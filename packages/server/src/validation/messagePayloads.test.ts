@@ -20,8 +20,8 @@ describe("messagePayloads", () => {
 				phaseAForward: 5,
 				phaseAStrafe: 2,
 				turnAngle: 10,
-				phaseBForward: 4,
-				phaseBStrafe: 1,
+				phaseCForward: 4,
+				phaseCStrafe: 1,
 			},
 		});
 

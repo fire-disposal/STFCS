@@ -143,15 +143,15 @@ export interface ShipState {
 	hasFired: boolean;
 	movePhaseAX: number;
 	movePhaseAStrafe: number;
-	movePhaseBX: number;
-	movePhaseBStrafe: number;
+	movePhaseCX: number;
+	movePhaseCStrafe: number;
 	turnAngle: number;
 	movePhase: "PHASE_A" | "PHASE_B" | "PHASE_C";
 	phaseAForwardUsed: number;
 	phaseAStrafeUsed: number;
 	phaseTurnUsed: number;
-	phaseBForwardUsed: number;
-	phaseBStrafeUsed: number;
+	phaseCForwardUsed: number;
+	phaseCStrafeUsed: number;
 }
 
 // ==================== 玩家状态 ====================

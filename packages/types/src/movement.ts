@@ -16,8 +16,8 @@ export interface MovementPlan {
 	phaseAForward: number;
 	phaseAStrafe: number;
 	turnAngle: number;
-	phaseBForward: number;
-	phaseBStrafe: number;
+	phaseCForward: number;
+	phaseCStrafe: number;
 }
 
 // ==================== 移动验证结果 ====================
@@ -35,7 +35,7 @@ export interface MovementFuelState {
 	phaseAForwardUsed: number;
 	phaseAStrafeUsed: number;
 	phaseTurnUsed: number;
-	phaseBForwardUsed: number;
-	phaseBStrafeUsed: number;
+	phaseCForwardUsed: number;
+	phaseCStrafeUsed: number;
 	currentPhase: MovePhaseValue;
 }
