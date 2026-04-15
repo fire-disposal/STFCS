@@ -5,17 +5,16 @@
  * - 顶部：回合状态栏
  * - 中央：地图区域
  * - 右侧：信息面板（视图/日志/DM，支持折叠）
- * - 底部：命令 Dock（整合舰船信息/辐能/护甲）
+ * - 底部：战斗命令面板（整合舰船信息/移动/武器/回合）
  *
- * 样式：game-layout.css + game-panels.css
+ * 样式：game-layout.css + battle-panel.css
  */
 
 import { GameCanvas } from "@/components/map/GameCanvas";
 import { notify } from "@/components/ui/Notification";
 import { PhaseBar } from "@/features/game/PhaseBar";
 import { PlayerRosterModal } from "@/features/lobby";
-import { FuelBasedMovementController } from "@/features/movement/FuelBasedMovementController";
-import { BottomCommandDock } from "@/features/ui/BottomCommandDock";
+import { BattleCommandPanel } from "@/features/ui/BattleCommandPanel";
 import { RightSidePanel } from "@/features/ui/RightSidePanel";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { useCurrentGameRoom } from "@/hooks";
@@ -40,7 +39,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
-	const [showMovementPanel, setShowMovementPanel] = useState(false);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
 	const selectedShipId = useSelectionStore((state) => state.selectedShipId);
 	const selectShip = useSelectionStore((state) => state.selectShip);
@@ -215,15 +213,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		notify.success("邀请链接已复制到剪贴板");
 	}, [networkManager, room]);
 
-	// 命令 Dock 操作
-	const handleOpenMovement = useCallback(() => {
-		setShowMovementPanel(true);
-	}, []);
-
-	const handleCloseMovement = useCallback(() => {
-		setShowMovementPanel(false);
-	}, []);
-
+	// 命令操作
 	const handleToggleShield = useCallback(() => {
 		if (!selectedShip) return;
 		sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, {
@@ -345,10 +335,10 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				/>
 			</div>
 
-			{/* 底部命令 Dock - 整合舰船信息/辐能/护甲 */}
-			<BottomCommandDock
+			{/* 底部战斗命令面板 */}
+			<BattleCommandPanel
 				selectedShip={selectedShip}
-				onMove={handleOpenMovement}
+				networkManager={networkManager}
 				onToggleShield={handleToggleShield}
 				onFire={handleFire}
 				onVent={handleVent}
@@ -357,20 +347,6 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				readyLocked={!isPlayerTurn}
 				disabled={!canControlSelectedShip}
 			/>
-
-			{/* 移动面板弹窗 - 燃料池制度 */}
-			{showMovementPanel && selectedShip && (
-				<div className="game-modal-overlay" onClick={handleCloseMovement}>
-					<div className="game-modal game-modal--large" onClick={(e) => e.stopPropagation()}>
-						<FuelBasedMovementController
-							ship={selectedShip}
-							networkManager={networkManager}
-							onClose={handleCloseMovement}
-							onOpenAttack={handleFire}
-						/>
-					</div>
-				</div>
-			)}
 
 			{/* 弹窗 */}
 			<PlayerRosterModal

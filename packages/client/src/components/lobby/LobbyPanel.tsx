@@ -53,7 +53,7 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
 	);
 
 	const isOwnRoom = useCallback(
-		(room: RoomInfo) => currentShortId !== null && room.ownerShortId === currentShortId,
+		(room: RoomInfo) => currentShortId !== null && room.metadata.ownerShortId === currentShortId,
 		[currentShortId]
 	);
 
@@ -103,12 +103,12 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
 						<div className="lobby-room-list">
 							{rooms.map((room) => (
 								<div
-									key={room.id}
-									className={`lobby-room-card${currentRoomId === room.id ? " is-disabled" : ""}`}
+									key={room.roomId}
+									className={`lobby-room-card${currentRoomId === room.roomId ? " is-disabled" : ""}`}
 								>
 									<div className="lobby-room-name">
 										{room.name}
-										{room.isPrivate && " 🔒"}
+										{room.metadata.isPrivate && " 🔒"}
 										{isOwnRoom(room) && " 👑"}
 									</div>
 									<div className="lobby-room-meta">
@@ -116,8 +116,12 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
 											<span className="lobby-status-dot" />
 											{room.clients}/{room.maxClients} 玩家
 										</span>
-										<span>阶段：{room.phase}</span>
-										{currentRoomId === room.id ? (
+										<span>阶段：{room.metadata.phase}</span>
+										{room.metadata.turnCount !== undefined && (
+											<span>回合：{room.metadata.turnCount}</span>
+										)}
+										<span>房主：#{room.metadata.ownerShortId}</span>
+										{currentRoomId === room.roomId ? (
 											<span className="lobby-room-badge lobby-room-badge--warning">
 												当前所在房间
 											</span>
@@ -129,16 +133,16 @@ export const LobbyPanel: React.FC<LobbyPanelProps> = ({
 										<button
 											className="lobby-btn lobby-btn--join"
 											data-magnetic
-											disabled={currentRoomId === room.id}
-											onClick={() => onJoinRoom(room.id)}
+											disabled={currentRoomId === room.roomId}
+											onClick={() => onJoinRoom(room.roomId)}
 										>
-											{isOwnRoom(room) ? "重新进入" : "进入房间"}
+											进入房间
 										</button>
 										{isOwnRoom(room) && (
 											<button
 												className="lobby-btn lobby-btn--small lobby-btn--danger"
 												data-magnetic
-												onClick={() => onDeleteRoom(room.id)}
+												onClick={() => onDeleteRoom(room.roomId)}
 											>
 												删除房间
 											</button>

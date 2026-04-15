@@ -91,14 +91,16 @@
 .game-layout__map-area {
   flex: 1;
   position: relative;
-  background-color: rgba(6, 16, 26, 0.8);
+  background-color: transparent;
   overflow: hidden;
+  z-index: 1;
 }
 
 .game-layout__map-section {
   width: 100%;
   height: 100%;
   position: relative;
+  z-index: 2;
 }
 
 /* ====== 游戏地图容器 ====== */
@@ -109,7 +111,7 @@
   border: 2px solid rgba(74, 158, 255, 0.3);
   border-radius: 0;
   overflow: hidden;
-  background: rgba(6, 16, 26, 0.85);
+  background: transparent;
   box-shadow: 0 0 28px rgba(74, 158, 255, 0.12);
   box-sizing: border-box;
 }
@@ -179,110 +181,8 @@
   gap: 12px;
 }
 
-/* ====== 底部命令区 - 新版 ====== */
 
-.bottom-command-dock {
-  height: 220px;
-  min-height: 220px;
-  background-color: rgba(13, 40, 71, 0.95);
-  border-top: 2px solid rgba(74, 158, 255, 0.3);
-  flex-shrink: 0;
-  display: flex;
-  padding: 12px 16px;
-  gap: 16px;
-  overflow: hidden;
-}
-
-.bottom-command-dock__empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  color: var(--game-text-secondary);
-  font-size: 14px;
-}
-
-/* 左侧：舰船立绘区 */
-.bottom-command-dock__ship-portrait {
-  width: 200px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.ship-portrait {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background-color: rgba(6, 16, 26, 0.8);
-  border: 1px solid rgba(74, 158, 255, 0.2);
-  width: 100%;
-}
-
-.ship-portrait__frame {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid rgba(74, 158, 255, 0.4);
-  background-color: rgba(26, 74, 122, 0.3);
-}
-
-.ship-portrait__icon {
-  width: 40px;
-  height: 40px;
-  color: var(--game-accent-blue);
-}
-
-.ship-portrait__info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-}
-
-.ship-portrait__name {
-  font-size: 12px;
-  font-weight: bold;
-  color: var(--game-text-primary);
-}
-
-.ship-portrait__faction {
-  font-size: 10px;
-  font-weight: bold;
-  padding: 2px 8px;
-}
-
-.ship-portrait__faction.faction--player {
-  background-color: rgba(74, 158, 255, 0.3);
-  color: var(--game-accent-blue);
-}
-
-.ship-portrait__faction.faction--dm {
-  background-color: rgba(255, 111, 143, 0.3);
-  color: var(--game-accent-red);
-}
-
-.ship-portrait__id {
-  font-size: 9px;
-  color: var(--game-text-muted);
-}
-
-/* 中部：信息展示区 */
-.bottom-command-dock__info-section {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
-/* 信息区块 */
+/* ====== 信息区块 ====== */
 .info-block {
   background-color: rgba(6, 16, 26, 0.8);
   border: 1px solid rgba(74, 158, 255, 0.2);
@@ -406,141 +306,7 @@
   gap: 12px;
 }
 
-.action-group {
-  background-color: rgba(6, 16, 26, 0.8);
-  border: 1px solid rgba(74, 158, 255, 0.2);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.action-group__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: bold;
-  color: var(--game-text-secondary);
-}
-
-.action-group__icon {
-  width: 14px;
-  height: 14px;
-  color: var(--game-accent-blue);
-}
-
-.action-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.action-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px 10px;
-  background-color: rgba(26, 74, 122, 0.3);
-  border: 1px solid rgba(74, 158, 255, 0.3);
-  color: var(--game-text-primary);
-  font-size: 9px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 56px;
-}
-
-.action-btn__icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
-.action-btn__label {
-  font-size: 8px;
-}
-
-.action-btn:hover:not(:disabled) {
-  background-color: rgba(26, 74, 122, 0.5);
-  border-color: var(--game-accent-blue);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(74, 158, 255, 0.2);
-}
-
-.action-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.action-btn--fire {
-  background-color: rgba(255, 111, 143, 0.2);
-  border-color: rgba(255, 111, 143, 0.4);
-  color: var(--game-accent-red);
-}
-
-.action-btn--fire:hover:not(:disabled) {
-  background-color: rgba(255, 111, 143, 0.3);
-  box-shadow: 0 4px 8px rgba(255, 111, 143, 0.2);
-}
-
-.action-btn--shield {
-  background-color: rgba(46, 204, 113, 0.2);
-  border-color: rgba(46, 204, 113, 0.4);
-  color: var(--game-accent-green);
-}
-
-.action-btn--active {
-  background-color: var(--game-accent-green);
-  border-color: var(--game-accent-green);
-  color: white;
-}
-
-.action-btn--move {
-  background-color: rgba(74, 158, 255, 0.2);
-  border-color: rgba(74, 158, 255, 0.4);
-  color: var(--game-accent-blue);
-}
-
-.action-btn--vent {
-  background-color: rgba(241, 196, 15, 0.2);
-  border-color: rgba(241, 196, 15, 0.4);
-  color: var(--game-accent-yellow);
-}
-
-.action-btn--weapon {
-  background-color: rgba(155, 89, 182, 0.2);
-  border-color: rgba(155, 89, 182, 0.4);
-  color: var(--game-accent-purple);
-}
-
-.action-btn--turn {
-  width: 100%;
-  flex-direction: row;
-  justify-content: center;
-  gap: 6px;
-  background-color: rgba(46, 204, 113, 0.16);
-  border-color: rgba(46, 204, 113, 0.45);
-  color: var(--game-accent-green);
-}
-
-/* 状态指示 */
-.action-group--status {
-  padding: 8px 10px;
-}
-
-.status-indicators {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
+/* ====== 状态徽章（右侧面板用） ====== */
 .status-badge {
   font-size: 9px;
   font-weight: bold;
@@ -565,143 +331,19 @@
   border: 1px solid rgba(231, 76, 60, 0.4);
 }
 
-/* ====== 旧版底部命令区（保留兼容） ====== */
-
-.game-layout__command-dock {
-  height: 120px;
-  min-height: 120px;
-  background-color: rgba(13, 40, 71, 0.95);
-  border-top: 2px solid rgba(74, 158, 255, 0.3);
-  flex-shrink: 0;
-  display: flex;
-  padding: 12px 16px;
-  gap: 16px;
-}
-
-.game-layout__command-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.game-layout__command-section-title {
-  font-size: 10px;
-  font-weight: bold;
-  color: var(--game-text-secondary);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.game-layout__command-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.game-layout__command-btn {
-  width: 64px;
-  height: 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid var(--game-border);
-  background-color: var(--game-btn-bg);
-  color: var(--game-text-primary);
-  font-size: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.game-layout__command-btn:hover:not(:disabled) {
-  background-color: var(--game-bg-hover);
-  border-color: var(--game-accent-blue);
-}
-
-.game-layout__command-btn:active:not(:disabled) {
-  background-color: var(--game-bg-active);
-}
-
-.game-layout__command-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.game-layout__command-btn--primary {
-  border-color: var(--game-accent-blue);
-  background-color: var(--game-btn-bg-primary);
-  color: var(--game-accent-blue);
-}
-
-.game-layout__command-btn--danger {
-  border-color: var(--game-accent-red);
-  background-color: var(--game-btn-bg-danger);
-  color: var(--game-accent-red);
-}
-
-.game-layout__command-btn--active {
-  background-color: var(--game-accent-green);
-  border-color: var(--game-accent-green);
-  color: white;
-}
-
-.game-layout__command-btn__icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.game-layout__command-btn__label {
-  font-size: 9px;
-  font-weight: bold;
-}
-
 /* ====== 磁力指针效果 ====== */
 
-.game-layout__command-btn[data-magnetic] {
+[data-magnetic] {
   transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
 }
 
-.game-layout__command-btn[data-magnetic]:hover:not(:disabled) {
+[data-magnetic]:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
 }
 
-.game-layout__command-btn[data-magnetic]:active:not(:disabled) {
+[data-magnetic]:active:not(:disabled) {
   transform: translateY(0);
-}
-
-.game-layout__info-tab[data-magnetic] {
-  transition: transform 0.15s ease-out, color 0.15s ease-out, background-color 0.15s ease-out;
-}
-
-.game-layout__info-tab[data-magnetic]:hover:not(.game-layout__info-tab--active) {
-  transform: translateY(-1px);
-}
-
-.game-layout__info-tab[data-magnetic]:active {
-  transform: translateY(0);
-}
-
-/* 顶栏按钮磁力效果 */
-.game-layout__top-bar .game-btn[data-magnetic] {
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-}
-
-.game-layout__top-bar .game-btn[data-magnetic]:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.2);
-}
-
-.game-layout__top-bar .game-btn[data-magnetic]:active {
-  transform: translateY(0);
-}
-
-/* ====== 移动面板（特殊高度） ====== */
-.game-layout__movement-dock {
-  height: 180px;
-  min-height: 180px;
 }
 
 /* ====== 信息区块 ====== */
@@ -787,120 +429,6 @@
   font-weight: bold;
 }
 
-/* ====== 响应式 ====== */
-
-@media (max-width: 1400px) {
-  .game-layout__info-panel {
-    width: 350px;
-  }
-}
-
-@media (max-width: 1200px) {
-  .game-layout__info-panel {
-    width: 320px;
-  }
-  
-  .game-layout__command-dock {
-    height: 100px;
-    min-height: 100px;
-  }
-  
-  .game-layout__command-btn {
-    width: 56px;
-    height: 40px;
-  }
-  
-  .game-layout__command-btn__icon {
-    font-size: 14px;
-  }
-  
-  .game-layout__command-btn__label {
-    font-size: 8px;
-  }
-}
-
-@media (max-width: 900px) {
-  .game-layout__info-panel {
-    width: 280px;
-  }
-  
-  .game-layout__top-bar-title {
-    font-size: 12px;
-    letter-spacing: 1px;
-  }
-  
-  .game-layout__command-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .game-layout__info-panel {
-    width: 240px;
-  }
-  
-  .game-layout__info-tab {
-    padding: 8px 4px;
-    font-size: 10px;
-  }
-  
-  .game-layout__info-content {
-    padding: 8px;
-    gap: 8px;
-  }
-  
-  .game-layout__command-dock {
-    height: 80px;
-    min-height: 80px;
-    padding: 8px 12px;
-  }
-  
-  .game-layout__command-section {
-    gap: 4px;
-  }
-  
-  .game-layout__command-section-title {
-    font-size: 9px;
-  }
-  
-  .game-layout__command-btn {
-    width: 48px;
-    height: 32px;
-    gap: 2px;
-  }
-  
-  .game-layout__command-btn__icon {
-    font-size: 12px;
-  }
-  
-  .game-layout__command-btn__label {
-    font-size: 7px;
-  }
-  
-  .game-btn--small {
-    padding: 4px 6px;
-    font-size: 10px;
-  }
-}
-
-@media (max-width: 600px) {
-  .game-layout__info-panel {
-    width: 200px;
-  }
-  
-  .game-layout__top-bar {
-    padding: 0 8px;
-  }
-  
-  .game-layout__top-bar-left,
-  .game-layout__top-bar-right {
-    gap: 6px;
-  }
-  
-  .game-layout__command-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 
 /* ====== 加载状态 ====== */
 
@@ -916,92 +444,64 @@
   color: var(--game-text-muted);
 }
 
-/* ====== 右侧面板 - 新版 ====== */
+/* ====== 右侧面板 ====== */
 
 .right-side-panel {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  height: 100%;
+  width: 385px; /* 内容区360px + 固定条25px */
+}
+
+/* 收起状态 - 只保留固定条宽度 */
+.right-side-panel--collapsed {
+  width: 25px !important;
+}
+
+/* 内容区 - 展开时360px */
+.right-side-panel__content-wrapper {
   width: 360px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: rgba(13, 40, 71, 0.95);
   border-left: 2px solid rgba(74, 158, 255, 0.2);
-  flex-shrink: 0;
   overflow: hidden;
-  position: relative;
-  transition: width 0.3s ease;
 }
 
-.right-side-panel--collapsed {
-  width: 56px;
-}
-
-.right-side-panel__collapse-btn,
-.right-side-panel__expand-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 48px;
+/* 右侧固定条 - 始终可见 */
+.right-side-panel__strip {
+  width: 25px;
+  height: 100%;
+  background-color: rgba(13, 40, 71, 0.95);
+  border-left: 1px solid rgba(74, 158, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(26, 74, 122, 0.5);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  position: relative;
+}
+
+/* 按钮始终在条上，加高高度 */
+.right-side-panel__collapse-btn,
+.right-side-panel__expand-btn {
+  width: 25px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(13, 40, 71, 0.95);
+  border: 1px solid rgba(74, 158, 255, 0.5);
   color: var(--game-text-primary);
   cursor: pointer;
-  transition: all 0.2s;
   z-index: 10;
-}
-
-.right-side-panel__collapse-btn {
-  right: 0;
-  border-left: none;
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
-}
-
-.right-side-panel__expand-btn {
-  left: 0;
-  border-right: none;
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
 }
 
 .right-side-panel__collapse-btn:hover,
 .right-side-panel__expand-btn:hover {
   background-color: rgba(26, 74, 122, 0.8);
   border-color: var(--game-accent-blue);
-}
-
-/* 折叠状态下的 mini tabs */
-.right-side-panel__mini-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 60px 8px 8px 8px;
-}
-
-.right-side-panel__mini-tab {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(26, 74, 122, 0.3);
-  border: 1px solid rgba(74, 158, 255, 0.2);
-  color: var(--game-text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.right-side-panel__mini-tab:hover {
-  background-color: rgba(26, 74, 122, 0.5);
-  color: var(--game-text-secondary);
-}
-
-.right-side-panel__mini-tab--active {
-  background-color: rgba(26, 74, 122, 0.6);
-  border-color: var(--game-accent-blue);
-  color: var(--game-accent-blue);
+  box-shadow: 0 0 12px rgba(74, 158, 255, 0.4);
 }
 
 /* Tab 头部 */
@@ -1416,66 +916,3 @@
   gap: 12px;
 }
 
-/* ====== 响应式 ====== */
-
-@media (max-width: 1400px) {
-  .right-side-panel {
-    width: 340px;
-  }
-  
-  .bottom-command-dock__info-section {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 1200px) {
-  .right-side-panel {
-    width: 320px;
-  }
-  
-  .bottom-command-dock {
-    height: 200px;
-    min-height: 200px;
-  }
-  
-  .bottom-command-dock__ship-portrait {
-    width: 160px;
-  }
-  
-  .bottom-command-dock__action-section {
-    width: 240px;
-  }
-}
-
-@media (max-width: 900px) {
-  .right-side-panel {
-    width: 300px;
-  }
-  
-  .bottom-command-dock__info-section {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .right-side-panel {
-    width: 280px;
-  }
-  
-  .bottom-command-dock {
-    height: 180px;
-    min-height: 180px;
-  }
-  
-  .bottom-command-dock__ship-portrait {
-    width: 120px;
-  }
-  
-  .bottom-command-dock__info-section {
-    grid-template-columns: 1fr;
-  }
-  
-  .bottom-command-dock__action-section {
-    width: 200px;
-  }
-}

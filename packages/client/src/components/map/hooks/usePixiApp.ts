@@ -175,6 +175,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			shipIconsLayer.zIndex = 12;
 			shipIconsLayer.eventMode = "none";
 
+			const hexagonArmorLayer = new Container();
+			hexagonArmorLayer.zIndex = 13;
+			hexagonArmorLayer.eventMode = "none";
+
 			world.addChild(
 				background,
 				starfieldNebula,
@@ -189,7 +193,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				effects,
 				weaponArcsLayer,
 				movementVisualsLayer,
-				shipIconsLayer
+				shipIconsLayer,
+				hexagonArmorLayer
 			);
 			app.stage.addChild(world);
 
@@ -211,6 +216,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,
 				shipIcons: shipIconsLayer,
+				hexagonArmor: hexagonArmorLayer,
 			};
 
 			const shipsLayerRef = newLayers.tacticalTokens;

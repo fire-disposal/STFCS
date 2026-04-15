@@ -21,6 +21,8 @@ export interface LayerRegistry {
 	weaponArcs: Container;
 	movementVisuals: Container;
 	shipIcons: Container;
+	/** 六边形护甲图层 */
+	hexagonArmor: Container;
 	/**
 	 * @deprecated 兼容旧代码，指向 tacticalTokens
 	 */

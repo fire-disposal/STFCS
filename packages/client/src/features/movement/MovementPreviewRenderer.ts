@@ -28,13 +28,15 @@ const defaultOptions: RenderOptions = {
 };
 
 /**
- * 绘制机动范围圈
+ * 绘制机动范围线条/转向夹角线
  */
 export function drawMovementRangePreview(
 	graphics: Graphics,
 	ship: ShipState,
+	phase: MovementPhase,
 	remainingForward: number,
 	remainingStrafe: number,
+	remainingTurn: number,
 	options: Partial<RenderOptions> = {}
 ): void {
 	const opts = { ...defaultOptions, ...options };
@@ -44,38 +46,70 @@ export function drawMovementRangePreview(
 	const { transform, maxSpeed } = ship;
 	const { x, y, heading } = transform;
 
-	// 计算最大可达距离（考虑当前剩余燃料）
-	const maxReach = remainingForward + remainingStrafe;
-
-	// 绘制外圈（理论最大范围）
-	graphics.circle(x, y, maxReach);
-	graphics.stroke({ color: 0x4a9eff, alpha: 0.3, width: 1 });
-
-	// 绘制内圈（当前阶段可用范围）
-	graphics.circle(x, y, remainingForward);
-	graphics.stroke({ color: 0x4a9eff, alpha: 0.5, width: 2 });
-
-	// 填充半透明区域
-	graphics.circle(x, y, remainingForward);
-	graphics.fill({ color: 0x4a9eff, alpha: opts.rangeOpacity * 0.5 });
-
-	// 绘制方向指示线（船头方向）
 	const headingRad = (heading * Math.PI) / 180;
-	const forwardX = x + Math.sin(headingRad) * remainingForward;
-	const forwardY = y - Math.cos(headingRad) * remainingForward;
-
-	graphics.moveTo(x, y);
-	graphics.lineTo(forwardX, forwardY);
-	graphics.stroke({ color: 0x4a9eff, alpha: 0.6, width: 2 });
-
-	// 绘制侧移范围线（右舷）
+	const forwardDir = { x: Math.sin(headingRad), y: -Math.cos(headingRad) };
 	const rightRad = ((heading + 90) * Math.PI) / 180;
-	const strafeX = x + Math.cos(rightRad) * remainingStrafe;
-	const strafeY = y + Math.sin(rightRad) * remainingStrafe;
+	const rightDir = { x: Math.cos(rightRad), y: Math.sin(rightRad) };
 
-	graphics.moveTo(x, y);
-	graphics.lineTo(strafeX, strafeY);
-	graphics.stroke({ color: 0x4a9eff, alpha: 0.6, width: 2 });
+	const lineWidth = 2;
+	const forwardColor = 0x4a9eff;
+	const strafeColor = 0x5ad1ff;
+	const turnColor = 0xf1c40f;
+
+	if (phase === "PHASE_B") {
+		// B 阶段：剩余转向角度左右夹角线
+		const angle = Math.max(0, remainingTurn);
+		if (angle > 0) {
+			const leftRad = ((heading - angle) * Math.PI) / 180;
+			const rightRadLocal = ((heading + angle) * Math.PI) / 180;
+			const rayLength = Math.max(30, maxSpeed * 2);
+
+			const leftX = x + Math.sin(leftRad) * rayLength;
+			const leftY = y - Math.cos(leftRad) * rayLength;
+			graphics.moveTo(x, y);
+			graphics.lineTo(leftX, leftY);
+			graphics.stroke({ color: turnColor, alpha: 0.7, width: lineWidth });
+
+			const rightX = x + Math.sin(rightRadLocal) * rayLength;
+			const rightY = y - Math.cos(rightRadLocal) * rayLength;
+			graphics.moveTo(x, y);
+			graphics.lineTo(rightX, rightY);
+			graphics.stroke({ color: turnColor, alpha: 0.7, width: lineWidth });
+		}
+
+		return;
+	}
+
+	// A/C 阶段：各方向可移动距离线条（前后/左右）
+	if (remainingForward > 0) {
+		const forwardX = x + forwardDir.x * remainingForward;
+		const forwardY = y + forwardDir.y * remainingForward;
+		const backX = x - forwardDir.x * remainingForward;
+		const backY = y - forwardDir.y * remainingForward;
+
+		graphics.moveTo(x, y);
+		graphics.lineTo(forwardX, forwardY);
+		graphics.stroke({ color: forwardColor, alpha: 0.7, width: lineWidth });
+
+		graphics.moveTo(x, y);
+		graphics.lineTo(backX, backY);
+		graphics.stroke({ color: forwardColor, alpha: 0.35, width: lineWidth });
+	}
+
+	if (remainingStrafe > 0) {
+		const rightX = x + rightDir.x * remainingStrafe;
+		const rightY = y + rightDir.y * remainingStrafe;
+		const leftX = x - rightDir.x * remainingStrafe;
+		const leftY = y - rightDir.y * remainingStrafe;
+
+		graphics.moveTo(x, y);
+		graphics.lineTo(rightX, rightY);
+		graphics.stroke({ color: strafeColor, alpha: 0.7, width: lineWidth });
+
+		graphics.moveTo(x, y);
+		graphics.lineTo(leftX, leftY);
+		graphics.stroke({ color: strafeColor, alpha: 0.35, width: lineWidth });
+	}
 }
 
 /**
@@ -157,7 +191,7 @@ export function drawPredictedPath(
 export function drawFuelIndicator(
 	graphics: Graphics,
 	ship: ShipState,
-	phase: MovementPhase,
+	_phase: MovementPhase,
 	fuelUsed: { forward: number; strafe: number; turn: number },
 	fuelMax: { forward: number; strafe: number; turn: number },
 	options: Partial<RenderOptions> = {}
@@ -248,7 +282,16 @@ export function drawMovementPreview(
 	// 1. 绘制机动范围
 	const forwardRemaining = remainingFuel.forward;
 	const strafeRemaining = remainingFuel.strafe;
-	drawMovementRangePreview(graphics, ship, forwardRemaining, strafeRemaining, options);
+	const turnRemaining = remainingFuel.turn;
+	drawMovementRangePreview(
+		graphics,
+		ship,
+		phase,
+		forwardRemaining,
+		strafeRemaining,
+		turnRemaining,
+		options
+	);
 
 	// 2. 绘制预测路径
 	drawPredictedPath(graphics, ship, command, options);
@@ -272,7 +315,7 @@ export function drawReachableGrid(
 
 	if (!opts.showRange) return;
 
-	const { transform, maxSpeed } = ship;
+	const { transform } = ship;
 	const { x, y, heading } = transform;
 
 	const headingRad = (heading * Math.PI) / 180;

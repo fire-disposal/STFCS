@@ -47,17 +47,16 @@ const normalizeMetadata = (
 
 export const toMatchmakeRoomDto = (room: MatchmakeRoomRecord): RoomListItemDTO => {
 	const roomId = toStringValue(room.roomId, "");
-	const roomType = toStringValue(room.name, "battle");
 	const clients = toNumberValue(room.clients, 0);
 	const maxClients = toNumberValue(room.maxClients, 0);
 	const metadata = normalizeMetadata(room.metadata, roomId, maxClients);
 
 	return {
 		roomId,
-		name: roomType,
+		name: metadata.name,
 		clients,
 		maxClients,
-		roomType,
+		roomType: metadata.roomType,
 		metadata,
 	};
 };

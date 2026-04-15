@@ -38,6 +38,7 @@ interface UIState {
 	showLabels: boolean;
 	showEffects: boolean;
 	showShipIcons: boolean;
+	showHexagonArmor: boolean;
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 
@@ -136,6 +137,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showLabels: true,
 	showEffects: true,
 	showShipIcons: true,
+	showHexagonArmor: false,
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
 
@@ -195,6 +197,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleLabels: () => set((state) => ({ showLabels: !state.showLabels })),
 	toggleEffects: () => set((state) => ({ showEffects: !state.showEffects })),
 	toggleShipIcons: () => set((state) => ({ showShipIcons: !state.showShipIcons })),
+	toggleHexagonArmor: () => set((state) => ({ showHexagonArmor: !state.showHexagonArmor })),
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),

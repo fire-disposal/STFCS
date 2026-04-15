@@ -37,7 +37,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 	private emptyDisposeTimeout: ReturnType<typeof setTimeout> | null = null;
 	private static readonly EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
 
-	onCreate(options: { roomName?: string; maxPlayers?: number }) {
+	async onCreate(options: { roomName?: string; maxPlayers?: number }) {
 		this.maxClients = Math.min(16, Math.max(2, options.maxPlayers ?? 8));
 		this.roomDisplayName = options.roomName?.trim() || `Battle-${this.roomId.substring(0, 6)}`;
 		this.createdAt = Date.now();
@@ -73,25 +73,57 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		const shortId = options.shortId ?? Math.floor(100000 + Math.random() * 900000);
 		const isFirstClient = this.clients.length === 1;
 
-		// 第一个加入的客户端会成为房主（DM），检查是否已经拥有其他房间
-		if (isFirstClient) {
-			const existingRooms = await matchMaker.query({ name: "battle" });
-			const alreadyOwns = existingRooms.some((r) => {
-				if (r.roomId === this.roomId) return false;
-				const meta = (r.metadata as Record<string, unknown> | undefined) || {};
-				return Number(meta.ownerShortId) === shortId;
+		// 🔑 检查房间是否已满（加入前检查）
+		if (!isFirstClient && this.clients.length >= this.maxClients) {
+			console.log("[BattleRoom] Room is full, rejecting:", this.roomId);
+			client.send("error", {
+				message: "房间已满，无法加入"
 			});
-			if (alreadyOwns) {
-				throw new Error("您已经拥有一个房间，请先解散后再创建新房间");
-			}
+			setTimeout(() => {
+				client.leave();
+			}, 200);
+			return;
 		}
 
+		// 第一个加入的客户端会成为房主（DM）
+		if (isFirstClient) {
+			// 🔑 后端权威检查：检查用户是否已经拥有其他房间（且房主仍在房间内）
+			const existingRooms = await matchMaker.query({ name: "battle" });
+			const alreadyOwnsActiveRoom = existingRooms.some((r) => {
+				if (r.roomId === this.roomId) return false; // 排除当前房间
+				const meta = (r.metadata as Record<string, unknown> | undefined) || {};
+				// 检查 shortId 匹配 AND 房间内有人（房主仍在线）
+				const shortIdMatch = Number(meta.ownerShortId) === shortId;
+				const hasActiveClients = Number(r.clients) > 0;
+				return shortIdMatch && hasActiveClients;
+			});
+
+			if (alreadyOwnsActiveRoom) {
+				// 🔑 验证失败：用户在其他房间中仍是活跃房主
+				console.log("[BattleRoom] Rejecting creator, already owns active room:", shortId);
+				client.send("error", {
+					message: "您已在一个活跃房间中担任房主，请先离开或解散该房间后再创建新房间"
+				});
+				// 🔑 关键：延迟断开连接并销毁房间（因为是第一个客户端）
+				setTimeout(() => {
+					console.log("[BattleRoom] Destroying room due to duplicate owner:", this.roomId);
+					this.disconnect(); // 销毁房间，而不仅仅是踢出用户
+				}, 200);
+				return; // 不再继续执行后续代码
+			}
+
+			// 验证通过，设置房主
+			this.roomOwnerId = client.sessionId;
+			console.log("[BattleRoom] Creator joined, room owner set:", client.sessionId);
+		}
+
+		// 🔑 只有验证通过后才添加玩家状态
 		const player = new PlayerState();
 		player.sessionId = client.sessionId;
 		player.shortId = shortId;
 		player.name = name;
 		player.connected = true;
-		player.role = this.clients.length === 1 ? PlayerRole.DM : PlayerRole.PLAYER;
+		player.role = isFirstClient ? PlayerRole.DM : PlayerRole.PLAYER;
 
 		if (player.role === PlayerRole.DM) this.roomOwnerId = client.sessionId;
 
@@ -227,6 +259,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			maxPlayers: this.maxClients,
 			isPrivate: false,
 			createdAt: this.createdAt,
+			turnCount: this.state.turnCount,
 		};
 		this.setMetadata(metadata);
 	}

@@ -15,6 +15,7 @@ export type AddonType =
 	| "headingIndicator"
 	| "angleDisplay"
 	| "armorQuadrants"
+	| "hexagonArmor"
 	| "shieldIndicator"
 	| "weaponArcs"
 	| "selectionGlow"
@@ -71,6 +72,26 @@ export interface ArmorQuadrantsConfig {
 	colorHigh?: number;
 	thresholdLow?: number;
 	thresholdHigh?: number;
+}
+
+/**
+ * 六边形护甲渲染配置
+ */
+export interface HexagonArmorConfig {
+	/** 护甲颜色渐变起点（绿色） */
+	colorGood?: number;
+	/** 护甲颜色渐变中点（黄色） */
+	colorMedium?: number;
+	/** 护甲颜色渐变终点（红色） */
+	colorLow?: number;
+	/** 低护甲阈值（0-1） */
+	thresholdLow?: number;
+	/** 高护甲阈值（0-1） */
+	thresholdHigh?: number;
+	/** 六边形边线宽度 */
+	lineWidth?: number;
+	/** 六边形与舰船边缘的距离 */
+	padding?: number;
 }
 
 /**
@@ -371,6 +392,167 @@ export function createArmorQuadrantsIndicator(
 	outerRing.circle(0, 0, ringRadius);
 	outerRing.stroke();
 	container.addChild(outerRing);
+
+	return container;
+}
+
+/**
+ * 创建六边形护甲指示器
+ * 
+ * 功能：
+ * - 绘制正六边形，每条边对应一个护甲方向
+ * - 根据护甲值/最大值的比例显示颜色（绿→黄→红）
+ * - 护甲归零时显示透明灰色
+ * 
+ * 六边形方向（顺时针，从顶部开始）：
+ * 0: FRONT_TOP (前上)
+ * 1: RIGHT_TOP (右上)
+ * 2: RIGHT_BOTTOM (右下)
+ * 3: FRONT_BOTTOM (前下)
+ * 4: LEFT_BOTTOM (左下)
+ * 5: LEFT_TOP (左上)
+ */
+export function createHexagonArmorIndicator(
+	token: TokenInfo,
+	config: HexagonArmorConfig = {},
+	zoom: number
+): Container {
+	const container = new Container();
+	const {
+		colorGood = 0x22c55e,     // 绿色
+		colorMedium = 0xf59e0b,   // 黄色
+		colorLow = 0xef4444,      // 红色
+		thresholdLow = 0.3,
+		thresholdHigh = 0.7,
+		lineWidth = 4,
+		padding = 8,
+	} = config;
+
+	const metadata = token.metadata as any;
+	const armorData = metadata?.armor;
+
+	if (!armorData || !armorData.quadrants) {
+		return container;
+	}
+
+	// 计算六边形半径
+	const tokenSize = token.size;
+	const hexRadius = tokenSize * 0.5 + padding;
+
+	// 六边形顶点角度（从 -90 度开始，顺时针）
+	const hexAngles = [
+		-90,   // 0: 顶部 (FRONT_TOP)
+		-30,   // 1: 右上 (RIGHT_TOP)
+		30,    // 2: 右下 (RIGHT_BOTTOM)
+		90,    // 3: 底部 (FRONT_BOTTOM)
+		150,   // 4: 左下 (LEFT_BOTTOM)
+		210,   // 5: 左上 (LEFT_TOP)
+	];
+
+	// 计算六边形顶点
+	const vertices = hexAngles.map((angle) => {
+		const rad = (angle * Math.PI) / 180;
+		return {
+			x: Math.cos(rad) * hexRadius,
+			y: Math.sin(rad) * hexRadius,
+		};
+	});
+
+	// 护甲象限顺序（与六边形边对应）
+	const armorOrder = [
+		"FRONT_TOP",
+		"RIGHT_TOP",
+		"RIGHT_BOTTOM",
+		"FRONT_BOTTOM",
+		"LEFT_BOTTOM",
+		"LEFT_TOP",
+	];
+
+	// 获取最大护甲值（每面）
+	const maxArmorPerSide = armorData.maxPerQuadrant || (armorData.maxArmor / 6);
+
+	// 绘制每条边
+	armorOrder.forEach((quadrant, index) => {
+		const armorValue = armorData.quadrants[quadrant] ?? 0;
+		const armorPercent = maxArmorPerSide > 0 ? armorValue / maxArmorPerSide : 0;
+
+		// 计算颜色
+		let color: number;
+		let alpha: number;
+
+		if (armorValue <= 0) {
+			// 护甲归零：透明灰色
+			color = 0x888888;
+			alpha = 0.2;
+		} else if (armorPercent >= thresholdHigh) {
+			// 高护甲：绿色
+			color = colorGood;
+			alpha = 0.9;
+		} else if (armorPercent >= thresholdLow) {
+			// 中等护甲：黄色
+			color = colorMedium;
+			alpha = 0.8;
+		} else {
+			// 低护甲：红色
+			color = colorLow;
+			alpha = 0.7;
+		}
+
+		// 获取边的两个顶点
+		const startVertex = vertices[index];
+		const endVertex = vertices[(index + 1) % 6];
+
+		// 绘制边
+		const edgeGraphics = new Graphics();
+		edgeGraphics.setStrokeStyle({
+			width: lineWidth,
+			color,
+			alpha,
+		});
+		edgeGraphics.moveTo(startVertex.x, startVertex.y);
+		edgeGraphics.lineTo(endVertex.x, endVertex.y);
+		edgeGraphics.stroke();
+		container.addChild(edgeGraphics);
+
+		// 添加护甲数值标签（在边的中点）
+		const midX = (startVertex.x + endVertex.x) / 2;
+		const midY = (startVertex.y + endVertex.y) / 2;
+
+		// 计算标签位置（向中心偏移）
+		const labelOffset = 12;
+		const angleToCenter = Math.atan2(-midY, -midX);
+		const labelX = midX + Math.cos(angleToCenter) * labelOffset;
+		const labelY = midY + Math.sin(angleToCenter) * labelOffset;
+
+		const valueText = new ScalableText(`${Math.round(armorValue)}`, {
+			baseFontSize: 8,
+			keepSize: true,
+			styleOptions: {
+				fill: 0xffffff,
+				stroke: { color: 0x000000, width: 2 },
+				fontWeight: "bold",
+			},
+		});
+		valueText.anchor.set(0.5, 0.5);
+		valueText.position.set(labelX, labelY);
+		valueText.updateForZoom(zoom);
+		container.addChild(valueText);
+	});
+
+	// 绘制六边形外框（白色细线）
+	const hexagonOutline = new Graphics();
+	hexagonOutline.setStrokeStyle({
+		width: 1,
+		color: 0xffffff,
+		alpha: 0.3,
+	});
+	hexagonOutline.moveTo(vertices[0].x, vertices[0].y);
+	for (let i = 1; i < vertices.length; i++) {
+		hexagonOutline.lineTo(vertices[i].x, vertices[i].y);
+	}
+	hexagonOutline.closePath();
+	hexagonOutline.stroke();
+	container.addChild(hexagonOutline);
 
 	return container;
 }
@@ -719,58 +901,8 @@ export function createControlLock(
 /**
  * 附加组件注册表
  */
-export const AddonRegistry: Record<AddonType, AddonRenderer> = {
-	headingIndicator: {
-		type: "headingIndicator",
-		render: (token, config, zoom) => createHeadingIndicator(token, config, zoom),
-	},
-	angleDisplay: {
-		type: "angleDisplay",
-		render: (token, config, zoom) => createAngleDisplay(token, config, zoom),
-	},
-	armorQuadrants: {
-		type: "armorQuadrants",
-		render: (token, config, zoom) => createArmorQuadrantsIndicator(token, config, zoom),
-	},
-	shieldIndicator: {
-		type: "shieldIndicator",
-		render: () => new Container(), // TODO: 实现护盾指示器
-	},
-	weaponArcs: {
-		type: "weaponArcs",
-		render: () => new Container(), // TODO: 实现武器射程弧
-	},
-	selectionGlow: {
-		type: "selectionGlow",
-		render: (token, _, zoom) => createSelectionGlow(token, zoom),
-	},
-	selectionLock: {
-		type: "selectionLock",
-		render: (token, config, zoom) => createSelectionLock(token, config, zoom),
-	},
-	controlLock: {
-		type: "controlLock",
-		render: (token, config, zoom) => {
-			return createControlLock(token, config, zoom);
-		},
-	},
-};
+// 注意：该文件导出的是具体的渲染器函数（用于 `TokenRenderer` 和 `SelectionLayerRenderer`）。
+// 早期存在的通用 `AddonRegistry` / `renderAddons` 未在仓库中被实际使用，已移除以减少维护成本。
 
-/**
- * 渲染所有启用的附加组件
- */
-export function renderAddons(token: TokenInfo, addons: AddonConfig[], zoom: number): Container {
-	const container = new Container();
+// 导出通过各处 `export` 声明完成，故无需重复列出。
 
-	addons.forEach((addon) => {
-		if (addon.enabled !== false) {
-			const renderer = AddonRegistry[addon.type];
-			if (renderer) {
-				const addonContainer = renderer.render(token, addon.options || {}, zoom);
-				container.addChild(addonContainer);
-			}
-		}
-	});
-
-	return container;
-}

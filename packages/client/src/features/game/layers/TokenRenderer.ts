@@ -150,6 +150,25 @@ export function renderToken(token: TokenInfo, config: TokenRendererConfig): Cont
 		}
 	}
 
+	// 添加六边形护甲指示器（在旋转容器中）
+	if (config.showHexagonArmor !== false && token.type === "ship") {
+		const metadata = token.metadata as any;
+		if (metadata?.armor?.quadrants) {
+			const hexArmorIndicator = createHexagonArmorIndicator(
+				token,
+				{
+					lineWidth: 4,
+					padding: 6,
+					colorGood: 0x22c55e,
+					colorMedium: 0xf59e0b,
+					colorLow: 0xef4444,
+				},
+				config.zoom
+			);
+			rotationContainer.addChild(hexArmorIndicator);
+		}
+	}
+
 	// 添加角度指示器（在根容器中，不旋转）
 	if (config.showAngleDisplay !== false && token.type === "ship") {
 		const angleDisplay = createAngleDisplay(

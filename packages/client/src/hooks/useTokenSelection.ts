@@ -10,7 +10,8 @@ import {
 	updateToken as updateTokenAction,
 } from "@/store/slices/mapSlice";
 import { selectShip } from "@/store/slices/shipSlice";
-import type { TokenInfo, TokenType } from "@vt/types";
+import { TokenType } from "@vt/types";
+import type { TokenInfo } from "@vt/types";
 import { useCallback, useMemo } from "react";
 
 export function useTokenSelection() {
@@ -28,7 +29,7 @@ export function useTokenSelection() {
 			dispatch(selectTokenAction(tokenId));
 
 			// 如果是舰船 Token，同时选中对应的舰船
-			if (tokenId && tokens[tokenId]?.type === "ship") {
+			if (tokenId && tokens[tokenId]?.type === TokenType.SHIP) {
 				dispatch(selectShip(tokenId));
 			}
 		},

@@ -95,7 +95,16 @@ export const parseMoveTokenPayload = (payload: unknown): MoveTokenPayload =>
 			const x = asFiniteNumber(value.x);
 			const y = asFiniteNumber(value.y);
 			const heading = asFiniteNumber(value.heading);
-			if (!shipId || x === null || y === null || heading === null) return null;
+			const isIncremental =
+				value.isIncremental === undefined
+					? undefined
+					: asBoolean(value.isIncremental);
+
+			// 如果不是增量移动，则 x, y, heading 必须存在
+			if (!shipId) return null;
+			if (!isIncremental && (x === null || y === null || heading === null)) {
+				return null;
+			}
 
 			const movementPlan =
 				value.movementPlan === undefined
@@ -107,17 +116,13 @@ export const parseMoveTokenPayload = (payload: unknown): MoveTokenPayload =>
 				value.phase === undefined ? undefined : asMovePhase(value.phase);
 			if (value.phase !== undefined && !phase) return null;
 
-			const isIncremental =
-				value.isIncremental === undefined
-					? undefined
-					: asBoolean(value.isIncremental);
 			if (value.isIncremental !== undefined && isIncremental === null) return null;
 
 			const result: MoveTokenPayload = {
 				shipId,
-				x,
-				y,
-				heading,
+				x: x ?? 0,
+				y: y ?? 0,
+				heading: heading ?? 0,
 			};
 			if (movementPlan !== undefined && movementPlan !== null) {
 				result.movementPlan = movementPlan;

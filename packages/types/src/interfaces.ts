@@ -21,15 +21,24 @@ import type {
 	WeaponSlotSizeValue,
 	WeaponStateValue,
 } from "./enums.js";
+import type { MovePhaseValue } from "./movement.js";
 
 // ==================== 基础类型 ====================
 
+/**
+ * Colyseus Schema Map 接口
+ * 用于描述 @colyseus/schema 的 MapSchema 类型
+ */
 export interface SchemaMap<T> {
 	get(key: string): T | undefined;
 	set(key: string, value: T): unknown;
 	forEach(callback: (value: T, key: string) => void): void;
 }
 
+/**
+ * Colyseus Schema Array 接口
+ * 用于描述 @colyseus/schema 的 ArraySchema 类型
+ */
 export interface SchemaArray<T> {
 	length: number;
 	[index: number]: T;
@@ -141,17 +150,19 @@ export interface ShipState {
 	isDestroyed: boolean;
 	hasMoved: boolean;
 	hasFired: boolean;
+	// ==================== 三阶段移动系统 ====================
+	/** 当前移动阶段 */
+	movePhase: MovePhaseValue;
+	/** Phase A 前进/后退距离 */
 	movePhaseAX: number;
+	/** Phase A 侧移距离 */
 	movePhaseAStrafe: number;
-	movePhaseCX: number;
-	movePhaseCStrafe: number;
+	/** Phase B 转向角度 */
 	turnAngle: number;
-	movePhase: "PHASE_A" | "PHASE_B" | "PHASE_C";
-	phaseAForwardUsed: number;
-	phaseAStrafeUsed: number;
-	phaseTurnUsed: number;
-	phaseCForwardUsed: number;
-	phaseCStrafeUsed: number;
+	/** Phase C 前进/后退距离 */
+	movePhaseCX: number;
+	/** Phase C 侧移距离 */
+	movePhaseCStrafe: number;
 }
 
 // ==================== 玩家状态 ====================
@@ -196,15 +207,20 @@ export interface GameRoomState {
 
 // ==================== 房间元数据 ====================
 
+/**
+ * 房间元数据接口
+ * 用于大厅房间列表显示和房间状态同步
+ */
 export interface RoomMetadata {
-	roomType: string;
-	name: string;
-	phase: string;
-	ownerId: string | null;
-	ownerShortId: number | null;
-	maxPlayers: number;
-	isPrivate: boolean;
-	createdAt: number;
+	roomType: string;      // 房间类型：battle
+	name: string;          // 房间名称
+	phase: string;         // 当前阶段：lobby, deployment, action, etc.
+	ownerId: string | null;        // 房主会话 ID
+	ownerShortId: number | null;   // 房主短 ID（显示用）
+	maxPlayers: number;    // 最大玩家数
+	isPrivate: boolean;    // 是否私有房间
+	createdAt: number;     // 创建时间戳
+	turnCount?: number;    // 当前回合数（可选，仅战斗阶段）
 }
 
 // ==================== DTO（传输对象） ====================
@@ -313,13 +329,17 @@ export interface ShipHullSpec {
 	armorValue: number;
 }
 
-// ==================== 类型别名（兼容旧代码） ====================
+// ==================== 类型别名（已废弃，直接使用原类型） ====================
 
+/** @deprecated 直接使用 `ArmorState` */
 export type ArmorInstanceState = ArmorState;
+/** @deprecated 直接使用 `FluxState` */
 export type FluxInstanceState = FluxState;
+/** @deprecated 直接使用 `ShieldState` */
 export type ShieldInstanceState = ShieldState;
-export type HullInstanceState = HullState;
+/** @deprecated 直接使用 `WeaponSlot` */
 export type WeaponInstanceState = WeaponSlot;
+/** @deprecated 直接使用 `FactionValue` */
 export type FactionId = FactionValue;
 
 // ==================== 相机状态 ====================
@@ -364,72 +384,65 @@ export interface PlayerCamera {
 	followingShipId?: string;
 }
 
-// ==================== Token 信息 ====================
+// ==================== Token 信息（统一类型定义） ====================
 
 export const TokenType = {
-	SHIP: "SHIP",
-	STATION: "STATION",
-	ASTEROID: "ASTEROID",
+	SHIP: "ship",
+	STATION: "station",
+	ASTEROID: "asteroid",
 } as const;
 
 export type TokenTypeValue = (typeof TokenType)[keyof typeof TokenType];
 
+/**
+ * Token 回合状态
+ */
+export type TokenTurnState = "waiting" | "active" | "done";
+
+/**
+ * Token 信息 - 统一类型定义
+ * 用于地图上所有可交互对象（舰船、空间站、小行星等）
+ */
 export interface TokenInfo {
+	/** Token 唯一标识 */
 	id: string;
+	/** Token 类型 */
 	type: TokenTypeValue;
+	/** 世界坐标 X */
 	x: number;
+	/** 世界坐标 Y */
 	y: number;
+	/** 朝向角度（度数） */
 	heading: number;
+	/** 显示名称 */
 	name: string;
+	/** 显示尺寸 */
 	size: number;
-	metadata?: Record<string, unknown>;
+	/** 缩放比例 */
+	scale: number;
+	/** 所属者 ID */
+	ownerId: string;
+	/** 阵营 */
 	faction?: FactionValue;
+	/** 位置（冗余字段，兼容旧代码） */
 	position: Point;
-}
-
-export interface ShipTokenV2Visual {
+	/** 碰撞半径 */
 	collisionRadius: number;
-}
-
-export interface ShipTokenV2Shield {
-	type: string;
-	radius: number;
-	coverageAngle: number;
-	active: boolean;
-	efficiency: number;
-}
-
-export interface ShipTokenV2Flux {
-	current: number;
-	capacity: number;
-	softFlux: number;
-	hardFlux: number;
-	state: string;
-}
-
-export interface ShipTokenV2Weapons {
-	mounts: Record<string, { position: Point; facing: number; arc: number }>;
-}
-
-export interface ShipTokenV2 {
-	id: string;
-	factionId: FactionValue;
-	faction: FactionValue;
-	name: string;
-	shipName: string;
-	hullType: string;
-	hullSize: HullSizeValue;
-	x: number;
-	y: number;
-	heading: number;
-	position: Point;
-	isEnemy: boolean;
-	hull: HullState;
-	armor: ArmorState;
-	shield: ShipTokenV2Shield;
-	flux: ShipTokenV2Flux;
-	visual: ShipTokenV2Visual;
-	weapons: ShipTokenV2Weapons;
+	/** 渲染层级 */
+	layer: number;
+	/** 元数据（扩展字段） */
+	metadata?: Record<string, unknown>;
+	// ==================== 回合制状态 ====================
+	/** 当前回合状态 */
+	turnState: TokenTurnState;
+	/** 每回合最大移动距离 */
+	maxMovement: number;
+	/** 剩余移动距离 */
+	remainingMovement: number;
+	/** 每回合行动点数 */
+	actionsPerTurn: number;
+	/** 剩余行动点数 */
+	remainingActions: number;
 }
 
 // ==================== 定义类型 ====================

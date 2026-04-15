@@ -10,6 +10,8 @@ import express from "express";
 
 // 房间
 import { BattleRoom } from "./rooms/BattleRoom.js";
+import { SaveRoom } from "./rooms/SaveRoom.js";
+import { SystemRoom } from "./rooms/SystemRoom.js";
 
 import { registerHttpRoutes } from "./http/registerRoutes.js";
 
@@ -52,10 +54,16 @@ const gameServer = new Server(colyseusOptions);
 
 // ==================== 房间注册 ====================
 
-// 启用实时房间列表，让客户端可以获取实时房间信息
+// 战斗房间 - 启用实时房间列表
 gameServer.define("battle", BattleRoom).enableRealtimeListing();
 
-console.log("[Server] Battle room registered with realtime listing");
+// 存档管理房间
+gameServer.define("system_save", SaveRoom);
+
+// 系统房间 - 用于房间列表等系统功能
+gameServer.define("system", SystemRoom);
+
+console.log("[Server] Rooms registered: battle, system_save, system");
 
 // ==================== 错误处理 ====================
 

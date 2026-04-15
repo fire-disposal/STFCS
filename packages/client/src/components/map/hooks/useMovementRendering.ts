@@ -1,9 +1,5 @@
 import { drawMovementPreview } from "@/features/movement/MovementPreviewRenderer";
-import {
-	drawMovementPath,
-	drawMovementRange,
-	drawTurnArc,
-} from "@/features/movement/MovementVisuals";
+import { drawMovementPath } from "@/features/movement/MovementVisuals";
 import type { MovementPhase, PhaseFuelState } from "@/store/slices/movementSlice";
 import type { ShipState } from "@vt/types";
 import { Graphics } from "pixi.js";
@@ -78,21 +74,7 @@ export function useMovementRendering(
 		const currentPhase = movementState.currentPhase;
 		const isAnimating = movementState.isAnimating;
 
-		drawMovementRange(graphics, selectedShip, maxSpeed, {
-			showRange: true,
-			showTurnArc: true,
-			showPath: true,
-			rangeOpacity: 0.15,
-		});
-
 		if (movementState.currentPlan) {
-			drawTurnArc(graphics, selectedShip, movementState.currentPlan.turnAngle, maxTurnRate, {
-				showRange: true,
-				showTurnArc: true,
-				showPath: true,
-				rangeOpacity: 0.15,
-			});
-
 			drawMovementPath(
 				graphics,
 				selectedShip,

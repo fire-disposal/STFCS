@@ -1,4 +1,5 @@
 import { StarfieldGenerator } from "@/features/game/rendering/StarfieldBackground";
+import { HexagonArmorLayer } from "@/features/game/layers/HexagonArmorLayer";
 import { useAppSelector } from "@/store";
 import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
@@ -75,13 +76,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
 	const { selectShip: storeSelectShip, setMouseWorldPosition } = useSelectionStore();
-	const { setZoom, setCameraPosition, setMapCursor, mapCursor, showLabels, showEffects, showShipIcons } = useUIStore();
+	const { setZoom, setCameraPosition, setMapCursor, mapCursor, showLabels, showEffects, showShipIcons, showHexagonArmor } = useUIStore();
 	const movementState = useAppSelector((state: any) => state.movement) as MovementState;
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
 	const interaction = useInteraction(onPanDelta, onRotateDelta);
 	const layerSystem = useLayerSystem();
 	const zoomInteraction = useZoomInteraction(camera, canvasSize);
+
+	// 创建六边形护甲图层实例
+	const hexagonArmorLayerRef = useRef<HexagonArmorLayer | null>(null);
+	if (!hexagonArmorLayerRef.current) {
+		hexagonArmorLayerRef.current = new HexagonArmorLayer();
+	}
 
 	const pixiApp = usePixiApp({
 		canvasSize,
@@ -124,7 +131,47 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		layerSystem.layers.labels.visible = showLabels;
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
-	}, [layerSystem.layers, showLabels, showEffects, showShipIcons]);
+		layerSystem.layers.hexagonArmor.visible = showHexagonArmor;
+	}, [layerSystem.layers, showLabels, showEffects, showShipIcons, showHexagonArmor]);
+
+	// 更新六边形护甲图层
+	useEffect(() => {
+		if (!layerSystem.layers?.hexagonArmor || !hexagonArmorLayerRef.current) return;
+		
+		// 清除旧图层
+		layerSystem.layers.hexagonArmor.removeChildren();
+		
+		// 添加新图层
+		const shipsWithArmor = ships.reduce((acc, ship) => {
+			acc[ship.id] = {
+				id: ship.id,
+				type: "ship" as const,
+				x: ship.transform.x,
+				y: ship.transform.y,
+				heading: ship.transform.heading,
+				name: ship.name,
+				size: Math.max(ship.width, ship.length),
+				metadata: {
+					armor: {
+						quadrants: {
+							FRONT_TOP: ship.armor.quadrants[0],
+							FRONT_BOTTOM: ship.armor.quadrants[1],
+							LEFT_TOP: ship.armor.quadrants[2],
+							LEFT_BOTTOM: ship.armor.quadrants[3],
+							RIGHT_TOP: ship.armor.quadrants[4],
+							RIGHT_BOTTOM: ship.armor.quadrants[5],
+						},
+						maxArmor: ship.armor.maxPerQuadrant * 6,
+						maxPerQuadrant: ship.armor.maxPerQuadrant,
+					},
+				},
+			};
+			return acc;
+		}, {} as Record<string, any>);
+		
+		hexagonArmorLayerRef.current.update(shipsWithArmor, zoom);
+		layerSystem.layers.hexagonArmor.addChild(hexagonArmorLayerRef.current);
+	}, [layerSystem.layers?.hexagonArmor, ships, zoom]);
 
 	useEffect(() => {
 		camera.cameraRef.current = { x: cameraX, y: cameraY, zoom, viewRotation };

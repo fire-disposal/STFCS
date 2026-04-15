@@ -18,6 +18,7 @@ import {
 	Tag,
 	ZoomIn,
 	ZoomOut,
+	Shield,
 } from "lucide-react";
 
 interface ViewControlPanelProps {
@@ -40,6 +41,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		showLabels,
 		showEffects,
 		showShipIcons,
+		showHexagonArmor,
 		mapCursor,
 		setZoom,
 		setCameraPosition,
@@ -51,6 +53,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		toggleLabels,
 		toggleEffects,
 		toggleShipIcons,
+		toggleHexagonArmor,
 		setMapCursor,
 		clearMapCursor,
 	} = useUIStore();
@@ -298,6 +301,13 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<span className="view-toggle__indicator" />
 						<Monitor className="view-toggle__icon" />
 						<span className="view-toggle__label">图标</span>
+					</label>
+
+					<label className="view-toggle">
+						<input type="checkbox" checked={showHexagonArmor} onChange={toggleHexagonArmor} />
+						<span className="view-toggle__indicator" />
+						<Shield className="view-toggle__icon" />
+						<span className="view-toggle__label">六边形护甲</span>
 					</label>
 				</div>
 			</div>

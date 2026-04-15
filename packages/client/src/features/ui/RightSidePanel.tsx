@@ -72,97 +72,81 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 		...(isDM ? [{ id: "dm", label: "DM", Icon: Palette } as TabDef] : []),
 	];
 
-	if (isCollapsed) {
-		return (
-			<div className="right-side-panel right-side-panel--collapsed">
-				<button
-					data-magnetic
-					className="right-side-panel__expand-btn"
-					onClick={() => setIsCollapsed(false)}
-					title="展开面板"
-				>
-					<ChevronLeft className="game-icon--md" />
-				</button>
-				<div className="right-side-panel__mini-tabs">
-					{tabs.map((tab) => (
-						<button
-							key={tab.id}
-							data-magnetic
-							className={`right-side-panel__mini-tab ${activeTab === tab.id ? "right-side-panel__mini-tab--active" : ""}`}
-							onClick={() => {
-								setActiveTab(tab.id);
-								setIsCollapsed(false);
-							}}
-							title={tab.label}
-						>
-							<tab.Icon className="game-icon--sm" />
-						</button>
-					))}
-				</div>
-			</div>
-		);
-	}
+	const ToggleButton = ({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) => (
+		<button
+			data-magnetic
+			className={collapsed ? "right-side-panel__expand-btn" : "right-side-panel__collapse-btn"}
+			onClick={onClick}
+			title={collapsed ? "展开面板" : "折叠面板"}
+		>
+			{collapsed ? (
+				<ChevronRight style={{ width: 12, height: 12 }} />
+			) : (
+				<ChevronLeft style={{ width: 12, height: 12 }} />
+			)}
+		</button>
+	);
 
 	return (
-		<div className="right-side-panel">
-			<button
-				data-magnetic
-				className="right-side-panel__collapse-btn"
-				onClick={() => setIsCollapsed(true)}
-				title="折叠面板"
-			>
-				<ChevronRight className="game-icon--md" />
-			</button>
-
-			<div className="right-side-panel__tabs">
-				{tabs.map((tab) => (
-					<button
-						key={tab.id}
-						data-magnetic
-						className={`right-side-panel__tab ${activeTab === tab.id ? "right-side-panel__tab--active" : ""}`}
-						onClick={() => setActiveTab(tab.id)}
-					>
-						<tab.Icon className="right-side-panel__tab-icon" />
-						<span className="right-side-panel__tab-label">{tab.label}</span>
-					</button>
-				))}
-			</div>
-
-			<div className="right-side-panel__content">
-				{activeTab === "view" && (
-					<ViewControlPanel cameraAnimation={cameraAnimation} onResetView={onResetView} />
-				)}
-
-				{activeTab === "log" && (
-					<CombatLogPanel isOpen={true} onClose={() => setActiveTab("view")} />
-				)}
-
-				{activeTab === "dm" && isDM && (
-					<div className="dm-panel">
-						<DMObjectCreator
-							onCreateObject={onCreateObject}
-							players={players
-								.filter((p) => p.role !== "DM")
-								.map((p) => ({
-									sessionId: p.sessionId,
-									name: p.nickname || p.name,
-									role: p.role,
-								}))}
-							mapCursor={mapCursor}
-						/>
-
-						<DMControlPanel
-							ships={ships}
-							players={players}
-							isDM={true}
-							onCreateTestShip={onCreateTestShip}
-							onClearOverload={onClearOverload}
-							onSetArmor={onSetArmor}
-							onAssignShip={onAssignShip}
-							onNextPhase={onNextPhase}
-						/>
+		<div className={`right-side-panel ${isCollapsed ? "right-side-panel--collapsed" : ""}`}>
+			{/* 内容区 - 收起时不渲染 */}
+			{!isCollapsed && (
+				<div className="right-side-panel__content-wrapper">
+					<div className="right-side-panel__tabs">
+						{tabs.map((tab) => (
+							<button
+								key={tab.id}
+								className={`right-side-panel__tab ${activeTab === tab.id ? "right-side-panel__tab--active" : ""}`}
+								onClick={() => setActiveTab(tab.id)}
+							>
+								<tab.Icon className="right-side-panel__tab-icon" />
+								<span className="right-side-panel__tab-label">{tab.label}</span>
+							</button>
+						))}
 					</div>
-				)}
+
+					<div className="right-side-panel__content">
+						{activeTab === "view" && (
+							<ViewControlPanel cameraAnimation={cameraAnimation} onResetView={onResetView} />
+						)}
+
+						{activeTab === "log" && (
+							<CombatLogPanel isOpen={true} onClose={() => setActiveTab("view")} />
+						)}
+
+						{activeTab === "dm" && isDM && (
+							<div className="dm-panel">
+								<DMObjectCreator
+									onCreateObject={onCreateObject}
+									players={players
+										.filter((p) => p.role !== "DM")
+										.map((p) => ({
+											sessionId: p.sessionId,
+											name: p.nickname || p.name,
+											role: p.role,
+										}))}
+									mapCursor={mapCursor}
+								/>
+
+								<DMControlPanel
+									ships={ships}
+									players={players}
+									isDM={true}
+									onCreateTestShip={onCreateTestShip}
+									onClearOverload={onClearOverload}
+									onSetArmor={onSetArmor}
+									onAssignShip={onAssignShip}
+									onNextPhase={onNextPhase}
+								/>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* 右侧固定条 - 始终可见 */}
+			<div className="right-side-panel__strip">
+				<ToggleButton collapsed={isCollapsed} onClick={() => setIsCollapsed(!isCollapsed)} />
 			</div>
 		</div>
 	);
