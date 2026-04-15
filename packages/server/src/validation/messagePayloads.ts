@@ -1,18 +1,23 @@
+/**
+ * Payload 验证器
+ */
+
 import {
 	AdvanceMovePhasePayload,
 	AssignShipPayload,
 	ClearOverloadPayload,
 	CreateObjectPayload,
-	Faction,
 	FireWeaponPayload,
-	MovePhase,
 	MoveTokenPayload,
 	NetPingPayload,
 	SetArmorPayload,
 	ToggleReadyPayload,
 	ToggleShieldPayload,
 	VentFluxPayload,
-} from "@vt/types";
+	MovePhase,
+	Faction,
+} from "../schema/types.js";
+import type { FactionValue, MovePhaseValue } from "../schema/types.js";
 
 const MOVE_PHASES = Object.values(MovePhase);
 type FactionLiteral = Exclude<CreateObjectPayload["faction"], undefined>;

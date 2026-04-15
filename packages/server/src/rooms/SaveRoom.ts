@@ -10,7 +10,7 @@
  */
 
 import { Room, Client } from "@colyseus/core";
-import type { GameSave, SaveSummary } from "@vt/types";
+import type { GameSave, SaveSummary } from "../schema/types.js";
 import { saveStore } from "../services/SaveStore.js";
 import { toSaveDetailDto, toSaveListDto } from "../dto/saveDto.js";
 

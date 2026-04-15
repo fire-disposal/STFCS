@@ -6,11 +6,11 @@ import type {
 	ChatMessageSave,
 	FactionValue,
 	GameSave,
-	PlayerSave,
 	ShieldTypeValue,
 	ShipSave,
 	WeaponSave,
-} from "@vt/types";
+	WeaponStateValue,
+} from "./types.js";
 import { ChatMessage, GameRoomState } from "./GameSchema.js";
 import { ShipState, WeaponSlot } from "./ShipStateSchema.js";
 
@@ -24,64 +24,40 @@ export function serializeGameSave(
 	isPrivate: boolean,
 	saveName: string
 ): GameSave {
-	const players: PlayerSave[] = [];
-	state.players.forEach((p) =>
-		players.push({
-			shortId: p.shortId,
-			name: p.name,
-			nickname: p.nickname,
-			avatar: p.avatar,
-			role: p.role,
-			isReady: p.isReady,
-		})
-	);
-
 	const ships: ShipSave[] = [];
 	state.ships.forEach((ship: ShipState) => {
 		const weapons: WeaponSave[] = [];
 		ship.weapons.forEach((w: WeaponSlot) =>
 			weapons.push({
 				mountId: w.mountId,
-				weaponSpecId: w.weaponSpecId,
-				currentAmmo: w.currentAmmo,
+				instanceId: w.instanceId,
+				state: w.state,
 				cooldownRemaining: w.cooldownRemaining,
-				hasFiredThisTurn: w.hasFiredThisTurn,
+				currentAmmo: w.currentAmmo,
 			})
 		);
 		ships.push({
 			id: ship.id,
-			ownerId: ship.ownerId,
-			hullType: ship.hullType,
-			faction: ship.faction,
+			hullId: ship.hullType,
 			name: ship.name,
-			transform: { x: ship.transform.x, y: ship.transform.y, heading: ship.transform.heading },
-			width: ship.width,
-			length: ship.length,
-			hull: { current: ship.hull.current, max: ship.hull.max },
-			armor: { maxPerQuadrant: ship.armor.maxPerQuadrant, quadrants: [...ship.armor.quadrants] },
-			flux: {
-				hard: ship.flux.hard,
-				soft: ship.flux.soft,
-				max: ship.flux.max,
-				dissipation: ship.flux.dissipation,
-			},
-			shield: {
-				type: ship.shield.type,
-				active: ship.shield.active,
-				orientation: ship.shield.orientation,
-				arc: ship.shield.arc,
-				radius: ship.shield.radius,
-			},
+			faction: ship.faction,
+			ownerId: ship.ownerId,
+			x: ship.transform.x,
+			y: ship.transform.y,
+			heading: ship.transform.heading,
+			hullCurrent: ship.hull.current,
+			hullMax: ship.hull.max,
+			fluxHard: ship.flux.hard,
+			fluxSoft: ship.flux.soft,
+			fluxMax: ship.flux.max,
+			shieldActive: ship.shield.active,
+			shieldCurrent: ship.shield.current,
+			shieldMax: ship.shield.max,
+			armorGrid: [...ship.armor.quadrants],
+			weapons,
 			isOverloaded: ship.isOverloaded,
-			isDestroyed: ship.isDestroyed,
 			hasMoved: ship.hasMoved,
 			hasFired: ship.hasFired,
-			movePhaseAX: ship.movePhaseAX,
-			movePhaseAStrafe: ship.movePhaseAStrafe,
-			movePhaseCX: ship.movePhaseCX,
-			movePhaseCStrafe: ship.movePhaseCStrafe,
-			turnAngle: ship.turnAngle,
-			weapons,
 		});
 	});
 
@@ -95,57 +71,47 @@ export function serializeGameSave(
 	}));
 
 	return {
-		saveId: `save_${Date.now()}_${roomId}`,
-		saveName,
+		id: `save_${Date.now()}_${roomId}`,
+		name: saveName,
 		createdAt: Date.now(),
 		updatedAt: Date.now(),
-		version: GAME_SAVE_VERSION,
-		roomId,
-		roomName,
-		maxPlayers,
-		isPrivate,
-		currentPhase: state.currentPhase,
 		turnCount: state.turnCount,
+		currentPhase: state.currentPhase,
 		activeFaction: state.activeFaction,
-		players,
 		ships,
-		chatHistory,
+		chatMessages: chatHistory,
+		mapWidth: state.mapWidth,
+		mapHeight: state.mapHeight,
 	};
 }
 
 export function deserializeShipSave(data: ShipSave): ShipState {
 	const ship = new ShipState();
 	ship.id = data.id;
-	ship.ownerId = data.ownerId;
-	ship.hullType = data.hullType;
-	ship.faction = data.faction as FactionValue;
+	ship.hullType = data.hullId;
 	ship.name = data.name;
-	ship.transform.x = data.transform.x;
-	ship.transform.y = data.transform.y;
-	ship.transform.heading = data.transform.heading;
-	ship.width = data.width;
-	ship.length = data.length;
-	ship.hull.current = data.hull.current;
-	ship.hull.max = data.hull.max;
-	ship.armor.maxPerQuadrant = data.armor.maxPerQuadrant;
-	data.armor.quadrants.forEach((v, i) => ship.armor.setQuadrant(i, v));
-	ship.flux.hard = data.flux.hard;
-	ship.flux.soft = data.flux.soft;
-	ship.flux.max = data.flux.max;
-	ship.flux.dissipation = data.flux.dissipation;
-	ship.shield.type = data.shield.type as ShieldTypeValue;
-	ship.shield.active = data.shield.active;
-	ship.shield.orientation = data.shield.orientation;
-	ship.shield.arc = data.shield.arc;
-	ship.shield.radius = data.shield.radius;
+	ship.faction = data.faction as FactionValue;
+	ship.ownerId = data.ownerId;
+	ship.transform.x = data.x;
+	ship.transform.y = data.y;
+	ship.transform.heading = data.heading;
+	ship.hull.current = data.hullCurrent;
+	ship.hull.max = data.hullMax;
+	ship.flux.hard = data.fluxHard;
+	ship.flux.soft = data.fluxSoft;
+	ship.flux.max = data.fluxMax;
+	ship.shield.active = data.shieldActive;
+	ship.shield.current = data.shieldCurrent;
+	ship.shield.max = data.shieldMax;
+	data.armorGrid.forEach((v, i) => ship.armor.setQuadrant(i, v));
 	ship.isOverloaded = data.isOverloaded;
-	ship.isDestroyed = data.isDestroyed;
 	ship.hasMoved = data.hasMoved;
 	ship.hasFired = data.hasFired;
-	ship.movePhaseAX = data.movePhaseAX;
-	ship.movePhaseAStrafe = data.movePhaseAStrafe;
-	ship.movePhaseCX = data.movePhaseCX;
-	ship.movePhaseCStrafe = data.movePhaseCStrafe;
-	ship.turnAngle = data.turnAngle;
+	ship.movePhase = "PHASE_A";
+	ship.phaseAForwardUsed = 0;
+	ship.phaseAStrafeUsed = 0;
+	ship.phaseTurnUsed = 0;
+	ship.phaseCForwardUsed = 0;
+	ship.phaseCStrafeUsed = 0;
 	return ship;
 }

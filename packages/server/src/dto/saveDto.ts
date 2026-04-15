@@ -1,6 +1,10 @@
-import type { GameSave, SaveSummary } from "@vt/types";
+/**
+ * 存档 DTO 转换器
+ */
 
-export const toSaveSummaryDto = (summary: SaveSummary): SaveSummary => ({
+import type { GameSave, SaveSummary } from "../schema/types.js";
+
+const toSaveSummaryDto = (summary: SaveSummary): SaveSummary => ({
 	saveId: summary.saveId,
 	saveName: summary.saveName,
 	roomName: summary.roomName,

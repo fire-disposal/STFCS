@@ -1,16 +1,21 @@
+/**
+ * DTO 转换器
+ */
+
 import type {
 	ErrorDTO,
 	GameLoadedDTO,
 	GameSavedDTO,
 	IdentityDTO,
-	NetPongPayload,
 	PhaseChangeDTO,
-	PlayerRoleValue,
 	RoleDTO,
 	RoomKickedDTO,
 	ShipCreatedDTO,
-} from "@vt/types";
-import type { ConnectionQualityValue, GamePhaseValue } from "@vt/types";
+	ConnectionQualityValue,
+	GamePhaseValue,
+	PlayerRoleValue,
+	NetPongPayload,
+} from "../schema/types.js";
 
 export const toErrorDto = (message: string): ErrorDTO => ({ message });
 
@@ -31,7 +36,7 @@ export const toGameLoadedDto = (saveId: string, saveName: string): GameLoadedDTO
 	saveName,
 });
 
-export const toShipCreatedDto = (
+const toShipCreatedDto = (
 	shipId: string,
 	hullType: string,
 	x: number,

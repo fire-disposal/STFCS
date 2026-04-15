@@ -10,7 +10,7 @@
 		"format:check": "turbo run format:check --continue",
 		"test": "turbo run test --continue",
 		"build": "turbo run build --continue",
-		"dev": "pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build && turbo run dev --filter=server --filter=client",
+		"dev": "pnpm --filter @vt/data build && pnpm --filter @vt/rules build && turbo run dev --filter=@vt/server --filter=client",
 		"dev:legacy": "turbo run dev",
 		"dev:server": "turbo run dev:server",
 		"dev:client": "turbo run dev:client",
@@ -25,22 +25,16 @@
 		"@colyseus/schema": "^4.0.19"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
 		"@eslint/js": "^9.15.0",
 		"@types/node": "^25.4.0",
-		"@types/ws": "^8.18.1",
 		"@typescript-eslint/eslint-plugin": "^8.16.0",
 		"@typescript-eslint/parser": "^8.16.0",
 		"eslint": "^9.15.0",
 		"eslint-plugin-vue": "^9.31.0",
 		"globals": "^15.12.0",
-		"ts-node": "^10.9.2",
-		"tsup": "^8.5.1",
 		"turbo": "^2.9.6",
 		"typescript": "^5.9.3",
 		"vue-eslint-parser": "^9.4.3"
 	},
-	"dependencies": {
-		"zod": "^4.3.6"
-	}
+	"dependencies": {}
 }

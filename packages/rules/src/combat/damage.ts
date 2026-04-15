@@ -6,7 +6,7 @@
  */
 
 import { DAMAGE_MODIFIERS } from "@vt/data";
-import type { DamageTypeValue } from "@vt/types";
+import type { DamageTypeValue } from "@vt/data";
 
 export interface DamageResult {
 	hitShield: boolean;

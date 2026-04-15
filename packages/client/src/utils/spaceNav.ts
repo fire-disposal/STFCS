@@ -7,7 +7,7 @@
  * 本文件仅处理坐标相关的实用函数
  */
 
-import type { CoordinatePrecision } from '@/store/uiStore';
+import type { CoordinatePrecision } from '@/state/stores/uiStore';
 
 /**
  * 坐标精度配置

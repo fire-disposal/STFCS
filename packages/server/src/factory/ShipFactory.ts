@@ -5,8 +5,8 @@
  */
 
 import { getShipHullSpec, getWeaponSpec } from "@vt/data";
-import type { DamageTypeValue, FactionValue, WeaponCategoryValue } from "@vt/types";
-import { WeaponState } from "@vt/types";
+import type { DamageTypeValue, FactionValue, WeaponCategoryValue } from "../schema/types.js";
+import { WeaponState } from "../schema/types.js";
 import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
 
 export function createShip(

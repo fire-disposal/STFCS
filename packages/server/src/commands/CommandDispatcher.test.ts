@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GamePhase, PlayerRole, WeaponState } from "@vt/types";
+import { GamePhase, PlayerRole, WeaponState } from "../schema/types.js";
 import { createShip } from "../factory/ShipFactory.js";
 import { CommandDispatcher } from "./CommandDispatcher.js";
 import { GameRoomState, PlayerState, WeaponSlot } from "../schema/index.js";

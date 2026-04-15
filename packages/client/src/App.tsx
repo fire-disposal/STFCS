@@ -7,11 +7,11 @@
  * - 用户管理通过 UserService 处理
  */
 
-import { AuthPanel } from "@/components/auth/AuthPanel";
-import { LobbyPanel } from "@/components/lobby/LobbyPanel";
-import { notify } from "@/components/ui/Notification";
+import { AuthPage } from "@/pages/AuthPage";
+import { LobbyPage } from "@/pages/LobbyPage";
+import { notify } from "@/ui/shared/Notification";
 import { DEFAULT_WS_URL } from "@/config";
-import { GameView } from "@/features/game/GameView";
+import GamePage from "@/pages/GamePage";
 import { NetworkManager, type RoomInfo } from "@/network/NetworkManager";
 import { SystemService } from "@/services/SystemService";
 import { userService } from "@/services/UserService";
@@ -250,10 +250,10 @@ const App: React.FC = () => {
 
 	return (
 		<div style={{ width: "100%", height: "100vh", overflow: "hidden" }}>
-			{appState === "auth" && <AuthPanel onAuthenticated={handleAuthenticated} />}
+			{appState === "auth" && <AuthPage onAuthenticated={handleAuthenticated} />}
 
 			{appState === "lobby" && (
-				<LobbyPanel
+				<LobbyPage
 					playerName={userName}
 					profile={networkManager.getProfile()}
 					currentShortId={networkManager.getShortId()}
@@ -270,7 +270,7 @@ const App: React.FC = () => {
 			)}
 
 			{appState === "game" && networkManager.getCurrentRoom() && (
-				<GameView
+				<GamePage
 					networkManager={networkManager}
 					onLeaveRoom={handleBackToLobby}
 					playerName={userName}

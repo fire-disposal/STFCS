@@ -11,13 +11,13 @@
  */
 
 import { ArraySchema } from "@colyseus/schema";
-import { ChatMessageType } from "@vt/types";
+import { ChatMessageType } from "../schema/types.js";
 import { ChatMessage } from "../schema/GameSchema.js";
 
 /**
  * 消息辅助工具
  */
-export class MessageUtils {
+class MessageUtils {
 	/**
 	 * 生成唯一消息 ID
 	 */

@@ -2,9 +2,9 @@
  * 预设武器数据
  */
 
-import type { WeaponSpec } from "@vt/types";
+import type { WeaponSpec } from "./types.js";
 
-export type { WeaponSpec };
+;
 
 export const PRESET_WEAPONS: Record<string, WeaponSpec> = {
 	autocannon: {

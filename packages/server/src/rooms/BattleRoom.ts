@@ -3,8 +3,13 @@
  */
 
 import { Client, matchMaker, Room } from "@colyseus/core";
-import type { CreateObjectPayload, MoveTokenPayload, RoomMetadata } from "@vt/types";
-import { Faction, GamePhase, PlayerRole, WeaponState } from "@vt/types";
+import {
+	Faction,
+	GamePhase,
+	PlayerRole,
+	WeaponState,
+} from "../schema/types.js";
+import type { CreateObjectPayload, MoveTokenPayload, RoomMetadata } from "../schema/types.js";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import {
 	toErrorDto,

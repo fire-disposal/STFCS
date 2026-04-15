@@ -6,14 +6,12 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./dist/index.js"
+		".": "./dist/index.js",
+		"./types": "./dist/types.js"
 	},
 	"scripts": {
-		"build": "tsup src/index.ts --format esm --dts --clean --external @vt/types",
+		"build": "tsup src/index.ts --format esm --dts --clean",
 		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@vt/types": "workspace:*"
 	},
 	"devDependencies": {
 		"tsup": "^8.5.1",

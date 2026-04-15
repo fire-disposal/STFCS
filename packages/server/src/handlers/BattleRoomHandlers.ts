@@ -5,10 +5,9 @@
 import type { Client } from "@colyseus/core";
 import {
 	ClientCommand,
-	type CreateObjectPayload,
-	type MoveTokenPayload,
 	PlayerRole,
-} from "@vt/types";
+} from "../schema/types.js";
+import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 import type { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { toErrorDto, toNetPongDto, toRoomKickedDto } from "../dto/index.js";
 import { advancePhase } from "../phase/PhaseManager.js";

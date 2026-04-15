@@ -2,9 +2,9 @@
  * 内存存档存储
  */
 
-import type { GameSave, SaveStore, SaveSummary } from "@vt/types";
+import type { GameSave, SaveStore, SaveSummary } from "../schema/types.js";
 
-export class MemorySaveStore implements SaveStore {
+class MemorySaveStore implements SaveStore {
 	private saves = new Map<string, GameSave>();
 
 	async save(data: GameSave) {

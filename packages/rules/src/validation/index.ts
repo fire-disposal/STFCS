@@ -5,10 +5,28 @@
  */
 
 import { GAME_CONFIG } from "@vt/data";
-import type { GamePhaseValue, PlayerRoleValue } from "@vt/types";
-import { GamePhase } from "@vt/types";
 import { angleBetween, angleDifference, distance, validateThreePhaseMove } from "../math/index.js";
 import type { MovementPlan, MovementValidation } from "../math/index.js";
+
+// 本地定义游戏阶段枚举（从 @vt/types 迁移）
+const GamePhase = {
+	DEPLOYMENT: "DEPLOYMENT",
+	PLAYER_TURN: "PLAYER_TURN",
+	DM_TURN: "DM_TURN",
+	END_PHASE: "END_PHASE",
+	BATTLE: "BATTLE",
+	END: "END",
+} as const;
+
+type GamePhaseValue = (typeof GamePhase)[keyof typeof GamePhase];
+
+// 本地定义玩家角色枚举
+const PlayerRole = {
+	DM: "DM",
+	PLAYER: "PLAYER",
+} as const;
+
+type PlayerRoleValue = (typeof PlayerRole)[keyof typeof PlayerRole];
 
 export interface WeaponFireValidation {
 	valid: boolean;

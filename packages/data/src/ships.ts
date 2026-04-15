@@ -2,9 +2,9 @@
  * 预设舰船数据
  */
 
-import type { ShipHullSpec } from "@vt/types";
+import type { ShipHullSpec } from "./types.js";
 
-export type { ShipHullSpec };
+;
 
 export const PRESET_SHIPS: Record<string, ShipHullSpec> = {
 	frigate: {

@@ -10,7 +10,7 @@
 
 import { userService } from "@/services/UserService";
 import { Client, Room } from "@colyseus/sdk";
-import type { GameRoomState } from "@vt/types";
+import type { GameRoomState } from "@/sync/types";
 
 export interface RoomInfo {
 	roomId: string;

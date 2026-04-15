@@ -6,8 +6,28 @@
  */
 
 import { DAMAGE_MODIFIERS } from "@vt/data";
-import type { ArmorQuadrantValue, DamageTypeValue } from "@vt/types";
-import { ARMOR_QUADRANTS, ArmorQuadrant } from "@vt/types";
+import type { DamageTypeValue } from "@vt/data";
+
+// 本地定义护甲象限枚举（从 @vt/types 迁移）
+export const ArmorQuadrant = {
+	FRONT_TOP: "FRONT_TOP",
+	FRONT_BOTTOM: "FRONT_BOTTOM",
+	LEFT_TOP: "LEFT_TOP",
+	LEFT_BOTTOM: "LEFT_BOTTOM",
+	RIGHT_TOP: "RIGHT_TOP",
+	RIGHT_BOTTOM: "RIGHT_BOTTOM",
+} as const;
+
+export type ArmorQuadrantValue = (typeof ArmorQuadrant)[keyof typeof ArmorQuadrant];
+
+const ARMOR_QUADRANTS: readonly ArmorQuadrantValue[] = [
+	ArmorQuadrant.FRONT_TOP,
+	ArmorQuadrant.FRONT_BOTTOM,
+	ArmorQuadrant.LEFT_TOP,
+	ArmorQuadrant.LEFT_BOTTOM,
+	ArmorQuadrant.RIGHT_TOP,
+	ArmorQuadrant.RIGHT_BOTTOM,
+];
 
 export const ARMOR_QUADRANT_NAMES: Record<ArmorQuadrantValue, string> = {
 	FRONT_TOP: "前上方",

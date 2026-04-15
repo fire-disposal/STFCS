@@ -4,14 +4,13 @@
  * 这些数据定义游戏规则的核心参数
  */
 
-import type { DamageTypeValue } from "@vt/types";
+import type { DamageModifiersMap, DamageTypeValue } from "./types.js";
+
+;
 
 // ==================== 伤害倍率 ====================
 
-export const DAMAGE_MODIFIERS: Record<
-	DamageTypeValue,
-	{ shield: number; armor: number; hull: number; description?: string }
-> = {
+export const DAMAGE_MODIFIERS: DamageModifiersMap = {
 	KINETIC: {
 		shield: 0.5,
 		armor: 2.0,
@@ -55,7 +54,7 @@ export const GAME_CONFIG = {
 
 // ==================== 护甲象限名称 ====================
 
-export const ARMOR_QUADRANT_NAMES = {
+const ARMOR_QUADRANT_NAMES = {
 	FRONT_TOP: "前上方",
 	FRONT_BOTTOM: "前下方",
 	LEFT_TOP: "左上方",

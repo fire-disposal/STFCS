@@ -7,10 +7,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "src"),
-			"@vt/types": resolve(__dirname, "../types/src/index.ts"),
 			"@vt/data": resolve(__dirname, "../data/src/index.ts"),
 			"@vt/rules": resolve(__dirname, "../rules/src/index.ts"),
-			"@vt/rules/math": resolve(__dirname, "../rules/src/math/index.ts"),
 		},
 	},
 	server: {
@@ -31,9 +29,9 @@ export default defineConfig({
 			output: {
 				manualChunks: {
 					vendor: ["react", "react-dom", "react-router-dom"],
-					ui: ["@pixi/react", "react-konva", "framer-motion"],
-					state: ["@reduxjs/toolkit", "react-redux", "zustand"],
-					graphics: ["pixi.js", "konva"],
+					ui: ["@pixi/react"],
+					state: ["zustand"],
+					graphics: ["pixi.js"],
 				},
 			},
 		},

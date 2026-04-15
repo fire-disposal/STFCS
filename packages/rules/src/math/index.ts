@@ -321,7 +321,7 @@ export function checkCollision(poly1: SAT.Polygon, poly2: SAT.Polygon): boolean 
  * @param strafeDistance 侧移距离（正值向右）
  * @returns 新位置 [x, y]
  */
-export function calculateMove(
+function calculateMove(
   x: number,
   y: number,
   heading: number,

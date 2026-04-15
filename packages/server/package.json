@@ -1,12 +1,19 @@
 {
-	"name": "server",
+	"name": "@vt/server",
 	"version": "1.0.0",
 	"description": "STFCS Backend Server",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"type": "module",
+	"exports": {
+		".": "./dist/index.js",
+		"./schema": "./dist/schema/index.js",
+		"./schema/types": "./dist/schema/types.js",
+		"./commands": "./dist/commands/index.js",
+		"./commands/types": "./dist/commands/types.js"
+	},
 	"scripts": {
-		"dev": "pnpm --filter @vt/types build && pnpm --filter @vt/data build && pnpm --filter @vt/rules build && tsup src/index.ts --format esm --sourcemap --watch --onSuccess \"node --enable-source-maps dist/index.js\"",
+		"dev": "pnpm --filter @vt/data build && pnpm --filter @vt/rules build && tsup src/index.ts --format esm --sourcemap --watch --onSuccess \"node --enable-source-maps dist/index.js\"",
 		"start": "node dist/index.js",
 		"build": "tsup src/index.ts --format esm --dts --sourcemap",
 		"test": "vitest run",
@@ -22,16 +29,14 @@
 	"license": "ISC",
 	"packageManager": "pnpm@10.32.1",
 	"dependencies": {
-		"@colyseus/schema": "^4.0.19",
 		"@colyseus/core": "^0.17.41",
 		"@colyseus/monitor": "^0.17.8",
+		"@colyseus/schema": "^4.0.19",
 		"@colyseus/ws-transport": "^0.17.13",
-		"@vt/types": "workspace:*",
 		"@vt/data": "workspace:*",
 		"@vt/rules": "workspace:*",
 		"cors": "^2.8.6",
-		"express": "^5.2.1",
-		"ws": "^8.19.0"
+		"express": "^5.2.1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
@@ -39,7 +44,6 @@
 		"@types/express": "^5.0.6",
 		"@types/node": "^25.4.0",
 		"tsup": "^8.5.1",
-		"tsx": "^4.21.0",
 		"vitest": "^3.2.4"
 	}
 }

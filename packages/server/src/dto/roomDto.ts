@@ -1,5 +1,9 @@
-import { GamePhase } from "@vt/types";
-import type { RoomListItemDTO, RoomMetadata } from "@vt/types";
+/**
+ * 房间 DTO 转换器
+ */
+
+import { GamePhase } from "../schema/types.js";
+import type { RoomListItemDTO, RoomMetadata } from "../schema/types.js";
 
 interface MatchmakeRoomRecord {
 	roomId?: unknown;

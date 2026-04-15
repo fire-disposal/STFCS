@@ -5,8 +5,11 @@
 import { Client } from "@colyseus/core";
 import { DAMAGE_MODIFIERS, GAME_CONFIG } from "@vt/data";
 import { angleBetween, angleDifference, distance, validateThreePhaseMove } from "@vt/rules";
-import { PlayerRole, WeaponState } from "@vt/types";
-import type { MoveTokenPayload } from "@vt/types";
+import {
+	PlayerRole,
+	WeaponState,
+} from "../schema/types.js";
+import type { MoveTokenPayload } from "./types.js";
 import type { GameRoomState } from "../schema/GameSchema.js";
 import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
 
