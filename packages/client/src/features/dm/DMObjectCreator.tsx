@@ -1,185 +1,10 @@
-/**
- * DM 对象创建面板
- *
- * 提供舰船、小行星、空间站等对象的创建和摆放功能
- * 游标朝向通过调整视图旋转控制，放置时自动继承
- */
-
 import { getAvailableShips } from "@vt/data";
-import type { FactionValue } from "@vt/types";
+import type { FactionValue, ShipHullSpec } from "@vt/types";
 import { Faction } from "@vt/types";
-import { ChevronDown, ChevronRight, Palette, Rocket, Sparkles, Users } from "lucide-react";
-import React, { useState, useMemo, useCallback } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Palette, Rocket, Sparkles } from "lucide-react";
+import React, { useMemo, useState } from "react";
 
 type TokenType = "ship" | "station" | "asteroid";
-
-const styles = {
-	panel: {
-		backgroundColor: "rgba(6, 16, 26, 0.95)",
-		borderRadius: "0",
-		border: "1px solid rgba(255, 111, 143, 0.3)",
-		overflow: "hidden",
-	},
-	header: {
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: "10px 12px",
-		backgroundColor: "rgba(90, 42, 58, 0.6)",
-		borderBottom: "1px solid rgba(255, 111, 143, 0.3)",
-		cursor: "pointer",
-		userSelect: "none" as const,
-	},
-	headerTitle: {
-		fontSize: "11px",
-		fontWeight: "bold" as const,
-		color: "#ff6f8f",
-		letterSpacing: "1px",
-		textTransform: "uppercase" as const,
-		display: "flex",
-		alignItems: "center",
-		gap: "6px",
-	},
-	collapseButton: {
-		background: "transparent",
-		border: "none",
-		color: "#ff6f8f",
-		fontSize: "16px",
-		cursor: "pointer",
-		padding: "0",
-		width: "20px",
-		height: "20px",
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	content: {
-		padding: "12px",
-		display: "flex",
-		flexDirection: "column" as const,
-		gap: "12px",
-	},
-	section: {
-		display: "flex",
-		flexDirection: "column" as const,
-		gap: "6px",
-	},
-	sectionTitle: {
-		fontSize: "10px",
-		fontWeight: "bold" as const,
-		color: "#ff6f8f",
-		letterSpacing: "1px",
-		textTransform: "uppercase" as const,
-	},
-	objectTypeGrid: {
-		display: "grid",
-		gridTemplateColumns: "repeat(3, 1fr)",
-		gap: "6px",
-	},
-	objectTypeButton: {
-		padding: "8px",
-		borderRadius: "0",
-		border: "1px solid rgba(90, 42, 58, 0.8)",
-		backgroundColor: "rgba(58, 42, 74, 0.6)",
-		color: "#ff6f8f",
-		fontSize: "10px",
-		fontWeight: "bold" as const,
-		cursor: "pointer",
-		transition: "all 0.2s",
-		letterSpacing: "0.5px",
-	},
-	objectTypeButtonActive: {
-		backgroundColor: "rgba(90, 42, 58, 0.9)",
-		borderColor: "rgba(255, 111, 143, 0.5)",
-	},
-	shipGrid: {
-		display: "grid",
-		gridTemplateColumns: "repeat(2, 1fr)",
-		gap: "6px",
-		maxHeight: "150px",
-		overflowY: "auto" as const,
-		padding: "4px",
-	},
-	shipCard: {
-		padding: "8px",
-		borderRadius: "0",
-		border: "1px solid rgba(90, 42, 58, 0.5)",
-		backgroundColor: "rgba(26, 45, 66, 0.8)",
-		cursor: "pointer",
-		transition: "all 0.2s",
-		fontSize: "10px",
-	},
-	shipCardSelected: {
-		borderColor: "#ff6f8f",
-		backgroundColor: "rgba(90, 42, 58, 0.4)",
-	},
-	shipCardName: {
-		color: "#cfe8ff",
-		fontWeight: "bold",
-		marginBottom: "4px",
-		fontSize: "10px",
-		display: "flex",
-		alignItems: "center",
-		gap: "4px",
-	},
-	shipCardStats: {
-		color: "#8ba4c7",
-		fontSize: "9px",
-		display: "flex",
-		flexDirection: "column" as const,
-		gap: "2px",
-	},
-	select: {
-		width: "100%",
-		padding: "8px",
-		borderRadius: "0",
-		border: "1px solid rgba(90, 42, 58, 0.8)",
-		backgroundColor: "rgba(26, 45, 66, 0.8)",
-		color: "#cfe8ff",
-		fontSize: "10px",
-	},
-	cursorInfo: {
-		padding: "10px",
-		borderRadius: "0",
-		backgroundColor: "rgba(74, 158, 255, 0.15)",
-		border: "1px solid rgba(74, 158, 255, 0.3)",
-		display: "flex",
-		flexDirection: "column" as const,
-		gap: "6px",
-	},
-	cursorCoords: {
-		color: "#4a9eff",
-		fontSize: "11px",
-		fontWeight: "bold" as const,
-	},
-	cursorHint: {
-		color: "#8ba4c7",
-		fontSize: "9px",
-	},
-	noCursorHint: {
-		padding: "10px",
-		borderRadius: "0",
-		backgroundColor: "rgba(255, 111, 143, 0.15)",
-		border: "1px dashed rgba(255, 111, 143, 0.4)",
-		color: "#ff6f8f",
-		fontSize: "10px",
-		textAlign: "center" as const,
-	},
-};
-
-const objectTypes = [
-	{ id: "ship" as TokenType, label: "舰船", icon: "🚀" },
-	{ id: "station" as TokenType, label: "空间站", icon: "🛰️" },
-	{ id: "asteroid" as TokenType, label: "小行星", icon: "☄️" },
-] as const;
-
-const ShipSizeIcons: Record<string, string> = {
-	fighter: "🛩️",
-	frigate: "🚀",
-	destroyer: "🚢",
-	cruiser: "🛳️",
-	capital: "🏢",
-};
 
 interface DMObjectCreatorProps {
 	onCreateObject: (params: {
@@ -190,161 +15,273 @@ interface DMObjectCreatorProps {
 		heading: number;
 		faction: FactionValue;
 		ownerId?: string;
+		name?: string;
 	}) => void;
 	players: Array<{ sessionId: string; name: string; role: string }>;
 	mapCursor: { x: number; y: number; r: number } | null;
 }
 
-export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({
-	onCreateObject,
-	players,
-	mapCursor,
-}) => {
+interface FormState {
+	type: TokenType;
+	hullId: string;
+	heading: string;
+	x: string;
+	y: string;
+	faction: FactionValue;
+	ownerId: string;
+	name: string;
+}
+
+const styles = {
+	panel: { backgroundColor: "rgba(6, 16, 26, 0.95)", border: "1px solid rgba(255, 111, 143, 0.3)" },
+	header: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "space-between",
+		padding: "10px 12px",
+		backgroundColor: "rgba(90, 42, 58, 0.6)",
+		borderBottom: "1px solid rgba(255, 111, 143, 0.3)",
+		cursor: "pointer",
+	},
+	headerTitle: {
+		fontSize: "11px",
+		fontWeight: "bold" as const,
+		color: "#ff6f8f",
+		textTransform: "uppercase" as const,
+		display: "flex",
+		alignItems: "center",
+		gap: "6px",
+	},
+	content: { padding: "12px", display: "flex", flexDirection: "column" as const, gap: "10px" },
+	sectionTitle: { fontSize: "10px", color: "#ff6f8f", fontWeight: "bold" as const },
+	input: {
+		width: "100%",
+		padding: "7px",
+		border: "1px solid rgba(90, 42, 58, 0.8)",
+		backgroundColor: "rgba(26, 45, 66, 0.8)",
+		color: "#cfe8ff",
+		fontSize: "11px",
+	},
+	row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" },
+	typeGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" },
+	typeButton: {
+		padding: "8px",
+		border: "1px solid rgba(90, 42, 58, 0.8)",
+		backgroundColor: "rgba(58, 42, 74, 0.6)",
+		color: "#ff6f8f",
+		fontSize: "10px",
+		fontWeight: "bold" as const,
+		cursor: "pointer",
+	},
+	typeButtonActive: { backgroundColor: "rgba(90, 42, 58, 0.95)", borderColor: "#ff6f8f" },
+	infoCard: {
+		padding: "8px",
+		border: "1px solid rgba(74, 158, 255, 0.35)",
+		backgroundColor: "rgba(74, 158, 255, 0.12)",
+		fontSize: "10px",
+		color: "#9dc5ef",
+	},
+	errorCard: {
+		padding: "8px",
+		border: "1px solid rgba(255,111,143,0.5)",
+		backgroundColor: "rgba(255,111,143,0.12)",
+		fontSize: "10px",
+		color: "#ffd2dc",
+		display: "flex",
+		alignItems: "center",
+		gap: "6px",
+	},
+	submit: {
+		padding: "9px",
+		border: "1px solid rgba(90, 42, 58, 0.8)",
+		backgroundColor: "rgba(90, 42, 58, 0.95)",
+		color: "#ff6f8f",
+		fontWeight: "bold" as const,
+		cursor: "pointer",
+	},
+	submitDisabled: { opacity: 0.5, cursor: "not-allowed" },
+};
+
+const objectTypes = [
+	{ id: "ship" as TokenType, label: "舰船", icon: "🚀" },
+	{ id: "station" as TokenType, label: "空间站", icon: "🛰️" },
+	{ id: "asteroid" as TokenType, label: "小行星", icon: "☄️" },
+] as const;
+
+function parseFinite(value: string): number | null {
+	const n = Number(value);
+	return Number.isFinite(n) ? n : null;
+}
+
+function getShipDetailLines(ship: ShipHullSpec | undefined): string[] {
+	if (!ship) return [];
+	return [
+		`尺寸: ${ship.size} / 级别: ${ship.class}`,
+		`船体: ${ship.hitPoints}  装甲: ${ship.armorMax}`,
+		`辐能: ${ship.fluxCapacity} / 散逸: ${ship.fluxDissipation}`,
+		`航速: ${ship.maxSpeed}  转向: ${ship.maxTurnRate}`,
+		`武器位: ${ship.weaponMounts.length}`,
+	];
+}
+
+export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({ onCreateObject, players, mapCursor }) => {
 	const [collapsed, setCollapsed] = useState(false);
-	const [objectType, setObjectType] = useState<TokenType>("ship");
-	const [selectedHullId, setSelectedHullId] = useState<string>("frigate_assault");
-	const [faction, setFaction] = useState<FactionValue>(Faction.DM);
-	const [ownerId, setOwnerId] = useState<string>("");
+	const [showTypeDetails, setShowTypeDetails] = useState(true);
+	const [form, setForm] = useState<FormState>({
+		type: "ship",
+		hullId: "frigate",
+		heading: "0",
+		x: "0",
+		y: "0",
+		faction: Faction.DM,
+		ownerId: "",
+		name: "",
+	});
 
 	const availableShips = useMemo(() => getAvailableShips(), []);
+	const selectedShip = useMemo(() => availableShips.find((s) => s.id === form.hullId), [availableShips, form.hullId]);
 
-	const handleCreate = useCallback(() => {
-		if (!mapCursor) return;
+	const heading = parseFinite(form.heading);
+	const x = parseFinite(form.x);
+	const y = parseFinite(form.y);
+	const cursorX = mapCursor ? Number(mapCursor.x.toFixed(1)) : null;
+	const cursorY = mapCursor ? Number(mapCursor.y.toFixed(1)) : null;
+	const cursorHeading = mapCursor ? Number(mapCursor.r.toFixed(2)) : null;
 
+	const effectiveX = x ?? cursorX;
+	const effectiveY = y ?? cursorY;
+	const effectiveHeading = heading ?? cursorHeading;
+
+	const errors: string[] = [];
+	if (form.type === "ship" && !selectedShip) errors.push("请选择有效舰船型号");
+	if (effectiveX === null || effectiveY === null) errors.push("缺少有效坐标（可使用地图游标）");
+	if (effectiveHeading === null) errors.push("缺少有效朝向");
+	if (effectiveHeading !== null && (effectiveHeading < -3600 || effectiveHeading > 3600)) {
+		errors.push("朝向输入超出可接受范围");
+	}
+	if (form.name.length > 32) errors.push("对象名称最多 32 字符");
+	if (form.ownerId && !players.some((p) => p.sessionId === form.ownerId)) errors.push("操作者不存在");
+
+	const isValid = errors.length === 0;
+
+	const submit = () => {
+		if (!isValid || effectiveX === null || effectiveY === null || effectiveHeading === null) return;
 		onCreateObject({
-			type: objectType,
-			hullId: objectType === "ship" ? selectedHullId : undefined,
-			x: mapCursor.x,
-			y: mapCursor.y,
-			heading: mapCursor.r,
-			faction,
-			ownerId: ownerId || undefined,
+			type: form.type,
+			hullId: form.type === "ship" ? form.hullId : undefined,
+			x: effectiveX,
+			y: effectiveY,
+			heading: ((effectiveHeading % 360) + 360) % 360,
+			faction: form.faction,
+			ownerId: form.ownerId || undefined,
+			name: form.name.trim() || undefined,
 		});
-	}, [objectType, selectedHullId, mapCursor, faction, ownerId, onCreateObject]);
+	};
 
 	return (
 		<div style={styles.panel}>
 			<div style={styles.header} onClick={() => setCollapsed(!collapsed)}>
 				<div style={styles.headerTitle}>
-					<Sparkles className="game-icon--sm" />
-					对象创建工具
+					<Sparkles className="game-icon--sm" />对象创建工具
 				</div>
-				<button style={styles.collapseButton}>
-					{collapsed ? (
-						<ChevronRight className="game-icon--xs" />
-					) : (
-						<ChevronDown className="game-icon--xs" />
-					)}
-				</button>
+				{collapsed ? <ChevronRight className="game-icon--xs" /> : <ChevronDown className="game-icon--xs" />}
 			</div>
-
 			{!collapsed && (
 				<div style={styles.content}>
-					<div style={styles.section}>
-						<div style={styles.sectionTitle}>
-							<Palette className="game-icon--xs" />
-							对象类型
-						</div>
-						<div style={styles.objectTypeGrid}>
-							{objectTypes.map((type) => (
-								<button
-									key={type.id}
-									data-magnetic
-									style={{
-										...styles.objectTypeButton,
-										...(objectType === type.id ? styles.objectTypeButtonActive : {}),
-									}}
-									className="game-btn game-btn--small"
-									onClick={() => setObjectType(type.id)}
-								>
-									{type.icon} {type.label}
-								</button>
-							))}
-						</div>
-					</div>
-
-					{objectType === "ship" && (
-						<div style={styles.section}>
-							<div style={styles.sectionTitle}>
-								<Rocket className="game-icon--xs" />
-								选择舰船型号
-							</div>
-							<div style={styles.shipGrid}>
-								{availableShips.map((ship) => (
-									<div
-										key={ship.id}
-										data-magnetic
-										style={{
-											...styles.shipCard,
-											...(selectedHullId === ship.id ? styles.shipCardSelected : {}),
-										}}
-										onClick={() => setSelectedHullId(ship.id)}
-									>
-										<div style={styles.shipCardName}>
-											<span>{ShipSizeIcons[ship.size]}</span>
-											<span>{ship.name}</span>
-										</div>
-										<div style={styles.shipCardStats}>
-											<span>船体：{ship.hullPoints}</span>
-											<span>装甲：{ship.armorValue}</span>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-
-					{mapCursor ? (
-						<div style={styles.cursorInfo}>
-							<div style={styles.cursorCoords}>
-								🎯 ({Math.round(mapCursor.x)}, {Math.round(mapCursor.y)}) ·{" "}
-								{Number((-mapCursor.r).toFixed(2))}°
-							</div>
-							<div style={styles.cursorHint}>提示：调整视图旋转可改变后续游标朝向</div>
-						</div>
-					) : (
-						<div style={styles.noCursorHint}>🎯 左键点击地图空白处放置游标</div>
-					)}
-
-					<div style={styles.section}>
-						<div style={styles.sectionTitle}>
-							<Users className="game-icon--xs" />
-							阵营与归属
-						</div>
-						<select
-							style={styles.select}
-							value={faction}
-							onChange={(e) => setFaction(Number(e.target.value) as unknown as FactionValue)}
-						>
-							<option value={Faction.PLAYER}>玩家阵营</option>
-							<option value={Faction.DM}>DM 阵营（敌方）</option>
-						</select>
-						{faction === Faction.PLAYER && (
-							<select
-								style={styles.select}
-								value={ownerId}
-								onChange={(e) => setOwnerId(e.target.value)}
+					<div style={styles.sectionTitle}><Palette className="game-icon--xs" />对象类型</div>
+					<div style={styles.typeGrid}>
+						{objectTypes.map((t) => (
+							<button
+								key={t.id}
+								data-magnetic
+								className="game-btn game-btn--small"
+								style={{ ...styles.typeButton, ...(form.type === t.id ? styles.typeButtonActive : {}) }}
+								onClick={() => setForm((prev) => ({ ...prev, type: t.id }))}
 							>
-								<option value="">未分配</option>
-								{players
-									.filter((p) => p.role !== "DM")
-									.map((player) => (
-										<option key={player.sessionId} value={player.sessionId}>
-											{player.name}
-										</option>
-									))}
-							</select>
-						)}
+								{t.icon} {t.label}
+							</button>
+						))}
 					</div>
+
+					{form.type === "ship" && (
+						<>
+							<div style={styles.sectionTitle}><Rocket className="game-icon--xs" />舰船型号</div>
+							<select
+								style={styles.input}
+								value={form.hullId}
+								onChange={(e) => setForm((prev) => ({ ...prev, hullId: e.target.value }))}
+							>
+								{availableShips.map((ship) => (
+									<option key={ship.id} value={ship.id}>
+										{ship.name}
+									</option>
+								))}
+							</select>
+
+							<button
+								data-magnetic
+								className="game-btn game-btn--small"
+								onClick={() => setShowTypeDetails((v) => !v)}
+							>
+								{showTypeDetails ? "隐藏舰船属性" : "展开舰船属性"}
+							</button>
+							{showTypeDetails && (
+								<div style={styles.infoCard}>
+									{getShipDetailLines(selectedShip).map((line) => (
+										<div key={line}>{line}</div>
+									))}
+								</div>
+							)}
+						</>
+					)}
+
+					{form.type !== "ship" && (
+						<div style={styles.infoCard}>
+							{form.type === "station" ? "空间站将使用固定耐久模板（高护甲、不可移动）。" : "小行星将使用障碍模板（固定耐久、默认不可操作）。"}
+						</div>
+					)}
+
+					<div style={styles.row}>
+						<input style={styles.input} type="number" placeholder={cursorX !== null ? `X(游标:${cursorX})` : "X"} value={form.x} onChange={(e) => setForm((prev) => ({ ...prev, x: e.target.value }))} />
+						<input style={styles.input} type="number" placeholder={cursorY !== null ? `Y(游标:${cursorY})` : "Y"} value={form.y} onChange={(e) => setForm((prev) => ({ ...prev, y: e.target.value }))} />
+					</div>
+					<div style={styles.row}>
+						<input style={styles.input} type="number" placeholder={cursorHeading !== null ? `朝向(游标:${cursorHeading}°)` : "朝向"} value={form.heading} onChange={(e) => setForm((prev) => ({ ...prev, heading: e.target.value }))} />
+						<input style={styles.input} placeholder="对象名称(可选)" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+					</div>
+
+					<div style={styles.row}>
+						<select style={styles.input} value={form.faction} onChange={(e) => setForm((prev) => ({ ...prev, faction: e.target.value as FactionValue }))}>
+							{Object.values(Faction).map((f) => (
+								<option key={f} value={f}>{f}</option>
+							))}
+						</select>
+						<select style={styles.input} value={form.ownerId} onChange={(e) => setForm((prev) => ({ ...prev, ownerId: e.target.value }))}>
+							<option value="">无操作者</option>
+							{players.map((p) => <option key={p.sessionId} value={p.sessionId}>{p.name}</option>)}
+						</select>
+					</div>
+
+					<div style={styles.infoCard}>
+						<div>实时验证: {isValid ? <><CheckCircle2 className="game-icon--xs" /> 可创建</> : "输入未通过"}</div>
+						<div>最终坐标: ({effectiveX ?? "--"}, {effectiveY ?? "--"})，朝向: {effectiveHeading ?? "--"}°</div>
+					</div>
+
+					{!isValid && (
+						<div style={styles.errorCard}>
+							<AlertTriangle className="game-icon--xs" />
+							<div>{errors.join("；")}</div>
+						</div>
+					)}
 
 					<button
 						data-magnetic
-						className="game-btn game-btn--primary game-btn--full"
-						onClick={handleCreate}
-						disabled={!mapCursor}
+						className="game-btn game-btn--small"
+						style={{ ...styles.submit, ...(!isValid ? styles.submitDisabled : {}) }}
+						onClick={submit}
+						disabled={!isValid}
 					>
-						<Sparkles className="game-icon--xs" />
-						{mapCursor ? "在游标位置创建" : "需要先放置游标"}
+						创建到游标 / 指定坐标
 					</button>
 				</div>
 			)}

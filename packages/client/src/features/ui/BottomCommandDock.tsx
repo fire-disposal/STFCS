@@ -13,6 +13,7 @@ import {
 	Activity,
 	Bomb,
 	Crosshair,
+	Flag,
 	Heart,
 	Navigation2,
 	Rocket,
@@ -29,6 +30,9 @@ interface BottomCommandDockProps {
 	onToggleShield?: () => void;
 	onFire?: () => void;
 	onVent?: () => void;
+	onToggleReady?: () => void;
+	isReady?: boolean;
+	readyLocked?: boolean;
 	disabled?: boolean;
 }
 
@@ -40,6 +44,9 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 	onToggleShield,
 	onFire,
 	onVent,
+	onToggleReady,
+	isReady = false,
+	readyLocked = false,
 	disabled = false,
 }) => {
 	// 计算护甲百分比（使用新的 armor.averagePercent）
@@ -317,6 +324,16 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 							<span className="status-badge status-badge--overload">过载</span>
 						)}
 					</div>
+					<button
+						data-magnetic
+						className={`action-btn action-btn--turn ${isReady ? "action-btn--active" : ""}`}
+						onClick={onToggleReady}
+						disabled={disabled || readyLocked || !onToggleReady}
+						title={readyLocked ? "当前阶段不可切换回合状态" : "宣布本回合结束（可在阶段推进前反悔）"}
+					>
+						<Flag className="action-btn__icon" />
+						<span className="action-btn__label">{isReady ? "取消结束" : "结束回合"}</span>
+					</button>
 				</div>
 			</div>
 		</div>

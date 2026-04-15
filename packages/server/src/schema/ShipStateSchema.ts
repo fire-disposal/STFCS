@@ -18,6 +18,8 @@ import type * as VT from "@vt/types";
 
 export class WeaponSlot extends Schema implements VT.WeaponSlot {
 	@type("string") mountId: string = "";
+	@type("number") mountOffsetX: number = 0;
+	@type("number") mountOffsetY: number = 0;
 	@type("string") weaponSpecId: string = "";
 	@type("string") instanceId: string = "";
 	@type("string") name: string = "";

@@ -91,6 +91,8 @@ export interface FluxState {
 
 export interface WeaponSlot {
 	mountId: string;
+	mountOffsetX?: number;
+	mountOffsetY?: number;
 	weaponSpecId: string;
 	instanceId: string;
 	name: string;

@@ -20,10 +20,11 @@ import { RightSidePanel } from "@/features/ui/RightSidePanel";
 import { SettingsMenu } from "@/features/ui/SettingsMenu";
 import { useCurrentGameRoom } from "@/hooks";
 import { NetworkManager } from "@/network/NetworkManager";
+import { useSelectionStore } from "@/store/selectionStore";
 import { useUIStore } from "@/store/uiStore";
 import { normalizeRotation } from "@/utils/angleSystem";
 import type { ClientCommandValue, FactionValue, PlayerState, ShipState } from "@vt/types";
-import { ClientCommand, Faction, PlayerRole } from "@vt/types";
+import { ClientCommand, Faction, GamePhase, PlayerRole } from "@vt/types";
 import { LogOut, Rocket, Settings, Users } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
@@ -40,6 +41,8 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
 	const [showMovementPanel, setShowMovementPanel] = useState(false);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
+	const selectedShipId = useSelectionStore((state) => state.selectedShipId);
+	const selectShip = useSelectionStore((state) => state.selectShip);
 
 	// 注意：不需要手动监听 ship_created/ship_destroyed
 	// Colyseus 的 MapSchema 会自动同步状态变化并触发 React 更新
@@ -76,18 +79,21 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 		return result;
 	}, [room?.state?.ships]);
 
-	// 选中的舰船
-	const selectedShipId = useMemo(() => {
-		const selected = ships.find((s) => {
-			const owner = players.find((p) => p.sessionId === room?.sessionId);
-			return s.ownerId === owner?.sessionId;
-		});
-		return selected?.id || null;
-	}, [ships, players, room?.sessionId]);
-
 	const selectedShip = useMemo(() => {
 		return ships.find((s) => s.id === selectedShipId) || null;
 	}, [ships, selectedShipId]);
+
+	const isPlayerTurn = room?.state?.currentPhase === GamePhase.PLAYER_TURN;
+	const canControlSelectedShip = useMemo(() => {
+		if (!selectedShip || !currentPlayer) return false;
+		if (currentPlayer.role === PlayerRole.DM) return true;
+		return (
+			currentPlayer.role === PlayerRole.PLAYER &&
+			isPlayerTurn &&
+			selectedShip.ownerId === currentPlayer.sessionId &&
+			!selectedShip.isDestroyed
+		);
+	}, [selectedShip, currentPlayer, isPlayerTurn]);
 
 	// UI 状态
 	const {
@@ -144,6 +150,7 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 			heading: number;
 			faction: FactionValue;
 			ownerId?: string;
+			name?: string;
 		}) => {
 			if (!room) return;
 			room.send(ClientCommand.CMD_CREATE_OBJECT, payload);
@@ -318,7 +325,9 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 							showWeaponArcs={showWeaponArcs}
 							showMovementRange={showMovementRange}
 							selectedShipId={selectedShipId}
-							onSelectShip={(id) => console.log("[GameView] Select:", id)}
+							onSelectShip={(id) => {
+								selectShip(id);
+							}}
 							onPanDelta={handleMapPan}
 							onRotateDelta={handleMapRotate}
 						/>
@@ -351,7 +360,10 @@ export const GameView: React.FC<GameViewProps> = ({ networkManager, onLeaveRoom 
 				onToggleShield={handleToggleShield}
 				onFire={handleFire}
 				onVent={handleVent}
-				disabled={false}
+				onToggleReady={toggleReady}
+				isReady={!!currentPlayer?.isReady}
+				readyLocked={!isPlayerTurn}
+				disabled={!canControlSelectedShip}
 			/>
 
 			{/* 移动面板弹窗 - 燃料池制度 */}

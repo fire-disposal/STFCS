@@ -88,13 +88,13 @@ export function createStation(x: number, y: number, heading: number): ShipState 
 	return station;
 }
 
-export function createAsteroid(x: number, y: number): ShipState {
+export function createAsteroid(x: number, y: number, heading = 0): ShipState {
 	const asteroid = new ShipState();
 	asteroid.id = `asteroid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 	asteroid.hullType = "asteroid";
 	asteroid.name = "Asteroid";
 	asteroid.setPosition(x, y);
-	asteroid.setHeading(Math.random() * 360);
+	asteroid.setHeading(heading);
 
 	asteroid.hull.max = 2000;
 	asteroid.hull.current = 2000;
@@ -115,7 +115,7 @@ export function createAsteroid(x: number, y: number): ShipState {
 }
 
 function createWeaponSlot(
-	mount: { id: string; facing: number; arc: number },
+	mount: { id: string; facing: number; arc: number; position?: { x: number; y: number } },
 	spec: {
 		id: string;
 		name: string;
@@ -132,6 +132,8 @@ function createWeaponSlot(
 ): WeaponSlot {
 	const weapon = new WeaponSlot();
 	weapon.mountId = mount.id;
+	weapon.mountOffsetX = mount.position?.x ?? 0;
+	weapon.mountOffsetY = mount.position?.y ?? 0;
 	weapon.weaponSpecId = spec.id;
 	weapon.instanceId = `${mount.id}_${Date.now()}`;
 	weapon.name = spec.name;

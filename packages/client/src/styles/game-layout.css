@@ -520,6 +520,16 @@
   color: var(--game-accent-purple);
 }
 
+.action-btn--turn {
+  width: 100%;
+  flex-direction: row;
+  justify-content: center;
+  gap: 6px;
+  background-color: rgba(46, 204, 113, 0.16);
+  border-color: rgba(46, 204, 113, 0.45);
+  color: var(--game-accent-green);
+}
+
 /* 状态指示 */
 .action-group--status {
   padding: 8px 10px;
