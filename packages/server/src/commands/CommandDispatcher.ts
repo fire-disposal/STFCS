@@ -32,6 +32,33 @@ export class CommandDispatcher {
 		return ((value % 360) + 360) % 360;
 	}
 
+	private getWeaponWorldPosition(ship: ShipState, weapon: WeaponSlot): { x: number; y: number } {
+		const headingRad = (ship.transform.heading * Math.PI) / 180;
+		const localX = weapon.mountOffsetX ?? 0;
+		const localY = weapon.mountOffsetY ?? 0;
+		const worldX = ship.transform.x + localX * Math.cos(headingRad) - localY * Math.sin(headingRad);
+		const worldY = ship.transform.y + localX * Math.sin(headingRad) + localY * Math.cos(headingRad);
+		return { x: worldX, y: worldY };
+	}
+
+	private assertTargetInWeaponArc(
+		attacker: ShipState,
+		weapon: WeaponSlot,
+		target: ShipState
+	): { distanceToMuzzle: number; angleToTarget: number } {
+		const muzzle = this.getWeaponWorldPosition(attacker, weapon);
+		const angleToTarget = angleBetween(muzzle.x, muzzle.y, target.transform.x, target.transform.y);
+		const weaponFacing = this.normalizeHeading(attacker.transform.heading + weapon.mountFacing);
+		const arcHalf = Math.max(0, weapon.arc) / 2;
+		const diff = angleDifference(weaponFacing, angleToTarget);
+		if (diff > arcHalf) {
+			throw new Error(`目标不在武器射界内: 偏差 ${diff.toFixed(1)}° > ${arcHalf.toFixed(1)}°`);
+		}
+
+		const dist = distance(muzzle.x, muzzle.y, target.transform.x, target.transform.y);
+		return { distanceToMuzzle: dist, angleToTarget };
+	}
+
 	private applyTranslation(
 		x: number,
 		y: number,
@@ -234,12 +261,7 @@ export class CommandDispatcher {
 		if (weapon.state !== WeaponState.READY) throw new Error(`武器状态: ${weapon.state}`);
 		if (weapon.hasFiredThisTurn) throw new Error("本回合已射击");
 
-		const dist = distance(
-			attacker.transform.x,
-			attacker.transform.y,
-			target.transform.x,
-			target.transform.y
-		);
+		const { distanceToMuzzle: dist } = this.assertTargetInWeaponArc(attacker, weapon, target);
 		if (dist > weapon.range) throw new Error(`超出射程: ${dist} > ${weapon.range}`);
 
 		if (weapon.fluxCost > 0) {
@@ -252,6 +274,14 @@ export class CommandDispatcher {
 		weapon.cooldownRemaining = weapon.cooldownMax || GAME_CONFIG.DEFAULT_COOLDOWN;
 		weapon.state = WeaponState.COOLDOWN;
 		weapon.hasFiredThisTurn = true;
+		attacker.hasFired = true;
+		if (weapon.maxAmmo > 0) {
+			weapon.currentAmmo = Math.max(0, weapon.currentAmmo - 1);
+			if (weapon.currentAmmo <= 0) {
+				weapon.state = WeaponState.OUT_OF_AMMO;
+				weapon.cooldownRemaining = 0;
+			}
+		}
 		this.applyDamage(attacker, weapon, target);
 	}
 

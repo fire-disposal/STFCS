@@ -4,7 +4,7 @@
 
 import { Client, Room } from "@colyseus/core";
 import type { CreateObjectPayload, FactionValue, RoomMetadata } from "@vt/types";
-import { Faction, GamePhase, PlayerRole } from "@vt/types";
+import { Faction, GamePhase, PlayerRole, WeaponState } from "@vt/types";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { toGameLoadedDto, toGameSavedDto, toIdentityDto, toRoleDto, toShipCreatedDto } from "../dto/index.js";
 import { createAsteroid, createShip, createStation } from "../factory/ShipFactory.js";
@@ -99,6 +99,12 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			if (ship.isDestroyed) return;
 			ship.weapons.forEach((w: WeaponSlot) => {
 				w.cooldownRemaining = Math.max(0, w.cooldownRemaining - dt);
+				if (w.state === WeaponState.COOLDOWN && w.cooldownRemaining <= 0) {
+					w.state =
+						w.currentAmmo === 0 && w.maxAmmo > 0
+							? WeaponState.OUT_OF_AMMO
+							: WeaponState.READY;
+				}
 			});
 			if (ship.isOverloaded && ship.overloadTime > 0) {
 				ship.overloadTime -= dt;
@@ -197,9 +203,12 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 				? createShip(p.hullId, p.x, p.y, heading, faction, p.ownerId)
 				: p.type === "station"
 					? createStation(p.x, p.y, heading)
-					: createAsteroid(p.x, p.y);
+					: createAsteroid(p.x, p.y, heading);
 		if (ship) {
 			ship.faction = faction;
+			if (p.name) {
+				ship.name = p.name;
+			}
 			this.state.ships.set(ship.id, ship);
 			this.broadcast(
 				"ship_created",

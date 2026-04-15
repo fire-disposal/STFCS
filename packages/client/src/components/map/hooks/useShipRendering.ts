@@ -76,6 +76,7 @@ export function useShipRendering(
 			if (!currentIds.has(id)) {
 				layers.ships.removeChild(item.token);
 				layers.labels.removeChild(item.label);
+				layers.labels.removeChild(item.hpBar);
 				cache.delete(id);
 			}
 		}
@@ -102,6 +103,11 @@ export function useShipRendering(
 				const dFlux = Math.abs(ship.flux.total - lastState.flux);
 				const isSelectedChanged = isSelected !== cached.isSelected;
 
+				// 视图旋转变化也需要更新（血条朝向补偿）
+				const dViewRotation = Math.abs(
+					(context.viewRotation ?? 0) - (cached.hpBar.rotation * 180) / Math.PI * -1
+				);
+
 				// 只有显著变化才更新
 				if (
 					dx > POSITION_THRESHOLD ||
@@ -109,7 +115,8 @@ export function useShipRendering(
 					dHeading > HEADING_THRESHOLD ||
 					dHp > HP_THRESHOLD ||
 					dFlux > FLUX_THRESHOLD ||
-					isSelectedChanged
+					isSelectedChanged ||
+					dViewRotation > 0.2
 				) {
 					hasChanges = true;
 					updates.push({ ship, cached });
@@ -129,7 +136,7 @@ export function useShipRendering(
 				const radius = 20;
 
 				if (cached) {
-					updateExistingShip(cached, ship, isSelected, color, radius);
+					updateExistingShip(cached, ship, isSelected, color, radius, contextRef);
 				} else {
 					createNewShip(layers, cache, ship, isSelected, color, radius, optionsRef, contextRef);
 				}
@@ -149,7 +156,8 @@ function updateExistingShip(
 	ship: ShipState,
 	isSelected: boolean,
 	color: number,
-	radius: number
+	radius: number,
+	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
 ) {
 	// 更新位置（总是需要）
 	cached.token.position.set(ship.transform.x, ship.transform.y);
@@ -170,17 +178,17 @@ function updateExistingShip(
 			});
 	}
 
-	// 只在 HP 变化超过阈值时更新血条（使用新的 hull.percent）
+	// 只在 HP 变化超过阈值时更新血条（屏幕空间保持水平，不跟随舰船旋转）
 	const hpPercent = ship.hull.percent / 100;
 	const hpBarWidth = 48 * hpPercent;
 
 	// 检查血条是否需要更新
 	const currentHpBar = cached.hpBar.children[1] as any;
 	if (!currentHpBar || Math.abs(currentHpBar.width - hpBarWidth) > HP_THRESHOLD) {
-		cached.hpBar.clear();
-		cached.hpBar.rect(-24, radius + 8, 48, 5).fill({ color: 0x000000, alpha: 0.45 });
-		cached.hpBar.rect(-24, radius + 8, hpBarWidth, 5).fill({ color: 0x3ddb6f, alpha: 0.95 });
+		drawHpBar(cached.hpBar, hpPercent);
 	}
+	cached.hpBar.position.set(ship.transform.x, ship.transform.y - radius - 24);
+	cached.hpBar.rotation = -((contextRef.current.viewRotation ?? 0) * Math.PI) / 180;
 
 	// 只在文本变化时更新标签（使用新的 flux.total）
 	const newText = `${ship.id.slice(-6)}  F:${Math.round(ship.flux.total)}/${Math.round(ship.flux.max)}`;
@@ -196,6 +204,30 @@ function updateExistingShip(
 		hp: ship.hull.current,
 		flux: ship.flux.total,
 	};
+}
+
+function drawHpBar(target: Graphics, hpPercent: number): void {
+	target.clear();
+	const width = 58;
+	const height = 8;
+	const fillWidth = Math.max(0, Math.min(1, hpPercent)) * width;
+	const hpColor = hpPercent <= 0.3 ? 0xff6f8f : hpPercent <= 0.6 ? 0xffd166 : 0x49f88f;
+
+	// 背景
+	target.roundRect(-width / 2, -height / 2, width, height, 3).fill({ color: 0x040914, alpha: 0.9 });
+	// 主填充
+	target.roundRect(-width / 2, -height / 2, fillWidth, height, 3).fill({ color: hpColor, alpha: 0.96 });
+	// 扫描线高光
+	target.rect(-width / 2, -height / 2, fillWidth, Math.max(2, height * 0.25)).fill({
+		color: 0xffffff,
+		alpha: 0.22,
+	});
+	// 边框
+	target.roundRect(-width / 2, -height / 2, width, height, 3).stroke({
+		color: 0xb9dbff,
+		alpha: 0.75,
+		width: 1.3,
+	});
 }
 
 function createNewShip(
@@ -254,9 +286,9 @@ function createNewShip(
 	// 使用新的 hull.percent
 	const hpPercent = ship.hull.percent / 100;
 	const hpBar = new Graphics();
-	hpBar.rect(-24, radius + 8, 48, 5).fill({ color: 0x000000, alpha: 0.45 });
-	hpBar.rect(-24, radius + 8, 48 * hpPercent, 5).fill({ color: 0x3ddb6f, alpha: 0.95 });
-	token.addChild(hpBar);
+	drawHpBar(hpBar, hpPercent);
+	hpBar.position.set(ship.transform.x, ship.transform.y - radius - 24);
+	hpBar.rotation = -((contextRef.current.viewRotation ?? 0) * Math.PI) / 180;
 
 	const label = new Text({
 		text: `${ship.id.slice(-6)}  F:${Math.round(ship.flux.total)}/${Math.round(ship.flux.max)}`,
@@ -266,6 +298,7 @@ function createNewShip(
 	label.position.set(ship.transform.x, ship.transform.y - radius - 8);
 
 	layers.ships.addChild(token);
+	layers.labels.addChild(hpBar);
 	layers.labels.addChild(label);
 	cache.set(ship.id, { token, label, hpBar, isSelected });
 }

@@ -27,6 +27,7 @@ interface RightSidePanelProps {
 		heading: number;
 		faction: FactionValue;
 		ownerId?: string;
+		name?: string;
 	}) => void;
 	onCreateTestShip: (faction: "player" | "dm", x: number, y: number) => void;
 	onClearOverload: (shipId: string) => void;
