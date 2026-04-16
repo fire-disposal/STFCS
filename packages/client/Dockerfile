@@ -4,21 +4,24 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY packages/types/package.json ./packages/types/
 COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
+COPY packages/server/package.json ./packages/server/
+COPY packages/schema-types/package.json ./packages/schema-types/
 COPY packages/client/package.json ./packages/client/
 
 RUN pnpm install --frozen-lockfile
 
-COPY packages/types ./packages/types
 COPY packages/data ./packages/data
 COPY packages/rules ./packages/rules
+COPY packages/server ./packages/server
+COPY packages/schema-types ./packages/schema-types
 COPY packages/client ./packages/client
 
-RUN pnpm --filter @vt/types build
 RUN pnpm --filter @vt/data build
 RUN pnpm --filter @vt/rules build
+RUN pnpm --filter @vt/server build
+RUN pnpm --filter @vt/schema-types build
 RUN pnpm --filter client build
 
 FROM nginx:alpine AS runner

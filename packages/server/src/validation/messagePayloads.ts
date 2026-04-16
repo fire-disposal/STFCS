@@ -1,8 +1,10 @@
 /**
  * Payload 验证器
+ *
+ * 从 commands/types.ts 导入 Payload 类型
  */
 
-import {
+import type {
 	AdvanceMovePhasePayload,
 	AssignShipPayload,
 	ClearOverloadPayload,
@@ -14,10 +16,9 @@ import {
 	ToggleReadyPayload,
 	ToggleShieldPayload,
 	VentFluxPayload,
-	MovePhase,
-	Faction,
-} from "../schema/types.js";
-import type { FactionValue, MovePhaseValue } from "../schema/types.js";
+} from "../commands/types.js";
+import { MovePhase, Faction } from "../schema/types.js";
+import type { FactionValue } from "../schema/types.js";
 
 const MOVE_PHASES = Object.values(MovePhase);
 type FactionLiteral = Exclude<CreateObjectPayload["faction"], undefined>;
@@ -47,14 +48,14 @@ const asMovePhase = (value: unknown): MovePhaseLiteral | null =>
 		? (value as MovePhaseLiteral)
 		: null;
 
-const asFaction = (
-	value: unknown
-): CreateObjectPayload["faction"] | null =>
+const asFaction = (value: unknown): CreateObjectPayload["faction"] | null =>
 	typeof value === "string" && FACTIONS.has(value as FactionLiteral)
 		? (value as FactionLiteral)
 		: null;
 
-const parseMovementPlan = (value: unknown): MoveTokenPayload["movementPlan"] | null => {
+const parseMovementPlan = (
+	value: unknown
+): MoveTokenPayload["movementPlan"] | null => {
 	if (!isRecord(value)) return null;
 	const phaseAForward = asFiniteNumber(value.phaseAForward);
 	const phaseAStrafe = asFiniteNumber(value.phaseAStrafe);
@@ -248,8 +249,8 @@ export const parseCreateObjectPayload = (payload: unknown): CreateObjectPayload 
 				value.faction === undefined ? undefined : asFaction(value.faction);
 			if (value.faction !== undefined && !faction) return null;
 
-				const result: CreateObjectPayload = { type, x, y };
-				if (faction !== undefined && faction !== null) result.faction = faction;
+			const result: CreateObjectPayload = { type, x, y };
+			if (faction !== undefined && faction !== null) result.faction = faction;
 			if (heading !== undefined && heading !== null) result.heading = heading;
 			if (hullId !== undefined && hullId !== null) result.hullId = hullId;
 			if (ownerId !== undefined && ownerId !== null) result.ownerId = ownerId;
@@ -265,10 +266,10 @@ export const parseSetArmorPayload = (payload: unknown): SetArmorPayload =>
 		(value) => {
 			if (!isRecord(value)) return null;
 			const shipId = asString(value.shipId);
-			const section = asInteger(value.section);
+			const quadrant = asInteger(value.quadrant);
 			const armorValue = asFiniteNumber(value.value);
-			if (!shipId || section === null || armorValue === null) return null;
-			return { shipId, section, value: armorValue };
+			if (!shipId || quadrant === null || quadrant < 0 || quadrant > 5 || armorValue === null) return null;
+			return { shipId, quadrant, value: armorValue };
 		},
 		"护甲设置命令格式错误"
 	);
@@ -285,18 +286,6 @@ export const parseNetPingPayload = (payload: unknown): NetPingPayload =>
 			return { seq, clientSentAt };
 		},
 		"网络心跳命令格式错误"
-	);
-
-export const parseChatPayload = (payload: unknown): { content: string } =>
-	parseMessage(
-		payload,
-		(value) => {
-			if (!isRecord(value)) return null;
-			const content = asString(value.content);
-			if (!content) return null;
-			return { content };
-		},
-		"聊天命令格式错误"
 	);
 
 export const parseUpdateProfilePayload = (

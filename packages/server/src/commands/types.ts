@@ -3,20 +3,13 @@
  *
  * Payload 内聚：命令 Payload 类型定义在 commands 目录下
  * 与 handler 文件放在一起，保持内聚
+ *
+ * 这是客户端请求的唯一 Payload 类型来源
  */
 
-import type {
-	FactionValue,
-	MovePhaseValue,
-	MovementPlan,
-	ConnectionQualityValue,
-} from "../schema/types.js";
+import type { FactionValue, MovePhaseValue, MovementPlan } from "../schema/types.js";
 
 // ==================== 移动命令 ====================
-
-export interface ChatPayload {
-	content: string;
-}
 
 export interface MoveTokenPayload {
 	shipId: string;
@@ -58,7 +51,7 @@ export interface ClearOverloadPayload {
 
 export interface SetArmorPayload {
 	shipId: string;
-	section: number;
+	quadrant: number; // 0-5 对应 ArmorQuadrant
 	value: number;
 }
 
@@ -103,12 +96,4 @@ export interface CreateObjectPayload {
 export interface NetPingPayload {
 	seq: number;
 	clientSentAt: number;
-}
-
-export interface NetPongPayload {
-	seq: number;
-	serverTime: number;
-	pingMs: number;
-	jitterMs: number;
-	quality: ConnectionQualityValue;
 }

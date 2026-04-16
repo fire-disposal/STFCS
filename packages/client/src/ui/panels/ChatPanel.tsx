@@ -1,23 +1,15 @@
 /**
  * 聊天面板组件
  *
- * 显示在右侧面板区域，提供：
- * - 聊天消息显示
- * - 消息发送
- * - 系统消息集成
- *
- * 性能优化：
- * - 只渲染最近 50 条消息
- * - 自动滚动优化
+ * 使用本地消息管理（LocalChatMessage），不依赖 Schema
  */
 
 import { useGameStore } from "@/state/stores";
-import type { ChatMessage } from "@/sync/types";
 import type { Room } from "@colyseus/sdk";
 import type { GameRoomState } from "@/sync/types";
 import React, { useState, useRef, useEffect } from "react";
 
-const MAX_MESSAGES = 50; // 最多显示 50 条
+const MAX_MESSAGES = 50;
 
 const styles = {
 	container: {
@@ -33,27 +25,11 @@ const styles = {
 		padding: "12px 16px",
 		backgroundColor: "rgba(26, 45, 66, 0.9)",
 		borderBottom: "1px solid #2b4261",
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "space-between",
 	},
 	title: {
 		fontSize: "13px",
 		fontWeight: "bold" as const,
 		color: "#cfe8ff",
-		display: "flex",
-		alignItems: "center",
-		gap: "8px",
-	},
-	unreadBadge: {
-		backgroundColor: "#4a9eff",
-		color: "white",
-		fontSize: "10px",
-		fontWeight: "bold" as const,
-		padding: "2px 6px",
-		borderRadius: "10px",
-		minWidth: "18px",
-		textAlign: "center" as const,
 	},
 	messageList: {
 		flex: 1,
@@ -72,10 +48,6 @@ const styles = {
 	messageSystem: {
 		backgroundColor: "rgba(74, 158, 255, 0.15)",
 		border: "1px solid rgba(74, 158, 255, 0.3)",
-	},
-	messageCombat: {
-		backgroundColor: "rgba(255, 100, 100, 0.1)",
-		border: "1px solid rgba(255, 100, 100, 0.3)",
 	},
 	messageHeader: {
 		display: "flex",
@@ -124,7 +96,6 @@ const styles = {
 		fontSize: "12px",
 		fontWeight: "bold" as const,
 		cursor: "pointer",
-		transition: "all 0.2s",
 	},
 	emptyState: {
 		padding: "24px",
@@ -145,65 +116,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ room, playerName }) => {
 	const [messageInput, setMessageInput] = useState("");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-	const scrollToBottom = () => {
+	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	};
-
-	useEffect(() => {
-		scrollToBottom();
 	}, [chatMessages]);
-
-	useEffect(() => {
-		if (!room) return;
-
-		room.onMessage("chat", (payload: { senderId: string; senderName: string; content: string }) => {
-			addChatMessage({
-				id: `msg_${Date.now()}_${Math.random()}`,
-				senderId: payload.senderId,
-				senderName: payload.senderName,
-				content: payload.content,
-				timestamp: Date.now(),
-				type: "chat" as any,
-			});
-		});
-
-		room.onMessage("system", (payload: { message: string }) => {
-			addChatMessage({
-				id: `sys_${Date.now()}`,
-				senderId: "system",
-				senderName: "系统",
-				content: payload.message,
-				timestamp: Date.now(),
-				type: "system" as any,
-			});
-		});
-
-		return () => {};
-	}, [room, addChatMessage]);
 
 	const handleSendMessage = () => {
 		const content = messageInput.trim();
-		if (!content || !room) return;
+		if (!content) return;
 
-		try {
-			room.send("chat", { content, playerName });
+		addChatMessage({
+			id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+			senderId: "local",
+			senderName: playerName,
+			content,
+			timestamp: Date.now(),
+			type: "chat",
+		});
 
-			addChatMessage({
-				id: `msg_${Date.now()}`,
-				senderId: "local",
-				senderName: playerName,
-				content,
-				timestamp: Date.now(),
-				type: "chat" as any,
-			});
-
-			setMessageInput("");
-		} catch (error) {
-			console.error("[Chat] Failed to send message:", error);
-		}
+		setMessageInput("");
 	};
 
-	// 处理键盘事件
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
@@ -211,60 +143,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ room, playerName }) => {
 		}
 	};
 
-	// 格式化时间
 	const formatTime = (timestamp: number) => {
 		const date = new Date(timestamp);
-		return date.toLocaleTimeString("zh-CN", {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	};
-
-	// 获取消息样式
-	const getMessageStyle = (message: any) => {
-		let style = { ...styles.message };
-		if (message.type === "system") {
-			style = { ...style, ...styles.messageSystem };
-		} else if (message.type === "combat") {
-			style = { ...style, ...styles.messageCombat };
-		}
-		return style;
+		return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 	};
 
 	return (
 		<div style={styles.container}>
-			{/* 头部 */}
 			<div style={styles.header}>
-				<div style={styles.title}>
-					💬 聊天
-				</div>
+				<div style={styles.title}>💬 聊天</div>
 			</div>
 
-			{/* 消息列表 */}
 			<div style={styles.messageList}>
 				{chatMessages.length === 0 ? (
-					<div style={styles.emptyState}>
-						暂无消息
-						<br />
-						<span style={{ fontSize: "10px", color: "#4a5a6a" }}>按 Enter 发送消息</span>
-					</div>
+					<div style={styles.emptyState}>暂无消息</div>
 				) : (
-					chatMessages
-						.slice(-MAX_MESSAGES)
-						.map((msg) => (
-							<div key={msg.id} style={getMessageStyle(msg)}>
-								<div style={styles.messageHeader}>
-									<span style={styles.senderName}>{msg.senderName}</span>
-									<span style={styles.timestamp}>{formatTime(msg.timestamp)}</span>
-								</div>
-								<div style={styles.messageContent}>{msg.content}</div>
+					chatMessages.slice(-MAX_MESSAGES).map((msg) => (
+						<div
+							key={msg.id}
+							style={msg.type === "system" ? { ...styles.message, ...styles.messageSystem } : styles.message}
+						>
+							<div style={styles.messageHeader}>
+								<span style={styles.senderName}>{msg.senderName}</span>
+								<span style={styles.timestamp}>{formatTime(msg.timestamp)}</span>
 							</div>
-						))
+							<div style={styles.messageContent}>{msg.content}</div>
+						</div>
+					))
 				)}
 				<div ref={messagesEndRef} />
 			</div>
 
-			{/* 输入区域 */}
 			<div style={styles.inputArea}>
 				<input
 					style={styles.input}
@@ -274,13 +183,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ room, playerName }) => {
 					onKeyDown={handleKeyDown}
 					placeholder="输入消息... (Enter 发送)"
 					maxLength={200}
-					disabled={!room}
 				/>
-				<button
-					style={styles.button}
-					onClick={handleSendMessage}
-					disabled={!room || !messageInput.trim()}
-				>
+				<button style={styles.button} onClick={handleSendMessage} disabled={!messageInput.trim()}>
 					发送
 				</button>
 			</div>

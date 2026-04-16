@@ -36,6 +36,7 @@ const normalizeMetadata = (
 	const phase = toStringValue(record.phase, GamePhase.DEPLOYMENT);
 	const ownerId = toStringValue(record.ownerId, "");
 	const ownerShortId = toNumberValue(record.ownerShortId, 0);
+	const turnCount = toNumberValue(record.turnCount, 0);
 
 	return {
 		roomType,
@@ -46,6 +47,7 @@ const normalizeMetadata = (
 		maxPlayers: toNumberValue(record.maxPlayers, fallbackMaxPlayers),
 		isPrivate: toBooleanValue(record.isPrivate, false),
 		createdAt: toNumberValue(record.createdAt, 0),
+		turnCount,
 	};
 };
 

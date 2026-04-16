@@ -2,38 +2,30 @@
  * 存档 DTO 转换器
  */
 
-import type { GameSave, SaveSummary } from "../schema/types.js";
+import type { GameSave, SaveMetadata, SaveSummary } from "../schema/types.js";
 
-const toSaveSummaryDto = (summary: SaveSummary): SaveSummary => ({
-	saveId: summary.saveId,
-	saveName: summary.saveName,
-	roomName: summary.roomName,
-	playerCount: summary.playerCount,
-	shipCount: summary.shipCount,
-	turnCount: summary.turnCount,
-	currentPhase: summary.currentPhase,
-	createdAt: summary.createdAt,
-	updatedAt: summary.updatedAt,
-	fileSize: summary.fileSize,
-});
-
-export const toSaveListDto = (saves: SaveSummary[]): SaveSummary[] =>
-	saves.map(toSaveSummaryDto);
-
-export const toSaveDetailDto = (save: GameSave): GameSave => ({
-	saveId: save.saveId,
-	saveName: save.saveName,
+export const toSaveMetadataDto = (save: GameSave): SaveMetadata => ({
+	id: save.id,
+	name: save.name,
 	createdAt: save.createdAt,
 	updatedAt: save.updatedAt,
-	version: save.version,
-	roomId: save.roomId,
-	roomName: save.roomName,
-	maxPlayers: save.maxPlayers,
-	isPrivate: save.isPrivate,
-	currentPhase: save.currentPhase,
 	turnCount: save.turnCount,
+});
+
+export const toSaveListDto = (saves: GameSave[]): SaveSummary => ({
+	saves: saves.map(toSaveMetadataDto),
+	total: saves.length,
+});
+
+export const toSaveDetailDto = (save: GameSave): GameSave => ({
+	id: save.id,
+	name: save.name,
+	createdAt: save.createdAt,
+	updatedAt: save.updatedAt,
+	turnCount: save.turnCount,
+	currentPhase: save.currentPhase,
 	activeFaction: save.activeFaction,
-	players: save.players,
 	ships: save.ships,
-	chatHistory: save.chatHistory,
+	mapWidth: save.mapWidth,
+	mapHeight: save.mapHeight,
 });

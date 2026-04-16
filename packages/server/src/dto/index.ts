@@ -1,6 +1,5 @@
 export { toMatchmakeRoomDto } from "./roomDto.js";
-export { toHealthDto } from "./healthDto.js";
-;
+export { toHealthStatusDto } from "./healthDto.js";
 export {
 	toErrorDto,
 	toGameLoadedDto,
@@ -10,5 +9,5 @@ export {
 	toPhaseChangeDto,
 	toRoleDto,
 	toRoomKickedDto,
-	
 } from "./eventDto.js";
+export { toSaveListDto, toSaveDetailDto, toSaveMetadataDto } from "./saveDto.js";

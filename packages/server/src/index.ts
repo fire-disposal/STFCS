@@ -6,7 +6,6 @@
 export {
 	GameRoomState,
 	PlayerState,
-	ChatMessage,
 	ShipState,
 	WeaponSlot,
 	Transform,
@@ -31,7 +30,6 @@ export type {
 	FactionValue,
 	PlayerRoleValue,
 	ConnectionQualityValue,
-	ChatMessageTypeValue,
 	GamePhaseValue,
 	TurnPhaseValue,
 	MovePhaseValue,
@@ -40,22 +38,27 @@ export type {
 	TokenTurnStateValue,
 	ClientCommandValue,
 	Point,
-	CameraState,
-	PlayerCamera,
 	SchemaMap,
 	SchemaArray,
 	MovementPlan,
-	MovementValidation,
-	FactionTurnState,
-	TokenInfo,
-	AttackPreviewResult,
-	CombatResult,
 	WeaponSave,
 	ShipSave,
-	ChatMessageSave,
 	GameSave,
 	SaveMetadata,
 	SaveSummary,
+	// DTO 类型
+	ErrorDTO,
+	RoleDTO,
+	IdentityDTO,
+	GameSavedDTO,
+	GameLoadedDTO,
+	PhaseChangeDTO,
+	RoomKickedDTO,
+	ShipCreatedDTO,
+	RoomMetadata,
+	RoomListItemDTO,
+	HealthStatusDTO,
+	NetPongPayload,
 } from "./schema/types.js";
 
 // 枚举常量导出
@@ -74,7 +77,6 @@ export {
 	Faction,
 	PlayerRole,
 	ConnectionQuality,
-	ChatMessageType,
 	GamePhase,
 	TurnPhase,
 	MovePhase,
@@ -84,9 +86,8 @@ export {
 	ClientCommand,
 } from "./schema/types.js";
 
-// Payload 类型导出
+// Payload 类型导出（客户端请求）
 export type {
-	ChatPayload,
 	MoveTokenPayload,
 	ToggleShieldPayload,
 	FireWeaponPayload,
@@ -99,12 +100,15 @@ export type {
 	NextPhasePayload,
 	CreateObjectPayload,
 	NetPingPayload,
-	NetPongPayload,
 } from "./commands/types.js";
+
+// 服务层导出
+export { PlayerService, GameService, SaveService, saveService } from "./services/index.js";
+export type { PlayerProfile, SaveInfo } from "./services/index.js";
 
 // 服务器启动代码
 import { createServer } from "http";
-import { Server, ServerOptions } from "@colyseus/core";
+import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import cors from "cors";
 import express from "express";

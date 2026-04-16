@@ -23,7 +23,7 @@ export const LanguageSwitcher: React.FC = () => {
         className="language-select"
         aria-label="Select language"
       >
-        {SUPPORTED_LANGUAGES.map((lang) => (
+        {SUPPORTED_LANGUAGES.map((lang: { value: string; label: string; flag: string }) => (
           <option key={lang.value} value={lang.value}>
             {lang.flag} {lang.label}
           </option>

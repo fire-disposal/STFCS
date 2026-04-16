@@ -1,9 +1,101 @@
 # Schema 即类型架构迁移方案
 
-**版本**: 1.0  
-**日期**: 2026-04-15  
-**状态**: 待执行  
+**版本**: 1.3
+**日期**: 2026-04-15
+**状态**: 进行中（类型重构阶段）
 **目标**: 彻底迁移，不向后兼容，速度优先
+**最后更新**: 2026-04-16
+
+---
+
+## 0. 当前迁移进度
+
+### 总体进度概览
+
+| 阶段 | 状态 | 完成度 |
+|------|------|--------|
+| 阶段 1: 基础设施准备 | ✅ 完成 | 100% |
+| 阶段 2: 服务端迁移 | ⚠️ 部分完成 | 80% |
+| 阶段 3: Data & Rules 包迁移 | ✅ 完成 | 100% |
+| 阶段 4: 客户端类型迁移 | ⚠️ 部分完成 | 70% |
+| 阶段 5: Redux 迁移到 Zustand | ✅ 完成 | 100% |
+| 阶段 6: 前端结构重构 | ✅ 完成 | 100% |
+| 阶段 7: 删除 @vt/types 包 | ✅ 完成 | 100% |
+| 阶段 8: 类型业务场景覆盖 | 🔲 进行中 | 20% |
+| 阶段 9: 端到端测试 | 🔲 待执行 | 0% |
+
+### 架构调整（2026-04-16）
+
+由于前端不能直接依赖后端运行时，原方案已调整：
+
+**新架构**:
+```
+@vt/data              (无依赖，枚举 + 静态数据类型)
+@vt/rules             (依赖 @vt/data)
+@vt/server            (依赖 @vt/data + @vt/rules)
+@vt/schema-types      (依赖 @vt/server，自动推导 Schema 类型)
+@vt/client            (依赖 @vt/schema-types + @vt/data)
+```
+
+**关键变更**:
+- ✅ 新建 `@vt/schema-types` 包，从 Schema 类自动推导类型
+- ✅ 前端改用 `@vt/schema-types`，不再直接依赖 `@vt/server`
+- ✅ 类型 100% 同步，零维护成本（Schema 变化自动反映）
+- ✅ Dockerfile 构建顺序已更新
+- ✅ ChatMessage 功能已移除（按用户要求）
+
+### 已完成的关键里程碑
+
+- ✅ `packages/types` 目录已删除
+- ✅ `@vt/data` 包无外部依赖，独立运行
+- ✅ `@vt/rules` 包只依赖 `@vt/data`
+- ✅ `@vt/server` 包构建成功
+- ✅ `@vt/schema-types` 包创建完成，构建成功
+- ✅ Redux 已完全移除，Zustand 正常工作
+- ✅ ChatMessage 相关功能已移除
+
+### 阶段 8：类型业务场景覆盖 - 待修复项
+
+**Schema 方法缺失（需添加到 ShipStateSchema.ts）**:
+
+| 方法 | 当前状态 | 修复方式 |
+|------|----------|----------|
+| `ship.setPosition(x, y)` | ❌ 不存在 | 添加到 Transform 类 |
+| `ship.setHeading(h)` | ❌ 不存在 | 添加到 Transform 类 |
+| `shield.setOrientation(h)` | ❌ 不存在 | 添加到 ShieldState 类 |
+| `ship.movePhaseAX` | ❌ 字段名错误 | 使用 `phaseAForwardUsed` |
+| `ship.movePhaseAStrafe` | ❌ 字段名错误 | 使用 `phaseAStrafeUsed` |
+| `ship.turnAngle` | ❌ 不存在 | 使用 `phaseTurnUsed` |
+| `ship.movePhaseCX` | ❌ 字段名错误 | 使用 `phaseCForwardUsed` |
+| `ship.movePhaseCStrafe` | ❌ 字段名错误 | 使用 `phaseCStrafeUsed` |
+
+**server 导入错误（需修复）**:
+
+| 文件 | 问题 | 修复方式 |
+|------|------|----------|
+| `dto/index.ts` | 导出 `toHealthDto` 不存在 | 改为 `toHealthStatusDto` |
+| `rooms/BattleRoom.ts` | 导入 `CreateObjectPayload` 位置错误 | 从 `commands/types.ts` 导入 |
+| `rooms/BattleRoom.ts` | `RoomEventLogger` 构造函数参数 | 移除参数 |
+| `rooms/BattleRoom.ts` | `serializeGameSave` 参数数量 | 减少参数 |
+| `services/SaveStore.ts` | `GameSave` 字段名错误 | 使用 `id` 替代 `saveId` |
+
+**client 类型错误（需修复）**:
+
+| 文件 | 问题 | 修复方式 |
+|------|------|----------|
+| `ui/panels/ChatPanel.tsx` | 导入 `ChatMessage` | 移除文件或重构 |
+| `pages/GamePage.tsx` | `player` 参数类型 | 添加类型注解 |
+| `renderer/entities/WeaponArcRenderer.ts` | `w`/`weaponSlot` 类型 | 添加类型注解 |
+| `ui/overlays/WeaponArcOverlay.tsx` | 参数类型 | 添加类型注解 |
+| `ui/panels/BattleCommandPanel.tsx` | `weapon` 类型 | 添加类型注解 |
+
+### 下一步行动
+
+1. **修复 Schema 方法** - 在 Transform/ShieldState 添加缺失方法
+2. **修复 server 导入** - 更正所有导入路径和字段名
+3. **修复 client 类型** - 移除 ChatPanel，添加类型注解
+4. **执行构建验证** - `pnpm build` 全项目通过
+5. **端到端测试** - 启动服务验证功能
 
 ---
 

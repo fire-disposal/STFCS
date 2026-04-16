@@ -2,7 +2,7 @@
  * Schema 导出
  */
 
-export { GameRoomState, PlayerState, ChatMessage } from "./GameSchema.js";
+export { GameRoomState, PlayerState } from "./GameSchema.js";
 export {
 	ShipState,
 	WeaponSlot,

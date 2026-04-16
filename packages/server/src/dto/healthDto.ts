@@ -1,10 +1,10 @@
 /**
- * 健康检查 DTO
+ * 健康检查 DTO 转换器
  */
 
 import type { HealthStatusDTO } from "../schema/types.js";
 
-export const toHealthDto = (startedAt: number, now = Date.now()): HealthStatusDTO => ({
+export const toHealthStatusDto = (uptimeSec: number): HealthStatusDTO => ({
 	status: "ok",
-	uptimeSec: Math.floor((now - startedAt) / 1000),
+	uptimeSec,
 });

@@ -36,7 +36,7 @@ export const toGameLoadedDto = (saveId: string, saveName: string): GameLoadedDTO
 	saveName,
 });
 
-const toShipCreatedDto = (
+export const toShipCreatedDto = (
 	shipId: string,
 	hullType: string,
 	x: number,

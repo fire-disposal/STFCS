@@ -32,8 +32,8 @@ export function createShip(
 	ship.width = spec.width;
 	ship.length = spec.length;
 
-	ship.setPosition(x, y);
-	ship.setHeading(heading);
+	ship.transform.setPosition(x, y);
+	ship.transform.setHeading(heading);
 
 	ship.hull.max = spec.hitPoints;
 	ship.hull.current = spec.hitPoints;
@@ -69,8 +69,8 @@ export function createStation(x: number, y: number, heading: number): ShipState 
 	station.id = `station_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 	station.hullType = "station";
 	station.name = "Space Station";
-	station.setPosition(x, y);
-	station.setHeading(heading);
+	station.transform.setPosition(x, y);
+	station.transform.setHeading(heading);
 
 	station.hull.max = 5000;
 	station.hull.current = 5000;
@@ -93,8 +93,8 @@ export function createAsteroid(x: number, y: number, heading = 0): ShipState {
 	asteroid.id = `asteroid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 	asteroid.hullType = "asteroid";
 	asteroid.name = "Asteroid";
-	asteroid.setPosition(x, y);
-	asteroid.setHeading(heading);
+	asteroid.transform.setPosition(x, y);
+	asteroid.transform.setHeading(heading);
 
 	asteroid.hull.max = 2000;
 	asteroid.hull.current = 2000;

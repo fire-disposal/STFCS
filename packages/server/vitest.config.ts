@@ -9,7 +9,6 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			"@vt/types": path.resolve(__dirname, "../types/src"),
 			"@vt/data": path.resolve(__dirname, "../data/src"),
 			"@vt/rules": path.resolve(__dirname, "../rules/src"),
 		},

@@ -1,10 +1,11 @@
 /**
  * STFCS 主应用
  *
- * 纯 WebSocket 版本：
- * - 房间列表通过 SystemService 获取
- * - 存档管理通过 SaveService 处理
- * - 用户管理通过 UserService 处理
+ * 架构：
+ * - NetworkManager: 连接管理
+ * - GameClient: 命令发送（通过 NetworkManager 获取）
+ * - UserService: 本地用户缓存
+ * - SystemService: 系统房间服务
  */
 
 import { AuthPage } from "@/pages/AuthPage";
@@ -28,8 +29,9 @@ const App: React.FC = () => {
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [pendingInviteRoomId, setPendingInviteRoomId] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
+	const roomsUnsubscribeRef = useRef<(() => void) | null>(null);
 
-	// 初始化 NetworkManager 和 SystemService
+	// 初始化
 	useEffect(() => {
 		const manager = new NetworkManager(DEFAULT_WS_URL);
 		const systemService = new SystemService(manager["client"]);
@@ -38,21 +40,17 @@ const App: React.FC = () => {
 		networkManagerRef.current = manager;
 		systemServiceRef.current = systemService;
 
-		// 恢复上次用户名
-		const restoredUser = localStorage.getItem("stfcs_username");
-
-		if (restoredUser) {
-			manager.setUser(restoredUser);
-			setUserName(restoredUser);
+		// 恢复用户
+		const restoredName = userService.restoreUsername();
+		if (restoredName) {
+			setUserName(restoredName);
 			setAppState("lobby");
-			console.log("[App] Restored user:", restoredUser);
-			notify.success(`欢迎回来，${restoredUser}！`);
+			notify.success(`欢迎回来，${restoredName}！`);
 		}
 
+		// 处理邀请链接
 		const inviteRoomId = new URLSearchParams(window.location.search).get("room");
-		if (inviteRoomId) {
-			setPendingInviteRoomId(inviteRoomId);
-		}
+		if (inviteRoomId) setPendingInviteRoomId(inviteRoomId);
 
 		return () => {
 			manager.dispose();
@@ -62,23 +60,14 @@ const App: React.FC = () => {
 
 	// 连接 SystemService 并订阅房间列表
 	useEffect(() => {
-		if (!systemServiceRef.current || appState !== "lobby") {
-			return;
-		}
+		if (!systemServiceRef.current || appState !== "lobby") return;
 
 		const systemService = systemServiceRef.current;
-
-		// 连接到系统房间
 		systemService
 			.connect()
 			.then(() => {
-				console.log("[App] SystemService connected");
-				// 订阅房间列表更新（SystemRoom 每 3 秒自动推送）
 				const unsubscribe = systemService.subscribeRooms(setRooms);
-				// 立即请求一次房间列表
 				systemService.requestRooms();
-
-				// 保存取消订阅函数
 				roomsUnsubscribeRef.current = unsubscribe;
 			})
 			.catch((error) => {
@@ -86,54 +75,32 @@ const App: React.FC = () => {
 				notify.error("连接系统服务失败");
 			});
 
-		return () => {
-			roomsUnsubscribeRef.current?.();
-		};
+		return () => roomsUnsubscribeRef.current?.();
 	}, [appState]);
 
-	// 房间订阅取消引用
-	const roomsUnsubscribeRef = useRef<(() => void) | null>(null);
-
-	// 监听业务错误消息（如：已拥有房间）
+	// 监听业务错误
 	useEffect(() => {
 		const handleBusinessError = (event: CustomEvent<string>) => {
-			console.log("[App] Business error received:", event.detail);
 			notify.error(event.detail);
 		};
-
 		window.addEventListener("stfcs-room-error", handleBusinessError as EventListener);
-
-		return () => {
-			window.removeEventListener("stfcs-room-error", handleBusinessError as EventListener);
-		};
+		return () => window.removeEventListener("stfcs-room-error", handleBusinessError as EventListener);
 	}, []);
 
-	// 认证成功处理
+	// 认证成功
 	const handleAuthenticated = useCallback((username: string) => {
 		setUserName(username);
-
-		// 设置到 UserService 和 NetworkManager
-		if (networkManagerRef.current) {
-			networkManagerRef.current.setUser(username);
-		}
-		userService.setUser(username);
-
+		userService.setUsername(username);
 		setAppState("lobby");
 		notify.success(`欢迎，${username}！`);
 	}, []);
 
-	// 登出处理
-	const handleLogout = useCallback(async () => {
+	// 登出
+	const handleLogout = useCallback(() => {
 		roomsUnsubscribeRef.current?.();
 		roomsUnsubscribeRef.current = null;
 
-		if (networkManagerRef.current) {
-			networkManagerRef.current.logout();
-		}
 		userService.logout();
-
-		// 清除用户名，但保留 shortId（可复用）
-		localStorage.removeItem("stfcs_username");
 		setUserName("");
 		setRooms([]);
 		setAppState("auth");
@@ -144,16 +111,19 @@ const App: React.FC = () => {
 	const handleCreateRoom = useCallback(async () => {
 		if (!networkManagerRef.current) return;
 
-		setIsLoading(true);
+		const username = userService.getUsername();
+		if (!username) {
+			notify.error("请先登录");
+			return;
+		}
 
+		setIsLoading(true);
 		try {
-			await networkManagerRef.current.createRoom();
+			await networkManagerRef.current.createRoom({ playerName: username });
 			notify.success("房间创建成功");
 			setAppState("game");
 		} catch (e) {
-			const errorMsg = e instanceof Error ? e.message : "创建房间失败";
-			console.error("[App] Create room error:", e);
-			notify.error(errorMsg);
+			notify.error(e instanceof Error ? e.message : "创建房间失败");
 		} finally {
 			setIsLoading(false);
 		}
@@ -163,85 +133,72 @@ const App: React.FC = () => {
 	const handleJoinRoom = useCallback(async (roomId: string) => {
 		if (!networkManagerRef.current) return;
 
-		setIsLoading(true);
+		const username = userService.getUsername();
+		if (!username) {
+			notify.error("请先登录");
+			return;
+		}
 
+		setIsLoading(true);
 		try {
-			await networkManagerRef.current.joinRoom(roomId);
+			await networkManagerRef.current.joinRoom(roomId, { playerName: username });
 			notify.success("加入房间成功");
 			setAppState("game");
 		} catch (e) {
-			const errorMsg = e instanceof Error ? e.message : "加入房间失败";
-			console.error("[App] Join room error:", e);
-			notify.error(errorMsg);
+			notify.error(e instanceof Error ? e.message : "加入房间失败");
 		} finally {
 			setIsLoading(false);
 		}
 	}, []);
 
-	// 检查并处理待处理的邀请房间
+	// 处理待处理的邀请房间
 	useEffect(() => {
 		if (!pendingInviteRoomId || appState !== "lobby" || !userName) return;
-
-		console.log("[App] Processing pending invite room:", pendingInviteRoomId);
 		handleJoinRoom(pendingInviteRoomId);
 		setPendingInviteRoomId(null);
 	}, [pendingInviteRoomId, appState, userName, handleJoinRoom]);
 
 	// 返回大厅
-	const handleBackToLobby = useCallback(async () => {
-		console.log("[App] handleBackToLobby called, current appState:", appState);
-
-		// 先切换状态，避免 UI 阻塞
+	const handleBackToLobby = useCallback(() => {
 		setAppState("lobby");
-
-		if (networkManagerRef.current) {
-			console.log("[App] Calling networkManager.leaveRoom()");
-			// 异步离开，不阻塞 UI
-			networkManagerRef.current.leaveRoom().catch((error) => {
-				console.error("[App] leaveRoom error:", error);
-			});
-		}
-
+		networkManagerRef.current?.leaveRoom().catch(() => {});
 		notify.info("已返回大厅");
 	}, []);
 
 	// 更新玩家档案
 	const handleUpdateProfile = useCallback((profile: { nickname?: string; avatar?: string }) => {
-		if (networkManagerRef.current) {
-			networkManagerRef.current.setProfile(profile);
-		}
-		userService.setProfile(profile);
+		const gameClient = networkManagerRef.current?.getGameClient();
+		gameClient?.sendUpdateProfile(profile);
 	}, []);
 
-	// 删除房间（通过 WS 消息或 SystemService 远程删除）
+	// 删除房间
 	const handleDeleteRoom = useCallback(async (roomId: string) => {
 		const nm = networkManagerRef.current;
 		const ss = systemServiceRef.current;
-		const shortId = nm?.getShortId();
 
-		if (!nm || !ss || !shortId) {
+		if (!nm || !ss) {
 			notify.error("请先登录后再操作");
 			return;
 		}
 
 		try {
-			// 如果当前在房间内，使用 NetworkManager 直接删除
 			if (nm.getCurrentRoomId() === roomId) {
-				await nm.deleteRoom();
+				const gameClient = nm.getGameClient();
+				gameClient?.sendDissolveRoom();
 				setAppState("lobby");
 			} else {
-				// 否则通过 SystemService 远程删除
-				await ss.deleteRoom(roomId, shortId);
-				// 远程删除成功后，清理本地房间状态
-				nm.clearRoomState(roomId);
+				// 远程删除需要 shortId，从房间列表获取
+				const room = rooms.find(r => r.roomId === roomId);
+				if (room?.metadata?.ownerShortId) {
+					await ss.deleteRoom(roomId, room.metadata.ownerShortId);
+					nm.clearRoomState(roomId);
+				}
 			}
 			notify.success("房间已删除");
 		} catch (e) {
-			const errorMsg = e instanceof Error ? e.message : "删除房间失败";
-			console.error("[App] Delete room error:", e);
-			notify.error(errorMsg);
+			notify.error(e instanceof Error ? e.message : "删除房间失败");
 		}
-	}, []);
+	}, [rooms]);
 
 	// 渲染
 	if (!networkManager) {
@@ -255,7 +212,7 @@ const App: React.FC = () => {
 			{appState === "lobby" && (
 				<LobbyPage
 					playerName={userName}
-					profile={networkManager.getProfile()}
+					profile={networkManager.getProfile() ?? { nickname: userName, avatar: "👤" }}
 					currentShortId={networkManager.getShortId()}
 					currentRoomId={networkManager.getCurrentRoomId()}
 					rooms={rooms}

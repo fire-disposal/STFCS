@@ -2,16 +2,8 @@
  * 存档序列化
  */
 
-import type {
-	ChatMessageSave,
-	FactionValue,
-	GameSave,
-	ShieldTypeValue,
-	ShipSave,
-	WeaponSave,
-	WeaponStateValue,
-} from "./types.js";
-import { ChatMessage, GameRoomState } from "./GameSchema.js";
+import type { GameSave, ShipSave, WeaponSave } from "./types.js";
+import { GameRoomState } from "./GameSchema.js";
 import { ShipState, WeaponSlot } from "./ShipStateSchema.js";
 
 export const GAME_SAVE_VERSION = "1.0.0";
@@ -19,9 +11,6 @@ export const GAME_SAVE_VERSION = "1.0.0";
 export function serializeGameSave(
 	state: GameRoomState,
 	roomId: string,
-	roomName: string,
-	maxPlayers: number,
-	isPrivate: boolean,
 	saveName: string
 ): GameSave {
 	const ships: ShipSave[] = [];
@@ -58,28 +47,24 @@ export function serializeGameSave(
 			isOverloaded: ship.isOverloaded,
 			hasMoved: ship.hasMoved,
 			hasFired: ship.hasFired,
+			movePhase: ship.movePhase,
+			phaseAForwardUsed: ship.phaseAForwardUsed,
+			phaseAStrafeUsed: ship.phaseAStrafeUsed,
+			phaseTurnUsed: ship.phaseTurnUsed,
+			phaseCForwardUsed: ship.phaseCForwardUsed,
+			phaseCStrafeUsed: ship.phaseCStrafeUsed,
 		});
 	});
-
-	const chatHistory: ChatMessageSave[] = state.chatMessages.slice(-50).map((m: ChatMessage) => ({
-		id: m.id,
-		senderId: m.senderId,
-		senderName: m.senderName,
-		content: m.content,
-		timestamp: m.timestamp,
-		type: m.type,
-	}));
 
 	return {
 		id: `save_${Date.now()}_${roomId}`,
 		name: saveName,
-		createdAt: Date.now(),
+	 createdAt: Date.now(),
 		updatedAt: Date.now(),
 		turnCount: state.turnCount,
 		currentPhase: state.currentPhase,
 		activeFaction: state.activeFaction,
 		ships,
-		chatMessages: chatHistory,
 		mapWidth: state.mapWidth,
 		mapHeight: state.mapHeight,
 	};
@@ -90,7 +75,7 @@ export function deserializeShipSave(data: ShipSave): ShipState {
 	ship.id = data.id;
 	ship.hullType = data.hullId;
 	ship.name = data.name;
-	ship.faction = data.faction as FactionValue;
+	ship.faction = data.faction;
 	ship.ownerId = data.ownerId;
 	ship.transform.x = data.x;
 	ship.transform.y = data.y;
@@ -107,11 +92,11 @@ export function deserializeShipSave(data: ShipSave): ShipState {
 	ship.isOverloaded = data.isOverloaded;
 	ship.hasMoved = data.hasMoved;
 	ship.hasFired = data.hasFired;
-	ship.movePhase = "PHASE_A";
-	ship.phaseAForwardUsed = 0;
-	ship.phaseAStrafeUsed = 0;
-	ship.phaseTurnUsed = 0;
-	ship.phaseCForwardUsed = 0;
-	ship.phaseCStrafeUsed = 0;
+	ship.movePhase = data.movePhase ?? "PHASE_A";
+	ship.phaseAForwardUsed = data.phaseAForwardUsed ?? 0;
+	ship.phaseAStrafeUsed = data.phaseAStrafeUsed ?? 0;
+	ship.phaseTurnUsed = data.phaseTurnUsed ?? 0;
+	ship.phaseCForwardUsed = data.phaseCForwardUsed ?? 0;
+	ship.phaseCStrafeUsed = data.phaseCStrafeUsed ?? 0;
 	return ship;
 }

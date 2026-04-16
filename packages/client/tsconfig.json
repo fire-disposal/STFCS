@@ -20,10 +20,10 @@
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["src/*"],
-			"@vt/types": ["../types/src/index.ts"],
 			"@vt/data": ["../data/src/index.ts"],
 			"@vt/rules": ["../rules/src/index.ts"],
-			"@vt/rules/math": ["../rules/src/math/index.ts"]
+			"@vt/rules/math": ["../rules/src/math/index.ts"],
+			"@vt/schema-types": ["../schema-types/src/index.ts"]
 		}
 	},
 	"include": ["src"]

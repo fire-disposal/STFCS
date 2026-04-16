@@ -3,10 +3,7 @@
  */
 
 import type { Client } from "@colyseus/core";
-import {
-	ClientCommand,
-	PlayerRole,
-} from "../schema/types.js";
+import { ClientCommand, PlayerRole } from "../schema/types.js";
 import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 import type { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { toErrorDto, toNetPongDto, toRoomKickedDto } from "../dto/index.js";
@@ -15,7 +12,6 @@ import type { GameRoomState } from "../schema/GameSchema.js";
 import type { RoomEventLogger } from "../utils/ColyseusMessaging.js";
 import {
 	parseAssignShipPayload,
-	parseChatPayload,
 	parseCreateObjectPayload,
 	parseFireWeaponPayload,
 	parseKickPlayerPayload,
@@ -74,21 +70,6 @@ export function registerMessageHandlers(
 			client.send("error", toErrorDto(onError(error as Error)));
 		}
 	};
-
-	onMessage("chat", (client, payload) => {
-		handleMessage(client, () => {
-			const p = parseChatPayload(payload);
-			const player = ctx.state.players.get(client.sessionId);
-			const content = p.content.trim();
-			if (!content) throw new Error("聊天内容不能为空");
-			if (content.length > 200) throw new Error("聊天内容过长");
-			ctx.logger.addChatMessage(
-				client.sessionId,
-				player?.nickname || player?.name || "Unknown",
-				content
-			);
-		});
-	});
 
 	onMessage(ClientCommand.CMD_MOVE_TOKEN, (client, payload) => {
 		handleMessage(client, () => {
@@ -165,8 +146,6 @@ export function registerMessageHandlers(
 			ship.overloadTime = 0;
 			ship.flux.hard = 0;
 			ship.flux.soft = 0;
-			ship.flux.hardFlux = 0;
-			ship.flux.softFlux = 0;
 			ship.shield.deactivate();
 		});
 	});
@@ -180,8 +159,7 @@ export function registerMessageHandlers(
 			}
 			const ship = ctx.state.ships.get(p.shipId);
 			if (!ship) throw new Error("舰船不存在");
-			if (p.section < 0 || p.section > 5) throw new Error("护甲象限无效");
-			ship.armor.setQuadrant(p.section, p.value);
+			ship.armor.setQuadrant(p.quadrant, p.value);
 		});
 	});
 

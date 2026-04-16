@@ -10,17 +10,17 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@vt/types": ["../types/src/index.ts"],
       "@vt/data": ["../data/src/index.ts"],
       "@vt/rules": ["../rules/src/index.ts"],
-      "@vt/rules/math": ["../rules/src/math/index.ts"]
+      "@vt/rules/math": ["../rules/src/math/index.ts"],
+      "@vt/schema-types": ["../schema-types/src/index.ts"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "declaration": false,
     "declarationMap": false,
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts", "../types/src/**/*.ts", "../data/src/**/*.ts", "../rules/src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vite.config.ts", "../data/src/**/*.ts", "../rules/src/**/*.ts", "../schema-types/src/**/*.ts", "../server/src/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",

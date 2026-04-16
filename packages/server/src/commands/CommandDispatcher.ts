@@ -175,8 +175,8 @@ export class CommandDispatcher {
 			nextY = next.y;
 		}
 
-		ship.setPosition(nextX, nextY);
-		ship.setHeading(nextHeading);
+		ship.transform.setPosition(nextX, nextY);
+		ship.transform.setHeading(nextHeading);
 	}
 
 	dispatchAdvanceMovePhase(client: Client, ship: ShipState): void {
@@ -219,13 +219,13 @@ export class CommandDispatcher {
 		if (!v.valid || !v.finalPosition || v.finalHeading === undefined)
 			throw new Error(v.error || "无效移动");
 
-		ship.movePhaseAX = payload.movementPlan.phaseAForward;
-		ship.movePhaseAStrafe = payload.movementPlan.phaseAStrafe;
-		ship.turnAngle = payload.movementPlan.turnAngle;
-		ship.movePhaseCX = payload.movementPlan.phaseCForward;
-		ship.movePhaseCStrafe = payload.movementPlan.phaseCStrafe;
-		ship.setPosition(v.finalPosition.x, v.finalPosition.y);
-		ship.setHeading(v.finalHeading);
+		ship.phaseAForwardUsed = payload.movementPlan.phaseAForward;
+		ship.phaseAStrafeUsed = payload.movementPlan.phaseAStrafe;
+		ship.phaseTurnUsed = payload.movementPlan.turnAngle;
+		ship.phaseCForwardUsed = payload.movementPlan.phaseCForward;
+		ship.phaseCStrafeUsed = payload.movementPlan.phaseCStrafe;
+		ship.transform.setPosition(v.finalPosition.x, v.finalPosition.y);
+		ship.transform.setHeading(v.finalHeading);
 		ship.hasMoved = true;
 	}
 
@@ -245,7 +245,7 @@ export class CommandDispatcher {
 		}
 
 		payload.isActive ? ship.shield.activate() : ship.shield.deactivate();
-		ship.shield.setOrientation(payload.orientation ?? ship.transform.heading);
+		ship.shield.orientation = payload.orientation ?? ship.transform.heading;
 	}
 
 	dispatchFireWeapon(

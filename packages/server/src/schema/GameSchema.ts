@@ -2,32 +2,15 @@
  * 服务端 Schema
  */
 
-import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
-import {
-	GamePhase,
-	PlayerRole,
-	ConnectionQuality,
-	ChatMessageType,
-	Faction,
-} from "./types.js";
+import { MapSchema, Schema, type } from "@colyseus/schema";
+import { GamePhase, PlayerRole, ConnectionQuality, Faction } from "./types.js";
 import type {
 	GamePhaseValue,
 	PlayerRoleValue,
 	ConnectionQualityValue,
-	ChatMessageTypeValue,
 	FactionValue,
 } from "./types.js";
-import {
-	ShipState,
-	WeaponSlot,
-	Transform,
-	HullState,
-	ArmorState,
-	FluxStateSchema,
-	ShieldState,
-} from "./ShipStateSchema.js";
-
-;
+import { ShipState } from "./ShipStateSchema.js";
 
 export class PlayerState extends Schema {
 	@type("string") sessionId: string = "";
@@ -40,21 +23,8 @@ export class PlayerState extends Schema {
 	@type("boolean") connected: boolean = true;
 	@type("number") pingMs: number = -1;
 	@type("number") jitterMs: number = 0;
-	@type("string") connectionQuality: ConnectionQualityValue = ConnectionQuality.OFFLINE;
-}
-
-export class ChatMessage extends Schema {
-	@type("string") id: string = "";
-	@type("string") senderId: string = "";
-	@type("string") senderName: string = "";
-	@type("string") content: string = "";
-	@type("number") timestamp: number = 0;
-	@type("string") type: ChatMessageTypeValue = ChatMessageType.CHAT;
-
-	constructor(init?: Partial<ChatMessage>) {
-		super();
-		if (init) Object.assign(this, init);
-	}
+	@type("string") connectionQuality: ConnectionQualityValue =
+		ConnectionQuality.OFFLINE;
 }
 
 export class GameRoomState extends Schema {
@@ -65,5 +35,4 @@ export class GameRoomState extends Schema {
 	@type("string") activeFaction: FactionValue = Faction.PLAYER;
 	@type("number") mapWidth: number = 2000;
 	@type("number") mapHeight: number = 2000;
-	@type([ChatMessage]) chatMessages = new ArraySchema<ChatMessage>();
 }

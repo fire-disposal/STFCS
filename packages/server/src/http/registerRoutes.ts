@@ -1,7 +1,7 @@
 import { matchMaker } from "@colyseus/core";
 import { monitor } from "@colyseus/monitor";
 import type { Express, Request, Response } from "express";
-import { toHealthDto, toMatchmakeRoomDto } from "../dto/index.js";
+import { toHealthStatusDto, toMatchmakeRoomDto } from "../dto/index.js";
 
 /**
  * 注册 HTTP 路由
@@ -14,7 +14,7 @@ import { toHealthDto, toMatchmakeRoomDto } from "../dto/index.js";
 export function registerHttpRoutes(app: Express): void {
 	// 健康检查
 	app.get("/health", (_req: Request, res: Response) => {
-		res.json(toHealthDto(app.get("startedAt")));
+		res.json(toHealthStatusDto(app.get("startedAt")));
 	});
 
 	// 房间列表（Colyseus 标准端点）
