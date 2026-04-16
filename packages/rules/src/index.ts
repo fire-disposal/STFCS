@@ -1,3 +1,17 @@
+/**
+ * @vt/rules - 游戏规则计算包
+ *
+ * 只包含实际使用的核心功能：
+ * - 数学计算（角度、向量、碰撞）
+ * - 移动验证（三阶段移动）
+ * - 阶段管理（回合阶段转换）
+ *
+ * 其他类型请直接从对应包导入：
+ * - 枚举/配置：@vt/data
+ * - Schema 类型：@vt/schema-types
+ * - DTO/存档：@vt/server/schema/types
+ */
+
 // ==================== 数学工具 ====================
 export {
 	toRadians,
@@ -22,72 +36,14 @@ export {
 	type MovementValidation,
 } from "./math/index.js";
 
-// ==================== 护甲计算 ====================
+// ==================== 阶段管理（纯函数）====================
 export {
-	getQuadrantFromAngle,
-	getQuadrantIndexFromAngle,
-	calculateArmorDamageReduction,
-	applyArmorDamage,
-	isArmorDepleted,
-	getArmorPercent,
-	getAverageArmorPercent,
-	repairArmor,
-	setArmorQuadrant,
-	createDefaultArmorState,
-	createArmorStateWithDistribution,
-	arrayToArmorState,
-	armorStateToArray,
-	getArmorQuadrantValue,
-	takeDamageOnQuadrant,
-	getWeakestQuadrant,
-	getStrongestQuadrant,
-	quadrantToIndex,
-	indexToQuadrant,
-	ARMOR_QUADRANT_NAMES,
-	QUADRANT_INDEX_MAP,
-	INDEX_TO_QUADRANT,
-	ArmorQuadrant,
-	type ArmorQuadrantValue,
-} from "./combat/armor.js";
-
-// ==================== 从 @vt/data 重导出 ====================
-export {
-	getAvailableShips,
-	getShipHullSpec,
-	PRESET_SHIPS,
-	type ShipHullSpec,
-	type DamageTypeValue,
-} from "@vt/data";
-
-// ==================== 伤害计算 ====================
-export {
-	calculateShieldDamage,
-	checkShieldHit,
-	calculateArmorAndHullDamage,
-	calculateFullDamage,
-	applyDamageToShield,
-	applyDamageToArmor,
-	applyDamageToHull,
-	calculateWeaponHitChance,
-	type DamageResult,
-	type ShieldDamageResult,
-	type ArmorDamageResult,
-	type HullDamageResult,
-} from "./combat/damage.js";
-
-// ==================== 游戏规则验证器 ====================
-export {
-	validateWeaponFire,
-	validateShieldToggle,
-	validateFluxVent,
-	validateMovement,
-	validateIncrementalMovement,
-	validatePhaseTransition,
-	validatePlayerAction,
-	validateShipOwnership,
-	validateMapBoundaries,
-	type WeaponFireValidation,
-	type ShieldToggleValidation,
-	type FluxVentValidation,
-	type PhaseTransitionValidation,
-} from "./validation/index.js";
+	PHASE_ORDER,
+	getNextPhase,
+	getPhaseIndex,
+	isCyclicPhase,
+	getActiveFactionForPhase,
+	isValidPhaseTransition,
+	computePhaseTransition,
+	type PhaseTransitionResult,
+} from "./phase/index.js";

@@ -9,15 +9,16 @@
 
 import type { Client } from "@colyseus/core";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
-import { createShip, createAsteroid, createStation } from "../factory/ShipFactory.js";
+import { ObjectFactory } from "../rooms/battle/ObjectFactory.js";
 import type { GameRoomState } from "../schema/GameSchema.js";
 import type { ShipState } from "../schema/ShipStateSchema.js";
 import { advancePhase } from "../phase/PhaseManager.js";
-import { Faction, PlayerRole } from "../schema/types.js";
+import { PlayerRole } from "@vt/data";
 import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 
 export class GameService {
 	private dispatcher: CommandDispatcher;
+	private objectFactory = new ObjectFactory();
 
 	constructor(state: GameRoomState) {
 		this.dispatcher = new CommandDispatcher(state);
@@ -75,23 +76,7 @@ export class GameService {
 
 	/** 创建对象（舰船、小行星、空间站） */
 	createObject(state: GameRoomState, payload: CreateObjectPayload): ShipState | null {
-		const heading = payload.heading ?? 0;
-		const faction = payload.faction ?? Faction.PLAYER;
-
-		const ship =
-			payload.type === "ship" && payload.hullId
-				? createShip(payload.hullId, payload.x, payload.y, heading, faction, payload.ownerId)
-				: payload.type === "station"
-					? createStation(payload.x, payload.y, heading)
-					: createAsteroid(payload.x, payload.y, heading);
-
-		if (ship) {
-			ship.faction = faction;
-			if (payload.name) ship.name = payload.name;
-			state.ships.set(ship.id, ship);
-		}
-
-		return ship;
+		return this.objectFactory.create(state, payload);
 	}
 
 	/** 分配舰船给玩家 */

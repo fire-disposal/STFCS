@@ -6,11 +6,15 @@
 export { default as PixiCanvas } from "./core/PixiCanvas";
 export { usePixiApp } from "./core/usePixiApp";
 export { useCanvasResize } from "./core/useCanvasResize";
-export { useLayerSystem, type LayerRegistry } from "./core/useLayerSystem";
+export { useLayerSystem, type LayerRegistry, worldToScreen, screenToWorldCoords } from "./core/useLayerSystem";
 
 // Entities - 实体渲染
 export { useShipRendering } from "./entities/ShipRenderer";
+export { useShipHUDRendering, ShipHUDManager, type ShipHUDRenderOptions } from "./entities/ShipHUDRenderer";
 export { useWeaponArcsRendering } from "./entities/WeaponArcRenderer";
+export { useArmorHexagonRendering } from "./entities/ArmorHexagonRenderer";
+export { useMovementVisualRendering, type MovementPreviewState, type MoveMode, type MoveDirection } from "./entities/MovementVisualRenderer";
+export { useTargetMarkers, type TargetMarkerOptions } from "./entities/TargetMarkerRenderer";
 
 // Systems - 渲染系统
 export { useGridRendering } from "./systems/GridRenderer";

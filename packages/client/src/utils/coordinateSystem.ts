@@ -54,9 +54,9 @@ export const radToDeg = toDegrees;
  * 规范化角度到 0-360 范围
  */
 export function normalizeAngle(angle: number): number {
-  let normalized = angle % 360;
-  if (normalized < 0) normalized += 360;
-  return normalized;
+  // 使用数学公式确保结果总是正数 0-360
+  // ((angle % 360) + 360) % 360 处理所有情况包括 -0
+  return ((angle % 360) + 360) % 360;
 }
 
 /**

@@ -1,0 +1,232 @@
+/**
+ * 回合状态栏样式
+ * TurnStatusBar v1.0
+ */
+
+/* ====== 主容器 ====== */
+.turn-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 8px 16px;
+	background-color: rgba(6, 16, 26, 0.95);
+	border: 1px solid rgba(74, 158, 255, 0.25);
+	min-width: 600px;
+	max-width: 900px;
+}
+
+/* ====== 左侧阶段信息 ====== */
+.turn-status-bar__phase-info {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 4px 12px;
+	border-left: 3px solid;
+	border-right: 3px solid;
+	border-color: transparent;
+	background-color: rgba(26, 45, 66, 0.6);
+}
+
+.phase-indicator {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.phase-indicator__icon {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+}
+
+.phase-indicator__label {
+	font-size: 12px;
+	font-weight: bold;
+	color: var(--game-text-primary);
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+.turn-count {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.turn-count__label {
+	font-size: 10px;
+	color: var(--game-text-secondary);
+}
+
+.turn-count__number {
+	font-size: 14px;
+	font-weight: bold;
+	color: var(--game-accent-blue);
+	min-width: 20px;
+	text-align: center;
+}
+
+/* ====== 中央玩家列表 ====== */
+.turn-status-bar__players {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex: 1;
+	overflow-x: auto;
+}
+
+.player-group {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.player-group__label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10px;
+	font-weight: bold;
+	color: var(--game-text-secondary);
+	white-space: nowrap;
+}
+
+.player-group__icon {
+	width: 12px;
+	height: 12px;
+}
+
+.player-group__list {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+/* DM组突出样式 */
+.player-group--dm {
+	padding: 4px 8px;
+	background-color: rgba(255, 111, 143, 0.15);
+	border: 1px solid rgba(255, 111, 143, 0.3);
+}
+
+.player-group--dm .player-group__label {
+	color: var(--game-accent-red);
+}
+
+/* 玩家组样式 */
+.player-group--player {
+	padding: 4px 8px;
+	background-color: rgba(74, 158, 255, 0.1);
+}
+
+.player-group--player .player-group__label {
+	color: var(--game-accent-blue);
+}
+
+/* 敌方组样式 */
+.player-group--enemy {
+	padding: 4px 8px;
+	background-color: rgba(255, 111, 143, 0.1);
+}
+
+.player-group--enemy .player-group__label {
+	color: var(--game-accent-red);
+}
+
+/* ====== 单个玩家卡片 ====== */
+.player-card {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	background-color: rgba(0, 0, 0, 0.3);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+.player-card--current {
+	border-color: rgba(74, 158, 255, 0.5);
+	background-color: rgba(74, 158, 255, 0.2);
+}
+
+.player-card--ready {
+	border-color: rgba(39, 174, 96, 0.5);
+	background-color: rgba(39, 174, 96, 0.1);
+}
+
+.player-card__avatar {
+	font-size: 12px;
+	line-height: 1;
+}
+
+.player-card__name {
+	color: var(--game-text-primary);
+	max-width: 80px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.player-card__status {
+	display: flex;
+	align-items: center;
+}
+
+.player-card__status-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.player-card__status-icon--ready {
+	color: var(--game-accent-green);
+}
+
+.player-card__status-icon--waiting {
+	color: rgba(255, 255, 255, 0.3);
+}
+
+/* ====== 右侧结束回合按钮 ====== */
+.turn-status-bar__action {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.ready-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	background-color: rgba(26, 74, 122, 0.8);
+	border: 1px solid rgba(74, 158, 255, 0.4);
+	color: var(--game-accent-blue);
+	font-size: 11px;
+	font-weight: bold;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.ready-btn:hover:not(:disabled) {
+	background-color: rgba(74, 158, 255, 0.3);
+	border-color: var(--game-accent-blue);
+}
+
+.ready-btn--active {
+	background-color: rgba(39, 174, 96, 0.3);
+	border-color: var(--game-accent-green);
+	color: var(--game-accent-green);
+}
+
+.ready-btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.ready-btn__icon {
+	width: 14px;
+	height: 14px;
+}
+
+.ready-btn__label {
+	white-space: nowrap;
+}

@@ -1,196 +1,153 @@
 /**
  * 战斗房间
  *
- * 使用 services 层处理业务逻辑
+ * 使用 composition 模式组合各子模块
  */
 
-import { Client, matchMaker, Room } from "@colyseus/core";
-import { Faction, GamePhase, PlayerRole, WeaponState } from "../schema/types.js";
+import { Client, Room } from "@colyseus/core";
+import { WeaponState } from "@vt/data";
 import type { RoomMetadata } from "../schema/types.js";
 import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
-import { GameService } from "../services/GameService.js";
-import { PlayerService } from "../services/PlayerService.js";
 import { saveService } from "../services/SaveService.js";
-import {
-	toErrorDto,
-	toGameLoadedDto,
-	toGameSavedDto,
-	toIdentityDto,
-	toRoleDto,
-} from "../dto/index.js";
-import { createAsteroid, createShip, createStation } from "../factory/ShipFactory.js";
+import { toGameSavedDto, toGameLoadedDto } from "../dto/index.js";
 import { registerMessageHandlers } from "../handlers/BattleRoomHandlers.js";
-import { GameRoomState, PlayerState } from "../schema/GameSchema.js";
+import { GameRoomState } from "../schema/GameSchema.js";
 import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
+import {
+	EMPTY_ROOM_TTL_MS,
+	DEFAULT_MAX_CLIENTS,
+	MAX_CLIENTS_LIMIT,
+	MIN_CLIENTS,
+	RECONNECTION_WINDOW_SECONDS,
+	SIMULATION_INTERVAL_MS,
+	MoveBuffer,
+	QosMonitor,
+	PlayerManager,
+	MetadataManager,
+	ObjectFactory,
+} from "./battle/index.js";
 
 export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetadata }> {
-	maxClients = 8;
+	maxClients = DEFAULT_MAX_CLIENTS;
 	autoDispose = false;
 
-	private gameService!: GameService;
-	private playerService!: PlayerService;
+	// 子模块
 	private dispatcher!: CommandDispatcher;
-	private pingEwma = new Map<string, number>();
-	private jitterEwma = new Map<string, number>();
-	private roomOwnerId: string | null = null;
-	private moveCommandBuffer = new Map<string, { client: Client; payload: MoveTokenPayload }>();
-	private roomDisplayName = "";
-	private createdAt = Date.now();
+	private moveBuffer = new MoveBuffer();
+	private qosMonitor = new QosMonitor();
+	private playerManager = new PlayerManager();
+	private metadataManager = new MetadataManager();
+	private objectFactory = new ObjectFactory();
+
+	// 定时器
 	private emptyDisposeTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	private static readonly EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
-
 	async onCreate(options: { roomName?: string; maxPlayers?: number }) {
-		this.maxClients = Math.min(16, Math.max(2, options.maxPlayers ?? 8));
-		this.roomDisplayName = options.roomName?.trim() || `Battle-${this.roomId.substring(0, 6)}`;
-		this.createdAt = Date.now();
+		this.maxClients = Math.min(MAX_CLIENTS_LIMIT, Math.max(MIN_CLIENTS, options.maxPlayers ?? DEFAULT_MAX_CLIENTS));
+		this.metadataManager.setDisplayName(options.roomName?.trim() || `Battle-${this.roomId.substring(0, 6)}`);
+		this.metadataManager.setCreatedAt(Date.now());
 
 		this.state = new GameRoomState();
 		this.dispatcher = new CommandDispatcher(this.state);
-		this.gameService = new GameService(this.state);
-		this.playerService = new PlayerService();
 
 		registerMessageHandlers(this, {
 			state: this.state,
 			dispatcher: this.dispatcher,
 			logger: { log: () => {} },
 			broadcast: (t, d) => this.broadcast(t, d),
-			pingEwma: this.pingEwma,
-			jitterEwma: this.jitterEwma,
-			getRoomOwnerId: () => this.roomOwnerId,
+			pingEwma: new Map(),
+			jitterEwma: new Map(),
+			getRoomOwnerId: () => this.playerManager.getOwnerId(),
 			setMetadata: () => this.syncMetadata(),
 			profileStore: new Map(),
-			createObject: (payload: CreateObjectPayload) => this.createObject(payload),
+			createObject: (payload: CreateObjectPayload) => this.objectFactory.create(this.state, payload),
 			enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) =>
-				this.enqueueMoveCommand(client, payload),
+				this.moveBuffer.enqueue(payload.shipId, client, payload),
 			dissolveRoom: () => this.disconnect(),
+			saveGame: (name: string) => this.saveGame(name),
+			loadGame: (saveId: string) => this.loadGame(saveId),
 		});
 
 		this.syncMetadata();
-		this.setSimulationInterval((dt) => this.update(dt / 1000), 50);
+		this.setSimulationInterval((dt) => this.update(dt / 1000), SIMULATION_INTERVAL_MS);
 	}
 
 	async onJoin(client: Client, options: { playerName?: string }) {
 		this.cancelEmptyDisposeTimer();
 
-		const name = options.playerName?.trim() || `Player-${client.sessionId.substring(0, 4)}`;
-		const isFirstClient = this.clients.length === 1;
+		const result = await this.playerManager.handleJoin(
+			client,
+			options,
+			this.state,
+			this.clients,
+			this.maxClients,
+			this.roomId,
+			this.qosMonitor
+		);
 
-		// 房间已满检查
-		if (!isFirstClient && this.clients.length >= this.maxClients) {
-			client.send("error", { message: "房间已满，无法加入" });
-			setTimeout(() => client.leave(), 200);
-			return;
+		if (result.success) {
+			this.syncMetadata();
 		}
-
-		// 创建玩家状态
-		const player = new PlayerState();
-		player.sessionId = client.sessionId;
-		player.name = name;
-		player.connected = true;
-		player.role = isFirstClient ? PlayerRole.DM : PlayerRole.PLAYER;
-
-		if (player.role === PlayerRole.DM) {
-			this.roomOwnerId = client.sessionId;
-		}
-
-		// 注册玩家档案（后端分配 shortId）
-		const { profile } = this.playerService.registerPlayer(client, this.state, { playerName: name });
-		player.shortId = profile.shortId;
-
-		// 房主重复检查（基于刚分配的 shortId）
-		if (isFirstClient) {
-			const existingRooms = await matchMaker.query({ name: "battle" });
-			const alreadyOwnsActiveRoom = existingRooms.some((r) => {
-				if (r.roomId === this.roomId) return false;
-				const meta = (r.metadata as Record<string, unknown> | undefined) || {};
-				const shortIdMatch = Number(meta.ownerShortId) === profile.shortId;
-				const hasActiveClients = Number(r.clients) > 0;
-				return shortIdMatch && hasActiveClients;
-			});
-
-			if (alreadyOwnsActiveRoom) {
-				client.send("error", { message: "您已在其他房间担任房主" });
-				setTimeout(() => this.disconnect(), 200);
-				return;
-			}
-		}
-
-		client.send("role", toRoleDto(player.role));
-		client.send("identity", toIdentityDto(name, profile.shortId));
-		this.state.players.set(client.sessionId, player);
-		this.pingEwma.set(client.sessionId, -1);
-		this.syncMetadata();
 	}
 
 	onLeave(client: Client, code?: number) {
 		const player = this.state.players.get(client.sessionId);
+		if (!player) return;
 
-		if (code === 1000) {
-			this.state.players.delete(client.sessionId);
-			this.playerService.handleDisconnect(client.sessionId);
-			this.assignOwner();
-			this.syncMetadata();
-			this.scheduleEmptyDisposeIfNeeded();
-			return;
-		}
+		// 标记为离线
+		player.connected = false;
+		this.playerManager.clearOwnerIfOffline(client.sessionId, this.state);
+		this.syncMetadata();
 
-		if (player) {
-			player.connected = false;
-			this.allowReconnection(client, 60)
-				.then(() => {
-					player.connected = true;
-					this.syncMetadata();
-				})
-				.catch(() => {
-					this.state.players.delete(client.sessionId);
-					this.playerService.handleDisconnect(client.sessionId);
-					this.assignOwner();
-					this.syncMetadata();
-					this.scheduleEmptyDisposeIfNeeded();
-				});
-		}
-	}
-
-	private enqueueMoveCommand(client: Client, payload: MoveTokenPayload): void {
-		this.moveCommandBuffer.set(payload.shipId, { client, payload });
-	}
-
-	private flushMoveCommands(): void {
-		if (this.moveCommandBuffer.size === 0) return;
-		const commands = Array.from(this.moveCommandBuffer.values());
-		this.moveCommandBuffer.clear();
-		for (const cmd of commands) {
-			try {
-				this.dispatcher.dispatchMoveToken(cmd.client, cmd.payload);
-			} catch (error) {
-				cmd.client.send("error", toErrorDto((error as Error).message));
-			}
-		}
+		// 轻量化重连：短暂窗口内允许恢复
+		// 使用 allowReconnection 让客户端可以自动重连
+		this.allowReconnection(client, RECONNECTION_WINDOW_SECONDS)
+			.then(() => {
+				// 重连成功，恢复玩家状态
+				player.connected = true;
+				this.syncMetadata();
+				this.cancelEmptyDisposeTimer();
+			})
+			.catch(() => {
+				// 重连窗口超时，玩家状态保持离线
+				// 用户可以手动点击"加入房间"重新加入（通过 playerName 匹配恢复）
+				this.scheduleEmptyDisposeIfNeeded();
+			});
 	}
 
 	private update(dt: number) {
-		this.flushMoveCommands();
+		this.moveBuffer.flush(this.dispatcher);
 		this.state.ships.forEach((ship: ShipState) => {
 			if (ship.isDestroyed) return;
+			// 武器冷却实时更新（冷却时间需要实时递减）
 			ship.weapons.forEach((w: WeaponSlot) => {
 				w.cooldownRemaining = Math.max(0, w.cooldownRemaining - dt);
 				if (w.state === WeaponState.COOLDOWN && w.cooldownRemaining <= 0) {
 					w.state = w.currentAmmo === 0 && w.maxAmmo > 0 ? WeaponState.OUT_OF_AMMO : WeaponState.READY;
 				}
 			});
+			// 过载时间实时更新
 			if (ship.isOverloaded && ship.overloadTime > 0) {
 				ship.overloadTime -= dt;
 				if (ship.overloadTime <= 0) ship.isOverloaded = false;
 			}
-			ship.flux.dissipate(dt);
-			if (ship.isOverloaded && !ship.flux.isOverloaded) ship.isOverloaded = false;
+			// 注意：回合制游戏不在此处自动降低辐能
+			// 辐能降低在 PhaseManager.ts 的回合结束阶段处理
 		});
 	}
 
 	onDispose() {
 		this.cancelEmptyDisposeTimer();
+	}
+
+	private syncMetadata(): void {
+		this.metadataManager.sync(
+			this.state,
+			this.playerManager,
+			this.maxClients,
+			(meta) => this.setMetadata(meta)
+		);
 	}
 
 	private scheduleEmptyDisposeIfNeeded(): void {
@@ -200,7 +157,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		this.emptyDisposeTimeout = setTimeout(() => {
 			if (this.clients.length === 0) this.disconnect();
 			this.emptyDisposeTimeout = null;
-		}, BattleRoom.EMPTY_ROOM_TTL_MS);
+		}, EMPTY_ROOM_TTL_MS);
 	}
 
 	private cancelEmptyDisposeTimer(): void {
@@ -208,38 +165,6 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			clearTimeout(this.emptyDisposeTimeout);
 			this.emptyDisposeTimeout = null;
 		}
-	}
-
-	private assignOwner() {
-		if (!this.state.players.has(this.roomOwnerId ?? "")) {
-			const next = Array.from(this.state.players.values()).find((p) => p.connected);
-			this.roomOwnerId = next?.sessionId ?? null;
-			this.state.players.forEach((p: PlayerState) => {
-				p.role = p.sessionId === this.roomOwnerId ? PlayerRole.DM : PlayerRole.PLAYER;
-			});
-		}
-	}
-
-	private getOwnerProfile(): { sessionId: string; shortId: number } | null {
-		if (!this.roomOwnerId) return null;
-		const owner = this.state.players.get(this.roomOwnerId);
-		return owner ? { sessionId: owner.sessionId, shortId: owner.shortId } : null;
-	}
-
-	private syncMetadata(): void {
-		const owner = this.getOwnerProfile();
-		const metadata: RoomMetadata = {
-			roomType: "battle",
-			name: this.roomDisplayName,
-			phase: this.state.currentPhase,
-			ownerId: owner?.sessionId ?? null,
-			ownerShortId: owner?.shortId ?? null,
-			maxPlayers: this.maxClients,
-			isPrivate: false,
-			createdAt: this.createdAt,
-			turnCount: this.state.turnCount,
-		};
-		this.setMetadata(metadata);
 	}
 
 	async saveGame(name: string): Promise<string> {
@@ -259,23 +184,6 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			return success;
 		} catch {
 			return false;
-		}
-	}
-
-	createObject(p: CreateObjectPayload) {
-		const heading = p.heading ?? 0;
-		const faction = p.faction ?? Faction.PLAYER;
-		const ship =
-			p.type === "ship" && p.hullId
-				? createShip(p.hullId, p.x, p.y, heading, faction, p.ownerId)
-				: p.type === "station"
-					? createStation(p.x, p.y, heading)
-					: createAsteroid(p.x, p.y, heading);
-
-		if (ship) {
-			ship.faction = faction;
-			if (p.name) ship.name = p.name;
-			this.state.ships.set(ship.id, ship);
 		}
 	}
 }

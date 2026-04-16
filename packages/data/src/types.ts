@@ -42,6 +42,38 @@ export const WeaponSlotSize = {
 export type WeaponSlotSizeValue =
 	(typeof WeaponSlotSize)[keyof typeof WeaponSlotSize];
 
+/** 武器尺寸兼容性规则：大型槽可装中型/小型，中型槽可装小型 */
+export const SIZE_COMPATIBILITY: Record<WeaponSlotSizeValue, WeaponSlotSizeValue[]> = {
+	SMALL: ["SMALL"],
+	MEDIUM: ["SMALL", "MEDIUM"],
+	LARGE: ["SMALL", "MEDIUM", "LARGE"],
+};
+
+/** 检查武器尺寸是否兼容挂载点 */
+export function isWeaponSizeCompatible(
+	mountSize: WeaponSlotSizeValue,
+	weaponSize: WeaponSlotSizeValue
+): boolean {
+	return SIZE_COMPATIBILITY[mountSize].includes(weaponSize);
+}
+
+// ==================== 武器标签 ====================
+
+export const WeaponTag = {
+	PD: "PD",                  // 点防御（反导弹/反战机）
+	ANTI_SHIP: "ANTI_SHIP",    // 反舰
+	ASSAULT: "ASSAULT",        // 近程突击
+	SUPPRESSION: "SUPPRESSION", // 远程压制
+	BEAM: "BEAM",              // 光束武器
+	BALLISTIC: "BALLISTIC",    // 弹道武器（有弹药）
+	GUIDED: "GUIDED",          // 制导武器（追踪）
+	EMP: "EMP",                // EMP效果（干扰系统）
+	HE: "HE",                  // 高爆强化
+	KINETIC: "KINETIC",        // 动能强化
+} as const;
+
+export type WeaponTagValue = (typeof WeaponTag)[keyof typeof WeaponTag];
+
 export const ShieldType = {
 	FRONT: "FRONT",
 	OMNI: "OMNI",
@@ -83,6 +115,17 @@ export const WeaponState = {
 } as const;
 export type WeaponStateValue = (typeof WeaponState)[keyof typeof WeaponState];
 
+/**
+ * 护甲象限系统（六边形）
+ *
+ * 每个象限代表船体六边形的一个边：
+ * - FRONT_TOP:    船头顶边（上）
+ * - FRONT_BOTTOM: 船头底边（下）
+ * - LEFT_TOP:     左侧上边
+ * - LEFT_BOTTOM:  左侧下边
+ * - RIGHT_TOP:    右侧上边
+ * - RIGHT_BOTTOM: 右侧下边
+ */
 export const ArmorQuadrant = {
 	FRONT_TOP: "FRONT_TOP",
 	FRONT_BOTTOM: "FRONT_BOTTOM",
@@ -161,6 +204,13 @@ export const MovePhase = {
 } as const;
 export type MovePhaseValue = (typeof MovePhase)[keyof typeof MovePhase];
 
+/** 客户端 UI 状态扩展 - 包含 NONE 表示未开始移动 */
+export const MovePhaseUI = {
+	...MovePhase,
+	NONE: "NONE",
+} as const;
+export type MovePhaseUIValue = (typeof MovePhaseUI)[keyof typeof MovePhaseUI];
+
 export const FactionTurnPhase = {
 	DRAW: "DRAW",
 	PLAY: "PLAY",
@@ -183,6 +233,7 @@ export const TokenTurnState = {
 export type TokenTurnStateValue = (typeof TokenTurnState)[keyof typeof TokenTurnState];
 
 export const ClientCommand = {
+	// 游戏命令
 	CMD_MOVE_TOKEN: "CMD_MOVE_TOKEN",
 	CMD_TOGGLE_SHIELD: "CMD_TOGGLE_SHIELD",
 	CMD_FIRE_WEAPON: "CMD_FIRE_WEAPON",
@@ -194,6 +245,29 @@ export const ClientCommand = {
 	CMD_CLEAR_OVERLOAD: "CMD_CLEAR_OVERLOAD",
 	CMD_SET_ARMOR: "CMD_SET_ARMOR",
 	CMD_ADVANCE_MOVE_PHASE: "CMD_ADVANCE_MOVE_PHASE",
+
+	// 武器配置命令
+	CMD_CONFIGURE_WEAPON: "CMD_CONFIGURE_WEAPON",
+	CMD_CONFIGURE_VARIANT: "CMD_CONFIGURE_VARIANT",
+	CMD_REPAIR_WEAPON: "CMD_REPAIR_WEAPON",
+
+	// 玩家档案命令
+	CMD_SAVE_VARIANT: "CMD_SAVE_VARIANT",
+	CMD_LOAD_VARIANT: "CMD_LOAD_VARIANT",
+	CMD_DELETE_VARIANT: "CMD_DELETE_VARIANT",
+	CMD_GET_PROFILE: "CMD_GET_PROFILE",
+	CMD_UPDATE_SETTINGS: "CMD_UPDATE_SETTINGS",
+
+	// 存档命令
+	CMD_SAVE_GAME: "CMD_SAVE_GAME",
+	CMD_LOAD_GAME: "CMD_LOAD_GAME",
+	CMD_DELETE_SAVE: "CMD_DELETE_SAVE",
+	CMD_LIST_SAVES: "CMD_LIST_SAVES",
+
+	// 房间命令
+	CMD_ROOM_DISSOLVE: "CMD_ROOM_DISSOLVE",
+	CMD_KICK_PLAYER: "CMD_KICK_PLAYER",
+	CMD_UPDATE_PROFILE: "CMD_UPDATE_PROFILE",
 } as const;
 export type ClientCommandValue = (typeof ClientCommand)[keyof typeof ClientCommand];
 
@@ -207,56 +281,173 @@ export interface Point {
 // ==================== 武器规格 ====================
 
 export interface WeaponSpec {
+	// 基础标识
 	id: string;
 	name: string;
+	description?: string;
+
+	// 分类属性
 	category: WeaponCategoryValue;
 	damageType: DamageTypeValue;
 	mountType: MountTypeValue;
-	damage: number;
-	range: number;
-	arc: number;
-	cooldown: number;
-	fluxCost: number;
-	ammo: number;
-	reloadTime: number;
-	ignoresShields: boolean;
+	size: WeaponSlotSizeValue;         // 武器尺寸（必填）
+
+	// 战斗属性
+	damage: number;                    // 单发伤害
+	range: number;                     // 最大射程
+	minRange?: number;                 // 最小射程（0 = 无限制，近距离无法开火）
+	arc: number;                       // 射界角度范围
+	cooldown: number;                  // 冷却时间（秒）
+	fluxCost: number;                  // 辐能消耗（每发）
+	ignoresShields: boolean;           // 是否无视护盾
+
+	// 连发系统
+	burstSize?: number;                // 连发数量（默认 1）
+	burstDelay?: number;               // 连发间隔（秒，默认 0.1）
+
+	// 弹药系统
+	ammo?: number;                     // 最大弹药（0 = 无限）
+	reloadTime?: number;               // 装填时间（秒）
+
+	// 资源系统
+	opCost: number;                    // OP 点数成本
+
+	// 特殊效果
+	tags?: WeaponTagValue[];           // 武器标签
+	empDamage?: number;                // EMP 伤害值
+	tracking?: number;                 // 追踪能力（0-1，导弹用）
+
+	// UI 资源
+	icon?: string;                     // 图标资源路径
 }
 
 // ==================== 武器挂载规格 ====================
 
+/**
+ * 武器挂载点规格
+ *
+ * 坐标系统说明（船体坐标系）：
+ * - 船体中心为原点 (0, 0)
+ * - X 轴：正方向朝右（从船头看向船尾时）
+ * - Y 轴：正方向朝船尾，负方向朝船头
+ * - 船头方向 = -Y（heading 0° 时朝上）
+ *
+ * 示例：
+ * - position: { x: 30, y: 0 }   → 船体中心右侧 30 单位
+ * - position: { x: 0, y: -50 }  → 船头前方 50 单位
+ * - facing: 0                   → 朝船头方向（-Y）
+ * - facing: 90                  → 朝右侧方向（+X）
+ * - facing: 180                 → 朝船尾方向（+Y）
+ * - facing: -90 / 270           → 朝左侧方向（-X）
+ */
 export interface WeaponMountSpec {
+	// 基础标识
 	id: string;
-	type: MountTypeValue;
+	displayName?: string;              // 挂载点显示名称（如"主炮"、"副炮"）
+
+	// 类型与尺寸
+	type: MountTypeValue;              // FIXED: 固定射界 ±10° / TURRET: 可旋转炮塔
 	size: WeaponSlotSizeValue;
-	position: Point;
-	facing: number;
-	arc: number;
-	defaultWeapon?: string;
+
+	// 位置与朝向（船体坐标系）
+	position: Point;                   // 相对船体中心的偏移位置
+	facing: number;                    // 基准朝向（度），0°=朝船头，90°=朝右
+
+	// 射界
+	arc: number;                       // 射界角度范围（度），以 facing 为中心
+
+	// 限制
+	restrictedTypes?: WeaponCategoryValue[]; // 限制武器类别（如只能装导弹）
+
+	// 默认配置
+	defaultWeapon?: string;            // 默认武器 ID
+	groupHint?: string;                // 默认武器组建议（如"主炮组"）
+
+	// 视觉
+	visualOffset?: Point;              // 武器图标渲染偏移
 }
 
 // ==================== 舰船规格 ====================
 
+/**
+ * 舰船规格定义
+ *
+ * 物理尺寸说明：
+ * - width:  船体宽度（左右方向，X 轴）
+ * - length: 船体长度（前后方向，Y 轴），船头到船尾
+ *
+ * 机动系统：
+ * - maxSpeed:     每阶段最大移动距离（单位）
+ * - maxTurnRate:  每回合最大转向角度（度）
+ *
+ * 三阶段移动：
+ * - Phase A: 平移（前进/后退/横移）
+ * - Phase B: 转向
+ * - Phase C: 再平移（沿新朝向）
+ */
 export interface ShipHullSpec {
+	// 基础标识
 	id: string;
 	name: string;
 	description?: string;
-	size: HullSizeValue;
-	class: ShipClassValue;
-	width: number;
-	length: number;
-	hitPoints: number;
-	armorMax: number;
-	fluxCapacity: number;
-	fluxDissipation: number;
+
+	// 分类
+	size: HullSizeValue;               // FRIGATE / DESTROYER / CRUISER / CAPITAL
+	class: ShipClassValue;             // STRIKE / ASSAULT / COMBAT / SUPPORT / HEAVY / CARRIER / BATTLESHIP
+
+	// 物理尺寸
+	width: number;                     // 船体宽度（左右方向）
+	length: number;                    // 船体长度（前后方向）
+
+	// 生存属性
+	hitPoints: number;                 // 结构值上限（降至 0 即摧毁）
+	hullPoints: number;                // 同 hitPoints（兼容字段）
+	armorMax: number;                  // 单象限护甲上限（六象限独立）
+	armorValue: number;                // 同 armorMax（兼容字段）
+
+	// 辐能系统
+	fluxCapacity: number;              // 辐能容量上限（过载阈值）
+	fluxDissipation: number;           // 每回合自然排散的软辐能量
+
+	// 护盾系统
 	hasShield: boolean;
-	shieldType: ShieldTypeValue;
-	shieldArc: number;
-	shieldRadius: number;
-	maxSpeed: number;
-	maxTurnRate: number;
-	weaponMounts: WeaponMountSpec[];
-	hullPoints: number;
-	armorValue: number;
+	shieldType: ShieldTypeValue;       // FRONT: 前盾（固定中心） / OMNI: 全盾（可调整）
+	shieldArc: number;                 // 护盾覆盖角度范围（度）
+	shieldRadius: number;              // 护盾半径（决定覆盖范围）
+	shieldUpCost?: number;             // 每回合护盾维持的软辐能消耗
+
+	// 机动系统
+	maxSpeed: number;                  // 每阶段最大移动距离（单位）
+	maxTurnRate: number;               // 每回合最大转向角度（度）
+
+	// 武器系统
+	weaponMounts: WeaponMountSpec[];   // 可配置的武器挂载点
+	builtInWeapons?: WeaponLoadoutEntry[]; // 内置武器（不可更换）
+
+	// 装备点数
+	opCapacity: number;                // OP 点数容量（限制武器配置总量）
+
+	// 变体
+	variants?: string[];               // 预设变体 ID 列表
+}
+
+// ==================== 舰船变体 ====================
+
+/** 武器配置条目 */
+export interface WeaponLoadoutEntry {
+	mountId: string;                   // 挂载点 ID
+	weaponId: string;                  // 武器 ID（空字符串表示不装备）
+}
+
+/** 舰船变体规格 */
+export interface ShipVariantSpec {
+	id: string;                        // 变体唯一 ID
+	hullId: string;                    // 基础舰船规格 ID
+	name: string;                      // 变体名称
+	description?: string;              // 变体描述
+	weaponLoadout: WeaponLoadoutEntry[]; // 武器配置
+	opUsed: number;                    // 已用 OP 点数
+	tags?: string[];                   // 变体标签
 }
 
 // ==================== 伤害倍率 ====================

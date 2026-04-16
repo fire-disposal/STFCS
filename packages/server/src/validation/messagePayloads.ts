@@ -17,8 +17,8 @@ import type {
 	ToggleShieldPayload,
 	VentFluxPayload,
 } from "../commands/types.js";
-import { MovePhase, Faction } from "../schema/types.js";
-import type { FactionValue } from "../schema/types.js";
+import { MovePhase, Faction } from "@vt/data";
+import type { FactionValue } from "@vt/data";
 
 const MOVE_PHASES = Object.values(MovePhase);
 type FactionLiteral = Exclude<CreateObjectPayload["faction"], undefined>;
@@ -305,14 +305,14 @@ export const parseUpdateProfilePayload = (
 
 export const parseKickPlayerPayload = (
 	payload: unknown
-): { targetSessionId: string } =>
+): { playerId: string } =>
 	parseMessage(
 		payload,
 		(value) => {
 			if (!isRecord(value)) return null;
-			const targetSessionId = asString(value.targetSessionId);
-			if (!targetSessionId) return null;
-			return { targetSessionId };
+			const playerId = asString(value.playerId);
+			if (!playerId) return null;
+			return { playerId };
 		},
 		"踢人命令格式错误"
 	);

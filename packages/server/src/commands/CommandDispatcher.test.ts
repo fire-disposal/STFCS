@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GamePhase, PlayerRole, WeaponState } from "../schema/types.js";
-import { createShip } from "../factory/ShipFactory.js";
+import { GamePhase, PlayerRole, WeaponState } from "@vt/data";
+import { ObjectFactory } from "../rooms/battle/ObjectFactory.js";
 import { CommandDispatcher } from "./CommandDispatcher.js";
 import { GameRoomState, PlayerState, WeaponSlot } from "../schema/index.js";
 
@@ -18,13 +18,13 @@ function setupState() {
 	targetOwner.role = PlayerRole.PLAYER;
 	state.players.set(targetOwner.sessionId, targetOwner);
 
-	return { state, client: { sessionId: "p1" } as any };
+	return { state, client: { sessionId: "p1" } as any, factory: new ObjectFactory() };
 }
 
 describe("CommandDispatcher 核心业务", () => {
 	it("允许单阶段内多次增量移动，直到资源耗尽", () => {
-		const { state, client } = setupState();
-		const ship = createShip("frigate", 0, 0, 0, "PLAYER", "p1");
+		const { state, client, factory } = setupState();
+		const ship = factory.createShip("frigate", 0, 0, 0, "PLAYER", "p1");
 		expect(ship).not.toBeNull();
 		const s = ship!;
 		state.ships.set(s.id, s);
@@ -72,9 +72,9 @@ describe("CommandDispatcher 核心业务", () => {
 	});
 
 	it("支持多武器分别开火（每个武器按各自状态限制）", () => {
-		const { state, client } = setupState();
-		const attacker = createShip("destroyer", 0, 0, 0, "PLAYER", "p1")!;
-		const target = createShip("frigate", 300, 0, 180, "PLAYER", "p2")!;
+		const { state, client, factory } = setupState();
+		const attacker = factory.createShip("destroyer", 0, 0, 0, "PLAYER", "p1")!;
+		const target = factory.createShip("frigate", 300, 0, 180, "PLAYER", "p2")!;
 		state.ships.set(attacker.id, attacker);
 		state.ships.set(target.id, target);
 
@@ -110,9 +110,9 @@ describe("CommandDispatcher 核心业务", () => {
 	});
 
 	it("武器射界会考虑挂点朝向并拒绝背向目标", () => {
-		const { state, client } = setupState();
-		const attacker = createShip("frigate", 0, 0, 0, "PLAYER", "p1")!;
-		const targetBehind = createShip("frigate", 0, 160, 0, "PLAYER", "p2")!;
+		const { state, client, factory } = setupState();
+		const attacker = factory.createShip("frigate", 0, 0, 0, "PLAYER", "p1")!;
+		const targetBehind = factory.createShip("frigate", 0, 160, 0, "PLAYER", "p2")!;
 		state.ships.set(attacker.id, attacker);
 		state.ships.set(targetBehind.id, targetBehind);
 

@@ -8,55 +8,140 @@ import {
 	WeaponCategory,
 	MountType,
 	WeaponState,
+	WeaponSlotSize,
 	ShieldType,
 	FluxState,
 	Faction,
-} from "./types.js";
+} from "@vt/data";
 import type {
 	DamageTypeValue,
 	WeaponCategoryValue,
 	MountTypeValue,
 	WeaponStateValue,
+	WeaponSlotSizeValue,
 	ShieldTypeValue,
 	FluxStateValue,
 	FactionValue,
 	MovePhaseValue,
-} from "./types.js";
+} from "@vt/data";
 
 export class WeaponSlot extends Schema {
+	// === 挂载点信息 ===
 	@type("string") mountId: string = "";
-	@type("number") mountOffsetX: number = 0;
-	@type("number") mountOffsetY: number = 0;
+	@type("string") displayName: string = "";           // 挂载点显示名称（如"主炮"、"副炮"）
+	@type("number") mountOffsetX: number = 0;           // 挂载点位置 X（相对于船体中心）
+	@type("number") mountOffsetY: number = 0;           // 挂载点位置 Y（船头方向为 -Y）
+	@type("string") mountType: MountTypeValue = MountType.TURRET;
+	@type("string") mountSize: WeaponSlotSizeValue = WeaponSlotSize.MEDIUM;  // 挂载点尺寸
+	@type("number") mountFacing: number = 0;            // 武器基准朝向（相对于船体，0=朝船头）
+	@type("number") currentTurretAngle: number = 0;     // 炮塔当前朝向（相对于船体，仅 TURRET）
+	@type("number") arc: number = 180;                  // 射界角度范围
+
+	// === 武器规格 ===
 	@type("string") weaponSpecId: string = "";
 	@type("string") instanceId: string = "";
 	@type("string") name: string = "";
+	@type("string") description: string = "";
 	@type("string") category: WeaponCategoryValue = WeaponCategory.BALLISTIC;
 	@type("string") damageType: DamageTypeValue = DamageType.KINETIC;
-	@type("string") mountType: MountTypeValue = MountType.TURRET;
-	@type("number") mountFacing: number = 0;
-	@type("number") arcMin: number = -90;
-	@type("number") arcMax: number = 90;
-	@type("number") arc: number = 180;
+	@type("string") size: WeaponSlotSizeValue = WeaponSlotSize.MEDIUM;      // 武器尺寸
+
+	// === 战斗属性 ===
 	@type("number") damage: number = 0;
 	@type("number") baseDamage: number = 0;
-	@type("number") range: number = 0;
+	@type("number") range: number = 0;              // 最大射程
+	@type("number") minRange: number = 0;           // 最小射程（近距离无法开火）
 	@type("number") fluxCost: number = 0;
 	@type("number") fluxCostPerShot: number = 0;
-	@type("number") cooldownMax: number = 0;
-	@type("number") cooldownRemaining: number = 0;
-	@type("number") maxAmmo: number = 0;
-	@type("number") currentAmmo: number = 0;
-	@type("number") reloadTime: number = 0;
-	@type("string") state: WeaponStateValue = WeaponState.READY;
-	@type("boolean") hasFiredThisTurn: boolean = false;
 	@type("boolean") ignoresShields: boolean = false;
 
+	// === 连发系统 ===
+	@type("number") burstSize: number = 1;           // 连发数量
+	@type("number") burstDelay: number = 0.1;        // 连发间隔（秒）
+	@type("number") burstRemaining: number = 0;      // 剩余连发数
+
+	// === 冷却系统 ===
+	@type("number") cooldownMax: number = 0;
+	@type("number") cooldownRemaining: number = 0;
+
+	// === 弹药系统 ===
+	@type("number") maxAmmo: number = 0;             // 最大弹药（0=无限）
+	@type("number") currentAmmo: number = 0;
+	@type("number") reloadTime: number = 0;          // 装填时间（秒）
+	@type("number") reloadProgress: number = 0;      // 装填进度（秒）
+
+	// === 特殊效果 ===
+	@type("number") empDamage: number = 0;           // EMP 伤害
+	@type("number") tracking: number = 0;            // 追踪能力（0-1）
+	@type(["string"]) tags = new ArraySchema<string>(); // 武器标签
+
+	// === 资源系统 ===
+	@type("number") opCost: number = 0;              // OP 点数成本
+
+	// === 状态 ===
+	@type("string") state: WeaponStateValue = WeaponState.READY;
+	@type("boolean") hasFiredThisTurn: boolean = false;
+	@type("boolean") isBuiltIn: boolean = false;     // 是否为内置武器（不可更换）
+
+	// === UI ===
+	@type("string") icon: string = "";               // 武器图标
+
+	/**
+	 * 执行开火
+	 * @returns 是否成功开火
+	 */
 	fire(): boolean {
 		if (this.state !== WeaponState.READY || this.cooldownRemaining > 0) return false;
+		if (this.maxAmmo > 0 && this.currentAmmo <= 0) return false;
+
 		this.cooldownRemaining = this.cooldownMax;
 		this.hasFiredThisTurn = true;
-		if (this.maxAmmo > 0) this.currentAmmo--;
+		this.burstRemaining = this.burstSize - 1;  // 连发计数
+
+		if (this.maxAmmo > 0) {
+			this.currentAmmo--;
+			if (this.currentAmmo <= 0) {
+				this.state = WeaponState.OUT_OF_AMMO;
+				this.reloadProgress = 0;
+			}
+		}
+
 		return true;
+	}
+
+	/**
+	 * 执行连发（burst 后续射击）
+	 * @returns 是否成功连发
+	 */
+	fireBurst(): boolean {
+		if (this.burstRemaining <= 0) return false;
+		if (this.maxAmmo > 0 && this.currentAmmo <= 0) return false;
+
+		this.burstRemaining--;
+		if (this.maxAmmo > 0) this.currentAmmo--;
+
+		return true;
+	}
+
+	/**
+	 * 重置连发状态
+	 */
+	resetBurst(): void {
+		this.burstRemaining = 0;
+	}
+
+	/**
+	 * 检查是否为点防御武器
+	 */
+	isPD(): boolean {
+		return this.tags.includes("PD");
+	}
+
+	/**
+	 * 检查是否为制导武器
+	 */
+	isGuided(): boolean {
+		return this.tags.includes("GUIDED");
 	}
 }
 

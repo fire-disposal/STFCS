@@ -1,0 +1,73 @@
+/**
+ * 舰船头像样式
+ */
+
+.ship-portrait {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	background: rgba(13, 40, 71, 0.8);
+	border: 1px solid rgba(74, 158, 255, 0.3);
+	height: 100%;
+}
+
+.ship-portrait__frame {
+	width: 64px;
+	height: 64px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 2px solid var(--color-primary);
+	background: rgba(26, 74, 122, 0.3);
+}
+
+.ship-portrait__icon {
+	width: 36px;
+	height: 36px;
+	color: var(--color-primary);
+}
+
+.ship-portrait__info {
+	text-align: center;
+}
+
+.ship-portrait__name {
+	font-size: var(--text-sm);
+	font-weight: var(--font-bold);
+	color: var(--text-primary);
+	white-space: nowrap;
+	max-width: 100px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ship-portrait__faction {
+	font-size: var(--text-xs);
+	padding: var(--space-1) var(--space-2);
+	margin-top: var(--space-1);
+	font-weight: var(--font-bold);
+}
+
+.ship-portrait__faction--player {
+	background: rgba(74, 158, 255, 0.3);
+	color: var(--color-primary);
+}
+
+.ship-portrait__faction--enemy {
+	background: rgba(255, 111, 143, 0.3);
+	color: var(--color-danger);
+}
+
+/* 响应式 */
+@media (max-width: 1400px) {
+	.ship-portrait__frame {
+		width: 56px;
+		height: 56px;
+	}
+	.ship-portrait__icon {
+		width: 28px;
+		height: 28px;
+	}
+}

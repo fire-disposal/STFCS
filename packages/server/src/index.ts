@@ -15,53 +15,7 @@ export {
 	ShieldState,
 } from "./schema/index.js";
 
-// 类型导出（不含 Payload，Payload 在 commands/types）
-export type {
-	DamageTypeValue,
-	WeaponCategoryValue,
-	MountTypeValue,
-	WeaponStateValue,
-	WeaponSlotSizeValue,
-	ArmorQuadrantValue,
-	ShieldTypeValue,
-	FluxStateValue,
-	HullSizeValue,
-	ShipClassValue,
-	FactionValue,
-	PlayerRoleValue,
-	ConnectionQualityValue,
-	GamePhaseValue,
-	TurnPhaseValue,
-	MovePhaseValue,
-	FactionTurnPhaseValue,
-	TokenTypeValue,
-	TokenTurnStateValue,
-	ClientCommandValue,
-	Point,
-	SchemaMap,
-	SchemaArray,
-	MovementPlan,
-	WeaponSave,
-	ShipSave,
-	GameSave,
-	SaveMetadata,
-	SaveSummary,
-	// DTO 类型
-	ErrorDTO,
-	RoleDTO,
-	IdentityDTO,
-	GameSavedDTO,
-	GameLoadedDTO,
-	PhaseChangeDTO,
-	RoomKickedDTO,
-	ShipCreatedDTO,
-	RoomMetadata,
-	RoomListItemDTO,
-	HealthStatusDTO,
-	NetPongPayload,
-} from "./schema/types.js";
-
-// 枚举常量导出
+// 枚举常量导出（从 @vt/data）
 export {
 	DamageType,
 	WeaponCategory,
@@ -84,7 +38,90 @@ export {
 	TokenType,
 	TokenTurnState,
 	ClientCommand,
+} from "@vt/data";
+
+// 类型导出（从 @vt/data）
+export type {
+	DamageTypeValue,
+	WeaponCategoryValue,
+	MountTypeValue,
+	WeaponStateValue,
+	WeaponSlotSizeValue,
+	ArmorQuadrantValue,
+	ShieldTypeValue,
+	FluxStateValue,
+	HullSizeValue,
+	ShipClassValue,
+	FactionValue,
+	PlayerRoleValue,
+	ConnectionQualityValue,
+	GamePhaseValue,
+	TurnPhaseValue,
+	MovePhaseValue,
+	FactionTurnPhaseValue,
+	TokenTypeValue,
+	TokenTurnStateValue,
+	ClientCommandValue,
+	Point,
+	ShipHullSpec,
+	WeaponSpec,
+	WeaponMountSpec,
+} from "@vt/data";
+
+// 服务端独有类型导出（从 ./schema/types）
+export type {
+	MovementPlan,
+	WeaponSave,
+	ShipSave,
+	GameSave,
+	SaveMetadata,
+	SaveSummary,
+	// 玩家档案类型
+	VariantConfig,
+	CustomVariant,
+	PlayerProfile,
+	PlayerSettings,
+	ProfileSummary,
+	// DTO 类型
+	ErrorDTO,
+	RoleDTO,
+	IdentityDTO,
+	GameSavedDTO,
+	GameLoadedDTO,
+	PhaseChangeDTO,
+	RoomKickedDTO,
+	ShipCreatedDTO,
+	RoomMetadata,
+	RoomListItemDTO,
+	HealthStatusDTO,
+	NetPongPayload,
 } from "./schema/types.js";
+
+// 命令结果类型导出
+export type { FireResult, DamageResult, ConfigureResult } from "./commands/handlers/index.js";
+
+// Schema 容器类型（本地定义，避免循环依赖）
+export interface SchemaMap<T> {
+	get(key: string): T | undefined;
+	set(key: string, value: T): void;
+	has(key: string): boolean;
+	delete(key: string): boolean;
+	clear(): void;
+	forEach(cb: (value: T, key: string) => void): void;
+	entries(): IterableIterator<[string, T]>;
+	keys(): IterableIterator<string>;
+	values(): IterableIterator<T>;
+	size: number;
+}
+
+export interface SchemaArray<T> {
+	length: number;
+	[index: number]: T;
+	push(...items: T[]): number;
+	pop(): T | undefined;
+	forEach(cb: (value: T, index: number) => void): void;
+	at(index: number): T | undefined;
+}
 
 // Payload 类型导出（客户端请求）
 export type {
@@ -92,19 +129,34 @@ export type {
 	ToggleShieldPayload,
 	FireWeaponPayload,
 	VentFluxPayload,
+	ConfigureWeaponPayload,
+	ConfigureVariantPayload,
+	WeaponLoadoutEntry,
+	SaveVariantPayload,
+	LoadVariantPayload,
+	DeleteVariantPayload,
 	ClearOverloadPayload,
 	SetArmorPayload,
+	RepairWeaponPayload,
 	AdvanceMovePhasePayload,
 	AssignShipPayload,
 	ToggleReadyPayload,
 	NextPhasePayload,
 	CreateObjectPayload,
 	NetPingPayload,
+	SaveGamePayload,
+	LoadGamePayload,
+	DeleteSavePayload,
+	ListSavesPayload,
+	KickPlayerPayload,
+	UpdateProfilePayload,
 } from "./commands/types.js";
 
 // 服务层导出
-export { PlayerService, GameService, SaveService, saveService } from "./services/index.js";
-export type { PlayerProfile, SaveInfo } from "./services/index.js";
+export { PlayerService, type OnlineProfile } from "./services/index.js";
+export { GameService } from "./services/index.js";
+export { SaveService, saveService } from "./services/index.js";
+export { ProfileService, profileService } from "./services/ProfileService.js";
 
 // 服务器启动代码
 import { createServer } from "http";

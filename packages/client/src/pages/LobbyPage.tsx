@@ -117,10 +117,14 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 											{room.clients}/{room.maxClients} 玩家
 										</span>
 										<span>阶段：{room.metadata.phase}</span>
-										{room.metadata.turnCount !== undefined && (
+										{room.metadata.turnCount !== undefined && room.metadata.turnCount > 0 && (
 											<span>回合：{room.metadata.turnCount}</span>
 										)}
-										<span>房主：#{room.metadata.ownerShortId}</span>
+										{room.metadata.ownerShortId != null ? (
+											<span>房主：#{room.metadata.ownerShortId}</span>
+										) : (
+											<span className="lobby-room-badge lobby-room-badge--warning">等待房主</span>
+										)}
 										{currentRoomId === room.roomId ? (
 											<span className="lobby-room-badge lobby-room-badge--warning">
 												当前所在房间

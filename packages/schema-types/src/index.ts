@@ -5,7 +5,7 @@
  * 供前端和其他包使用，零维护成本，100% 同步
  *
  * 使用方式：
- *   import type { ShipStateType, GameRoomStateType } from '@vt/schema-types';
+ *   import type { ShipStateType, GameRoomStateType, MoveTokenPayload } from '@vt/schema-types';
  */
 
 // ==================== Schema 实例类型（自动推导）====================
@@ -41,6 +41,85 @@ export type PlayerRole = PlayerStateType["role"];
 export type WeaponState = WeaponSlotType["state"];
 export type MovePhase = ShipStateType["movePhase"];
 export type ConnectionQuality = PlayerStateType["connectionQuality"];
+
+// ==================== Payload 类型（从 @vt/server 导入）====================
+
+import type {
+	MoveTokenPayload,
+	ToggleShieldPayload,
+	FireWeaponPayload,
+	VentFluxPayload,
+	ConfigureWeaponPayload,
+	ConfigureVariantPayload,
+	WeaponLoadoutEntry,
+	SaveVariantPayload,
+	LoadVariantPayload,
+	DeleteVariantPayload,
+	RepairWeaponPayload,
+	ClearOverloadPayload,
+	SetArmorPayload,
+	AdvanceMovePhasePayload,
+	AssignShipPayload,
+	ToggleReadyPayload,
+	NextPhasePayload,
+	CreateObjectPayload,
+	NetPingPayload,
+	SaveGamePayload,
+	LoadGamePayload,
+	DeleteSavePayload,
+	ListSavesPayload,
+	KickPlayerPayload,
+	UpdateProfilePayload,
+} from "@vt/server";
+
+export type {
+	MoveTokenPayload,
+	ToggleShieldPayload,
+	FireWeaponPayload,
+	VentFluxPayload,
+	// 武器配置
+	ConfigureWeaponPayload,
+	ConfigureVariantPayload,
+	WeaponLoadoutEntry,
+	// 玩家档案
+	SaveVariantPayload,
+	LoadVariantPayload,
+	DeleteVariantPayload,
+	// DM 指令
+	RepairWeaponPayload,
+	ClearOverloadPayload,
+	SetArmorPayload,
+	// 移动和回合
+	AdvanceMovePhasePayload,
+	AssignShipPayload,
+	ToggleReadyPayload,
+	NextPhasePayload,
+	CreateObjectPayload,
+	// 网络
+	NetPingPayload,
+	// 存档
+	SaveGamePayload,
+	LoadGamePayload,
+	DeleteSavePayload,
+	ListSavesPayload,
+	// 房间管理
+	KickPlayerPayload,
+	UpdateProfilePayload,
+};
+
+// ==================== 命令结果类型（从 @vt/server 导入）====================
+
+import type {
+	FireResult,
+	DamageResult,
+	ConfigureResult,
+} from "@vt/server";
+
+export type {
+	FireResult,
+	DamageResult,
+	ConfigureResult,
+};
 
 // ==================== Schema 容器类型（客户端辅助）====================
 

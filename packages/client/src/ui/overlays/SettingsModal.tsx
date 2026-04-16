@@ -1,12 +1,13 @@
 /**
  * 设置菜单组件
- * 
+ *
  * 提供游戏设置选项
  * - 坐标精度设置
- * - 视角设置
- * - 游戏设置
- * - 音频设置
- * 
+ * - 角度模式设置
+ * - 缩放设置
+ *
+ * 图层控制已移至右侧面板 ViewControlPanel
+ *
  * 使用 game-panels.css 样式系统
  */
 
@@ -25,14 +26,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'view' | 'game' | 'audio'>('general');
-  
+
   const {
     coordinatePrecision,
     setCoordinatePrecision,
     angleMode,
     setAngleMode,
-    showGrid,
-    toggleGrid,
     zoom,
     setZoom,
   } = useUIStore();
@@ -130,22 +129,6 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
           {activeTab === 'view' && (
             <>
               <CoordinateSettingsPanel />
-              
-              <div className="game-section">
-                <div className="game-section__title">🔲 网格显示</div>
-                <div className="game-setting-row">
-                  <div>
-                    <div className="game-setting__label">显示网格</div>
-                    <div className="game-setting__hint">辅助定位和测量</div>
-                  </div>
-                  <button
-                    className={`game-toggle ${showGrid ? 'game-toggle--active' : ''}`}
-                    onClick={toggleGrid}
-                  >
-                    <div className={`game-toggle__knob ${showGrid ? '' : ''}`} />
-                  </button>
-                </div>
-              </div>
 
               <div className="game-section">
                 <div className="game-section__title">🔍 默认缩放</div>
@@ -164,6 +147,16 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     className="game-slider"
                     style={{ width: '150px' }}
                   />
+                </div>
+              </div>
+
+              <div className="game-section">
+                <div className="game-section__title">ℹ️ 图层控制</div>
+                <div className="game-setting-row">
+                  <div>
+                    <div className="game-setting__label">图层开关</div>
+                    <div className="game-setting__hint">请使用右侧面板"视图"页的图层管理</div>
+                  </div>
                 </div>
               </div>
             </>

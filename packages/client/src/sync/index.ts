@@ -7,12 +7,26 @@ export * from "./types";
 
 // 命令发送
 export { GameClient } from "./GameClient";
+
+// Payload 类型从 @vt/schema-types 导入（与后端 100% 同步）
 export type {
-	MovePayload,
-	FireWeaponPayload,
+	MoveTokenPayload,
 	ToggleShieldPayload,
+	FireWeaponPayload,
+	VentFluxPayload,
+	ClearOverloadPayload,
+	SetArmorPayload,
+	AdvanceMovePhasePayload,
+	AssignShipPayload,
+	ToggleReadyPayload,
+	NextPhasePayload,
+	CreateObjectPayload,
+	SaveGamePayload,
+	LoadGamePayload,
+	KickPlayerPayload,
 	UpdateProfilePayload,
-} from "./GameClient";
+	NetPingPayload,
+} from "@vt/schema-types";
 
 // Hooks
 export { useCurrentGameRoom } from "./useCurrentGameRoom";

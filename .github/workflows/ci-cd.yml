@@ -3,13 +3,69 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
+  PNPM_VERSION: 10.32.1
+  NODE_VERSION: 24
 
 jobs:
+  validate:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Lint
+        run: pnpm run lint
+
+      - name: Run Typecheck
+        run: pnpm run typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Tests
+        run: pnpm run test
+
   prepare:
+    name: Prepare Environment
+    needs: [validate, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     outputs:
       server_image: ${{ steps.set-images.outputs.server_image }}
@@ -23,6 +79,7 @@ jobs:
           echo "client_image=${LOWERED}-client" >> $GITHUB_OUTPUT
 
   build:
+    name: Build & Push Images
     needs: prepare
     runs-on: ubuntu-latest
     permissions:
@@ -31,15 +88,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build and push Server
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./packages/server/Dockerfile
@@ -47,8 +107,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - uses: docker/build-push-action@v6
+      - name: Build and push Client
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./packages/client/Dockerfile
@@ -56,6 +119,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
             ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             COMMIT_SHA=${{ github.sha }}
 

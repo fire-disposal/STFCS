@@ -1,5 +1,4 @@
-import { getAvailableShips } from "@vt/data";
-import type { ShipHullSpec } from "@vt/rules";
+import { getAvailableShips, type ShipHullSpec } from "@vt/data";
 import type { FactionValue } from "@/sync/types";
 import { Faction } from "@/sync/types";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Palette, Rocket, Sparkles } from "lucide-react";

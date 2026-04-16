@@ -12,8 +12,11 @@ import { useInteraction } from "../interactions/InteractionHandler";
 import { useLayerSystem } from "./useLayerSystem";
 import { usePixiApp } from "./usePixiApp";
 import { useShipRendering } from "../entities/ShipRenderer";
+import { useShipHUDRendering } from "../entities/ShipHUDRenderer";
 import { useStarfieldRendering } from "../systems/StarfieldRenderer";
 import { useWeaponArcsRendering } from "../entities/WeaponArcRenderer";
+import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
+import { useMovementVisualRendering, type MovementPreviewState } from "../entities/MovementVisualRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 
 interface GameCanvasProps {
@@ -31,6 +34,8 @@ interface GameCanvasProps {
 	showBackground?: boolean;
 	onClick?: (x: number, y: number) => void;
 	viewRotation?: number;
+	/** 移动预览状态（从 BattleCommandPanel 同步） */
+	movementPreview?: MovementPreviewState;
 }
 
 const useStarfield = () => {
@@ -65,6 +70,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	showBackground = true,
 	onClick,
 	viewRotation = 0,
+	movementPreview,
 }) => {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
@@ -92,6 +98,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useCursorRendering(layerSystem.layers, mapCursor);
 	useStarfieldRendering(layerSystem.layers, starfield);
+
+	// 舰船战术标记渲染（在 world 层）
 	useShipRendering(
 		layerSystem.layers,
 		ships,
@@ -106,22 +114,38 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		},
 		{ onSelectShip, storeSelectShip: selectShipAction }
 	);
+
+	// 舰船 HUD 渲染（血条/标签，在 HUD 层，固定像素大小）
+	useShipHUDRendering(
+		layerSystem.layers,
+		ships,
+		{ x: cameraX, y: cameraY, zoom, viewRotation },
+		canvasSize,
+		{ showHpBars: showLabels, showLabels: showLabels }
+	);
+
 	useWeaponArcsRendering(layerSystem.layers, ships, selectedShipId, {
 		showWeaponArcs,
-		showMovementRange,
+		showMovementRange: false,
+	});
+	useArmorHexagonRendering(layerSystem.layers, ships);
+	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId, {
+		show: showMovementRange,
+		preview: movementPreview,
 	});
 	useGridRendering(layerSystem.layers, showGrid);
 
+	// 更新可见性
 	useEffect(() => {
 		if (!layerSystem.layers) return;
-		layerSystem.layers.labels.visible = showLabels;
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
-	}, [layerSystem.layers, showLabels, showEffects, showShipIcons]);
+	}, [layerSystem.layers, showEffects, showShipIcons]);
 
+	// 更新世界层和 HUD 层变换
 	useEffect(() => {
 		camera.cameraRef.current = { x: cameraX, y: cameraY, zoom, viewRotation };
-		layerSystem.updateLayerTransforms(
+		layerSystem.updateWorldTransforms(
 			zoom,
 			cameraX,
 			cameraY,

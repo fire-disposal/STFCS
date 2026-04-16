@@ -41,6 +41,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		showLabels,
 		showEffects,
 		showShipIcons,
+		showHexagonArmor,
 		mapCursor,
 		setZoom,
 		setCameraPosition,
@@ -52,6 +53,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		toggleLabels,
 		toggleEffects,
 		toggleShipIcons,
+		toggleHexagonArmor,
 		setMapCursor,
 		clearMapCursor,
 	} = useUIStore();
@@ -302,10 +304,10 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 					</label>
 
 					<label className="view-toggle">
-						<input type="checkbox" checked={showEffects} onChange={toggleEffects} />
+						<input type="checkbox" checked={showHexagonArmor} onChange={toggleHexagonArmor} />
 						<span className="view-toggle__indicator" />
 						<Shield className="view-toggle__icon" />
-						<span className="view-toggle__label">六边形护甲</span>
+						<span className="view-toggle__label">护甲</span>
 					</label>
 				</div>
 			</div>

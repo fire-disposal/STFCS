@@ -3,7 +3,7 @@
  */
 
 import type { Client } from "@colyseus/core";
-import { ClientCommand, PlayerRole } from "../schema/types.js";
+import { ClientCommand, PlayerRole } from "@vt/data";
 import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 import type { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { toErrorDto, toNetPongDto, toRoomKickedDto } from "../dto/index.js";
@@ -37,6 +37,8 @@ interface Context {
 	createObject: (payload: CreateObjectPayload) => void;
 	enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) => void;
 	dissolveRoom: () => void;
+	saveGame: (name: string) => Promise<string>;
+	loadGame: (saveId: string) => Promise<boolean>;
 }
 
 export function registerMessageHandlers(
@@ -196,7 +198,7 @@ export function registerMessageHandlers(
 		});
 	});
 
-	onMessage("ROOM_UPDATE_PROFILE", (client, payload) => {
+	onMessage(ClientCommand.CMD_UPDATE_PROFILE, (client, payload) => {
 		handleMessage(client, () => {
 			const p = parseUpdateProfilePayload(payload);
 			const player = ctx.state.players.get(client.sessionId);
@@ -212,23 +214,51 @@ export function registerMessageHandlers(
 		});
 	});
 
-	onMessage("ROOM_KICK_PLAYER", (client, payload) => {
+	onMessage(ClientCommand.CMD_KICK_PLAYER, (client, payload) => {
 		handleMessage(client, () => {
 			const p = parseKickPlayerPayload(payload);
 			if (client.sessionId !== ctx.getRoomOwnerId()) {
 				throw new Error("仅房主可踢出");
 			}
-			const target = room.clients.find((c) => c.sessionId === p.targetSessionId);
+			const target = room.clients.find((c) => c.sessionId === p.playerId);
 			target?.send("ROOM_KICKED", toRoomKickedDto("被移出"));
 			target?.leave(4001);
 		});
 	});
 
-	onMessage("ROOM_DISSOLVE", (client) => {
+	onMessage(ClientCommand.CMD_ROOM_DISSOLVE, (client) => {
 		if (client.sessionId !== ctx.getRoomOwnerId()) {
 			client.send("error", toErrorDto("仅房主可解散房间"));
 			return;
 		}
 		ctx.dissolveRoom();
+	});
+
+	onMessage(ClientCommand.CMD_SAVE_GAME, (client, payload) => {
+		handleMessage(client, async () => {
+			if (client.sessionId !== ctx.getRoomOwnerId()) {
+				throw new Error("仅房主可保存游戏");
+			}
+			const p = payload as { name?: string };
+			const name = String(p.name || "").trim() || `Save-${Date.now()}`;
+			await ctx.saveGame(name);
+		});
+	});
+
+	onMessage(ClientCommand.CMD_LOAD_GAME, (client, payload) => {
+		handleMessage(client, async () => {
+			if (client.sessionId !== ctx.getRoomOwnerId()) {
+				throw new Error("仅房主可加载游戏");
+			}
+			const p = payload as { saveId?: string };
+			const saveId = String(p.saveId || "").trim();
+			if (!saveId) {
+				throw new Error("需要指定存档 ID");
+			}
+			const success = await ctx.loadGame(saveId);
+			if (!success) {
+				throw new Error("加载存档失败");
+			}
+		});
 	});
 }

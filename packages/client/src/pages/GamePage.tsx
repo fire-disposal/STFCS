@@ -7,24 +7,25 @@
  * - 右侧：信息面板（视图/日志/DM，支持折叠）
  * - 底部：战斗命令面板（整合舰船信息/移动/武器/回合）
  *
- * 样式：game-layout.css + battle-panel.css
+ * 样式：game-layout.css + BattleCommandPanel 模块
  */
 
-import PixiCanvas from "@/renderer/core/PixiCanvas";
-import { notify } from "@/ui/shared/Notification";
-import { PhaseBar } from "@/ui/panels/PhaseBar";
-import PlayerRosterModal from "@/ui/overlays/PlayerRosterModal";
-import { BattleCommandPanel } from "@/ui/panels/BattleCommandPanel";
-import { RightSidePanel } from "@/ui/panels/RightSidePanel";
-import SettingsModal from "@/ui/overlays/SettingsModal";
-import { useCurrentGameRoom } from "@/sync";
-import { useShips } from "@/sync";
 import { NetworkManager } from "@/network/NetworkManager";
+import type { MovementPreviewState } from "@/renderer";
+import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useGameStore } from "@/state/stores";
 import { useUIStore } from "@/state/stores/uiStore";
-import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
+import { useCurrentGameRoom } from "@/sync";
+import { useShips } from "@/sync";
 import type { ClientCommandValue, FactionValue, PlayerState } from "@/sync/types";
 import { ClientCommand, Faction, GamePhase, PlayerRole } from "@/sync/types";
+import PlayerRosterModal from "@/ui/overlays/PlayerRosterModal";
+import SettingsModal from "@/ui/overlays/SettingsModal";
+import { BattleCommandPanel } from "@/ui/panels/BattleCommandPanel";
+import { RightSidePanel } from "@/ui/panels/RightSidePanel";
+import { TurnStatusBar } from "@/ui/panels/TurnStatusBar";
+import { notify } from "@/ui/shared/Notification";
+import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 import { LogOut, Rocket, Settings, Users } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
@@ -39,6 +40,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+	const [movementPreview, setMovementPreview] = useState<MovementPreviewState | undefined>(
+		undefined
+	);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
 	const selectedShipId = useGameStore((state) => state.selectedShipId);
 	const selectShip = useGameStore((state) => state.selectShip);
@@ -172,9 +176,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	);
 
 	const setArmor = useCallback(
-		(shipId: string, section: number, value: number) => {
+		(shipId: string, quadrant: number, value: number) => {
 			if (!room) return;
-			room.send(ClientCommand.CMD_SET_ARMOR, { shipId, section, value });
+			room.send(ClientCommand.CMD_SET_ARMOR, { shipId, quadrant, value });
 		},
 		[room]
 	);
@@ -200,7 +204,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const kickPlayer = useCallback(
 		(sessionId: string) => {
 			if (!room) return;
-			room.send("ROOM_KICK_PLAYER", { targetSessionId: sessionId });
+			room.send(ClientCommand.CMD_KICK_PLAYER, { playerId: sessionId });
 			notify.info("已发送踢出请求");
 		},
 		[room]
@@ -267,11 +271,15 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</div>
 
 				<div className="game-layout__top-bar-center">
-					<PhaseBar
+					<TurnStatusBar
 						currentPhase={room.state.currentPhase}
 						turnCount={room.state.turnCount}
 						activeFaction={room.state.activeFaction}
-						playerRole={currentPlayer?.role || PlayerRole.PLAYER}
+						players={players}
+						ships={ships}
+						currentSessionId={room.sessionId || ""}
+						onToggleReady={toggleReady}
+						isReady={!!currentPlayer?.isReady}
 					/>
 				</div>
 
@@ -307,6 +315,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							showWeaponArcs={showWeaponArcs}
 							showMovementRange={showMovementRange}
 							selectedShipId={selectedShipId}
+							movementPreview={movementPreview}
 							onSelectShip={(id) => {
 								selectShip(id);
 							}}
@@ -338,14 +347,12 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			{/* 底部战斗命令面板 */}
 			<BattleCommandPanel
 				selectedShip={selectedShip}
+				ships={ships}
 				networkManager={networkManager}
 				onToggleShield={handleToggleShield}
-				onFire={handleFire}
 				onVent={handleVent}
-				onToggleReady={toggleReady}
-				isReady={!!currentPlayer?.isReady}
-				readyLocked={!isPlayerTurn}
 				disabled={!canControlSelectedShip}
+				onMovementPreviewChange={setMovementPreview}
 			/>
 
 			{/* 弹窗 */}

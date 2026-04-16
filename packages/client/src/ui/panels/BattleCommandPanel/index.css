@@ -1,0 +1,80 @@
+/**
+ * 战斗命令面板主容器样式
+ */
+
+/* ====== 主容器 ====== */
+.battle-panel {
+	height: 200px;
+	display: flex;
+	gap: var(--space-3);
+	padding: var(--space-3) var(--space-4);
+	background: rgba(6, 16, 26, 0.95);
+	border-top: 2px solid rgba(74, 158, 255, 0.3);
+	box-sizing: border-box;
+}
+
+.battle-panel__empty {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-3);
+	color: var(--text-tertiary);
+}
+
+.battle-panel__empty-icon {
+	width: 24px;
+	height: 24px;
+	opacity: 0.5;
+}
+
+/* ====== 5列布局 ====== */
+.battle-panel__column {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	flex: 1;
+	min-width: 0;
+}
+
+.battle-panel__column--combat {
+	flex-direction: row;
+	gap: var(--space-2);
+}
+
+/* ====== 响应式 ====== */
+@media (max-width: 1400px) {
+	.battle-panel {
+		height: 180px;
+		padding: var(--space-2) var(--space-3);
+		gap: var(--space-2);
+	}
+}
+
+@media (max-width: 1200px) {
+	.battle-panel {
+		height: auto;
+		min-height: 160px;
+		flex-wrap: wrap;
+	}
+	.battle-panel__column:nth-child(3) {
+		order: -1;
+		width: 100%;
+		min-height: 120px;
+	}
+	.battle-panel__column {
+		flex: 1;
+		min-width: 100px;
+	}
+}
+
+@media (max-width: 768px) {
+	.battle-panel {
+		flex-direction: column;
+		height: auto;
+	}
+	.battle-panel__column {
+		width: 100%;
+	}
+}

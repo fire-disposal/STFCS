@@ -2,7 +2,7 @@
  * 房间 DTO 转换器
  */
 
-import { GamePhase } from "../schema/types.js";
+import { GamePhase } from "@vt/data";
 import type { RoomListItemDTO, RoomMetadata } from "../schema/types.js";
 
 interface MatchmakeRoomRecord {

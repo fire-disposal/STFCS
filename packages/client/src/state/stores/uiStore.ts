@@ -89,6 +89,7 @@ interface UIActions {
 	toggleLabels: () => void;
 	toggleEffects: () => void;
 	toggleShipIcons: () => void;
+	toggleHexagonArmor: () => void;
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
 

@@ -3,13 +3,13 @@
  */
 
 import { MapSchema, Schema, type } from "@colyseus/schema";
-import { GamePhase, PlayerRole, ConnectionQuality, Faction } from "./types.js";
+import { GamePhase, PlayerRole, ConnectionQuality, Faction } from "@vt/data";
 import type {
 	GamePhaseValue,
 	PlayerRoleValue,
 	ConnectionQualityValue,
 	FactionValue,
-} from "./types.js";
+} from "@vt/data";
 import { ShipState } from "./ShipStateSchema.js";
 
 export class PlayerState extends Schema {

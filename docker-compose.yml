@@ -7,7 +7,7 @@ version: '3.8'
 
 services:
   server:
-    image: ghcr.io/fire-disposal/stfcs-server:latest
+    image: ${SERVER_IMAGE:-ghcr.io/fire-disposal/stfcs-server}:${IMAGE_TAG:-latest}
     container_name: stfcs-server
     restart: unless-stopped
     ports:
@@ -35,7 +35,7 @@ services:
           memory: 128M
 
   client:
-    image: ghcr.io/fire-disposal/stfcs-client:latest
+    image: ${CLIENT_IMAGE:-ghcr.io/fire-disposal/stfcs-client}:${IMAGE_TAG:-latest}
     container_name: stfcs-client
     restart: unless-stopped
     ports:

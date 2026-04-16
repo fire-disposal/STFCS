@@ -3,6 +3,11 @@
  */
 
 import type {
+	ConnectionQualityValue,
+	GamePhaseValue,
+	PlayerRoleValue,
+} from "@vt/data";
+import type {
 	ErrorDTO,
 	GameLoadedDTO,
 	GameSavedDTO,
@@ -11,9 +16,6 @@ import type {
 	RoleDTO,
 	RoomKickedDTO,
 	ShipCreatedDTO,
-	ConnectionQualityValue,
-	GamePhaseValue,
-	PlayerRoleValue,
 	NetPongPayload,
 } from "../schema/types.js";
 

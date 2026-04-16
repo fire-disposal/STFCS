@@ -1,5 +1,9 @@
 /**
- * ?????? - Zustand ????
+ * gameStore - Zustand 状态管理
+ *
+ * 移动阶段类型说明：
+ * - MovePhaseValue: 服务端同步类型（PHASE_A/B/C）
+ * - MovePhaseUIValue: 客户端 UI 状态类型（包含 NONE 表示未开始）
  */
 
 import { create } from "zustand";
@@ -12,15 +16,13 @@ import type {
 	CameraState,
 	PlayerCamera,
 } from "@/sync/types";
+import { MovePhaseUI, type MovePhaseUIValue, type MovePhaseValue } from "@vt/data";
 
-export const MovePhase = {
-	PHASE_A: "PHASE_A",
-	PHASE_B: "PHASE_B",
-	PHASE_C: "PHASE_C",
-	NONE: "NONE",
-} as const;
+// 导出常量供组件使用
+export { MovePhaseUI };
 
-export type MovementPhaseValue = (typeof MovePhase)[keyof typeof MovePhase];
+// 类型别名 - 保持向后兼容
+export type MovementPhaseValue = MovePhaseUIValue;
 
 export interface MovementCommand {
 	forward?: number;
@@ -216,7 +218,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 	startMovement: (maxSpeed, maxTurnRate) => set({
 		shipMaxSpeed: maxSpeed,
 		shipMaxTurnRate: maxTurnRate,
-		movementPhase: "PHASE_A",
+		movementPhase: MovePhaseUI.PHASE_A,
 		phaseA: { ...initialPhaseFuel, fuel: { forwardMax: maxSpeed * 2, forwardUsed: 0, strafeMax: maxSpeed, strafeUsed: 0, turnMax: 0, turnUsed: 0 } },
 		phaseB: { ...initialPhaseFuel, fuel: { forwardMax: 0, forwardUsed: 0, strafeMax: 0, strafeUsed: 0, turnMax: maxTurnRate, turnUsed: 0 } },
 		phaseC: { ...initialPhaseFuel, fuel: { forwardMax: maxSpeed * 2, forwardUsed: 0, strafeMax: maxSpeed, strafeUsed: 0, turnMax: 0, turnUsed: 0 } },
@@ -231,9 +233,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 		return { [key]: { ...phaseState, fuel, lastMove: command } };
 	}),
 	advanceMovePhase: () => set((state) => {
-		const phases: MovementPhaseValue[] = ["PHASE_A", "PHASE_B", "PHASE_C"];
+		const phases: MovePhaseUIValue[] = [MovePhaseUI.PHASE_A, MovePhaseUI.PHASE_B, MovePhaseUI.PHASE_C];
 		const idx = phases.indexOf(state.movementPhase);
-		const next = idx < phases.length - 1 ? phases[idx + 1] : "PHASE_C";
+		const next = idx < phases.length - 1 ? phases[idx + 1] : MovePhaseUI.PHASE_C;
 		return { movementPhase: next };
 	}),
 	setMovePhase: (phase) => set({ movementPhase: phase }),

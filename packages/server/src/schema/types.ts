@@ -1,132 +1,31 @@
 /**
- * 服务端类型定义
+ * 服务端独有类型定义
  *
- * 枚举从 @vt/data 导入（唯一来源）
- * 本文件只定义服务端独有类型：
+ * 枚举和基础类型请直接从 @vt/data 导入：
+ *   import { Faction, GamePhase } from "@vt/data";
+ *   import type { FactionValue, GamePhaseValue } from "@vt/data";
+ *
+ * 移动计划从 @vt/rules 导入：
+ *   import type { MovementPlan } from "@vt/rules";
+ *
+ * 本文件只定义服务端独有的：
  * - DTO（服务端响应）
  * - 存档接口
- * - Schema 辅助类型
+ * - 其他服务端特有类型
  */
 
-// ==================== 从 @vt/data 导入枚举（唯一来源）====================
-
-import {
-	// 武器相关
-	DamageType,
-	WeaponCategory,
-	MountType,
-	WeaponState,
-	WeaponSlotSize,
-	ShieldType,
-	FluxState,
-
-	// 舰船相关
-	HullSize,
-	ShipClass,
-	ArmorQuadrant,
-	ARMOR_QUADRANTS,
-
-	// 游戏状态
-	Faction,
-	PlayerRole,
-	GamePhase,
-	TurnPhase,
-	MovePhase,
-	FactionTurnPhase,
-	ConnectionQuality,
-
-	// Token/命令
-	TokenType,
-	TokenTurnState,
-	ClientCommand,
-
-	// 基础类型
-	Point,
-} from "@vt/data";
-
 import type {
-	DamageTypeValue,
-	WeaponCategoryValue,
-	MountTypeValue,
-	WeaponStateValue,
-	WeaponSlotSizeValue,
-	ShieldTypeValue,
-	FluxStateValue,
-	HullSizeValue,
-	ShipClassValue,
-	ArmorQuadrantValue,
 	FactionValue,
-	PlayerRoleValue,
 	GamePhaseValue,
-	TurnPhaseValue,
 	MovePhaseValue,
-	FactionTurnPhaseValue,
+	PlayerRoleValue,
+	WeaponStateValue,
 	ConnectionQualityValue,
-	TokenTypeValue,
-	TokenTurnStateValue,
-	ClientCommandValue,
 } from "@vt/data";
+import type { MovementPlan } from "@vt/rules";
 
-// 重新导出供其他模块使用（值）
-export {
-	DamageType,
-	WeaponCategory,
-	MountType,
-	WeaponState,
-	WeaponSlotSize,
-	ShieldType,
-	FluxState,
-	HullSize,
-	ShipClass,
-	ArmorQuadrant,
-	ARMOR_QUADRANTS,
-	Faction,
-	PlayerRole,
-	GamePhase,
-	TurnPhase,
-	MovePhase,
-	FactionTurnPhase,
-	ConnectionQuality,
-	TokenType,
-	TokenTurnState,
-	ClientCommand,
-};
-
-// 重新导出类型（interface 和 type alias）
-export type {
-	Point,
-	DamageTypeValue,
-	WeaponCategoryValue,
-	MountTypeValue,
-	WeaponStateValue,
-	WeaponSlotSizeValue,
-	ShieldTypeValue,
-	FluxStateValue,
-	HullSizeValue,
-	ShipClassValue,
-	ArmorQuadrantValue,
-	FactionValue,
-	PlayerRoleValue,
-	GamePhaseValue,
-	TurnPhaseValue,
-	MovePhaseValue,
-	FactionTurnPhaseValue,
-	ConnectionQualityValue,
-	TokenTypeValue,
-	TokenTurnStateValue,
-	ClientCommandValue,
-};
-
-// ==================== 服务端独有类型 ====================
-
-/** 移动计划（不在 @vt/data） */
-export interface MovementPlan {
-	phaseAForward: number;
-	phaseAStrafe: number;
-	turnAngle: number;
-	phaseCForward: number;
-	phaseCStrafe: number;
-}
+// 重导出 MovementPlan 以保持向后兼容
+export type { MovementPlan };
 
 // ==================== DTO 类型（服务端响应）====================
 
@@ -220,9 +119,13 @@ export interface NetPongPayload {
 export interface WeaponSave {
 	mountId: string;
 	instanceId: string;
+	weaponSpecId: string;          // 武器规格 ID
 	state: WeaponStateValue;
 	cooldownRemaining: number;
 	currentAmmo?: number;
+	reloadProgress?: number;       // 装填进度
+	burstRemaining?: number;       // 连发剩余
+	currentTurretAngle?: number;   // 炮塔当前朝向（相对于船体）
 }
 
 export interface ShipSave {
@@ -242,9 +145,11 @@ export interface ShipSave {
 	shieldActive: boolean;
 	shieldCurrent: number;
 	shieldMax: number;
+	shieldOrientation: number;     // 护盾朝向
 	armorGrid: number[];
 	weapons: WeaponSave[];
 	isOverloaded: boolean;
+	overloadTime: number;          // 过载剩余时间
 	hasMoved: boolean;
 	hasFired: boolean;
 	movePhase: MovePhaseValue;
@@ -258,8 +163,10 @@ export interface ShipSave {
 export interface GameSave {
 	id: string;
 	name: string;
+	description?: string;          // 存档描述
 	createdAt: number;
 	updatedAt: number;
+	version: string;               // 存档版本号
 	turnCount: number;
 	currentPhase: GamePhaseValue;
 	activeFaction: FactionValue;
@@ -271,6 +178,7 @@ export interface GameSave {
 export interface SaveMetadata {
 	id: string;
 	name: string;
+	description?: string;
 	createdAt: number;
 	updatedAt: number;
 	turnCount: number;
@@ -281,26 +189,51 @@ export interface SaveSummary {
 	total: number;
 }
 
-// ==================== Schema 容器类型辅助 ====================
+// ==================== 玩家档案接口 ====================
 
-export interface SchemaMap<T> {
-	get(key: string): T | undefined;
-	set(key: string, value: T): void;
-	has(key: string): boolean;
-	delete(key: string): boolean;
-	clear(): void;
-	forEach(cb: (value: T, key: string) => void): void;
-	entries(): IterableIterator<[string, T]>;
-	keys(): IterableIterator<string>;
-	values(): IterableIterator<T>;
-	size: number;
+/** 舰船变体配置 */
+export interface VariantConfig {
+	mountId: string;
+	weaponSpecId: string;          // 空字符串 = 不装备
 }
 
-export interface SchemaArray<T> {
-	length: number;
-	[index: number]: T;
-	push(...items: T[]): number;
-	pop(): T | undefined;
-	forEach(cb: (value: T, index: number) => void): void;
-	at(index: number): T | undefined;
+/** 自定义舰船变体 */
+export interface CustomVariant {
+	id: string;                    // 变体唯一 ID
+	hullId: string;                // 基础舰船 ID
+	name: string;                  // 变体名称
+	description?: string;          // 变体描述
+	weaponLoadout: VariantConfig[];
+	opUsed: number;                // 已用 OP 点数
+	createdAt: number;
+	updatedAt: number;
+	isPublic: boolean;             // 是否公开分享
+}
+
+/** 玩家档案 */
+export interface PlayerProfile {
+	id: string;                    // 档案 ID（关联用户账号）
+	displayName: string;           // 显示名称
+	customVariants: CustomVariant[];  // 自定义变体列表
+	favoriteVariants: string[];    // 收藏的变体 ID
+	settings: PlayerSettings;      // 玩家设置
+	createdAt: number;
+	updatedAt: number;
+}
+
+/** 玩家设置 */
+export interface PlayerSettings {
+	showWeaponArcs: boolean;       // 默认显示武器射界
+	showGrid: boolean;             // 显示网格
+	coordinatePrecision: "exact" | "rounded10" | "rounded100";
+	angleMode: "degrees" | "radians" | "nav";
+	theme: "dark" | "light";
+}
+
+/** 玩家档案摘要（用于列表显示） */
+export interface ProfileSummary {
+	id: string;
+	displayName: string;
+	variantCount: number;
+	createdAt: number;
 }
