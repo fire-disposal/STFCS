@@ -16,6 +16,8 @@ function getDefaultWsUrl(): string {
 			return `${wsProtocol}://${hostname}:2567`;
 		}
 
+		// 在生产环境下，Nginx 会处理包含 /matchmake 等路径的请求并转发到后端端口
+		// Colyseus 客户端会自动将这个 URL 处理为后端基础地址
 		return `${wsProtocol}://${host}`;
 	}
 
