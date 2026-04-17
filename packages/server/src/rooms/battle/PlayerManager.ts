@@ -70,6 +70,14 @@ export class PlayerManager {
 			client.send("role", toRoleDto(existingPlayer.role));
 			client.send("identity", toIdentityDto(name, existingPlayer.shortId));
 
+			// 发送玩家头像（恢复时也需要）
+			if (existingPlayer.avatar) {
+				client.send("PLAYER_AVATAR", {
+					shortId: existingPlayer.shortId,
+					avatar: existingPlayer.avatar,
+				});
+			}
+
 			return { success: true, player: existingPlayer };
 		}
 
@@ -126,6 +134,14 @@ export class PlayerManager {
 
 		client.send("role", toRoleDto(player.role));
 		client.send("identity", toIdentityDto(name, profile.shortId));
+
+		// 发送玩家头像（通过消息，不通过 Schema 同步）
+		if (profile.avatar) {
+			client.send("PLAYER_AVATAR", {
+				shortId: profile.shortId,
+				avatar: profile.avatar,
+			});
+		}
 
 		return { success: true, player };
 	}

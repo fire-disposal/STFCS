@@ -1,7 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { getAvatar } from "@/sync";
 
 interface AvatarProps {
-	src: string | null | undefined;
+	/** 直接传入图片 Base64 数据 */
+	src?: string | null;
+	/** 玩家 shortId，从全局存储获取头像（优先级低于 src） */
+	shortId?: number;
 	size?: "small" | "medium" | "large" | number;
 	className?: string;
 	fallback?: string;
@@ -9,31 +13,40 @@ interface AvatarProps {
 
 /**
  * 统一头像组件
- * 
+ *
  * 职责：
  * - 识别 Base64 图片数据
- * - 当 src 为空或无效时，渲染默认 👤 Emoji
+ * - 支持 shortId 从全局存储获取头像
+ * - 当 src 和 shortId 都无效时，渲染默认 👤 Emoji
  * - 统一处理视觉样式
  */
-export const Avatar: React.FC<AvatarProps> = ({ 
-	src, 
-	size = "medium", 
-	className = "", 
-	fallback = "👤" 
+export const Avatar: React.FC<AvatarProps> = ({
+	src,
+	shortId,
+	size = "medium",
+	className = "",
+	fallback = "👤"
 }) => {
-	const isImage = src && src.startsWith("data:image/");
-	
+	// 优先使用 src，其次从全局存储获取
+	const imageSrc = useMemo(() => {
+		if (src && src.startsWith("data:image/")) return src;
+		if (shortId !== undefined) return getAvatar(shortId);
+		return null;
+	}, [src, shortId]);
+
+	const isImage = imageSrc && imageSrc.startsWith("data:image/");
+
 	const getSizeStyle = () => {
 		if (typeof size === "number") {
 			return { width: `${size}px`, height: `${size}px`, fontSize: `${size * 0.6}px` };
 		}
-		
+
 		const sizes: Record<string, { width: string; height: string; fontSize: string }> = {
 			small: { width: "24px", height: "24px", fontSize: "14px" },
 			medium: { width: "42px", height: "42px", fontSize: "24px" },
 			large: { width: "80px", height: "80px", fontSize: "40px" },
 		};
-		
+
 		return sizes[size] || sizes.medium;
 	};
 
@@ -43,7 +56,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 		justifyContent: "center",
 		backgroundColor: "rgba(13, 40, 71, 0.5)",
 		border: "1px solid rgba(74, 158, 255, 0.4)",
-		borderRadius: "0", 
+		borderRadius: "0",
 		overflow: "hidden",
 		...getSizeStyle(),
 	};
@@ -51,10 +64,10 @@ export const Avatar: React.FC<AvatarProps> = ({
 	if (isImage) {
 		return (
 			<div className={`stfcs-avatar stfcs-avatar--image ${className}`} style={baseStyle}>
-				<img 
-					src={src!} 
-					alt="Avatar" 
-					style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+				<img
+					src={imageSrc!}
+					alt="Avatar"
+					style={{ width: "100%", height: "100%", objectFit: "cover" }}
 					onError={(e) => {
 						// 报错时退回到 fallback
 						(e.target as HTMLImageElement).style.display = "none";

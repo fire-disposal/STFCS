@@ -80,9 +80,10 @@ export class CommandDispatcher {
 	async dispatchUpdateProfile(
 		client: Client,
 		playerService: PlayerService,
-		payload: UpdateProfilePayload
+		payload: UpdateProfilePayload,
+		broadcast: (type: string, data: unknown) => void
 	): Promise<void> {
-		await handleUpdateProfile(this.state, client, playerService, payload);
+		await handleUpdateProfile(this.state, client, playerService, payload, broadcast);
 	}
 
 	/** 执行移动命令 */

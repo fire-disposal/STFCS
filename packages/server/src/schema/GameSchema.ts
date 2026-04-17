@@ -18,7 +18,8 @@ export class PlayerState extends Schema {
 	@type("string") role: PlayerRoleValue = PlayerRole.PLAYER;
 	@type("string") name: string = "";
 	@type("string") nickname: string = "";
-	@type("string") avatar: string = ""; // 为空或 Base64
+	// avatar 不通过 Schema 同步（大数据），改为消息发送
+	avatar: string = ""; // 仅服务端内存存储，不标注 @type
 	@type("boolean") isReady: boolean = false;
 	@type("boolean") connected: boolean = true;
 	@type("number") pingMs: number = -1;

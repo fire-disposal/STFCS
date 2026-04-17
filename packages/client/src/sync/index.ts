@@ -39,4 +39,4 @@ export {
 	useTurnCount,
 	useActiveFaction,
 } from "./useMultiplayerState";
-export { usePlayerProfile } from "./usePlayerProfile";
+export { usePlayerProfile, getAvatar, getAvatarByPlayerId, updateAvatar, hasValidCache } from "./usePlayerProfile";

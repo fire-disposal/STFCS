@@ -322,6 +322,13 @@ export class NetworkManager {
 		room.onMessage("PROFILE_UPDATED", (payload: unknown) => {
 			window.dispatchEvent(new CustomEvent("stfcs-profile-updated", { detail: payload }));
 		});
+		// 监听 PLAYER_AVATAR（头像数据，不通过 Schema 同步）
+		room.onMessage("PLAYER_AVATAR", (payload: unknown) => {
+			if (payload && typeof payload === "object") {
+				const data = payload as { shortId: number; avatar: string };
+				window.dispatchEvent(new CustomEvent("stfcs-player-avatar", { detail: data }));
+			}
+		});
 		// 监听业务错误
 		room.onMessage("error", (payload: unknown) => {
 			const message =

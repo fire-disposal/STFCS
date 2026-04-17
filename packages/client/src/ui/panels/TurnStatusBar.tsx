@@ -200,7 +200,7 @@ const PlayerStatusCard: React.FC<{
 			className={`player-card ${isCurrentPlayer ? "player-card--current" : ""} ${player.isReady ? "player-card--ready" : ""}`}
 		>
 			<span className="player-card__avatar">
-				<Avatar src={player.avatar} size={28} />
+				<Avatar shortId={player.shortId} size={28} />
 			</span>
 			<span className="player-card__name">
 				{player.nickname || player.name || `玩家${player.shortId}`}

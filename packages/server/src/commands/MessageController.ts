@@ -128,7 +128,7 @@ function registerQueryHandlers(room: any, ctx: ControllerContext) {
 
 function registerProfileHandlers(room: any, ctx: ControllerContext) {
 	room.onMessage(ClientCommand.CMD_UPDATE_PROFILE, (client: Client, payload: any) => {
-		handle(client, async () => ctx.dispatcher.dispatchUpdateProfile(client, ctx.playerService, parseUpdateProfilePayload(payload)));
+		handle(client, async () => ctx.dispatcher.dispatchUpdateProfile(client, ctx.playerService, parseUpdateProfilePayload(payload), ctx.broadcast));
 	});
 
 	room.onMessage(ClientCommand.CMD_TOGGLE_READY, (client: Client, payload: any) => {

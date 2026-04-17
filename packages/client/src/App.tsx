@@ -16,7 +16,7 @@ import GamePage from "@/pages/GamePage";
 import { NetworkManager, type RoomInfo } from "@/network/NetworkManager";
 import { SystemService } from "@/services/SystemService";
 import { userService } from "@/services/UserService";
-import { usePlayerProfile } from "@/sync";
+import { usePlayerProfile, updateAvatar } from "@/sync";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
 type AppState = "auth" | "lobby" | "game";
@@ -113,23 +113,37 @@ const App: React.FC = () => {
 			notify.error(event.detail);
 		};
 		const handleProfileUpdated = (event: CustomEvent<{ success: boolean; nickname: string; avatar: string }>) => {
+			// 仅处理游戏房间内的更新（大厅更新由 handleUpdateProfile 直接处理）
+			if (appState !== "game") return;
+			
 			if (event.detail.success) {
-				notify.success("玩家档案已持久化保存");
-				// 同步本地状态（确保与后端一致）
+				notify.success("玩家档案已保存");
 				setUserProfile({
 					nickname: event.detail.nickname,
-					avatar: event.detail.avatar,
+					avatar: event.detail.avatar || "",
 				});
 				setUserName(event.detail.nickname);
+				if (event.detail.avatar) {
+					updateAvatar(event.detail.nickname, 0, event.detail.avatar);
+				}
 			}
+		};
+		const handlePlayerAvatar = (event: CustomEvent<{ shortId: number; avatar: string }>) => {
+			// 更新本地头像状态
+			setUserProfile(prev => ({
+				nickname: prev?.nickname || userName,
+				avatar: event.detail.avatar,
+			}));
 		};
 		window.addEventListener("stfcs-room-error", handleBusinessError as EventListener);
 		window.addEventListener("stfcs-profile-updated", handleProfileUpdated as EventListener);
+		window.addEventListener("stfcs-player-avatar", handlePlayerAvatar as EventListener);
 		return () => {
 			window.removeEventListener("stfcs-room-error", handleBusinessError as EventListener);
 			window.removeEventListener("stfcs-profile-updated", handleProfileUpdated as EventListener);
+			window.removeEventListener("stfcs-player-avatar", handlePlayerAvatar as EventListener);
 		};
-	}, []);
+	}, [appState]);
 
 	// 认证成功
 	const handleAuthenticated = useCallback((username: string) => {
@@ -223,8 +237,18 @@ const App: React.FC = () => {
 			// 在大厅：使用 SystemService（全局档案）
 			if (systemServiceRef.current && userName) {
 				try {
-					await systemServiceRef.current.updateProfile(userName, profile);
-					// 成功后会通过 PROFILE_UPDATED 事件触发 UI 更新
+					const result = await systemServiceRef.current.updateProfile(userName, profile);
+					// 立即更新本地状态（不等待事件）
+					setUserProfile({
+						nickname: result.nickname,
+						avatar: result.avatar,
+					});
+					setUserName(result.nickname);
+					// 更新全局缓存
+					if (result.avatar) {
+						updateAvatar(result.nickname, 0, result.avatar);
+					}
+					notify.success("玩家档案已保存");
 				} catch (error) {
 					notify.error(error instanceof Error ? error.message : "更新档案失败");
 				}
