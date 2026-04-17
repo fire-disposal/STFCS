@@ -142,10 +142,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		layerSystem.layers.shipIcons.visible = showShipIcons;
 	}, [layerSystem.layers, showEffects, showShipIcons]);
 
+	// ⚠️ 使用 ref 存储 layerSystem 函数，避免对象引用作为依赖
+	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
+	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;
+	const updateHitAreasRef = useRef(layerSystem.updateHitAreas);
+	updateHitAreasRef.current = layerSystem.updateHitAreas;
+
+	// ⚠️ 提取 canvasSize 的基本值作为依赖
+	const canvasWidth = canvasSize.width;
+	const canvasHeight = canvasSize.height;
+
 	// 更新世界层和 HUD 层变换
 	useEffect(() => {
 		camera.cameraRef.current = { x: cameraX, y: cameraY, zoom, viewRotation };
-		layerSystem.updateWorldTransforms(
+		updateWorldTransformsRef.current(
 			zoom,
 			cameraX,
 			cameraY,
@@ -153,8 +163,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 			viewRotation,
 			showBackground
 		);
-		layerSystem.updateHitAreas(canvasSize);
-	}, [camera, cameraX, cameraY, zoom, viewRotation, layerSystem, canvasSize, showBackground]);
+		updateHitAreasRef.current(canvasSize);
+	}, [camera, cameraX, cameraY, zoom, viewRotation, canvasWidth, canvasHeight, showBackground]); // ⚠️ 使用 canvasWidth/canvasHeight 替代 canvasSize
 
 	return (
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container">

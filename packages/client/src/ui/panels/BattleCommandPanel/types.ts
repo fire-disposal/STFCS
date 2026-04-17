@@ -18,9 +18,15 @@ export interface ShipPortraitProps {
 	ship: ShipState;
 }
 
+/** ShipInfoSummary Props */
+export interface ShipInfoSummaryProps {
+	ship: ShipState;
+}
+
 /** StatBlocks Props */
 export interface StatBlocksProps {
 	ship: ShipState;
+	compact?: boolean;  // 紧凑模式
 }
 
 /** MovementPanel Props */
@@ -43,8 +49,15 @@ export interface WeaponPanelProps {
 export interface SkillsPanelProps {
 	ship: ShipState;
 	disabled: boolean;
-	onToggleShield?: () => void;
 	onVent?: () => void;
+}
+
+/** ShieldPanel Props */
+export interface ShieldPanelProps {
+	ship: ShipState;
+	disabled: boolean;
+	onToggleShield?: () => void;
+	onSetShieldOrientation?: (orientation: number) => void;
 }
 
 /** 阶段配置 */

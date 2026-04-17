@@ -5,12 +5,8 @@
  * - WebSocket 连接管理
  * - 房间创建/加入/离开
  * - 连接状态维护
- * - 自动重连（轻量化）
  *
- * 重连策略：
- * - 断开后立即尝试重新加入（最多3次，每次间隔1秒）
- * - 使用之前的 roomId 和 playerName 尝试恢复
- * - 失败后由上层 UI 显示"重新加入"按钮
+ * 注意：不支持自动重连，玩家离开后需手动重新加入房间
  */
 
 import { Client, Room } from "@colyseus/sdk";
@@ -45,14 +41,6 @@ export class NetworkManager {
 	private roomLeaveOperation: Promise<void> | null = null;
 	private playerShortId: number | null = null;
 	private playerProfile: { nickname: string; avatar: string } | null = null;
-
-	// 重连状态
-	private lastRoomId: string | null = null;
-	private lastPlayerName: string | null = null;
-	private reconnectAttempts = 0;
-	private maxReconnectAttempts = 3;
-	private reconnectDelayMs = 1000;
-	private isReconnecting = false;
 
 	private static readonly ROOM_OPERATION_TIMEOUT_MS = 12000;
 
@@ -91,9 +79,9 @@ export class NetworkManager {
 				throw new Error("服务器返回无效的房间对象");
 			}
 
-			// 保存重连信息
-			this.lastRoomId = room.roomId;
-			this.lastPlayerName = options.playerName || null;
+			// 保存重连信息（已禁用）
+			// this.lastRoomId = room.roomId;
+			// this.lastPlayerName = options.playerName || null;
 
 			this.bindRoomLifecycle(room);
 			this.gameClient = new GameClient(room);
@@ -132,9 +120,9 @@ export class NetworkManager {
 				throw new Error("服务器返回无效的房间对象");
 			}
 
-			// 保存重连信息
-			this.lastRoomId = room.roomId;
-			this.lastPlayerName = options.playerName || null;
+			// 保存重连信息（已禁用）
+			// this.lastRoomId = room.roomId;
+			// this.lastPlayerName = options.playerName || null;
 
 			this.bindRoomLifecycle(room);
 			this.gameClient = new GameClient(room);
@@ -153,11 +141,7 @@ export class NetworkManager {
 
 	/** 离开房间 */
 	async leaveRoom(): Promise<void> {
-		// 立即清除状态（避免返回大厅时状态不一致）
-		this.lastRoomId = null;
-		this.lastPlayerName = null;
-		this.reconnectAttempts = 0;
-		this.isReconnecting = false;
+		// 立即清除状态
 		this.playerShortId = null;
 
 		// 保存引用后立即清除（onLeave 回调可能延迟触发）
@@ -172,55 +156,6 @@ export class NetworkManager {
 		} catch (error) {
 			console.warn("[NetworkManager] leaveRoom error:", error);
 		}
-	}
-
-	/** 尝试自动重连 */
-	async attemptReconnect(): Promise<Room<GameRoomState> | null> {
-		if (!this.lastRoomId || !this.lastPlayerName) {
-			return null;
-		}
-
-		if (this.isReconnecting || this.activeRoomOperation) {
-			return this.activeRoomOperation;
-		}
-
-		this.isReconnecting = true;
-		this.reconnectAttempts++;
-
-		console.log(`[NetworkManager] 尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts}) 房间 ${this.lastRoomId}`);
-
-		try {
-			const room = await this.joinRoom(this.lastRoomId, { playerName: this.lastPlayerName });
-			console.log("[NetworkManager] 重连成功");
-			this.reconnectAttempts = 0;
-			this.isReconnecting = false;
-			return room;
-		} catch (error) {
-			console.warn(`[NetworkManager] 重连失败:`, error);
-
-			if (this.reconnectAttempts < this.maxReconnectAttempts) {
-				// 延迟后再次尝试
-				await new Promise(resolve => setTimeout(resolve, this.reconnectDelayMs));
-				this.isReconnecting = false;
-				return this.attemptReconnect();
-			}
-
-			// 重连失败
-			this.isReconnecting = false;
-			window.dispatchEvent(new CustomEvent("stfcs-reconnect-failed", {
-				detail: { roomId: this.lastRoomId, playerName: this.lastPlayerName }
-			}));
-			return null;
-		}
-	}
-
-	/** 获取重连状态 */
-	getReconnectStatus(): { isReconnecting: boolean; attempts: number; canReconnect: boolean } {
-		return {
-			isReconnecting: this.isReconnecting,
-			attempts: this.reconnectAttempts,
-			canReconnect: !!this.lastRoomId && !!this.lastPlayerName,
-		};
 	}
 
 	/** 清理房间状态 */
@@ -329,6 +264,50 @@ export class NetworkManager {
 				window.dispatchEvent(new CustomEvent("stfcs-player-avatar", { detail: data }));
 			}
 		});
+
+		// 监听玩家加入事件
+		room.onMessage("player_joined", (payload: unknown) => {
+			if (payload && typeof payload === "object") {
+				const data = payload as { sessionId: string; shortId: number; name: string; role: string; isNew: boolean };
+				window.dispatchEvent(new CustomEvent("stfcs-player-joined", { detail: data }));
+			}
+		});
+
+		// 监听玩家离线事件
+		room.onMessage("player_left", (payload: unknown) => {
+			if (payload && typeof payload === "object") {
+				const data = payload as { sessionId: string; shortId: number; name: string; role: string };
+				window.dispatchEvent(new CustomEvent("stfcs-player-left", { detail: data }));
+			}
+		});
+
+		// 监听房主离开事件（启动5分钟计时器）
+		room.onMessage("owner_left", (payload: unknown) => {
+			if (payload && typeof payload === "object") {
+				const data = payload as { name: string; shortId: number; waitTimeSeconds: number };
+				window.dispatchEvent(new CustomEvent("stfcs-owner-left", { detail: data }));
+			}
+		});
+
+		// 监听房主重新加入事件
+		room.onMessage("owner_rejoined", (payload: unknown) => {
+			if (payload && typeof payload === "object") {
+				const data = payload as { sessionId: string; shortId: number; name: string };
+				window.dispatchEvent(new CustomEvent("stfcs-owner-rejoined", { detail: data }));
+			}
+		});
+
+		// 监听房间解散事件（房主5分钟内未重新加入）
+		room.onMessage("room_dissolved", (payload: unknown) => {
+			const reason = payload && typeof payload === "object" && "reason" in payload
+				? String((payload as Record<string, unknown>).reason)
+				: "房间已解散";
+			window.dispatchEvent(new CustomEvent("stfcs-room-dissolved", { detail: reason }));
+			// 清理本地状态
+			this.currentRoom = null;
+			this.gameClient = null;
+		});
+
 		// 监听业务错误
 		room.onMessage("error", (payload: unknown) => {
 			const message =
@@ -340,26 +319,13 @@ export class NetworkManager {
 			window.dispatchEvent(new CustomEvent("stfcs-room-error", { detail: message }));
 		});
 
-		// 监听可攻击目标查询结果（单武器）
-		room.onMessage("ATTACKABLE_TARGETS_RESULT", (payload: unknown) => {
-			window.dispatchEvent(new CustomEvent("stfcs-attackable-targets", { detail: payload }));
-		});
-
-		// 监听批量可攻击目标查询结果（舰船选中时）
-		room.onMessage("ALL_ATTACKABLE_TARGETS_RESULT", (payload: unknown) => {
-			window.dispatchEvent(new CustomEvent("stfcs-all-attackable-targets", { detail: payload }));
-		});
-
-		// 监听连接断开 - 触发自动重连
+		// 监听连接断开（不支持自动重连）
 		room.onLeave(() => {
-			console.log("[NetworkManager] 房间连接断开，尝试自动重连");
+			console.log("[NetworkManager] 房间连接断开");
 			this.currentRoom = null;
 			this.gameClient = null;
-
-			// 静默自动重连
-			this.attemptReconnect().catch(err => {
-				console.warn("[NetworkManager] 自动重连异常:", err);
-			});
+			// 广播断开事件，让UI层处理
+			window.dispatchEvent(new CustomEvent("stfcs-room-left"));
 		});
 
 		room.onError((code, message) => {
@@ -424,10 +390,6 @@ export class NetworkManager {
 	/** 清理资源 */
 	dispose(): void {
 		this.roomLeaveOperation = null;
-		this.lastRoomId = null;
-		this.lastPlayerName = null;
-		this.isReconnecting = false;
-		this.reconnectAttempts = 0;
 
 		if (this.currentRoom) {
 			this.currentRoom.leave().catch(() => {});

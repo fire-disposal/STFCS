@@ -40,3 +40,16 @@ export {
 	useActiveFaction,
 } from "./useMultiplayerState";
 export { usePlayerProfile, getAvatar, getAvatarByPlayerId, updateAvatar, hasValidCache } from "./usePlayerProfile";
+
+// 火控系统 Hooks（服务端权威，Schema 同步）
+export {
+	useShipFireControl,
+	useWeaponAttackableTargets,
+	useWeaponFireStatus,
+	refreshFireControlData,
+} from "./useFireControl";
+export type {
+	TargetAttackability,
+	WeaponTargetsData,
+	ShipFireControlData,
+} from "./useFireControl";

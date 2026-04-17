@@ -174,3 +174,132 @@ export interface UpdateProfilePayload {
 export interface TransferOwnerPayload {
 	targetSessionId: string;
 }
+
+// ==================== 舰船自定义命令 ====================
+
+import type { TextureConfig, ShipCustomizationConfig, CustomWeaponMount, WeaponCustomizationConfig } from "@vt/data";
+
+/**
+ * 舰船完整自定义 Payload
+ *
+ * DM专用命令，支持舰船所有属性的编辑
+ * 所有字段可选，仅发送需要更新的字段
+ */
+export interface CustomizeShipPayload {
+	shipId: string;
+
+	// === 基本信息 ===
+	name?: string;
+	hullType?: string;              // 原型模板ID，可设为 "custom"
+	size?: string;                  // HullSizeValue
+
+	// === 外观 ===
+	texture?: TextureConfig;
+	width?: number;
+	length?: number;
+
+	// === 生存属性 ===
+	hullPointsMax?: number;
+	hullPointsCurrent?: number;
+	armorMaxPerQuadrant?: number;
+	armorQuadrants?: [number, number, number, number, number, number];
+	armorMinReductionRatio?: number;
+	armorMaxReductionRatio?: number;
+
+	// === 辐能系统 ===
+	fluxCapacityMax?: number;
+	fluxDissipation?: number;
+	fluxSoftCurrent?: number;
+	fluxHardCurrent?: number;
+
+	// === 护盾系统 ===
+	shieldType?: string;            // ShieldTypeValue
+	shieldArc?: number;
+	shieldEfficiency?: number;
+	shieldRadius?: number;
+	shieldUpCost?: number;
+
+	// === 机动属性 ===
+	maxSpeed?: number;
+	maxTurnRate?: number;
+
+	// === 武器挂点 ===
+	weaponMounts?: CustomWeaponMount[];
+
+	// === 其他 ===
+	opCapacity?: number;
+	rangeModifier?: number;
+}
+
+/**
+ * 添加武器挂点 Payload
+ */
+export interface AddWeaponMountPayload {
+	shipId: string;
+	mount: CustomWeaponMount;
+}
+
+/**
+ * 删除武器挂点 Payload
+ */
+export interface RemoveWeaponMountPayload {
+	shipId: string;
+	mountId: string;
+}
+
+/**
+ * 更新武器挂点 Payload
+ */
+export interface UpdateWeaponMountPayload {
+	shipId: string;
+	mountId: string;
+	updates: Partial<CustomWeaponMount>;
+}
+
+/**
+ * 设置舰船贴图 Payload
+ */
+export interface SetShipTexturePayload {
+	shipId: string;
+	texture: TextureConfig;
+}
+
+/**
+ * 创建自定义武器 Payload
+ *
+ * DM专用命令，支持创建全新的武器
+ */
+export interface CreateCustomWeaponPayload {
+	weaponId?: string;              // 可选，自动生成如果不提供
+	name: string;
+	category: string;               // WeaponCategoryValue
+	size: string;                   // WeaponSlotSizeValue
+	damageType: string;             // DamageTypeValue
+	damagePerShot: number;
+	range: number;
+	arc: number;
+	fluxCost: number;
+	cooldown: number;
+	opCost: number;
+	description?: string;
+	projectilesPerShot?: number;
+	minRange?: number;
+	ammo?: number;
+	isPD?: boolean;
+	hasTracking?: boolean;
+	ignoresShields?: boolean;
+	burstSize?: number;
+	burstDelay?: number;
+	empDamage?: number;
+	tracking?: number;
+	texture?: TextureConfig;
+	icon?: string;
+}
+
+/**
+ * 更新自定义武器 Payload
+ */
+export interface UpdateCustomWeaponPayload {
+	weaponId: string;
+	updates: WeaponCustomizationConfig;
+}

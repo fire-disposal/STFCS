@@ -1,38 +1,23 @@
+/**
+ * 查询处理器
+ *
+ * 处理火控查询请求，结果写入 Schema 直接同步
+ */
+
 import type { Client } from "@colyseus/core";
-import { handleQueryAttackableTargets, handleQueryAllAttackableTargets } from "./index.js";
-import type { AttackableTargetsResult } from "./index.js";
+import { handleQueryAllAttackableTargets } from "./queryTargetHandler.js";
 import type { GameRoomState } from "../../schema/GameSchema.js";
 
 /**
- * 处理单个武器的可攻击目标查询
- */
-export function handleGetAttackableTargets(
-	state: GameRoomState,
-	client: Client,
-	payload: { shipId: string; weaponInstanceId: string }
-): void {
-	const result = handleQueryAttackableTargets(state, client, payload);
-	client.send("ATTACKABLE_TARGETS_RESULT", result);
-}
-
-/**
  * 处理舰船所有武器的可攻击目标批量查询
+ *
+ * 结果直接写入 fireControlCache Schema，自动同步到客户端
+ * 无需发送消息，客户端通过 Schema 订阅获取数据
  */
 export function handleGetAllAttackableTargets(
 	state: GameRoomState,
 	client: Client,
 	payload: { shipId: string }
 ): void {
-	const result = handleQueryAllAttackableTargets(state, client, payload);
-	
-	// 转换 Map 为数组以便网络传输
-	const weaponsArray: Array<{ weaponInstanceId: string; result: AttackableTargetsResult }> = [];
-	result.weapons.forEach((r, weaponInstanceId) => {
-		weaponsArray.push({ weaponInstanceId, result: r });
-	});
-
-	client.send("ALL_ATTACKABLE_TARGETS_RESULT", {
-		shipId: result.shipId,
-		weapons: weaponsArray,
-	});
+	handleQueryAllAttackableTargets(state, client, payload);
 }

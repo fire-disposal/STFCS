@@ -349,6 +349,15 @@ export const ClientCommand = {
 	CMD_KICK_PLAYER: "CMD_KICK_PLAYER",
 	CMD_UPDATE_PROFILE: "CMD_UPDATE_PROFILE",
 	CMD_TRANSFER_OWNER: "CMD_TRANSFER_OWNER",
+
+	// 舰船自定义命令
+	CMD_CUSTOMIZE_SHIP: "CMD_CUSTOMIZE_SHIP",
+	CMD_ADD_WEAPON_MOUNT: "CMD_ADD_WEAPON_MOUNT",
+	CMD_REMOVE_WEAPON_MOUNT: "CMD_REMOVE_WEAPON_MOUNT",
+	CMD_UPDATE_WEAPON_MOUNT: "CMD_UPDATE_WEAPON_MOUNT",
+	CMD_SET_TEXTURE: "CMD_SET_TEXTURE",
+	CMD_CREATE_CUSTOM_WEAPON: "CMD_CREATE_CUSTOM_WEAPON",
+	CMD_UPDATE_CUSTOM_WEAPON: "CMD_UPDATE_CUSTOM_WEAPON",
 } as const;
 export type ClientCommandValue = (typeof ClientCommand)[keyof typeof ClientCommand];
 
@@ -358,6 +367,54 @@ export interface Point {
 	x: number;
 	y: number;
 }
+
+// ==================== 贴图配置 ====================
+
+/**
+ * 贴图来源类型
+ */
+export const TextureSourceType = {
+	URL: "url",
+	UPLOADED: "uploaded",
+	PRESET: "preset",
+	NONE: "none",
+} as const;
+export type TextureSourceTypeValue = (typeof TextureSourceType)[keyof typeof TextureSourceType];
+
+/**
+ * 贴图配置
+ *
+ * 用于舰船和武器的自定义外观
+ */
+export interface TextureConfig {
+	/** 贴图来源类型 */
+	sourceType: TextureSourceTypeValue;
+	/** 贴图来源：URL 或 Base64 数据 */
+	source: string;
+	/** 透明色（如 "#FFFFFF"）- 用于简单抠图 */
+	transparentColor?: string;
+	/** 透明色容差（0-255）- 相近颜色透明范围 */
+	transparencyTolerance?: number;
+	/** 贴图偏移X（用于对齐中心点） */
+	offsetX: number;
+	/** 贴图偏移Y */
+	offsetY: number;
+	/** 缩放比例 */
+	scale: number;
+}
+
+/**
+ * 默认贴图配置
+ */
+export const DEFAULT_TEXTURE_CONFIG: TextureConfig = {
+	sourceType: "none",
+	source: "",
+	transparentColor: undefined,
+	transparencyTolerance: 32,
+	offsetX: 0,
+	offsetY: 0,
+	scale: 1.0,
+};
 
 // ==================== 武器规格 ====================
 
@@ -567,3 +624,319 @@ export interface DamageModifierConfig {
 }
 
 export type DamageModifiersMap = Record<DamageTypeValue, DamageModifierConfig>;
+
+// ==================== 自定义舰船 ====================
+
+/**
+ * 自定义武器挂点
+ *
+ * 用于舰船自定义系统，支持自由添加/修改挂点属性
+ */
+export interface CustomWeaponMount {
+	/** 挂载点唯一ID */
+	id: string;
+	/** 挂载点显示名称（如"主炮"、"副炮"） */
+	displayName?: string;
+	/** 相对舰船中心的位置 */
+	position: Point;
+	/** 基准朝向（度），0°=朝船头，90°=朝右 */
+	facing: number;
+	/** 射界角度（炮塔型使用） */
+	arc: number;
+	/** 硬点型射界（默认20°，±10°） */
+	hardpointArc?: number;
+	/** 挂载点尺寸：SMALL/MEDIUM/LARGE */
+	size: WeaponSlotSizeValue;
+	/** 武器形态：炮塔或硬点 */
+	mountType: "turret" | "hardpoint";
+	/** 挂载点类别限制 */
+	slotCategory: SlotCategoryValue;
+	/** 是否接受炮塔型武器 */
+	acceptsTurret: boolean;
+	/** 是否接受硬点型武器 */
+	acceptsHardpoint: boolean;
+	/** 是否为内置武器（不可更换） */
+	builtin?: boolean;
+	/** 当前安装的武器ID */
+	currentWeaponId?: string;
+	/** 内置武器的规格（仅 builtin=true 时使用） */
+	builtinWeaponSpec?: WeaponSpec;
+}
+
+/**
+ * 插件栏位
+ *
+ * 用于记录舰船的自定义插件/模块
+ */
+export interface PluginSlot {
+	id: string;
+	name: string;
+	description?: string;
+}
+
+/**
+ * 舰船自定义配置
+ *
+ * 用于舰船自定义面板，支持完整属性编辑
+ * 所有字段可选，仅发送需要更新的字段
+ */
+export interface ShipCustomizationConfig {
+	// === 基本信息 ===
+	name?: string;
+	hullType?: string;              // 原型模板ID，可设为 "custom"
+	size?: HullSizeValue;
+
+	// === 外观 ===
+	texture?: TextureConfig;
+	width?: number;
+	length?: number;
+
+	// === 生存属性 ===
+	hullPointsMax?: number;
+	hullPointsCurrent?: number;
+	armorMaxPerQuadrant?: number;
+	armorQuadrants?: [number, number, number, number, number, number];
+	armorMinReductionRatio?: number;
+	armorMaxReductionRatio?: number;
+
+	// === 辐能系统 ===
+	fluxCapacityMax?: number;
+	fluxDissipation?: number;
+	fluxSoftCurrent?: number;
+	fluxHardCurrent?: number;
+
+	// === 护盾系统 ===
+	shieldType?: ShieldTypeValue;
+	shieldArc?: number;
+	shieldEfficiency?: number;
+	shieldRadius?: number;
+	shieldUpCost?: number;
+
+	// === 机动属性 ===
+	maxSpeed?: number;
+	maxTurnRate?: number;
+
+	// === 武器挂点 ===
+	weaponMounts?: CustomWeaponMount[];
+
+	// === 其他 ===
+	opCapacity?: number;
+	rangeModifier?: number;
+	pluginSlots?: PluginSlot[];
+}
+
+/**
+ * 武器自定义配置
+ *
+ * 用于武器自定义面板，支持完整属性编辑
+ */
+export interface WeaponCustomizationConfig {
+	// === 基本信息 ===
+	name?: string;
+	weaponType?: string;           // 原型模板ID
+	category?: WeaponCategoryValue;
+	size?: WeaponSlotSizeValue;
+	description?: string;
+
+	// === 伤害配置 ===
+	damageType?: DamageTypeValue;
+	damagePerShot?: number;
+	projectilesPerShot?: number;
+
+	// === 射程配置 ===
+	range?: number;
+	minRange?: number;
+	arc?: number;
+	accuracy?: number;             // 仅记录，沙盘不处理
+
+	// === 资源配置 ===
+	fluxCost?: number;
+	cooldown?: number;             // 回合数
+	ammo?: number;
+
+	// === 特殊标记 ===
+	isPD?: boolean;
+	hasTracking?: boolean;
+	ignoresShields?: boolean;
+
+	// === 连发系统 ===
+	burstSize?: number;
+	burstDelay?: number;
+
+	// === 特殊效果 ===
+	empDamage?: number;
+	tracking?: number;
+	opCost?: number;
+
+	// === 外观 ===
+	texture?: TextureConfig;
+	icon?: string;
+}
+
+/**
+ * 舰船统计摘要
+ *
+ * 用于配置面板的实时统计显示
+ */
+export interface ShipStatsSummary {
+	// === 火力输出 ===
+	/** 单次射击总伤害（所有武器） */
+	totalDamagePerShot: number;
+	/** 单次射击总辐能消耗 */
+	totalFluxPerShot: number;
+	/** 最小有效射程 */
+	effectiveRangeMin: number;
+	/** 最大有效射程 */
+	effectiveRangeMax: number;
+	/** 估算DPS（考虑冷却） */
+	dpsEstimate: number;
+
+	// === 伤害类型分布 ===
+	/** 动能伤害比例 */
+	kineticDamageRatio: number;
+	/** 高爆伤害比例 */
+	highExplosiveDamageRatio: number;
+	/** 能量伤害比例 */
+	energyDamageRatio: number;
+	/** 破片伤害比例 */
+	fragmentationDamageRatio: number;
+
+	// === 生存能力 ===
+	/** 有效生命值（考虑护甲） */
+	effectiveHP: number;
+	/** 护盾覆盖角度 */
+	shieldCoverage: number;
+	/** 辐能散逸率 */
+	fluxDissipationRate: number;
+
+	// === 机动能力 ===
+	/** 每阶段最大移动距离 */
+	maxSpeed: number;
+	/** 每回合最大转向角度 */
+	maxTurnRate: number;
+
+	// === 资源预算 ===
+	/** 已用OP点数 */
+	opUsed: number;
+	/** OP上限 */
+	opMax: number;
+	/** 状态：合规/超出 */
+	opStatus: "compliant" | "exceeded" | "disabled";
+}
+
+// ==================== 舰船自定义命令 Payload ====================
+
+/**
+ * 舰船完整自定义 Payload（客户端版本）
+ *
+ * DM专用命令，支持舰船所有属性的编辑
+ * 所有字段可选，仅发送需要更新的字段
+ */
+export interface CustomizeShipPayload {
+	shipId: string;
+
+	// === 基本信息 ===
+	name?: string;
+	hullType?: string;
+	size?: HullSizeValue;
+
+	// === 外观 ===
+	texture?: TextureConfig;
+	width?: number;
+	length?: number;
+
+	// === 生存属性 ===
+	hullPointsMax?: number;
+	hullPointsCurrent?: number;
+	armorMaxPerQuadrant?: number;
+	armorQuadrants?: [number, number, number, number, number, number];
+	armorMinReductionRatio?: number;
+	armorMaxReductionRatio?: number;
+
+	// === 辐能系统 ===
+	fluxCapacityMax?: number;
+	fluxDissipation?: number;
+	fluxSoftCurrent?: number;
+	fluxHardCurrent?: number;
+
+	// === 护盾系统 ===
+	shieldType?: ShieldTypeValue;
+	shieldArc?: number;
+	shieldEfficiency?: number;
+	shieldRadius?: number;
+	shieldUpCost?: number;
+
+	// === 机动属性 ===
+	maxSpeed?: number;
+	maxTurnRate?: number;
+
+	// === 武器挂点 ===
+	weaponMounts?: CustomWeaponMount[];
+
+	// === 其他 ===
+	opCapacity?: number;
+	rangeModifier?: number;
+}
+
+/**
+ * 添加武器挂点 Payload
+ */
+export interface AddWeaponMountPayload {
+	shipId: string;
+	mount: CustomWeaponMount;
+}
+
+/**
+ * 删除武器挂点 Payload
+ */
+export interface RemoveWeaponMountPayload {
+	shipId: string;
+	mountId: string;
+}
+
+/**
+ * 更新武器挂点 Payload
+ */
+export interface UpdateWeaponMountPayload {
+	shipId: string;
+	mountId: string;
+	updates: Partial<CustomWeaponMount>;
+}
+
+/**
+ * 设置舰船贴图 Payload
+ */
+export interface SetShipTexturePayload {
+	shipId: string;
+	texture: TextureConfig;
+}
+
+/**
+ * 创建自定义武器 Payload
+ */
+export interface CreateCustomWeaponPayload {
+	weaponId?: string;
+	name: string;
+	category: WeaponCategoryValue;
+	size: WeaponSlotSizeValue;
+	damageType: DamageTypeValue;
+	damagePerShot: number;
+	range: number;
+	arc: number;
+	fluxCost: number;
+	cooldown: number;
+	opCost: number;
+	description?: string;
+	projectilesPerShot?: number;
+	minRange?: number;
+	ammo?: number;
+	isPD?: boolean;
+	hasTracking?: boolean;
+	ignoresShields?: boolean;
+	burstSize?: number;
+	burstDelay?: number;
+	empDamage?: number;
+	tracking?: number;
+	texture?: TextureConfig;
+	icon?: string;
+}

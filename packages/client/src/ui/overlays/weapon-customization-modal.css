@@ -1,0 +1,92 @@
+/**
+ * WeaponCustomizationModal 样式
+ */
+
+.weapon-customization-modal__restricted {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+}
+
+.weapon-customization-modal__restricted-icon {
+	width: 48px;
+	height: 48px;
+	color: #e74c3c;
+	margin-bottom: 16px;
+}
+
+.weapon-customization-form {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.weapon-customization-section {
+	border: 1px solid rgba(90, 42, 58, 0.6);
+	background: rgba(26, 45, 66, 0.4);
+	padding: 10px;
+}
+
+.weapon-customization-section__title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	color: #ff6f8f;
+	margin-bottom: 8px;
+}
+
+.weapon-customization-section__icon {
+	width: 14px;
+	height: 14px;
+}
+
+.weapon-customization-row {
+	display: flex;
+	gap: 8px;
+}
+
+.weapon-customization-field {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.weapon-customization-field label {
+	font-size: 9px;
+	color: #8ba4c7;
+}
+
+.weapon-customization-field input,
+.weapon-customization-field select {
+	padding: 6px 8px;
+	border: 1px solid rgba(90, 42, 58, 0.6);
+	background: rgba(6, 16, 26, 0.8);
+	color: #cfe8ff;
+	font-size: 10px;
+}
+
+.weapon-customization-hint {
+	font-size: 9px;
+	color: #8ba4c7;
+	margin-top: 4px;
+	padding: 4px;
+	background: rgba(90, 42, 58, 0.2);
+}
+
+.weapon-customization-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 10px;
+	color: #cfe8ff;
+	cursor: pointer;
+}
+
+.weapon-customization-checkbox input {
+	width: 14px;
+	height: 14px;
+}

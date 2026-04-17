@@ -83,7 +83,17 @@
 .game-layout__main {
   display: flex;
   flex: 1;
+  min-height: 0;  /* ✅ 允许收缩 */
   overflow: hidden;
+}
+
+/* ====== 底部战斗命令区 ====== */
+
+.game-layout__battle-panel {
+  flex-shrink: 0;  /* ✅ 不压缩 */
+  min-height: 140px;  /* ✅ 最小高度 */
+  max-height: 200px;  /* ✅ 最大高度限制 */
+  overflow: hidden;  /* ✅ 防止溢出 */
 }
 
 /* ====== 地图区域 ====== */

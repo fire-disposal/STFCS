@@ -2,26 +2,26 @@
  * 武器面板模块
  * 四列布局：武器列表 | 武器信息 | 目标列表 | 开火按钮
  *
- * 交互流程：
- * 1. 选中舰船 → 批量查询所有武器的可攻击目标（服务端权威）
- * 2. 选中武器 → 切换显示该武器的目标列表
- * 3. 选择目标 → 点击开火
- *
- * ⚠️ 目标可攻击性数据由服务端权威计算
+ * ⚠️ 数据流设计（后端权威）：
+ * 1. 火控数据通过 useShipFireControl hook 从 Schema 获取（服务端权威）
+ * 2. UI 状态通过 fireModeStore 存储（仅 ID，不存对象）
+ * 3. 所有 useEffect 依赖使用基本类型值
  */
 
-import type {
-	TargetAttackabilityType,
-	AttackableTargetsResult,
-	AllAttackableTargetsResult,
-} from "@/state/stores";
-import { useFireModeStore } from "@/state/stores/fireModeStore";
+import type { TargetAttackability, WeaponTargetsData, ShipFireControlData } from "@/sync";
+import {
+	useShipFireControl,
+	useWeaponAttackableTargets,
+	useWeaponFireStatus,
+	refreshFireControlData,
+} from "@/sync";
+import { useFireModeStore } from "@/state/stores";
 import { GameClient } from "@/sync/GameClient";
-import type { WeaponSlot, WeaponStateValue } from "@/sync/types";
+import type { WeaponSlot, WeaponStateValue, ShipState } from "@/sync/types";
 import { WeaponState } from "@/sync/types";
 import { notify } from "@/ui/shared/Notification";
 import { Bomb, CheckCircle, Crosshair, Loader2, Swords, XCircle } from "lucide-react";
-import React, { useMemo, useCallback, useEffect, useState, useRef } from "react";
+import React, { useMemo, useCallback, useEffect, useRef } from "react";
 import type { WeaponPanelProps } from "./types";
 import { DAMAGE_TYPE_COLORS } from "./types";
 import "./WeaponPanel.css";
@@ -36,7 +36,7 @@ interface WeaponStatusDetail {
 	reloadProgress?: number;
 }
 
-function getWeaponStatusDetail(ship: any, weapon: WeaponSlot): WeaponStatusDetail {
+function getWeaponStatusDetail(ship: ShipState, weapon: WeaponSlot): WeaponStatusDetail {
 	if (ship.isOverloaded) {
 		return { canFire: false, state: weapon.state, stateLabel: "过载", reason: "舰船过载" };
 	}
@@ -66,57 +66,38 @@ function getWeaponStatusDetail(ship: any, weapon: WeaponSlot): WeaponStatusDetai
 }
 
 export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, ships, disabled, networkManager }) => {
-	// Store 状态
-	const selectedWeapon = useFireModeStore((s) => s.selectedWeapon);
-	const weaponsTargets = useFireModeStore((s) => s.weaponsTargets);
-	const attackableTargets = useFireModeStore((s) => s.attackableTargets);
-	const weaponCanFire = useFireModeStore((s) => s.weaponCanFire);
-	const weaponFireReason = useFireModeStore((s) => s.weaponFireReason);
+	// ===== 从 Schema 获取火控数据（服务端权威） =====
+	const room = networkManager.getCurrentRoom();
+	const fireControlData = useShipFireControl(room, ship?.id);
+
+	// ===== 从 fireModeStore 获取 UI 状态（仅 ID） =====
+	const selectedWeaponId = useFireModeStore((s) => s.selectedWeaponId);
 	const selectedTargetIds = useFireModeStore((s) => s.selectedTargetIds);
 	const isLoading = useFireModeStore((s) => s.isLoading);
 	const fireError = useFireModeStore((s) => s.fireError);
 
-	// Store actions
-	const selectShip = useFireModeStore((s) => s.selectShip);
+	// ===== Store actions =====
 	const selectWeapon = useFireModeStore((s) => s.selectWeapon);
-	const setAllAttackableTargetsFromServer = useFireModeStore((s) => s.setAllAttackableTargetsFromServer);
-	const setAttackableTargetsFromServer = useFireModeStore((s) => s.setAttackableTargetsFromServer);
 	const setSelectedTargets = useFireModeStore((s) => s.setSelectedTargets);
 	const startFiring = useFireModeStore((s) => s.startFiring);
 	const endFiring = useFireModeStore((s) => s.endFiring);
-	const clearSelection = useFireModeStore((s) => s.clearSelection);
+	const setLoading = useFireModeStore((s) => s.setLoading);
 	const clearError = useFireModeStore((s) => s.clearError);
+	const clearWeaponSelection = useFireModeStore((s) => s.clearWeaponSelection);
 
-	// 面板状态
-	const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
-
-	// GameClient
+	// ===== GameClient ref =====
 	const gameClientRef = useRef<GameClient | null>(null);
-	useEffect(() => {
-		const room = networkManager.getCurrentRoom();
-		if (room) gameClientRef.current = new GameClient(room);
-	}, [networkManager]);
 
-	// 监听批量查询结果
-	useEffect(() => {
-		const handler = (e: CustomEvent<AllAttackableTargetsResult>) => setAllAttackableTargetsFromServer(e.detail);
-		window.addEventListener("stfcs-all-attackable-targets", handler as EventListener);
-		return () => window.removeEventListener("stfcs-all-attackable-targets", handler as EventListener);
-	}, [setAllAttackableTargetsFromServer]);
+	// ⚠️ 使用 ref 存储 room 对象，避免作为 useEffect 依赖
+	const roomRef = useRef(room);
+	roomRef.current = room;
 
-	// 监听单武器查询结果
-	useEffect(() => {
-		const handler = (e: CustomEvent<AttackableTargetsResult>) => setAttackableTargetsFromServer(e.detail);
-		window.addEventListener("stfcs-attackable-targets", handler as EventListener);
-		return () => window.removeEventListener("stfcs-attackable-targets", handler as EventListener);
-	}, [setAttackableTargetsFromServer]);
+	// ⚠️ 稳定的依赖值
+	const shipId = ship?.id;
+	const roomId = room?.roomId;
+	const weaponsLength = ship?.weapons?.size ?? 0;
 
-	// 错误通知
-	useEffect(() => {
-		if (fireError) { notify.error(fireError); clearError(); }
-	}, [fireError, clearError]);
-
-	// 获取武器列表
+	// ===== 计算武器列表 =====
 	const weapons = useMemo(() => {
 		if (!ship) return [];
 		const result: WeaponSlot[] = [];
@@ -124,36 +105,93 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, ships, disabled,
 		return result;
 	}, [ship]);
 
-	// 选中舰船时触发批量查询
+	// ===== 初始化 GameClient（仅依赖 roomId） =====
 	useEffect(() => {
-		if (ship) {
-			const room = networkManager.getCurrentRoom();
-			if (room) selectShip(ship, room);
-			// 默认选中第一个武器
-			if (weapons.length > 0 && !selectedWeaponId) {
-				setSelectedWeaponId(weapons[0].mountId);
-				selectWeapon(weapons[0]);
-			}
-		} else {
-			clearSelection();
-			setSelectedWeaponId(null);
+		if (roomRef.current) {
+			gameClientRef.current = new GameClient(roomRef.current);
 		}
-	}, [ship, networkManager, selectShip, clearSelection, weapons, selectedWeaponId, selectWeapon]);
+	}, [roomId]);
 
-	// 当前选中武器
+	// ===== 触发火控查询（仅依赖 shipId 和 roomId） =====
+	useEffect(() => {
+		if (shipId && roomRef.current) {
+			setLoading(true);
+			refreshFireControlData(roomRef.current, shipId);
+		}
+	}, [shipId, roomId, setLoading]);
+
+	// ===== 清除状态（shipId 变为空时） =====
+	useEffect(() => {
+		if (!shipId) {
+			clearWeaponSelection();
+			setLoading(false);
+		}
+	}, [shipId, clearWeaponSelection, setLoading]);
+
+	// ===== 默认选中第一个武器（使用 ref 存储已初始化标志） =====
+	const weaponInitializedRef = useRef(false);
+	useEffect(() => {
+		// 仅在首次有武器且未选中时执行
+		if (shipId && weaponsLength > 0 && !selectedWeaponId && !weaponInitializedRef.current) {
+			// 从 ship ref 获取第一个武器
+			const firstWeapon = weapons[0];
+			if (firstWeapon) {
+				selectWeapon(firstWeapon.mountId);
+				weaponInitializedRef.current = true;
+			}
+		}
+		// 当 shipId 变化时重置初始化标志
+		if (!shipId) {
+			weaponInitializedRef.current = false;
+		}
+	}, [shipId, weaponsLength, selectedWeaponId, selectWeapon, weapons]);
+
+	// ===== 错误通知 =====
+	useEffect(() => {
+		if (fireError) {
+			notify.error(fireError);
+			clearError();
+		}
+	}, [fireError, clearError]);
+
+	// ===== 监控 fireControlData 更新完成（使用 lastUpdateTime 作为依赖） =====
+	const fireControlUpdateTime = fireControlData?.lastUpdateTime;
+	useEffect(() => {
+		if (fireControlUpdateTime && isLoading) {
+			setLoading(false);
+		}
+	}, [fireControlUpdateTime, isLoading, setLoading]);
+
+	// ===== 当前选中武器的可攻击目标 =====
+	const attackableTargets = useMemo(() => {
+		if (!fireControlData || !selectedWeaponId) return [];
+		const weaponData = fireControlData.weapons.get(selectedWeaponId);
+		if (!weaponData) return [];
+		return weaponData.targets.filter(t => t.canAttack);
+	}, [fireControlData, selectedWeaponId]);
+
+	// ===== 当前选中武器 =====
 	const currentWeapon = useMemo(() => {
 		if (!selectedWeaponId || !ship) return null;
-		return weapons.find((w) => w.mountId === selectedWeaponId);
-	}, [selectedWeaponId, weapons, ship]);
+		for (const w of ship.weapons.values()) {
+			if (w.mountId === selectedWeaponId) return w;
+		}
+		return null;
+	}, [selectedWeaponId, ship]);
 
-	// 切换武器
+	// ===== 武器状态详情 =====
+	const weaponStatusDetail = useMemo(() => {
+		if (!currentWeapon || !ship) return null;
+		return getWeaponStatusDetail(ship, currentWeapon);
+	}, [currentWeapon, ship]);
+
+	// ===== 切换武器 =====
 	const handleSelectWeapon = useCallback((weapon: WeaponSlot) => {
-		setSelectedWeaponId(weapon.mountId);
+		selectWeapon(weapon.mountId);
 		setSelectedTargets([]);
-		selectWeapon(weapon);
-	}, [setSelectedTargets, selectWeapon]);
+	}, [selectWeapon, setSelectedTargets]);
 
-	// 选择目标
+	// ===== 选择目标 =====
 	const handleSelectTarget = useCallback((targetId: string) => {
 		const current = selectedTargetIds || [];
 		if (current.includes(targetId)) {
@@ -163,13 +201,18 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, ships, disabled,
 		}
 	}, [selectedTargetIds, setSelectedTargets]);
 
-	// 开火
-	const handleFire = useCallback(async () => {
+	// ===== 开火 =====
+	const handleFire = useCallback(() => {
 		if (!ship || !selectedWeaponId || selectedTargetIds.length === 0 || !gameClientRef.current) return;
+
 		startFiring();
 		try {
 			for (const targetId of selectedTargetIds) {
-				gameClientRef.current.sendFireWeapon({ attackerId: ship.id, weaponId: selectedWeaponId, targetId });
+				gameClientRef.current.sendFireWeapon({
+					attackerId: ship.id,
+					weaponId: selectedWeaponId,
+					targetId
+				});
 			}
 			notify.success(`开火命令已发送 (${selectedTargetIds.length}个目标)`);
 			endFiring();
@@ -179,12 +222,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, ships, disabled,
 		}
 	}, [ship, selectedWeaponId, selectedTargetIds, startFiring, endFiring, setSelectedTargets]);
 
-	// 武器状态详情
-	const weaponStatusDetail = useMemo(() => {
-		if (!currentWeapon || !ship) return null;
-		return getWeaponStatusDetail(ship, currentWeapon);
-	}, [currentWeapon, ship]);
-
+	// ===== 空状态 =====
 	if (!ship || weapons.length === 0) {
 		return (
 			<div className="weapon-panel weapon-panel--empty">
@@ -207,9 +245,9 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, ships, disabled,
 						const hasFired = weapon.hasFiredThisTurn;
 						const isSelected = selectedWeaponId === weapon.mountId;
 
-						// 从批量查询结果判断是否有可攻击目标
-						const weaponResult = weaponsTargets.get(weapon.instanceId);
-						const hasAttackableTargets = weaponResult?.targets.some((t) => t.canAttack) ?? false;
+						// 从 Schema 数据判断是否有可攻击目标
+						const weaponData = fireControlData?.weapons.get(weapon.mountId);
+						const hasAttackableTargets = weaponData?.targets.some((t) => t.canAttack) ?? false;
 
 						// 指示灯：红(不能开火) > 黄(已开火) > 蓝(就绪有目标) > 绿(就绪)
 						const indicatorColor = !statusDetail.canFire

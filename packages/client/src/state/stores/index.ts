@@ -5,10 +5,5 @@
 export { useGameStore, MovePhaseUI, type MovementPhaseValue } from "./gameStore";
 export { useUIStore } from "./uiStore";
 
-// 武器开火状态（服务端权威计算）
-export {
-	useFireModeStore,
-	type TargetAttackabilityType,
-	type AttackableTargetsResult,
-	type AllAttackableTargetsResult,
-} from "./fireModeStore";
+// 武器开火状态（仅 UI 意图，数据从 Schema 获取）
+export { useFireModeStore } from "./fireModeStore";

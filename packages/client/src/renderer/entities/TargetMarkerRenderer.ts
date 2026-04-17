@@ -8,7 +8,7 @@
  */
 
 import type { ShipState } from "@/sync/types";
-import type { TargetAttackabilityType } from "@/state/stores";
+import type { TargetAttackability } from "@/sync";
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -59,7 +59,7 @@ const DEFAULT_OPTIONS: ResolvedTargetMarkerOptions = {
 export function useTargetMarkers(
 	layers: LayerRegistry | null,
 	ships: ShipState[],
-	attackableTargets: TargetAttackabilityType[],
+	attackableTargets: TargetAttackability[],
 	hoveredTargetId: string | null | undefined,
 	options: TargetMarkerOptions = {}
 ) {
@@ -141,7 +141,7 @@ export function useTargetMarkers(
 function drawTargetMarker(
 	graphics: Graphics,
 	ship: ShipState,
-	target: TargetAttackabilityType,
+	target: TargetAttackability,
 	isHovered: boolean,
 	options: ResolvedTargetMarkerOptions
 ) {

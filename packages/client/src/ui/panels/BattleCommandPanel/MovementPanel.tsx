@@ -1,6 +1,6 @@
 /**
  * 移动控制面板模块
- * 阶段切换、移动量设置、执行控制
+ * 简化版：直接填充Tab内容区，无额外容器/标题
  */
 
 import type { MoveMode, MovementPreviewState } from "@/renderer";
@@ -13,19 +13,14 @@ import {
 	Flag,
 	MoveHorizontal,
 	MoveVertical,
-	Navigation2,
 	RotateCw,
 } from "lucide-react";
 import React, { useMemo, useCallback, useEffect, useState } from "react";
 import type { MovementPanelProps } from "./types";
 import "./MovementPanel.css";
 
-// 阶段配置
-const PHASE_CONFIG = {
-	A: { label: "Phase A", sub: "平移", icon: ArrowUp },
-	B: { label: "Phase B", sub: "转向", icon: RotateCw },
-	C: { label: "Phase C", sub: "平移", icon: ArrowUp },
-};
+// 阶段配置（简化）
+const PHASES = ["A", "B", "C"] as const;
 
 export const MovementPanel: React.FC<MovementPanelProps> = ({
 	ship,
@@ -36,7 +31,6 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 	const movementPhase = useGameStore((state) => state.movementPhase);
 	const setMovePhaseAction = useGameStore((state) => state.setMovePhase);
 
-	// 移动状态
 	const [moveValue, setMoveValue] = useState(0);
 	const [turnInput, setTurnInput] = useState(0);
 	const [moveMode, setMoveMode] = useState<MoveMode>("forward");
@@ -89,7 +83,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 		return moveMode === "forward" ? remainingFuel.forward : remainingFuel.strafe;
 	}, [moveMode, remainingFuel]);
 
-	// 同步 movementPreview
+	// 同步 preview
 	useEffect(() => {
 		if (onMovementPreviewChange && movementPhase !== "NONE") {
 			const preview: MovementPreviewState = {
@@ -102,15 +96,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 			};
 			onMovementPreviewChange(preview);
 		}
-	}, [
-		onMovementPreviewChange,
-		movementPhase,
-		moveMode,
-		moveValue,
-		turnInput,
-		remainingFuel,
-		directionLocked,
-	]);
+	}, [onMovementPreviewChange, movementPhase, moveMode, moveValue, turnInput, remainingFuel, directionLocked]);
 
 	// 阶段切换重置
 	useEffect(() => {
@@ -126,11 +112,11 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 
 		const phase = movementPhase;
 		if (phase !== "PHASE_B" && moveValue === 0) {
-			notify.warning("请设置移动量后再执行");
+			notify.warning("请设置移动量");
 			return;
 		}
 		if (phase === "PHASE_B" && turnInput === 0) {
-			notify.warning("请设置转向量后再执行");
+			notify.warning("请设置转向量");
 			return;
 		}
 
@@ -159,14 +145,11 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 					phase: phase,
 					isIncremental: true,
 				});
+				notify.success(`移动执行成功`);
+				if (phase !== "PHASE_B") setDirectionLocked(true);
+				setMoveValue(0);
+				setTurnInput(0);
 			}
-
-			// 服务端会自动同步更新 ship.phaseAForwardUsed 等字段
-			notify.success(`移动执行成功 [Phase ${phase.slice(-1)}]`);
-
-			if (phase !== "PHASE_B") setDirectionLocked(true);
-			setMoveValue(0);
-			setTurnInput(0);
 		} catch (error) {
 			console.error("[Movement] Execute failed:", error);
 			notify.error("移动执行失败");
@@ -184,7 +167,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 		setDirectionLocked(false);
 	}, [networkManager, ship]);
 
-	// 切换移动模式
+	// 切换模式
 	const handleModeChange = useCallback(
 		(newMode: MoveMode) => {
 			if (directionLocked) {
@@ -201,164 +184,134 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 	const phaseComplete = ship?.hasMoved || movementPhase === "NONE";
 
 	return (
-		<div className="movement-panel">
-			<div className="movement-panel__header">
-				<Navigation2 className="movement-panel__header-icon" />
-				<span>移动</span>
+		<div className="movement-content">
+			{/* 阶段指示器 */}
+			<div className="phase-tabs">
+				{PHASES.map((p) => {
+					const isActive = movementPhase === `PHASE_${p}`;
+					const Icon = p === "B" ? RotateCw : ArrowUp;
+					return (
+						<div key={p} className={`phase-tab ${isActive ? "phase-tab--active" : ""}`}>
+							<Icon className="phase-tab__icon" />
+							<span className="phase-tab__label">P{p}</span>
+						</div>
+					);
+				})}
 			</div>
-			<div className="movement-panel__body">
-				<div className="movement-panel__left">
-					{/* 阶段指示器 */}
-					<div className="phase-tabs">
-						{(["A", "B", "C"] as const).map((p) => {
-							const isActive = movementPhase === `PHASE_${p}`;
-							const Icon = PHASE_CONFIG[p].icon;
-							return (
-								<div key={p} className={`phase-tab ${isActive ? "phase-tab--active" : ""}`}>
-									<Icon className="phase-tab__icon" />
-									<span className="phase-tab__label">{PHASE_CONFIG[p].label}</span>
-									<span className="phase-tab__sub">{PHASE_CONFIG[p].sub}</span>
-								</div>
-							);
-						})}
-					</div>
 
-					{/* 滑块控制区 */}
-					<div className="movement-sliders">
-						{(movementPhase === "PHASE_A" || movementPhase === "PHASE_C") && (
-							<>
-								{/* 模式切换 */}
-								<div className="mode-switch">
-									<button
-										className={`mode-btn ${moveMode === "forward" ? "mode-btn--active" : ""} ${directionLocked ? "mode-btn--locked" : ""}`}
-										onClick={() => handleModeChange("forward")}
-										disabled={!canMove || (directionLocked && moveMode !== "forward")}
-									>
-										<MoveVertical className="mode-btn__icon" />
-										<span>前向</span>
-										{moveMode === "forward" && directionLocked && (
-											<span className="mode-btn__lock-indicator">🔒</span>
-										)}
-									</button>
-									<button
-										className={`mode-btn ${moveMode === "strafe" ? "mode-btn--active" : ""} ${directionLocked ? "mode-btn--locked" : ""}`}
-										onClick={() => handleModeChange("strafe")}
-										disabled={!canMove || (directionLocked && moveMode !== "strafe")}
-									>
-										<MoveHorizontal className="mode-btn__icon" />
-										<span>侧向</span>
-										{moveMode === "strafe" && directionLocked && (
-											<span className="mode-btn__lock-indicator">🔒</span>
-										)}
-									</button>
-								</div>
+			{/* 控制区 */}
+			<div className="movement-controls">
+				{(movementPhase === "PHASE_A" || movementPhase === "PHASE_C") && (
+					<>
+						{/* 模式切换 */}
+						<div className="mode-switch">
+							<button
+								className={`mode-btn ${moveMode === "forward" ? "mode-btn--active" : ""}`}
+								onClick={() => handleModeChange("forward")}
+								disabled={!canMove || (directionLocked && moveMode !== "forward")}
+							>
+								<MoveVertical className="mode-btn__icon" />
+								<span>前向</span>
+							</button>
+							<button
+								className={`mode-btn ${moveMode === "strafe" ? "mode-btn--active" : ""}`}
+								onClick={() => handleModeChange("strafe")}
+								disabled={!canMove || (directionLocked && moveMode !== "strafe")}
+							>
+								<MoveHorizontal className="mode-btn__icon" />
+								<span>侧向</span>
+							</button>
+						</div>
 
-								{/* 移动量滑块 */}
-								<div className="slider-row">
-									<div className="slider-row__header">
-										{moveMode === "forward" ? (
-											<ArrowUp className="slider-row__icon" />
-										) : (
-											<ArrowRight className="slider-row__icon" />
-										)}
-										<span>{moveMode === "forward" ? "移动量" : "侧移量"}</span>
-										<span className="slider-row__value">
-											{moveValue}/{maxMoveValue}
-										</span>
-									</div>
-									<div className="slider-row__input-group">
-										<input
-											type="range"
-											className="move-slider"
-											min={-maxMoveValue}
-											max={maxMoveValue}
-											value={moveValue}
-											onChange={(e) => setMoveValue(Number(e.target.value))}
-											disabled={!canMove}
-										/>
-										<input
-											type="number"
-											className="battle-input"
-											min={-maxMoveValue}
-											max={maxMoveValue}
-											value={moveValue}
-											onChange={(e) =>
-												setMoveValue(
-													Math.max(
-														-maxMoveValue,
-														Math.min(maxMoveValue, Number(e.target.value) || 0)
-													)
-												)
-											}
-											disabled={!canMove}
-										/>
-									</div>
-								</div>
-							</>
-						)}
-
-						{movementPhase === "PHASE_B" && (
-							<div className="slider-row">
-								<div className="slider-row__header">
-									<RotateCw className="slider-row__icon" />
-									<span>转向</span>
-									<span className="slider-row__value">
-										{turnInput}°/{remainingFuel.turn}°
-									</span>
-								</div>
-								<div className="slider-row__input-group">
-									<input
-										type="range"
-										className="move-slider"
-										min={-remainingFuel.turn}
-										max={remainingFuel.turn}
-										value={turnInput}
-										onChange={(e) => setTurnInput(Number(e.target.value))}
-										disabled={!canMove}
-									/>
-									<input
-										type="number"
-										className="battle-input"
-										min={-remainingFuel.turn}
-										max={remainingFuel.turn}
-										value={turnInput}
-										onChange={(e) =>
-											setTurnInput(
-												Math.max(
-													-remainingFuel.turn,
-													Math.min(remainingFuel.turn, Number(e.target.value) || 0)
-												)
-											)
-										}
-										disabled={!canMove}
-									/>
-								</div>
+						{/* 滑块 */}
+						<div className="slider-row">
+							<div className="slider-row__header">
+								{moveMode === "forward" ? <ArrowUp className="slider-row__icon" /> : <ArrowRight className="slider-row__icon" />}
+								<span>{moveMode === "forward" ? "移动" : "侧移"}</span>
+								<span className="slider-row__value">{moveValue}/{maxMoveValue}</span>
 							</div>
-						)}
+							<div className="slider-row__input-group">
+								<input
+									type="range"
+									className="move-slider"
+									min={-maxMoveValue}
+									max={maxMoveValue}
+									value={moveValue}
+									onChange={(e) => setMoveValue(Number(e.target.value))}
+									disabled={!canMove}
+								/>
+								<input
+									type="number"
+									className="battle-input"
+									min={-maxMoveValue}
+									max={maxMoveValue}
+									value={moveValue}
+									onChange={(e) =>
+										setMoveValue(
+											Math.max(-maxMoveValue, Math.min(maxMoveValue, Number(e.target.value) || 0))
+										)
+									}
+									disabled={!canMove}
+								/>
+							</div>
+						</div>
+					</>
+				)}
 
-						{phaseComplete && <div className="movement-complete">已完成</div>}
+				{movementPhase === "PHASE_B" && (
+					<div className="slider-row">
+						<div className="slider-row__header">
+							<RotateCw className="slider-row__icon" />
+							<span>转向</span>
+							<span className="slider-row__value">{turnInput}°/{remainingFuel.turn}°</span>
+						</div>
+						<div className="slider-row__input-group">
+							<input
+								type="range"
+								className="move-slider"
+								min={-remainingFuel.turn}
+								max={remainingFuel.turn}
+								value={turnInput}
+								onChange={(e) => setTurnInput(Number(e.target.value))}
+								disabled={!canMove}
+							/>
+							<input
+								type="number"
+								className="battle-input"
+								min={-remainingFuel.turn}
+								max={remainingFuel.turn}
+								value={turnInput}
+								onChange={(e) =>
+									setTurnInput(
+										Math.max(-remainingFuel.turn, Math.min(remainingFuel.turn, Number(e.target.value) || 0))
+									)
+								}
+								disabled={!canMove}
+							/>
+						</div>
 					</div>
-				</div>
+				)}
 
-				{/* 右侧按钮 */}
-				<div className="movement-panel__right">
-					<button
-						className="battle-btn battle-btn--secondary"
-						onClick={handleAdvancePhase}
-						disabled={!canMove || movementPhase === "PHASE_C"}
-					>
-						<Flag className="battle-btn__icon" />
-						<span>推进</span>
-					</button>
-					<button
-						className="battle-btn battle-btn--primary"
-						onClick={handleExecuteMove}
-						disabled={!canMove || phaseComplete}
-					>
-						<Navigation2 className="battle-btn__icon" />
-						<span>执行</span>
-					</button>
-				</div>
+				{phaseComplete && <div className="movement-complete">已完成</div>}
+			</div>
+
+			{/* 操作按钮 */}
+			<div className="movement-actions">
+				<button
+					className="game-btn"
+					onClick={handleAdvancePhase}
+					disabled={!canMove || movementPhase === "PHASE_C"}
+				>
+					<Flag className="game-btn__icon" />
+					推进
+				</button>
+				<button
+					className="game-btn game-btn--primary"
+					onClick={handleExecuteMove}
+					disabled={!canMove || phaseComplete}
+				>
+					执行
+				</button>
 			</div>
 		</div>
 	);

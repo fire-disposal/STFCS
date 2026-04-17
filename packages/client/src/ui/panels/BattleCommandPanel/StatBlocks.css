@@ -1,5 +1,6 @@
 /**
  * 状态条样式
+ * 简化版，复用全局 game-bar 样式
  */
 
 .stat-blocks {
@@ -9,13 +10,17 @@
 	height: 100%;
 }
 
+.stat-blocks--compact {
+	gap: var(--space-2);
+}
+
 .stat-block {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	padding: var(--space-2) var(--space-3);
-	background: rgba(13, 40, 71, 0.8);
-	border: 1px solid rgba(74, 158, 255, 0.3);
+	padding: var(--space-2);
+	background: var(--game-bg-tertiary);
+	border: 1px solid var(--game-border);
 	min-height: 0;
 }
 
@@ -30,58 +35,34 @@
 .stat-block__icon {
 	width: 14px;
 	height: 14px;
+	flex-shrink: 0;
 }
 
 .stat-block__label {
 	font-size: var(--text-xs);
-	color: var(--text-tertiary);
+	color: var(--game-text-secondary);
 	font-weight: var(--font-bold);
 }
 
 .stat-block__value {
 	font-size: var(--text-xs);
-	color: var(--text-primary);
+	color: var(--game-text-primary);
 	font-family: var(--font-mono);
 	margin-left: auto;
 }
 
-/* 状态条 */
-.stat-bar {
-	height: 10px;
-	background: rgba(0, 0, 0, 0.5);
-	border: 1px solid rgba(43, 66, 97, 0.5);
-	overflow: hidden;
+/* 辐能条特殊处理 */
+.game-bar--flux {
+	display: flex;
 	position: relative;
 }
 
-.stat-bar--flux {
-	display: flex;
-}
-
-.stat-bar__fill {
-	height: 100%;
-	transition: width var(--transition-slow);
-}
-
-.stat-bar__fill--hull {
-	transition: width var(--transition-slow), background-color var(--transition-slow);
-}
-
-.stat-bar__fill--soft {
-	background: var(--color-primary);
-	opacity: 0.7;
-}
-
-.stat-bar__fill--hard {
-	background: var(--color-danger);
+.game-bar__fill--hard {
+	background: var(--game-accent-red);
 	opacity: 0.9;
 	position: absolute;
 	top: 0;
 	left: 0;
-}
-
-.stat-bar__fill--shield {
-	box-shadow: 0 0 6px rgba(74, 158, 255, 0.3);
 }
 
 /* 过载警告 */
@@ -91,10 +72,10 @@
 	gap: var(--space-1);
 	margin-top: var(--space-1);
 	font-size: var(--text-xs);
-	color: var(--color-danger);
-	background: rgba(231, 76, 60, 0.15);
+	color: var(--game-accent-red);
+	background: var(--game-btn-bg-danger);
 	padding: var(--space-1) var(--space-2);
-	border: 1px solid rgba(231, 76, 60, 0.3);
+	border: 1px solid rgba(255, 111, 143, 0.3);
 }
 
 .stat-block__warning-icon {
@@ -102,7 +83,7 @@
 	height: 10px;
 }
 
-/* 护甲网格 */
+/* 护甲网格（仅非紧凑模式） */
 .armor-grid {
 	display: grid;
 	grid-template-columns: repeat(6, 1fr);

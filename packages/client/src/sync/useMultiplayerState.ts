@@ -4,6 +4,10 @@
  * 利用 Colyseus Schema 的响应式特性，自动触发组件更新
  * 无需手动管理 stateVersion 或 forceUpdate
  *
+ * 设计原则：
+ * - 使用 ref 存储 room 对象引用，避免作为 useEffect 依赖
+ * - 使用 roomId 作为稳定的依赖标识
+ *
  * @example
  * // 订阅整个房间状态
  * const roomState = useMultiplayerState(room, 'state');
@@ -37,27 +41,35 @@ export function useMultiplayerState<T>(
 		return selector(room.state) ?? null;
 	});
 
+	// ⚠️ 使用 ref 存储 room 对象和 selector，避免作为 useEffect 依赖
+	const roomRef = useRef(room);
+	roomRef.current = room;
+
 	const selectorRef = useRef(selector);
 	selectorRef.current = selector;
 
+	// ⚠️ 使用 roomId 作为稳定的依赖标识
+	const roomId = room?.roomId;
+
 	useEffect(() => {
-		if (!room) return;
+		const currentRoom = roomRef.current;
+		if (!currentRoom) return;
 
 		const handleStateChange = () => {
 			if (typeof selectorRef.current === "string") {
-				setState((room.state as any)[selectorRef.current] ?? null);
+				setState((currentRoom.state as any)[selectorRef.current] ?? null);
 			} else {
-				setState(selectorRef.current(room.state) ?? null);
+				setState(selectorRef.current(currentRoom.state) ?? null);
 			}
 		};
 
 		// Colyseus 的 onStateChange 会在任何 Schema 字段变化时触发
-		room.onStateChange(handleStateChange);
+		currentRoom.onStateChange(handleStateChange);
 
 		return () => {
-			room.onStateChange.remove(handleStateChange);
+			currentRoom.onStateChange.remove(handleStateChange);
 		};
-	}, [room]);
+	}, [roomId]); // ⚠️ 仅依赖 roomId，不依赖 room 对象
 
 	return state;
 }
@@ -85,13 +97,21 @@ export function usePlayers(room: Room | null) {
 export function useShips(room: Room | null) {
 	const [ships, setShips] = useState<any[]>([]);
 
+	// ⚠️ 使用 ref 存储 room 对象，避免作为 useEffect 依赖
+	const roomRef = useRef(room);
+	roomRef.current = room;
+
+	// ⚠️ 使用 roomId 作为稳定的依赖标识
+	const roomId = room?.roomId;
+
 	useEffect(() => {
-		if (!room?.state?.ships) {
+		const currentRoom = roomRef.current;
+		if (!currentRoom?.state?.ships) {
 			setShips([]);
 			return;
 		}
 
-		const shipsMap = room.state.ships;
+		const shipsMap = currentRoom.state.ships;
 
 		const getShipsArray = (): any[] => {
 			const arr: any[] = [];
@@ -101,16 +121,16 @@ export function useShips(room: Room | null) {
 
 		setShips(getShipsArray());
 
-		const handleStateChange = (state: any) => {
+		const handleStateChange = () => {
 			setShips(getShipsArray());
 		};
 
-		room.onStateChange(handleStateChange);
+		currentRoom.onStateChange(handleStateChange);
 
 		return () => {
-			room.onStateChange.remove(handleStateChange);
+			currentRoom.onStateChange.remove(handleStateChange);
 		};
-	}, [room?.state?.ships]);
+	}, [roomId]); // ⚠️ 仅依赖 roomId，不依赖 room 对象
 
 	return ships;
 }
@@ -119,9 +139,11 @@ export function useShips(room: Room | null) {
  * 订阅当前玩家
  */
 export function useCurrentPlayer(room: Room | null) {
+	// ⚠️ sessionId 是稳定的字符串值
+	const sessionId = room?.sessionId;
 	return useMultiplayerState(room, (state: any) => {
-		if (!room?.sessionId || !state?.players) return null;
-		return state.players.get(room.sessionId) ?? null;
+		if (!sessionId || !state?.players) return null;
+		return state.players.get(sessionId) ?? null;
 	});
 }
 

@@ -1,0 +1,147 @@
+/**
+ * 舰船信息摘要样式
+ */
+
+.ship-info-summary {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	height: 100%;
+}
+
+/* 头部：舰船名称 + 阵营 */
+.ship-info-summary__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-bottom: var(--space-1);
+	border-bottom: 1px solid var(--game-border);
+}
+
+.ship-info-summary__name {
+	font-size: var(--text-sm);
+	font-weight: var(--font-bold);
+	color: var(--game-text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ship-info-summary__faction {
+	font-size: var(--text-xs);
+	padding: 1px var(--space-2);
+	background: var(--game-btn-bg);
+	border: 1px solid var(--game-border);
+	color: var(--game-text-secondary);
+}
+
+.ship-info-summary__faction--player {
+	background: var(--game-btn-bg-primary);
+	border-color: var(--game-accent-blue);
+	color: var(--game-accent-blue);
+}
+
+.ship-info-summary__faction--enemy {
+	background: var(--game-btn-bg-danger);
+	border-color: var(--game-accent-red);
+	color: var(--game-accent-red);
+}
+
+/* 状态条区 */
+.ship-info-summary__stats {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.ship-info-summary__stat-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+}
+
+.ship-info-summary__stat-label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10px;
+	color: var(--game-text-secondary);
+	min-width: 40px;
+}
+
+.ship-info-summary__stat-icon {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+
+.ship-info-summary__stat-bar {
+	flex: 1;
+	height: 8px;
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid var(--game-border);
+	overflow: hidden;
+}
+
+.ship-info-summary__stat-fill {
+	height: 100%;
+	transition: width var(--transition-normal);
+}
+
+.ship-info-summary__stat-fill--flux {
+	background: linear-gradient(90deg, var(--game-accent-blue), var(--game-accent-purple));
+}
+
+.ship-info-summary__stat-fill--shield {
+	background: linear-gradient(90deg, #2a5a8a, var(--game-accent-blue));
+}
+
+.ship-info-summary__stat-fill--armor {
+	background: linear-gradient(90deg, #8a6a2a, var(--game-accent-yellow));
+}
+
+.ship-info-summary__stat-value {
+	font-size: 10px;
+	font-family: var(--font-mono);
+	color: var(--game-text-primary);
+	min-width: 50px;
+	text-align: right;
+}
+
+/* BUFF区 */
+.ship-info-summary__buffs {
+	display: flex;
+	gap: var(--space-1);
+	flex-shrink: 0;
+	padding-top: var(--space-1);
+	border-top: 1px solid rgba(43, 66, 97, 0.3);
+}
+
+.ship-info-summary__buff {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10px;
+	padding: 1px var(--space-2);
+	background: var(--game-btn-bg);
+	border: 1px solid var(--game-border);
+	color: var(--game-text-secondary);
+}
+
+.ship-info-summary__buff-icon {
+	width: 10px;
+	height: 10px;
+}
+
+.ship-info-summary__buff--positive {
+	background: var(--game-btn-bg-success);
+	border-color: var(--game-accent-green);
+	color: var(--game-accent-green);
+}
+
+.ship-info-summary__buff--negative {
+	background: var(--game-btn-bg-danger);
+	border-color: var(--game-accent-red);
+	color: var(--game-accent-red);
+}

@@ -6,7 +6,8 @@
  * - 扇形大小基于武器射程
  * - 支持最小射程（近距离无法开火时显示空心扇形）
  * - 显示可行目标的瞄准线（红色带辉光效果）
- * - 使用 fireModeStore 的权威数据绘制瞄准线
+ *
+ * ⚠️ 数据流：fireModeStore 仅存储 UI 意图 ID（selectedWeaponId, selectedTargetIds）
  */
 
 import { useFireModeStore } from "@/state/stores/fireModeStore";
@@ -15,7 +16,7 @@ import type { WeaponSlot } from "@/sync/types";
 import { DamageType, WeaponState } from "@/sync/types";
 import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@vt/rules";
 import { Graphics } from "pixi.js";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 
 export interface DrawWeaponArcsOptions {
@@ -54,14 +55,52 @@ export function useWeaponArcsRendering(
 	const moveGraphicsRef = useRef<Graphics | null>(null);
 	const lastShipIdRef = useRef<string | null>(null);
 
-	// 从 fireModeStore 获取选中状态（用于高亮）
-	const selectedWeaponFromStore = useFireModeStore((state) => state.selectedWeapon);
+	// 从 fireModeStore 获取选中状态（仅 ID，用于高亮）
+	const selectedWeaponId = useFireModeStore((state) => state.selectedWeaponId);
 	const selectedTargetIds = useFireModeStore((state) => state.selectedTargetIds);
+
+	// ⚠️ 使用 ref 存储数组引用，避免作为 useEffect 依赖触发无限循环
+	const selectedTargetIdsRef = useRef(selectedTargetIds);
+	selectedTargetIdsRef.current = selectedTargetIds;
+
+	// 提取 options 的关键布尔值，避免每次渲染触发
+	const showWeaponArcs = options.showWeaponArcs;
+	const showMovementRange = options.showMovementRange;
+	const showTargetLines = options.showTargetLines ?? true;
+
+	// ⚠️ 将数组转换为稳定的字符串依赖（内容相同时不触发重绘）
+	const selectedTargetIdsKey = JSON.stringify(selectedTargetIds);
+
+	// ⚠️ 使用 ref 存储 ships 数组，减少重绘频率
+	const shipsRef = useRef(ships);
+	shipsRef.current = ships;
+
+	// ⚠️ 计算舰船位置签名，用于触发重绘（舰船移动后更新）
+	// 格式: "shipId:x:y:heading" 对选中舰船和所有可见舰船
+	const shipsPositionKey = useMemo(() => {
+		const selectedShip = ships.find((s) => s.id === selectedShipId);
+		if (!selectedShip) return "";
+
+		// 选中舰船的位置（关键，用于武器射界起点）
+		const selectedPos = `${selectedShip.id}:${Math.round(selectedShip.transform.x)}:${Math.round(selectedShip.transform.y)}:${Math.round(selectedShip.transform.heading)}`;
+
+		// 所有其他舰船的位置（用于目标瞄准线）
+		const otherPositions = ships
+			.filter((s) => s.id !== selectedShipId && !s.isDestroyed)
+			.map((s) => `${s.id}:${Math.round(s.transform.x)}:${Math.round(s.transform.y)}`)
+			.sort()
+			.join("|");
+
+		return `${selectedPos}|${otherPositions}`;
+	}, [ships, selectedShipId]);
 
 	useEffect(() => {
 		if (!layers) return;
 
-		const selectedShip = selectedShipId ? ships.find((s) => s.id === selectedShipId) : null;
+		const currentShips = shipsRef.current;
+		const currentSelectedTargetIds = selectedTargetIdsRef.current;
+
+		const selectedShip = selectedShipId ? currentShips.find((s) => s.id === selectedShipId) : null;
 
 		// 切换舰船时清除旧的图形
 		if (lastShipIdRef.current && lastShipIdRef.current !== selectedShipId) {
@@ -91,16 +130,16 @@ export function useWeaponArcsRendering(
 			return;
 		}
 
-		if (options.showWeaponArcs) {
+		if (showWeaponArcs) {
 			// 绘制所有武器的射界和瞄准线
 			drawWeaponArcs(
 				layers,
 				selectedShip,
-				ships,
+				currentShips,
 				arcGraphicsRef,
-				options.showTargetLines ?? true,
-				selectedWeaponFromStore,
-				selectedTargetIds
+				showTargetLines,
+				selectedWeaponId,
+				currentSelectedTargetIds
 			);
 		} else {
 			arcGraphicsRef.current.forEach((meta) => {
@@ -110,13 +149,13 @@ export function useWeaponArcsRendering(
 			arcGraphicsRef.current = [];
 		}
 
-		if (options.showMovementRange) {
+		if (showMovementRange) {
 			drawMovementRange(layers, selectedShip, moveGraphicsRef);
 		} else if (moveGraphicsRef.current) {
 			layers.weaponArcs.removeChild(moveGraphicsRef.current);
 			moveGraphicsRef.current = null;
 		}
-	}, [layers, ships, selectedShipId, options, selectedWeaponFromStore, selectedTargetIds]);
+	}, [layers, selectedShipId, showWeaponArcs, showMovementRange, showTargetLines, selectedWeaponId, selectedTargetIdsKey, shipsPositionKey]); // ⚠️ 添加 shipsPositionKey 作为依赖
 
 	useEffect(() => {
 		return () => {
@@ -150,19 +189,19 @@ function drawWeaponArcs(
 	allShips: ShipState[],
 	arcGraphicsRef: React.MutableRefObject<ArcGraphicsMeta[]>,
 	showTargetLines: boolean,
-	selectedWeaponFromStore: WeaponSlot | null,
+	selectedWeaponId: string | null,  // 仅 ID
 	selectedTargetIds: string[]
 ): void {
 	const existingWeaponIds = new Set(arcGraphicsRef.current.map((m) => m.weaponId));
 	const currentWeaponIds = new Set<string>();
-	ship.weapons.forEach((w) => currentWeaponIds.add(w.instanceId));
+	ship.weapons.forEach((w) => currentWeaponIds.add(w.mountId));
 
 	// 所有非摧毁舰船（包括友军，允许误伤）
 	const potentialTargets = allShips.filter((s) => !s.isDestroyed && s.id !== ship.id);
 
 	ship.weapons.forEach((weapon) => {
-		const weaponId = weapon.instanceId;
-		const isCurrentSelectedWeapon = selectedWeaponFromStore?.instanceId === weaponId;
+		const weaponId = weapon.mountId;  // 使用 mountId
+		const isCurrentSelectedWeapon = selectedWeaponId === weaponId;  // 比较 ID
 		const existingMeta = arcGraphicsRef.current.find((m) => m.weaponId === weaponId);
 		const arcGraphics = existingMeta?.graphics ?? new Graphics();
 		const targetLineGraphics = existingMeta?.targetLines ?? new Graphics();

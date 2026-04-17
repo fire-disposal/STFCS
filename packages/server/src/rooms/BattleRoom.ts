@@ -17,10 +17,10 @@ import { GameRoomState } from "../schema/GameSchema.js";
 import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
 import {
 	EMPTY_ROOM_TTL_MS,
+	OWNER_LEAVE_TTL_MS,
 	DEFAULT_MAX_CLIENTS,
 	MAX_CLIENTS_LIMIT,
 	MIN_CLIENTS,
-	RECONNECTION_WINDOW_SECONDS,
 	SIMULATION_INTERVAL_MS,
 	MoveBuffer,
 	QosMonitor,
@@ -43,6 +43,9 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 
 	// 定时器
 	private emptyDisposeTimeout: ReturnType<typeof setTimeout> | null = null;
+	private ownerLeaveTimeout: ReturnType<typeof setTimeout> | null = null;
+	/** 房主离开时记录的名称（用于匹配重新加入） */
+	private ownerName: string | null = null;
 
 	async onCreate(options: { roomName?: string; maxPlayers?: number }) {
 		this.maxClients = Math.min(MAX_CLIENTS_LIMIT, Math.max(MIN_CLIENTS, options.maxPlayers ?? DEFAULT_MAX_CLIENTS));
@@ -71,8 +74,7 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			dissolveRoom: () => this.disconnect(),
 			saveGame: (name: string) => this.saveGame(name),
 			loadGame: (saveId: string) => this.loadGame(saveId),
-			transferOwner: (targetSessionId: string) =>
-				this.playerManager.transferOwnership(targetSessionId, this.state),
+			// transferOwner 已禁用（DM权限固定）
 		});
 
 		this.syncMetadata();
@@ -82,6 +84,14 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 	async onJoin(client: Client, options: { playerName?: string }) {
 		this.cancelEmptyDisposeTimer();
 
+		// 检查是否是房主重新加入
+		const playerName = options.playerName?.trim();
+		if (this.ownerName && playerName === this.ownerName && this.ownerLeaveTimeout) {
+			// 房主重新加入，取消解散计时器
+			this.cancelOwnerLeaveTimer();
+			console.log(`[BattleRoom] 房主 ${playerName} 重新加入，取消解散计时器`);
+		}
+
 		const result = await this.playerManager.handleJoin(
 			client,
 			options,
@@ -89,11 +99,42 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 			this.clients,
 			this.maxClients,
 			this.roomId,
-			this.qosMonitor
+			this.qosMonitor,
+			this.ownerName // 传入房主名称用于恢复DM身份
 		);
 
 		if (result.success) {
+			// 如果是房主重新加入，确保恢复DM身份
+			if (result.player && result.player.name === this.ownerName && result.player.role !== "DM") {
+				result.player.role = "DM";
+				this.playerManager.setOwnerId(client.sessionId);
+				this.broadcast("owner_rejoined", {
+					sessionId: client.sessionId,
+					shortId: result.player.shortId,
+					name: result.player.name,
+				});
+			}
+
 			this.syncMetadata();
+
+			// 广播玩家加入事件（让其他客户端知道）
+			if (result.player) {
+				this.broadcast("player_joined", {
+					sessionId: result.player.sessionId,
+					shortId: result.player.shortId,
+					name: result.player.name,
+					role: result.player.role,
+					isNew: result.isNew ?? false,
+				});
+
+				// 广播头像给所有房间成员（头像不走Schema）
+				if (result.player.avatar && result.isNew) {
+					this.broadcast("PLAYER_AVATAR", {
+						shortId: result.player.shortId,
+						avatar: result.player.avatar,
+					});
+				}
+			}
 		}
 	}
 
@@ -101,32 +142,32 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		const player = this.state.players.get(client.sessionId);
 		if (!player) return;
 
-		// 标记为离线
-		player.connected = false;
-		this.playerManager.clearOwnerIfOffline(client.sessionId, this.state);
-		this.syncMetadata();
+		// 广播玩家离线事件
+		this.broadcast("player_left", {
+			sessionId: client.sessionId,
+			shortId: player.shortId,
+			name: player.name,
+			role: player.role,
+		});
 
-		// 主动离开（code 1000）不启用重连窗口，允许立即重新加入
-		// 仅对意外断开启用重连窗口
-		const isNormalLeave = code === 1000;
-		if (isNormalLeave) {
-			this.scheduleEmptyDisposeIfNeeded();
+		// 删除玩家
+		this.state.players.delete(client.sessionId);
+
+		// 如果是房主离开，启动5分钟解散计时器
+		if (player.role === "DM") {
+			this.ownerName = player.name; // 记录房主名称
+			this.broadcast("owner_left", {
+				name: player.name,
+				shortId: player.shortId,
+				waitTimeSeconds: OWNER_LEAVE_TTL_MS / 1000,
+			});
+			this.scheduleOwnerLeaveDispose();
+			console.log(`[BattleRoom] 房主 ${player.name} 离开，启动 ${OWNER_LEAVE_TTL_MS / 1000}s 解散计时器`);
 			return;
 		}
 
-		// 意外断开：短暂窗口内允许恢复
-		this.allowReconnection(client, RECONNECTION_WINDOW_SECONDS)
-			.then(() => {
-				// 重连成功，恢复玩家状态
-				player.connected = true;
-				this.syncMetadata();
-				this.cancelEmptyDisposeTimer();
-			})
-			.catch(() => {
-				// 重连窗口超时，玩家状态保持离线
-				// 用户可以手动点击"加入房间"重新加入（通过 playerName 匹配恢复）
-				this.scheduleEmptyDisposeIfNeeded();
-			});
+		this.syncMetadata();
+		this.scheduleEmptyDisposeIfNeeded();
 	}
 
 	private update(dt: number) {
@@ -179,6 +220,25 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		if (this.emptyDisposeTimeout) {
 			clearTimeout(this.emptyDisposeTimeout);
 			this.emptyDisposeTimeout = null;
+		}
+	}
+
+	private scheduleOwnerLeaveDispose(): void {
+		if (this.ownerLeaveTimeout) return;
+
+		this.ownerLeaveTimeout = setTimeout(() => {
+			console.log(`[BattleRoom] 房主 ${this.ownerName} 未重新加入，解散房间`);
+			this.broadcast("room_dissolved", { reason: "房主未在规定时间内重新加入" });
+			this.disconnect();
+			this.ownerLeaveTimeout = null;
+			this.ownerName = null;
+		}, OWNER_LEAVE_TTL_MS);
+	}
+
+	private cancelOwnerLeaveTimer(): void {
+		if (this.ownerLeaveTimeout) {
+			clearTimeout(this.ownerLeaveTimeout);
+			this.ownerLeaveTimeout = null;
 		}
 	}
 

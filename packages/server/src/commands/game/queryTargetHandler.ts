@@ -1,8 +1,8 @@
 /**
- * 目标可攻击性查询处理器 (合集)
+ * 目标可攻击性查询处理器
  *
- * 服务端权威计算可攻击目标列表，减少客户端计算负担。
- * 返回每个目标的可攻击性状态（射程、射界、武器状态检查）。
+ * 服务端权威计算可攻击目标列表，直接写入 Schema 同步
+ * 客户端通过 Colyseus Schema 订阅获取数据（无需 CustomEvent）
  */
 
 import type { Client } from "@colyseus/core";
@@ -10,39 +10,17 @@ import { WeaponState } from "@vt/data";
 import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@vt/rules";
 import type { GameRoomState } from "../../schema/GameSchema.js";
 import type { ShipState, WeaponSlot } from "../../schema/ShipStateSchema.js";
+import {
+	TargetAttackabilitySchema,
+	WeaponTargetsSchema,
+	ShipFireControlSchema,
+} from "../../schema/FireControlSchema.js";
 import { normalizeHeading } from "./utils.js";
-
-/** 目标可攻击性结果（返回给客户端） */
-export interface TargetAttackability {
-	shipId: string;
-	canAttack: boolean;
-	reason?: string;
-	inRange: boolean;
-	inArc: boolean;
-	distance: number;
-	estimatedDamage?: number;
-	isFriendly?: boolean;
-}
-
-/** 查询结果 DTO */
-export interface AttackableTargetsResult {
-	attackerShipId: string;
-	weaponInstanceId: string;
-	targets: TargetAttackability[];
-	weaponCanFire: boolean;
-	weaponFireReason?: string;
-}
-
-/** 批量查询结果 */
-export interface AllAttackableTargetsResult {
-	shipId: string;
-	weapons: Map<string, AttackableTargetsResult>; // weaponInstanceId -> result
-}
 
 /**
  * 检查武器是否可以开火
  */
-function checkWeaponCanFire(ship: ShipState, weapon: WeaponSlot): { canFire: boolean; reason?: string } {
+function checkWeaponCanFire(ship: ShipState, weapon: WeaponSlot): { canFire: boolean; reason: string } {
 	if (ship.isOverloaded) {
 		return { canFire: false, reason: "舰船过载" };
 	}
@@ -63,7 +41,7 @@ function checkWeaponCanFire(ship: ShipState, weapon: WeaponSlot): { canFire: boo
 		return { canFire: false, reason: "本回合已射击" };
 	}
 
-	return { canFire: true };
+	return { canFire: true, reason: "" };
 }
 
 /**
@@ -73,17 +51,18 @@ function calculateTargetAttackability(
 	attacker: ShipState,
 	weapon: WeaponSlot,
 	target: ShipState
-): TargetAttackability {
+): TargetAttackabilitySchema {
+	const result = new TargetAttackabilitySchema();
+	result.shipId = target.id;
+
 	// 已摧毁目标不可攻击
 	if (target.isDestroyed || target.hull.current <= 0) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: "目标已摧毁",
-			inRange: false,
-			inArc: false,
-			distance: 0,
-		};
+		result.canAttack = false;
+		result.reason = "目标已摧毁";
+		result.inRange = false;
+		result.inArc = false;
+		result.distance = 0;
+		return result;
 	}
 
 	// 计算武器挂载点的世界坐标（使用权威函数）
@@ -101,141 +80,108 @@ function calculateTargetAttackability(
 
 	// 武器实际朝向（规范化到 0-360）
 	const weaponFacing = normalizeHeading(attacker.transform.heading + (weapon.mountFacing ?? 0));
-	// 使用 getEffectiveArc() 获取有效射界（TURRET 用 arc，HARDPOINT 用 hardpointArc）
+	// 使用 getEffectiveArc() 获取有效射界
 	const effectiveArc = weapon.getEffectiveArc();
 	const arcHalf = Math.max(0, effectiveArc) / 2;
 
-	// 应用射程比率：真实射程 = 武器面板射程 × 舰船射程比率
+	// 应用射程比率
 	const rangeRatio = attacker.rangeRatio ?? 1.0;
 	const maxRange = (weapon.range ?? 300) * rangeRatio;
 	const minRange = (weapon.minRange ?? 0) * rangeRatio;
 
+	result.distance = dist;
+
 	// 射程检查
 	if (dist > maxRange) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `超出射程: ${Math.round(dist)} > ${Math.round(maxRange)}`,
-			inRange: false,
-			inArc: true,
-			distance: dist,
-		};
+		result.canAttack = false;
+		result.reason = `超出射程: ${Math.round(dist)} > ${Math.round(maxRange)}`;
+		result.inRange = false;
+		result.inArc = true;
+		return result;
 	}
 
 	if (minRange > 0 && dist < minRange) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `距离过近: ${Math.round(dist)} < ${Math.round(minRange)}`,
-			inRange: false,
-			inArc: true,
-			distance: dist,
-		};
+		result.canAttack = false;
+		result.reason = `距离过近: ${Math.round(dist)} < ${Math.round(minRange)}`;
+		result.inRange = false;
+		result.inArc = true;
+		return result;
 	}
 
-	// 射界检查（使用权威 angleDifference）
+	// 射界检查
 	const angleDiff = angleDifference(weaponFacing, angleToTarget);
 	if (angleDiff > arcHalf) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `不在射界内: 偏差 ${Math.round(angleDiff)}° > ${Math.round(arcHalf)}°`,
-			inRange: true,
-			inArc: false,
-			distance: dist,
-		};
+		result.canAttack = false;
+		result.reason = `不在射界内: 偏差 ${Math.round(angleDiff)}° > ${Math.round(arcHalf)}°`;
+		result.inRange = true;
+		result.inArc = false;
+		return result;
 	}
 
 	// 可攻击（允许向任何人开火，包括友军误伤）
-	const isFriendly = target.faction === attacker.faction;
+	result.canAttack = true;
+	result.inRange = true;
+	result.inArc = true;
+	result.estimatedDamage = weapon.damage;
+	result.isFriendly = target.faction === attacker.faction;
 
-	return {
-		shipId: target.id,
-		canAttack: true,
-		inRange: true,
-		inArc: true,
-		distance: dist,
-		estimatedDamage: weapon.damage,
-		isFriendly,
-	};
+	return result;
 }
 
 /**
- * 查询单武器的可攻击目标列表
- */
-export function handleQueryAttackableTargets(
-	state: GameRoomState,
-	client: Client,
-	payload: { shipId: string; weaponInstanceId: string }
-): AttackableTargetsResult {
-	if (!payload.shipId || !payload.weaponInstanceId) {
-		throw new Error("请求格式错误: 需要 shipId 和 weaponInstanceId");
-	}
-
-	const attacker = state.ships.get(payload.shipId);
-	if (!attacker) throw new Error("舰船不存在");
-
-	const player = state.players.get(client.sessionId);
-	if (!player) throw new Error("玩家未注册");
-	if (player.role !== "DM" && attacker.ownerId !== client.sessionId) {
-		throw new Error("没有权限查询此舰船");
-	}
-
-	const weapon = attacker.weapons.get(payload.weaponInstanceId);
-	if (!weapon) throw new Error("武器不存在");
-
-	const weaponCheck = checkWeaponCanFire(attacker, weapon);
-	const targets: TargetAttackability[] = [];
-
-	state.ships.forEach((targetShip) => {
-		if (targetShip.id === attacker.id) return;
-		targets.push(calculateTargetAttackability(attacker, weapon, targetShip));
-	});
-
-	targets.sort((a, b) => a.distance - b.distance);
-
-	return {
-		attackerShipId: attacker.id,
-		weaponInstanceId: weapon.instanceId,
-		targets,
-		weaponCanFire: weaponCheck.canFire,
-		weaponFireReason: weaponCheck.reason,
-	};
-}
-
-/**
- * 批量查询舰船所有武器的可攻击目标
+ * 执行批量查询并将结果写入 Schema
+ *
+ * 服务端权威计算，通过 Schema 直接同步到客户端
  */
 export function handleQueryAllAttackableTargets(
 	state: GameRoomState,
 	client: Client,
 	payload: { shipId: string }
-): AllAttackableTargetsResult {
-	if (!payload.shipId) throw new Error("请求格式错误: 需要 shipId");
+): void {
+	if (!payload.shipId) return; // Silent return for invalid payload on query
 
 	const ship = state.ships.get(payload.shipId);
-	if (!ship) throw new Error("舰船不存在");
+	if (!ship) return; // Silent return for non-existent ship
 
 	const player = state.players.get(client.sessionId);
-	if (!player) throw new Error("玩家未注册");
+	if (!player) return; // 静默忽略，避免重连期间查询导致刷屏
 	if (player.role !== "DM" && ship.ownerId !== client.sessionId) {
-		throw new Error("没有权限查询此舰船");
+		return; // 静默忽略权限不足的查询
 	}
 
-	const weapons = new Map<string, AttackableTargetsResult>();
+	// 创建或更新 ShipFireControlSchema
+	let shipFireControl = state.fireControlCache.ships.get(payload.shipId);
+	if (!shipFireControl) {
+		shipFireControl = new ShipFireControlSchema();
+		shipFireControl.shipId = payload.shipId;
+		state.fireControlCache.ships.set(payload.shipId, shipFireControl);
+	}
 
+	shipFireControl.lastUpdateTime = Date.now();
+
+	// 遍历所有武器，计算可攻击目标
 	ship.weapons.forEach((weapon) => {
-		weapons.set(
-			weapon.instanceId,
-			handleQueryAttackableTargets(state, client, {
-				shipId: ship.id,
-				weaponInstanceId: weapon.instanceId,
-			})
-		);
+		const weaponTargets = new WeaponTargetsSchema();
+		weaponTargets.weaponMountId = weapon.mountId;
+
+		const weaponCheck = checkWeaponCanFire(ship, weapon);
+		weaponTargets.weaponCanFire = weaponCheck.canFire;
+		weaponTargets.weaponFireReason = weaponCheck.reason;
+
+		// 计算所有目标的可攻击性
+		state.ships.forEach((targetShip) => {
+			if (targetShip.id === ship.id) return;
+
+			const targetData = calculateTargetAttackability(ship, weapon, targetShip);
+			weaponTargets.targets.push(targetData);
+		});
+
+		// 按距离排序
+		weaponTargets.targets.sort((a, b) => a.distance - b.distance);
+
+		// 写入 Schema
+		shipFireControl.weapons.set(weapon.mountId, weaponTargets);
 	});
 
-	return {
-		shipId: ship.id,
-		weapons,
-	};
+	// Schema 变化会自动触发客户端更新，无需发送消息
 }

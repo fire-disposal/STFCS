@@ -9,7 +9,7 @@ import { PlayerRole } from "@vt/data";
 import type { GameRoomState } from "../schema/GameSchema.js";
 import type { ShipState } from "../schema/ShipStateSchema.js";
 import type { PlayerService } from "../services/PlayerService.js";
-import type { MoveTokenPayload, UpdateProfilePayload, CreateObjectPayload } from "./types.js";
+import type { MoveTokenPayload, UpdateProfilePayload, CreateObjectPayload, CustomizeShipPayload, AddWeaponMountPayload, RemoveWeaponMountPayload, UpdateWeaponMountPayload } from "./types.js";
 import {
 	handleMove,
 	handleAdvanceMovePhase,
@@ -18,10 +18,15 @@ import {
 	handleVentFlux,
 	handleAssignShip,
 	handleAdvancePhase,
-	handleGetAttackableTargets,
 	handleGetAllAttackableTargets,
 } from "./game/index.js";
 import { handleUpdateProfile } from "./system/index.js";
+import {
+	handleCustomizeShip,
+	handleAddWeaponMount,
+	handleRemoveWeaponMount,
+	handleUpdateWeaponMount,
+} from "./game/customizeHandler.js";
 
 export class CommandDispatcher {
 	constructor(private state: GameRoomState) {}
@@ -32,11 +37,6 @@ export class CommandDispatcher {
 		if (!player || player.role !== PlayerRole.DM) {
 			throw new Error("无权限：仅 DM 可执行此操作");
 		}
-	}
-
-	/** 查询可攻击目标 */
-	dispatchQueryTargets(client: Client, payload: { shipId: string; weaponInstanceId: string }): void {
-		handleGetAttackableTargets(this.state, client, payload);
 	}
 
 	/** 批量查询所有武器可攻击目标 */
@@ -120,5 +120,31 @@ export class CommandDispatcher {
 	/** 分配舰船 */
 	dispatchAssignShip(client: Client, shipId: string, targetSessionId: string): void {
 		handleAssignShip(this.state, client, shipId, targetSessionId);
+	}
+
+	// ==================== 舰船自定义 ====================
+
+	/** 舰船完整自定义 */
+	dispatchCustomizeShip(client: Client, payload: CustomizeShipPayload): void {
+		this.assertDM(client);
+		handleCustomizeShip(this.state, client, payload);
+	}
+
+	/** 添加武器挂点 */
+	dispatchAddWeaponMount(client: Client, payload: AddWeaponMountPayload): void {
+		this.assertDM(client);
+		handleAddWeaponMount(this.state, client, payload);
+	}
+
+	/** 删除武器挂点 */
+	dispatchRemoveWeaponMount(client: Client, payload: RemoveWeaponMountPayload): void {
+		this.assertDM(client);
+		handleRemoveWeaponMount(this.state, client, payload);
+	}
+
+	/** 更新武器挂点 */
+	dispatchUpdateWeaponMount(client: Client, payload: UpdateWeaponMountPayload): void {
+		this.assertDM(client);
+		handleUpdateWeaponMount(this.state, client, payload);
 	}
 }

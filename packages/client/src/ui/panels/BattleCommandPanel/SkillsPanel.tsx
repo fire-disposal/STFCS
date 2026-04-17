@@ -1,9 +1,9 @@
 /**
- * 技能面板模块
- * 护盾开关、辐能排散等技能控制
+ * 技能面板
+ * 简化版：无容器/标题，直接填充Tab内容区
  */
 
-import { Shield, Wind } from "lucide-react";
+import { Wind } from "lucide-react";
 import React from "react";
 import type { SkillsPanelProps } from "./types";
 import "./SkillsPanel.css";
@@ -11,31 +11,44 @@ import "./SkillsPanel.css";
 export const SkillsPanel: React.FC<SkillsPanelProps> = ({
 	ship,
 	disabled,
-	onToggleShield,
 	onVent,
 }) => {
-	const canToggleShield = !disabled || (ship.isOverloaded && !ship.shield.active);
+	// 排散条件
 	const canVent = !disabled && !ship.shield.active && ship.flux.soft + ship.flux.hard > 0;
 
+	// 辐能信息
+	const fluxSoft = ship?.flux?.soft ?? 0;
+	const fluxHard = ship?.flux?.hard ?? 0;
+	const fluxTotal = fluxSoft + fluxHard;
+	const fluxMax = ship?.flux?.max ?? 0;
+	const fluxPercent = fluxMax > 0 ? Math.round((fluxTotal / fluxMax) * 100) : 0;
+
 	return (
-		<div className="skills-panel">
-			<div className="skills-panel__header">
-				<span>技能</span>
+		<div className="skills-content">
+			{/* 辐能状态 */}
+			<div className="skills-flux">
+				<span className="skills-flux__label">辐能</span>
+				<div className="skills-flux__bar">
+					<div className="skills-flux__fill" style={{ width: `${fluxPercent}%` }} />
+				</div>
+				<span className="skills-flux__value">{fluxTotal}/{fluxMax}</span>
 			</div>
-			<div className="skills-panel__buttons">
-				<button
-					className={`battle-btn battle-btn--shield ${ship.shield.active ? "battle-btn--active" : ""}`}
-					onClick={onToggleShield}
-					disabled={!canToggleShield}
-				>
-					<Shield className="battle-btn__icon" />
-					{ship.shield.active ? "护盾" : "开盾"}
-				</button>
-				<button className="battle-btn battle-btn--vent" onClick={onVent} disabled={!canVent}>
-					<Wind className="battle-btn__icon" />
-					排散
-				</button>
-			</div>
+
+			{/* 排散按钮 */}
+			<button
+				className={`skills-vent ${canVent ? "skills-vent--ready" : "skills-vent--blocked"}`}
+				onClick={onVent}
+				disabled={!canVent}
+				title={ship.shield.active ? "关闭护盾后可排散" : "清空所有辐能"}
+			>
+				<Wind className="skills-vent__icon" />
+				<span>排散</span>
+			</button>
+
+			{/* 提示 */}
+			{ship.shield.active && (
+				<span className="skills-hint">需关闭护盾</span>
+			)}
 		</div>
 	);
 };

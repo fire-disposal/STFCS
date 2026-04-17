@@ -11,6 +11,7 @@ import type {
 	FactionValue,
 } from "@vt/data";
 import { ShipState } from "./ShipStateSchema.js";
+import { FireControlCacheSchema } from "./FireControlSchema.js";
 
 export class PlayerState extends Schema {
 	@type("string") sessionId: string = "";
@@ -36,4 +37,8 @@ export class GameRoomState extends Schema {
 	@type("string") activeFaction: FactionValue = Faction.PLAYER;
 	@type("number") mapWidth: number = 2000;
 	@type("number") mapHeight: number = 2000;
+	/** 房间创建者 sessionId（固定不变，DM权限始终属于创建者） */
+	@type("string") creatorSessionId: string = "";
+	/** 火控数据缓存 - 服务端权威，通过 Schema 同步到客户端 */
+	@type(FireControlCacheSchema) fireControlCache = new FireControlCacheSchema();
 }

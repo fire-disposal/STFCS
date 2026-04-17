@@ -8,23 +8,13 @@ export { handleMove, handleAdvanceMovePhase } from "./moveHandler.js";
 // 阶段管理
 export { handleAdvancePhase } from "./phaseHandler.js";
 
-// 查询逻辑
-export { handleGetAttackableTargets, handleGetAllAttackableTargets } from "./queryHandler.js";
+// 查询逻辑（结果写入 Schema，无需消息发送）
+export { handleGetAllAttackableTargets } from "./queryHandler.js";
+export { handleQueryAllAttackableTargets } from "./queryTargetHandler.js";
 
 // 开火命令
 export { handleFireWeapon, handleBurstFire } from "./fireHandler.js";
 export type { FireResult } from "./fireHandler.js";
-
-// 目标查询命令
-export {
-	handleQueryAttackableTargets,
-	handleQueryAllAttackableTargets,
-} from "./queryTargetHandler.js";
-export type {
-	TargetAttackability,
-	AttackableTargetsResult,
-	AllAttackableTargetsResult,
-} from "./queryTargetHandler.js";
 
 // 命中判定
 export {

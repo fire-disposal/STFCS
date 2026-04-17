@@ -16,6 +16,10 @@ import type {
 	ToggleReadyPayload,
 	ToggleShieldPayload,
 	VentFluxPayload,
+	CustomizeShipPayload,
+	AddWeaponMountPayload,
+	RemoveWeaponMountPayload,
+	UpdateWeaponMountPayload,
 } from "../commands/types.js";
 import { MovePhase, Faction } from "@vt/data";
 import type { FactionValue } from "@vt/data";
@@ -346,4 +350,154 @@ export const parseTransferOwnerPayload = (
 			return { targetSessionId };
 		},
 		"房主转移命令格式错误"
+	);
+
+// ==================== 舰船自定义 Payload 解析 ====================
+
+/**
+ * 解析舰船完整自定义 Payload
+ *
+ * 所有字段可选，仅验证存在的字段
+ */
+export const parseCustomizeShipPayload = (payload: unknown): CustomizeShipPayload =>
+	parseMessage(
+		payload,
+		(value) => {
+			if (!isRecord(value)) return null;
+			const shipId = asString(value.shipId);
+			if (!shipId) return null;
+
+			// 基本信息字段（可选）
+			const name = value.name === undefined ? undefined : asString(value.name);
+			const hullType = value.hullType === undefined ? undefined : asString(value.hullType);
+			const width = value.width === undefined ? undefined : asFiniteNumber(value.width);
+			const length = value.length === undefined ? undefined : asFiniteNumber(value.length);
+
+			// 生存属性字段（可选）
+			const hullPointsMax = value.hullPointsMax === undefined ? undefined : asFiniteNumber(value.hullPointsMax);
+			const hullPointsCurrent = value.hullPointsCurrent === undefined ? undefined : asFiniteNumber(value.hullPointsCurrent);
+			const armorMaxPerQuadrant = value.armorMaxPerQuadrant === undefined ? undefined : asFiniteNumber(value.armorMaxPerQuadrant);
+			const armorMinReductionRatio = value.armorMinReductionRatio === undefined ? undefined : asFiniteNumber(value.armorMinReductionRatio);
+			const armorMaxReductionRatio = value.armorMaxReductionRatio === undefined ? undefined : asFiniteNumber(value.armorMaxReductionRatio);
+
+			// 护甲象限（可选）
+			let armorQuadrants: [number, number, number, number, number, number] | undefined = undefined;
+			if (value.armorQuadrants !== undefined) {
+				if (!Array.isArray(value.armorQuadrants) || value.armorQuadrants.length !== 6) {
+					return null;
+				}
+				const parsed = value.armorQuadrants.map((v: unknown) => asFiniteNumber(v));
+				if (parsed.some((v) => v === null)) return null;
+				armorQuadrants = parsed as [number, number, number, number, number, number];
+			}
+
+			// 辐能系统字段（可选）
+			const fluxCapacityMax = value.fluxCapacityMax === undefined ? undefined : asFiniteNumber(value.fluxCapacityMax);
+			const fluxDissipation = value.fluxDissipation === undefined ? undefined : asFiniteNumber(value.fluxDissipation);
+			const fluxSoftCurrent = value.fluxSoftCurrent === undefined ? undefined : asFiniteNumber(value.fluxSoftCurrent);
+			const fluxHardCurrent = value.fluxHardCurrent === undefined ? undefined : asFiniteNumber(value.fluxHardCurrent);
+
+			// 护盾系统字段（可选）
+			const shieldType = value.shieldType === undefined ? undefined : asString(value.shieldType);
+			const shieldArc = value.shieldArc === undefined ? undefined : asFiniteNumber(value.shieldArc);
+			const shieldEfficiency = value.shieldEfficiency === undefined ? undefined : asFiniteNumber(value.shieldEfficiency);
+			const shieldRadius = value.shieldRadius === undefined ? undefined : asFiniteNumber(value.shieldRadius);
+			const shieldUpCost = value.shieldUpCost === undefined ? undefined : asFiniteNumber(value.shieldUpCost);
+
+			// 机动属性字段（可选）
+			const maxSpeed = value.maxSpeed === undefined ? undefined : asFiniteNumber(value.maxSpeed);
+			const maxTurnRate = value.maxTurnRate === undefined ? undefined : asFiniteNumber(value.maxTurnRate);
+
+			// 其他字段（可选）
+			const opCapacity = value.opCapacity === undefined ? undefined : asFiniteNumber(value.opCapacity);
+			const rangeModifier = value.rangeModifier === undefined ? undefined : asFiniteNumber(value.rangeModifier);
+
+			// 构建结果
+			const result: CustomizeShipPayload = { shipId };
+			if (name !== undefined && name !== null) result.name = name;
+			if (hullType !== undefined && hullType !== null) result.hullType = hullType;
+			if (width !== undefined && width !== null) result.width = width;
+			if (length !== undefined && length !== null) result.length = length;
+			if (hullPointsMax !== undefined && hullPointsMax !== null) result.hullPointsMax = hullPointsMax;
+			if (hullPointsCurrent !== undefined && hullPointsCurrent !== null) result.hullPointsCurrent = hullPointsCurrent;
+			if (armorMaxPerQuadrant !== undefined && armorMaxPerQuadrant !== null) result.armorMaxPerQuadrant = armorMaxPerQuadrant;
+			if (armorQuadrants !== undefined) result.armorQuadrants = armorQuadrants;
+			if (armorMinReductionRatio !== undefined && armorMinReductionRatio !== null) result.armorMinReductionRatio = armorMinReductionRatio;
+			if (armorMaxReductionRatio !== undefined && armorMaxReductionRatio !== null) result.armorMaxReductionRatio = armorMaxReductionRatio;
+			if (fluxCapacityMax !== undefined && fluxCapacityMax !== null) result.fluxCapacityMax = fluxCapacityMax;
+			if (fluxDissipation !== undefined && fluxDissipation !== null) result.fluxDissipation = fluxDissipation;
+			if (fluxSoftCurrent !== undefined && fluxSoftCurrent !== null) result.fluxSoftCurrent = fluxSoftCurrent;
+			if (fluxHardCurrent !== undefined && fluxHardCurrent !== null) result.fluxHardCurrent = fluxHardCurrent;
+			if (shieldType !== undefined && shieldType !== null) result.shieldType = shieldType;
+			if (shieldArc !== undefined && shieldArc !== null) result.shieldArc = shieldArc;
+			if (shieldEfficiency !== undefined && shieldEfficiency !== null) result.shieldEfficiency = shieldEfficiency;
+			if (shieldRadius !== undefined && shieldRadius !== null) result.shieldRadius = shieldRadius;
+			if (shieldUpCost !== undefined && shieldUpCost !== null) result.shieldUpCost = shieldUpCost;
+			if (maxSpeed !== undefined && maxSpeed !== null) result.maxSpeed = maxSpeed;
+			if (maxTurnRate !== undefined && maxTurnRate !== null) result.maxTurnRate = maxTurnRate;
+			if (opCapacity !== undefined && opCapacity !== null) result.opCapacity = opCapacity;
+			if (rangeModifier !== undefined && rangeModifier !== null) result.rangeModifier = rangeModifier;
+
+			// 武器挂点（可选，复杂对象）
+			if (value.weaponMounts !== undefined) {
+				if (!Array.isArray(value.weaponMounts)) return null;
+				// 简化处理：信任数组内容格式
+				result.weaponMounts = value.weaponMounts as any;
+			}
+
+			return result;
+		},
+		"舰船自定义命令格式错误"
+	);
+
+/**
+ * 解析添加武器挂点 Payload
+ */
+export const parseAddWeaponMountPayload = (payload: unknown): AddWeaponMountPayload =>
+	parseMessage(
+		payload,
+		(value) => {
+			if (!isRecord(value)) return null;
+			const shipId = asString(value.shipId);
+			if (!shipId) return null;
+			if (!isRecord(value.mount)) return null;
+
+			// 简化处理：信任 mount 对象格式
+			return { shipId, mount: value.mount as any };
+		},
+		"添加武器挂点命令格式错误"
+	);
+
+/**
+ * 解析删除武器挂点 Payload
+ */
+export const parseRemoveWeaponMountPayload = (payload: unknown): RemoveWeaponMountPayload =>
+	parseMessage(
+		payload,
+		(value) => {
+			if (!isRecord(value)) return null;
+			const shipId = asString(value.shipId);
+			const mountId = asString(value.mountId);
+			if (!shipId || !mountId) return null;
+			return { shipId, mountId };
+		},
+		"删除武器挂点命令格式错误"
+	);
+
+/**
+ * 解析更新武器挂点 Payload
+ */
+export const parseUpdateWeaponMountPayload = (payload: unknown): UpdateWeaponMountPayload =>
+	parseMessage(
+		payload,
+		(value) => {
+			if (!isRecord(value)) return null;
+			const shipId = asString(value.shipId);
+			const mountId = asString(value.mountId);
+			if (!shipId || !mountId) return null;
+			if (!isRecord(value.updates)) return null;
+
+			return { shipId, mountId, updates: value.updates as any };
+		},
+		"更新武器挂点命令格式错误"
 	);

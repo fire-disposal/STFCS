@@ -27,8 +27,11 @@ import {
 	parseShipIdPayload,
 	parseToggleReadyPayload,
 	parseToggleShieldPayload,
-	parseTransferOwnerPayload,
 	parseUpdateProfilePayload,
+	parseCustomizeShipPayload,
+	parseAddWeaponMountPayload,
+	parseRemoveWeaponMountPayload,
+	parseUpdateWeaponMountPayload,
 } from "../validation/messagePayloads.js";
 
 interface ControllerContext {
@@ -46,7 +49,7 @@ interface ControllerContext {
 	dissolveRoom: () => void;
 	saveGame: (name: string) => Promise<string>;
 	loadGame: (saveId: string) => Promise<boolean>;
-	transferOwner: (targetSessionId: string) => { success: boolean; error?: string };
+	// transferOwner 已禁用（DM权限固定）
 }
 
 export function registerMessageController(
@@ -64,6 +67,7 @@ export function registerMessageController(
 	registerProfileHandlers(room, ctx);
 	registerManagementHandlers(room, ctx);
 	registerUtilityHandlers(room, ctx);
+	registerCustomizationHandlers(room, ctx);
 }
 
 /** 统一消息处理包装 */
@@ -115,12 +119,9 @@ function registerActionHandlers(room: any, ctx: ControllerContext) {
 // ==================== 2. 状态查询 ====================
 
 function registerQueryHandlers(room: any, ctx: ControllerContext) {
-	room.onMessage(ClientCommand.CMD_GET_ATTACKABLE_TARGETS, (client: Client, payload: any) => {
-		handle(client, () => ctx.dispatcher.dispatchQueryTargets(client, payload));
-	});
-
+	// 仅保留批量查询
 	room.onMessage(ClientCommand.CMD_GET_ALL_ATTACKABLE_TARGETS, (client: Client, payload: any) => {
-		handle(client, () => ctx.dispatcher.dispatchQueryAllTargets(client, payload));
+		handle(client, () => ctx.dispatcher.dispatchQueryAllTargets(client, parseShipIdPayload(payload, "请求格式错误: 需要 shipId")));
 	});
 }
 
@@ -183,16 +184,7 @@ function registerManagementHandlers(room: any, ctx: ControllerContext) {
 		ctx.dissolveRoom();
 	});
 
-	room.onMessage(ClientCommand.CMD_TRANSFER_OWNER, (client: Client, payload: any) => {
-		handle(client, () => {
-			if (client.sessionId !== ctx.getRoomOwnerId()) throw new Error("仅房主可转移房主身份");
-			const p = parseTransferOwnerPayload(payload);
-			const result = ctx.transferOwner(p.targetSessionId);
-			if (!result.success) throw new Error(result.error || "房主转移失败");
-			ctx.setMetadata();
-			room.broadcast("owner_transferred", { newOwnerId: p.targetSessionId });
-		});
-	});
+	// CMD_TRANSFER_OWNER 已禁用（DM权限固定）
 
 	room.onMessage(ClientCommand.CMD_SAVE_GAME, (client: Client, payload: any) => {
 		handle(client, async () => {
@@ -223,6 +215,42 @@ function registerUtilityHandlers(room: any, ctx: ControllerContext) {
 			ctx.pingEwma.set(client.sessionId, rtt);
 			player.pingMs = Math.round(rtt);
 			client.send("NET_PONG", toNetPongDto(p.seq, Date.now(), player.pingMs, 0, "GOOD"));
+		});
+	});
+}
+
+// ==================== 6. 舰船自定义 ====================
+
+function registerCustomizationHandlers(room: any, ctx: ControllerContext) {
+	// 舰船完整自定义
+	room.onMessage(ClientCommand.CMD_CUSTOMIZE_SHIP, (client: Client, payload: any) => {
+		handle(client, () => {
+			const p = parseCustomizeShipPayload(payload);
+			ctx.dispatcher.dispatchCustomizeShip(client, p);
+		});
+	});
+
+	// 添加武器挂点
+	room.onMessage(ClientCommand.CMD_ADD_WEAPON_MOUNT, (client: Client, payload: any) => {
+		handle(client, () => {
+			const p = parseAddWeaponMountPayload(payload);
+			ctx.dispatcher.dispatchAddWeaponMount(client, p);
+		});
+	});
+
+	// 删除武器挂点
+	room.onMessage(ClientCommand.CMD_REMOVE_WEAPON_MOUNT, (client: Client, payload: any) => {
+		handle(client, () => {
+			const p = parseRemoveWeaponMountPayload(payload);
+			ctx.dispatcher.dispatchRemoveWeaponMount(client, p);
+		});
+	});
+
+	// 更新武器挂点
+	room.onMessage(ClientCommand.CMD_UPDATE_WEAPON_MOUNT, (client: Client, payload: any) => {
+		handle(client, () => {
+			const p = parseUpdateWeaponMountPayload(payload);
+			ctx.dispatcher.dispatchUpdateWeaponMount(client, p);
 		});
 	});
 }

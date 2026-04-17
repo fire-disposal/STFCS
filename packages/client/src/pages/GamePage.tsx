@@ -21,12 +21,13 @@ import type { ClientCommandValue, FactionValue, PlayerState } from "@/sync/types
 import { ClientCommand, Faction, GamePhase, PlayerRole } from "@/sync/types";
 import PlayerRosterModal from "@/ui/overlays/PlayerRosterModal";
 import SettingsModal from "@/ui/overlays/SettingsModal";
+import ShipCustomizationModal from "@/ui/overlays/ShipCustomizationModal";
 import { BattleCommandPanel } from "@/ui/panels/BattleCommandPanel";
 import { RightSidePanel } from "@/ui/panels/RightSidePanel";
 import { TurnStatusBar } from "@/ui/panels/TurnStatusBar";
 import { notify } from "@/ui/shared/Notification";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
-import { LogOut, Rocket, Settings, Users } from "lucide-react";
+import { LogOut, Rocket, Settings, Users, Crown } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import "@/styles/game-layout.css";
 
@@ -40,6 +41,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const room = useCurrentGameRoom({ networkManager, onLeaveRoom });
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+	const [showShipCustomization, setShowShipCustomization] = useState(false);
 	const [movementPreview, setMovementPreview] = useState<MovementPreviewState | undefined>(
 		undefined
 	);
@@ -223,9 +225,24 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, {
 			shipId: selectedShip.id,
 			isActive: !selectedShip.shield.active,
-			orientation: selectedShip.transform.heading,
+			orientation: selectedShip.shield.orientation ?? selectedShip.transform.heading,
 		});
 	}, [selectedShip, sendCommand]);
+
+	const handleSetShieldOrientation = useCallback(
+		(orientation: number) => {
+			if (!selectedShip) return;
+			// 全盾激活时可调整朝向
+			if (selectedShip.shield.active && selectedShip.shield.type === "OMNI") {
+				sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, {
+					shipId: selectedShip.id,
+					isActive: true,
+					orientation: orientation,
+				});
+			}
+		},
+		[selectedShip, sendCommand]
+	);
 
 	const handleFire = useCallback(() => {
 		notify.info("请选择武器和目标进行攻击");
@@ -284,6 +301,17 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</div>
 
 				<div className="game-layout__top-bar-right">
+					{isDM && (
+						<button
+							data-magnetic
+							className="game-btn game-btn--dm"
+							onClick={() => setShowShipCustomization(true)}
+							title="舰船自定义"
+						>
+							<Crown className="game-btn__icon game-btn__icon--left" />
+							自定义
+						</button>
+					)}
 					<button data-magnetic className="game-btn" onClick={() => setShowPlayerRoster(true)}>
 						<Users className="game-btn__icon game-btn__icon--left" />
 						玩家
@@ -350,6 +378,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				ships={ships}
 				networkManager={networkManager}
 				onToggleShield={handleToggleShield}
+				onSetShieldOrientation={handleSetShieldOrientation}
 				onVent={handleVent}
 				disabled={!canControlSelectedShip}
 				onMovementPreviewChange={setMovementPreview}
@@ -373,6 +402,15 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			/>
 
 			<SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
+			{/* 舰船自定义弹窗 */}
+			<ShipCustomizationModal
+				isOpen={showShipCustomization}
+				onClose={() => setShowShipCustomization(false)}
+				ships={ships}
+				networkManager={networkManager}
+				currentSessionId={room.sessionId || ""}
+			/>
 		</div>
 	);
 };

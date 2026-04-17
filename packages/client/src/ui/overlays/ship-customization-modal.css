@@ -1,0 +1,163 @@
+/**
+ * ShipCustomizationModal 样式
+ */
+
+.ship-customization-modal__restricted {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+	text-align: center;
+}
+
+.ship-customization-modal__restricted-icon {
+	width: 48px;
+	height: 48px;
+	color: #e74c3c;
+	margin-bottom: 16px;
+}
+
+.ship-customization-modal__restricted-message {
+	font-size: 14px;
+	color: #cfe8ff;
+	margin-bottom: 8px;
+}
+
+.ship-customization-modal__restricted-hint {
+	font-size: 11px;
+	color: #8ba4c7;
+}
+
+.ship-customization-modal__selector {
+	border-bottom: 1px solid rgba(90, 42, 58, 0.6);
+	padding-bottom: 12px;
+	margin-bottom: 12px;
+}
+
+.ship-customization-modal__selector-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	color: #ff6f8f;
+	margin-bottom: 8px;
+}
+
+.ship-customization-modal__selector-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.ship-customization-modal__ship-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	max-height: 150px;
+	overflow-y: auto;
+}
+
+.ship-customization-modal__ship-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background-color: rgba(26, 45, 66, 0.6);
+	border: 1px solid transparent;
+	cursor: pointer;
+	transition: all 0.2s;
+	min-width: 180px;
+}
+
+.ship-customization-modal__ship-item:hover {
+	border-color: rgba(255, 111, 143, 0.3);
+	background-color: rgba(36, 55, 76, 0.6);
+}
+
+.ship-customization-modal__ship-item--selected {
+	border-color: #ff6f8f;
+	background-color: rgba(90, 42, 58, 0.6);
+}
+
+.ship-customization-modal__ship-faction {
+	width: 4px;
+	height: 40px;
+	border-radius: 2px;
+}
+
+.ship-customization-modal__ship-info {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.ship-customization-modal__ship-name {
+	font-size: 11px;
+	color: #cfe8ff;
+	font-weight: bold;
+}
+
+.ship-customization-modal__ship-meta {
+	font-size: 9px;
+	color: #8ba4c7;
+}
+
+.ship-customization-modal__ship-check {
+	width: 16px;
+	height: 16px;
+	color: #ff6f8f;
+}
+
+.ship-customization-modal__panel {
+	flex: 1;
+	min-height: 400px;
+	max-height: 500px;
+	overflow-y: auto;
+}
+
+.ship-customization-modal__empty {
+	text-align: center;
+	color: #8ba4c7;
+	padding: 20px;
+	font-size: 12px;
+}
+
+.ship-customization-modal__hint {
+	text-align: center;
+	color: #8ba4c7;
+	padding: 20px;
+	font-size: 11px;
+}
+
+/* 宽弹窗样式 */
+.game-modal--wide {
+	min-width: 600px;
+	max-width: 800px;
+	width: 80%;
+}
+
+/* 游戏面板底部 */
+.game-panel__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px;
+	background-color: rgba(58, 42, 74, 0.4);
+	border-top: 1px solid rgba(255, 111, 143, 0.3);
+}
+
+.game-panel__hint {
+	font-size: 10px;
+	color: #8ba4c7;
+}
+
+/* 游戏面板标题徽章 */
+.game-panel__title-badge {
+	font-size: 9px;
+	padding: 2px 6px;
+	background-color: rgba(255, 111, 143, 0.2);
+	color: #ff6f8f;
+	border-radius: 2px;
+	margin-left: 8px;
+}
