@@ -1,61 +1,38 @@
 /**
  * ============================================================================
- * 坐标系统 (CoordinateSystem)
+ * 坐标系统 (CoordinateSystem) - UI/渲染专用
  * ============================================================================
  *
- * 统一的坐标与角度处理模块
- * 
- * 合并自：
- * - angleSystem.ts (角度参考系系统)
- * - angleUtils.ts (角度工具)
- * - mathUtils.ts (数学工具)
+ * 本模块仅包含 UI 和渲染相关的坐标/角度函数。
  *
- * 核心原则：
- * 1. 内部存储统一使用数学角度（标准笛卡尔坐标系）
- * 2. 所有转换函数必须明确标注参考系
- * 3. 屏幕坐标转换保持与现有行为完全一致
+ * ⚠️ 游戏规则相关函数请从 @vt/rules 导入：
+ * - distance()         → @vt/rules 的 distance
+ * - angleBetween()     → @vt/rules 的 angleBetween
+ * - angleDifference()  → @vt/rules 的 angleDifference（返回绝对值 0~180）
+ * - normalizeAngle()   → @vt/rules 的 normalizeAngle
+ * - toRadians()        → @vt/rules 的 toRadians
+ * - toDegrees()        → @vt/rules 的 toDegrees
+ *
+ * 本模块保留的函数用途：
+ * - 屏幕坐标转换（screenToWorld, worldToScreen 等）
+ * - 视图旋转（normalizeRotation, calculateViewRotationForAlignment）
+ * - 角度参考系转换（mathToNav, navToMath, mathToScreen, screenToMath）
+ * - UI 显示格式化（formatAngle, parseAngleInput, getCompassDirection）
+ * - 极坐标转换（polarToCartesian, cartesianToPolar）
+ * - 通用数学工具（clampValue, lerp）
  *
  * ============================================================================
  */
 
 // ============================================================================
-// 基础工具函数
+// 角度参考系转换
 // ============================================================================
 
 /**
- * 将角度转换为弧度
+ * 规范化角度到 0-360 范围（内部使用）
+ * 用于参考系转换，游戏规则请使用 @vt/rules 的 normalizeAngle
  */
-export function toRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
-/**
- * 将弧度转换为角度
- */
-export function toDegrees(radians: number): number {
-  return (radians * 180) / Math.PI;
-}
-
-/**
- * 度数转弧度 (degToRad 别名)
- */
-export const degToRad = toRadians;
-
-/**
- * 弧度转度数 (radToDeg 别名)
- */
-export const radToDeg = toDegrees;
-
-// ============================================================================
-// 角度规范化
-// ============================================================================
-
-/**
- * 规范化角度到 0-360 范围
- */
-export function normalizeAngle(angle: number): number {
-  // 使用数学公式确保结果总是正数 0-360
-  // ((angle % 360) + 360) % 360 处理所有情况包括 -0
+function normalizeAngleInternal(angle: number): number {
   return ((angle % 360) + 360) % 360;
 }
 
@@ -70,73 +47,51 @@ export function normalizeRotation(angle: number): number {
 }
 
 /**
- * 标准化角度到 -180~180 范围 (normalizeAngleSigned 别名)
+ * 计算带符号的角度差（内部使用，用于 lerpAngle）
+ * 游戏规则请使用 @vt/rules 的 angleDifference（返回绝对值）
  */
-export const normalizeAngleSigned = normalizeRotation;
-
-// ============================================================================
-// 角度差计算
-// ============================================================================
-
-/**
- * 计算两个角度之间的最短差值（带符号）
- * 返回值范围：-180 ~ 180
- */
-export function angleDifference(from: number, to: number): number {
-  const diff = normalizeAngle(to - from);
+function angleDifferenceSigned(from: number, to: number): number {
+  const diff = normalizeAngleInternal(to - from);
   return diff > 180 ? diff - 360 : diff;
 }
 
 /**
- * 计算两个角度之间的最小差值（绝对值）
- */
-export function angleDifferenceAbs(angle1: number, angle2: number): number {
-  let diff = Math.abs(angle1 - angle2) % 360;
-  if (diff > 180) diff = 360 - diff;
-  return diff;
-}
-
-// ============================================================================
-// 角度参考系转换
-// ============================================================================
-
-/**
  * 数学角度 → 航海角度
- * 
+ *
  * 数学角度：0°东，90°北，逆时针
  * 航海角度：0°北，90°东，顺时针
  */
 export function mathToNav(mathAngle: number): number {
-  return normalizeAngle(450 - mathAngle);
+  return normalizeAngleInternal(450 - mathAngle);
 }
 
 /**
  * 航海角度 → 数学角度
  */
 export function navToMath(navAngle: number): number {
-  return normalizeAngle(450 - navAngle);
+  return normalizeAngleInternal(450 - navAngle);
 }
 
 /**
  * 数学角度 → 屏幕角度（PixiJS 渲染）
- * 
+ *
  * 数学角度：0°东，逆时针
  * 屏幕角度：0°东，顺时针
  */
 export function mathToScreen(mathAngle: number): number {
-  return normalizeAngle(360 - mathAngle);
+  return normalizeAngleInternal(360 - mathAngle);
 }
 
 /**
  * 屏幕角度 → 数学角度
  */
 export function screenToMath(screenAngle: number): number {
-  return normalizeAngle(360 - screenAngle);
+  return normalizeAngleInternal(360 - screenAngle);
 }
 
 /**
  * 计算视图旋转角度（使对象朝上）
- * 
+ *
  * 示例：
  * - 舰船朝东 (0°) → viewRotation = 90° (逆时针转 90°)
  * - 舰船朝北 (90°) → viewRotation = 0° (无需旋转)
@@ -149,6 +104,13 @@ export function calculateViewRotationForAlignment(mathAngle: number): number {
 // ============================================================================
 // 屏幕 ↔ 世界坐标转换
 // ============================================================================
+
+/**
+ * 将角度转换为弧度（内部使用）
+ */
+function toRadiansInternal(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
 
 /**
  * 屏幕坐标转世界坐标
@@ -169,7 +131,7 @@ export function screenToWorld(
   cameraY: number,
   viewRotation: number
 ): { x: number; y: number } {
-  const theta = toRadians(viewRotation);
+  const theta = toRadiansInternal(viewRotation);
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 
@@ -204,7 +166,7 @@ export function worldToScreen(
   const relativeX = (worldX - cameraX) * zoom;
   const relativeY = (worldY - cameraY) * zoom;
 
-  const theta = toRadians(-viewRotation);
+  const theta = toRadiansInternal(-viewRotation);
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 
@@ -229,7 +191,7 @@ export function screenDeltaToWorldDelta(
   zoom: number,
   viewRotation: number
 ): { x: number; y: number } {
-  const theta = toRadians(viewRotation);
+  const theta = toRadiansInternal(viewRotation);
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 
@@ -251,7 +213,7 @@ export function worldDeltaToScreenDelta(
   zoom: number,
   viewRotation: number
 ): { x: number; y: number } {
-  const theta = toRadians(viewRotation);
+  const theta = toRadiansInternal(viewRotation);
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 
@@ -262,27 +224,27 @@ export function worldDeltaToScreenDelta(
 }
 
 // ============================================================================
-// 极坐标 ↔ 笛卡尔坐标
+// 极坐标 ↔ 笛卡尔坐标（渲染用）
 // ============================================================================
 
 /**
  * 极坐标 → 笛卡尔坐标（数学角度系统）
  *
- * @param distance 距离
+ * @param r 距离
  * @param mathAngle 数学角度（0°东，逆时针）
  * @param centerX 中心 X
  * @param centerY 中心 Y
  */
 export function polarToCartesian(
-  distance: number,
+  r: number,
   mathAngle: number,
   centerX: number = 0,
   centerY: number = 0
 ): { x: number; y: number } {
-  const rad = toRadians(mathAngle);
+  const rad = toRadiansInternal(mathAngle);
   return {
-    x: centerX + distance * Math.cos(rad),
-    y: centerY + distance * Math.sin(rad),
+    x: centerX + r * Math.cos(rad),
+    y: centerY + r * Math.sin(rad),
   };
 }
 
@@ -293,56 +255,25 @@ export function polarToCartesian(
  * @param y Y 坐标
  * @param centerX 中心 X
  * @param centerY 中心 Y
- * @returns { distance, mathAngle }
+ * @returns { r, mathAngle }
  */
 export function cartesianToPolar(
   x: number,
   y: number,
   centerX: number = 0,
   centerY: number = 0
-): { distance: number; mathAngle: number } {
+): { r: number; mathAngle: number } {
   const dx = x - centerX;
   const dy = y - centerY;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const mathAngle = normalizeAngle(Math.atan2(dy, dx) * 180 / Math.PI);
+  const r = Math.sqrt(dx * dx + dy * dy);
+  const mathAngle = normalizeAngleInternal(Math.atan2(dy, dx) * 180 / Math.PI);
 
-  return { distance, mathAngle };
+  return { r, mathAngle };
 }
 
 // ============================================================================
-// 角度与方向计算
+// 角度与方向计算（渲染用）
 // ============================================================================
-
-/**
- * 计算从点 A 到点 B 的方向角（数学角度）
- */
-export function angleFromAToB(
-  ax: number, ay: number,
-  bx: number, by: number
-): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  return normalizeAngle(Math.atan2(dy, dx) * 180 / Math.PI);
-}
-
-/**
- * 计算两点之间的角度（度数）
- * 返回值范围：0-360，0°指向右方（+X 轴），顺时针
- */
-export function angleToPoint(fromX: number, fromY: number, toX: number, toY: number): number {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  return normalizeAngle(toDegrees(Math.atan2(dy, dx)));
-}
-
-/**
- * 计算两点之间的距离
- */
-export function distance(x1: number, y1: number, x2: number, y2: number): number {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  return Math.sqrt(dx * dx + dy * dy);
-}
 
 /**
  * 根据角度和距离计算目标点
@@ -353,7 +284,7 @@ export function pointAtAngle(
   angle: number,
   dist: number
 ): { x: number; y: number } {
-  const rad = toRadians(angle);
+  const rad = toRadiansInternal(angle);
   return {
     x: fromX + Math.cos(rad) * dist,
     y: fromY + Math.sin(rad) * dist,
@@ -361,11 +292,11 @@ export function pointAtAngle(
 }
 
 /**
- * 线性插值角度（沿最短路径）
+ * 线性插值角度（沿最短路径，用于动画）
  */
 export function lerpAngle(from: number, to: number, t: number): number {
-  const diff = angleDifference(from, to);
-  return normalizeAngle(from + diff * t);
+  const diff = angleDifferenceSigned(from, to);
+  return normalizeAngleInternal(from + diff * t);
 }
 
 // ============================================================================
@@ -395,7 +326,7 @@ export type AngleDisplayMode = 'math' | 'nav' | 'screen';
 export interface AngleDisplayOptions {
   mode: AngleDisplayMode;
   showDecimal: boolean;
-  showCompassDirection?: boolean; // 是否显示方位（N/NE/E 等）
+  showCompassDirection?: boolean;
 }
 
 /**
@@ -410,15 +341,15 @@ export function formatAngle(
 
   switch (options.mode) {
     case 'math':
-      displayAngle = normalizeAngle(mathAngle);
+      displayAngle = normalizeAngleInternal(mathAngle);
       break;
     case 'nav':
       displayAngle = mathToNav(mathAngle);
-      suffix = '°N'; // 航海角度标记
+      suffix = '°N';
       break;
     case 'screen':
       displayAngle = mathToScreen(mathAngle);
-      suffix = '°S'; // 屏幕角度标记
+      suffix = '°S';
       break;
   }
 
@@ -436,7 +367,6 @@ export function parseAngleInput(
   input: string,
   mode: AngleDisplayMode = 'math'
 ): number {
-  // 移除度符号和其他非数字字符
   const cleanInput = input.replace(/[^0-9.-]/g, '');
   const value = parseFloat(cleanInput);
 
@@ -444,7 +374,7 @@ export function parseAngleInput(
 
   switch (mode) {
     case 'math':
-      return normalizeAngle(value);
+      return normalizeAngleInternal(value);
     case 'nav':
       return navToMath(value);
     case 'screen':
@@ -470,33 +400,21 @@ export function getCompassDirection(mathAngle: number): string {
 }
 
 // ============================================================================
-// 使用示例
+// 别名（向后兼容）
 // ============================================================================
 
-/**
- * 示例 1：对齐视图到舰船朝向
- */
-export function alignViewToShip(shipMathAngle: number): number {
-  const viewRotation = calculateViewRotationForAlignment(shipMathAngle);
-  return viewRotation;
+/** @deprecated 使用 normalizeRotation */
+export const normalizeAngleSigned = normalizeRotation;
+
+/** @deprecated 使用 @vt/rules 的 toRadians */
+export function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
 }
 
-/**
- * 示例 2：显示角度到 UI
- */
-export function displayShipHeading(shipMathAngle: number): string {
-  return formatAngle(shipMathAngle, {
-    mode: 'nav',
-    showDecimal: true,
-    showCompassDirection: true,
-  });
-  // 输出示例："45.0°N (NE)"
+/** @deprecated 使用 @vt/rules 的 toDegrees */
+export function toDegrees(radians: number): number {
+  return (radians * 180) / Math.PI;
 }
 
-/**
- * 示例 3：解析用户输入的目标角度
- */
-export function setTargetHeading(userInput: string, mode: AngleDisplayMode): number {
-  const mathAngle = parseAngleInput(userInput, mode);
-  return mathAngle;
-}
+export const degToRad = toRadians;
+export const radToDeg = toDegrees;

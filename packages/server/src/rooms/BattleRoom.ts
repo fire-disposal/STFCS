@@ -10,8 +10,9 @@ import type { RoomMetadata } from "../schema/types.js";
 import type { CreateObjectPayload, MoveTokenPayload } from "../commands/types.js";
 import { CommandDispatcher } from "../commands/CommandDispatcher.js";
 import { saveService } from "../services/SaveService.js";
+import { roomOwnerRegistry } from "../services/RoomOwnerRegistry.js";
 import { toGameSavedDto, toGameLoadedDto } from "../dto/index.js";
-import { registerMessageHandlers } from "../handlers/BattleRoomHandlers.js";
+import { registerMessageController } from "../commands/MessageController.js";
 import { GameRoomState } from "../schema/GameSchema.js";
 import { ShipState, WeaponSlot } from "../schema/ShipStateSchema.js";
 import {
@@ -48,25 +49,30 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		this.metadataManager.setDisplayName(options.roomName?.trim() || `Battle-${this.roomId.substring(0, 6)}`);
 		this.metadataManager.setCreatedAt(Date.now());
 
+		// 设置房间 ID 到 PlayerManager（用于房主注册）
+		this.playerManager.setRoomId(this.roomId);
+
 		this.state = new GameRoomState();
 		this.dispatcher = new CommandDispatcher(this.state);
 
-		registerMessageHandlers(this, {
+		registerMessageController(this, {
 			state: this.state,
 			dispatcher: this.dispatcher,
 			logger: { log: () => {} },
-			broadcast: (t, d) => this.broadcast(t, d),
+			broadcast: (type: string, data: unknown) => this.broadcast(type, data),
 			pingEwma: new Map(),
 			jitterEwma: new Map(),
 			getRoomOwnerId: () => this.playerManager.getOwnerId(),
 			setMetadata: () => this.syncMetadata(),
-			profileStore: new Map(),
+			playerService: this.playerManager.getPlayerService(),
 			createObject: (payload: CreateObjectPayload) => this.objectFactory.create(this.state, payload),
 			enqueueMoveCommand: (client: Client, payload: MoveTokenPayload) =>
 				this.moveBuffer.enqueue(payload.shipId, client, payload),
 			dissolveRoom: () => this.disconnect(),
 			saveGame: (name: string) => this.saveGame(name),
 			loadGame: (saveId: string) => this.loadGame(saveId),
+			transferOwner: (targetSessionId: string) =>
+				this.playerManager.transferOwnership(targetSessionId, this.state),
 		});
 
 		this.syncMetadata();
@@ -100,8 +106,15 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		this.playerManager.clearOwnerIfOffline(client.sessionId, this.state);
 		this.syncMetadata();
 
-		// 轻量化重连：短暂窗口内允许恢复
-		// 使用 allowReconnection 让客户端可以自动重连
+		// 主动离开（code 1000）不启用重连窗口，允许立即重新加入
+		// 仅对意外断开启用重连窗口
+		const isNormalLeave = code === 1000;
+		if (isNormalLeave) {
+			this.scheduleEmptyDisposeIfNeeded();
+			return;
+		}
+
+		// 意外断开：短暂窗口内允许恢复
 		this.allowReconnection(client, RECONNECTION_WINDOW_SECONDS)
 			.then(() => {
 				// 重连成功，恢复玩家状态
@@ -139,6 +152,8 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 
 	onDispose() {
 		this.cancelEmptyDisposeTimer();
+		// 清理房主注册
+		roomOwnerRegistry.unregisterByRoom(this.roomId);
 	}
 
 	private syncMetadata(): void {
@@ -177,8 +192,8 @@ export class BattleRoom extends Room<{ state: GameRoomState; metadata: RoomMetad
 		try {
 			const success = await saveService.loadGame(this.state, id);
 			if (success) {
-				const save = await saveService.exportSave(id);
-				this.broadcast("game_loaded", toGameLoadedDto(id, save.name));
+				const meta = await saveService.getSaveMetadata(id);
+				this.broadcast("game_loaded", toGameLoadedDto(id, meta?.name || "未知存档"));
 				this.syncMetadata();
 			}
 			return success;

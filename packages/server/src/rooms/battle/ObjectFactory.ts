@@ -11,12 +11,16 @@ import {
 	getWeaponSpec,
 	WeaponState,
 	WeaponSlotSize,
-	MountType,
+	WeaponMountType,
+	HARDPOINT_ARC,
+	SlotCategory,
 	STATION_SPEC,
 	ASTEROID_SPEC,
 	isWeaponSizeCompatible,
+	isWeaponCategoryCompatible,
+	isWeaponMountTypeCompatible,
 } from "@vt/data";
-import type { FactionValue, WeaponCategoryValue, DamageTypeValue, WeaponSlotSizeValue, MountTypeValue, WeaponTagValue } from "@vt/data";
+import type { FactionValue, WeaponCategoryValue, DamageTypeValue, WeaponSlotSizeValue, WeaponMountTypeValue, SlotCategoryValue, WeaponTagValue } from "@vt/data";
 import type { WeaponMountSpec, WeaponSpec } from "@vt/data";
 import type { GameRoomState } from "../../schema/GameSchema.js";
 import type { CreateObjectPayload } from "../../commands/types.js";
@@ -57,6 +61,9 @@ function createShipFromSpec(
 	ship.hull.current = spec.hitPoints;
 
 	ship.armor.maxPerQuadrant = spec.armorMax;
+	// 初始化护甲减伤比属性
+	ship.armor.maxReductionRatio = spec.maxArmorReductionRatio ?? 0.85;
+	ship.armor.minReductionRatio = spec.minArmorReductionRatio ?? 0.1;
 	for (let i = 0; i < 6; i++) {
 		ship.armor.setQuadrant(i, spec.armorMax);
 	}
@@ -67,6 +74,9 @@ function createShipFromSpec(
 	ship.maxSpeed = spec.maxSpeed;
 	ship.maxTurnRate = spec.maxTurnRate;
 
+	// 初始化射程比率
+	ship.rangeRatio = spec.rangeRatio ?? 1.0;
+
 	// 显式初始化移动阶段使用量（确保同步到客户端）
 	ship.phaseAForwardUsed = 0;
 	ship.phaseAStrafeUsed = 0;
@@ -74,8 +84,10 @@ function createShipFromSpec(
 	ship.phaseCForwardUsed = 0;
 	ship.phaseCStrafeUsed = 0;
 
+	// 初始化护盾属性
 	ship.shield.arc = spec.shieldArc;
 	ship.shield.radius = spec.shieldRadius;
+	ship.shield.efficiency = spec.shieldEfficiency ?? 1.0;  // 护盾效率
 
 	// 初始化武器
 	for (const mount of spec.weaponMounts) {
@@ -86,9 +98,14 @@ function createShipFromSpec(
 				console.warn(`武器 ${weaponSpec.name} (${weaponSpec.size}) 不兼容挂载点 ${mount.id} (${mount.size})`);
 				continue;
 			}
-			// 验证类型限制
-			if (mount.restrictedTypes && !mount.restrictedTypes.includes(weaponSpec.category)) {
-				console.warn(`武器 ${weaponSpec.name} (${weaponSpec.category}) 不符合挂载点 ${mount.id} 类型限制`);
+			// 验证类别兼容性（远行星号机制）
+			if (!isWeaponCategoryCompatible(mount.slotCategory, weaponSpec.category)) {
+				console.warn(`武器 ${weaponSpec.name} (${weaponSpec.category}) 不兼容挂载点 ${mount.id} (${mount.slotCategory})`);
+				continue;
+			}
+			// 验证形态兼容性（远行星号机制）
+			if (!isWeaponMountTypeCompatible(mount.acceptsTurret, mount.acceptsHardpoint, weaponSpec.mountType)) {
+				console.warn(`武器 ${weaponSpec.name} (${weaponSpec.mountType}) 不符合挂载点 ${mount.id} 形态限制 (turret:${mount.acceptsTurret}, hardpoint:${mount.acceptsHardpoint})`);
 				continue;
 			}
 			ship.weapons.set(mount.id, createWeaponSlot(mount, weaponSpec));
@@ -173,11 +190,19 @@ function createWeaponSlot(mount: WeaponMountSpec, spec: WeaponSpec): WeaponSlot 
 	weapon.displayName = mount.displayName ?? mount.id;  // 挂载点显示名称
 	weapon.mountOffsetX = mount.position?.x ?? 0;
 	weapon.mountOffsetY = mount.position?.y ?? 0;
-	weapon.mountType = mount.type as MountTypeValue;
-	weapon.mountSize = mount.size as WeaponSlotSizeValue;
-	weapon.mountFacing = mount.facing;                    // 基准朝向
-	weapon.currentTurretAngle = mount.facing;             // 炮塔初始朝向等于基准朝向
-	weapon.arc = mount.arc;                               // 射界范围
+	weapon.mountType = spec.mountType as WeaponMountTypeValue; // 武器形态（从武器规格继承）
+	weapon.mountSize = mount.size as WeaponSlotSizeValue;      // 挂载点尺寸
+	weapon.mountFacing = mount.facing;                          // 基准朝向
+	weapon.currentTurretAngle = mount.facing;                   // 炮塔初始朝向等于基准朝向
+
+	// === 挂载点限制（从挂载点规格继承） ===
+	weapon.slotCategory = mount.slotCategory as SlotCategoryValue;
+	weapon.acceptsTurret = mount.acceptsTurret ?? true;
+	weapon.acceptsHardpoint = mount.acceptsHardpoint ?? true;
+
+	// === 武器射界（从武器规格继承） ===
+	weapon.arc = spec.arc ?? 180;                              // 炮塔型武器射界
+	weapon.hardpointArc = spec.hardpointArc ?? HARDPOINT_ARC;  // 硬点型武器射界（默认 20°）
 
 	// === 武器规格 ===
 	weapon.weaponSpecId = spec.id;
@@ -221,7 +246,7 @@ function createWeaponSlot(mount: WeaponMountSpec, spec: WeaponSpec): WeaponSlot 
 		weapon.tags = new ArraySchema<string>(...spec.tags);
 	}
 
-	// === 资源系统 ===
+	// === 节源系统 ===
 	weapon.opCost = spec.opCost;
 
 	// === 状态 ===
@@ -329,9 +354,15 @@ export class ObjectFactory {
 			return false;
 		}
 
-		// 验证类型限制
-		if (mount.restrictedTypes && !mount.restrictedTypes.includes(newWeaponSpec.category)) {
-			console.warn(`武器 ${newWeaponSpec.name} (${newWeaponSpec.category}) 不符合挂载点 ${mountId} 类型限制`);
+		// 验证类别兼容性（远行星号机制）
+		if (!isWeaponCategoryCompatible(mount.slotCategory, newWeaponSpec.category)) {
+			console.warn(`武器 ${newWeaponSpec.name} (${newWeaponSpec.category}) 不兼容挂载点 ${mountId} (${mount.slotCategory})`);
+			return false;
+		}
+
+		// 验证形态兼容性（远行星号机制）
+		if (!isWeaponMountTypeCompatible(mount.acceptsTurret, mount.acceptsHardpoint, newWeaponSpec.mountType)) {
+			console.warn(`武器 ${newWeaponSpec.name} (${newWeaponSpec.mountType}) 不符合挂载点 ${mountId} 形态限制`);
 			return false;
 		}
 

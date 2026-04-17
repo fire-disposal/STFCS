@@ -28,6 +28,34 @@ export interface MovementValidation {
 /**
  * 将角度转换为弧度
  */
+
+/**
+ * 计算挂载点的世界坐标
+ *
+ * 用于计算武器挂载点相对于舰船中心的世界坐标位置。
+ * 挂载点坐标遵循游戏坐标系约定：
+ * - X: 右为正
+ * - Y: 船头方向为负（屏幕上方）
+ *
+ * @param shipX 舰船中心 X 坐标
+ * @param shipY 舰船中心 Y 坐标
+ * @param shipHeading 舰船朝向（度数，0=朝北/屏幕上方，顺时针增加）
+ * @param mountOffsetX 挂载点相对于舰船中心的 X 偏移
+ * @param mountOffsetY 挂载点相对于舰船中心的 Y 偏移（船头方向为负）
+ * @returns 挂载点的世界坐标 { x, y }
+ */
+export function getMountWorldPosition(
+  shipX: number,
+  shipY: number,
+  shipHeading: number,
+  mountOffsetX: number,
+  mountOffsetY: number
+): { x: number; y: number } {
+  const headingRad = toRadians(shipHeading);
+  const worldX = shipX + mountOffsetX * Math.cos(headingRad) - mountOffsetY * Math.sin(headingRad);
+  const worldY = shipY + mountOffsetX * Math.sin(headingRad) + mountOffsetY * Math.cos(headingRad);
+  return { x: worldX, y: worldY };
+}
 export function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }

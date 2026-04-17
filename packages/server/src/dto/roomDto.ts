@@ -3,7 +3,7 @@
  */
 
 import { GamePhase } from "@vt/data";
-import type { RoomListItemDTO, RoomMetadata } from "../schema/types.js";
+import type { RoomListItemDTO, RoomMetadata, RoomListDTO, RoomDeleteDTO } from "../schema/types.js";
 
 interface MatchmakeRoomRecord {
 	roomId?: unknown;
@@ -12,6 +12,16 @@ interface MatchmakeRoomRecord {
 	maxClients?: unknown;
 	metadata?: unknown;
 }
+
+export const toRoomListDto = (rooms: RoomListItemDTO[]): RoomListDTO => ({
+	rooms
+});
+
+export const toRoomDeleteDto = (success: boolean, roomId?: string, error?: string): RoomDeleteDTO => ({
+	success,
+	roomId,
+	error
+});
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	Boolean(value) && typeof value === "object";

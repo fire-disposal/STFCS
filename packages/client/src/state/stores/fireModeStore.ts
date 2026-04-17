@@ -1,257 +1,225 @@
 /**
  * fireModeStore - 武器开火状态管理
  *
- * 新交互流程（移除瞄准模式）：
- * 1. 点击武器 → 展开武器详情面板（局部状态）
- * 2. 面板内显示武器信息和可攻击目标列表
+ * 交互流程：
+ * 1. 选中舰船 → 发送批量查询请求（获取所有武器的可攻击目标）
+ * 2. 服务端返回权威的目标列表
  * 3. 选择目标 → 点击开火按钮
  *
- * 此 store 仅用于渲染器绘制瞄准线，
- * 面板内的交互状态由面板组件自身管理
+ * ⚠️ 所有游戏规则计算由服务端权威执行
+ * 客户端仅用于 UI 状态管理和瞄准线绘制
  */
 
 import type { ShipState, WeaponSlot } from "@/sync/types";
-import { angleBetween, angleDifference, distance } from "@vt/rules";
+import { ClientCommand } from "@/sync/types";
 import { create } from "zustand";
 
-/** 目标可攻击性状态 */
+/** 目标可攻击性状态（与服务端 AttackableTargetsResult 一致） */
 export interface TargetAttackability {
 	shipId: string;
 	canAttack: boolean;
-	reason?: string; // 不可攻击原因
-	inRange: boolean; // 是否在射程内
-	inArc: boolean; // 是否在射界内
-	distance: number; // 距离
-	estimatedDamage?: number; // 预估伤害
-	isFriendly?: boolean; // 是否为友军（用于 UI 提示误伤）
+	reason?: string;
+	inRange: boolean;
+	inArc: boolean;
+	distance: number;
+	estimatedDamage?: number;
+	isFriendly?: boolean;
 }
 
-/** 渲染器状态（用于绘制瞄准线） */
+/** 单个武器的查询结果 */
+export interface AttackableTargetsResult {
+	attackerShipId: string;
+	weaponInstanceId: string;
+	targets: TargetAttackability[];
+	weaponCanFire: boolean;
+	weaponFireReason?: string;
+}
+
+/** 批量查询结果 */
+export interface AllAttackableTargetsResult {
+	shipId: string;
+	weapons: Array<{ weaponInstanceId: string; result: AttackableTargetsResult }>;
+}
+
+/** 渲染器状态 */
 interface FireModeStoreState {
+	/** 当前选中的舰船 */
+	selectedShip: ShipState | null;
 	/** 当前选中的武器（用于绘制射界和瞄准线） */
 	selectedWeapon: WeaponSlot | null;
-	/** 选中的舰船 */
-	attackerShip: ShipState | null;
-	/** 可攻击目标列表 */
+	/** 各武器的可攻击目标列表（从批量查询获取） */
+	weaponsTargets: Map<string, AttackableTargetsResult>;  // weaponInstanceId -> result
+	/** 当前选中武器的可攻击目标（便捷访问） */
 	attackableTargets: TargetAttackability[];
-	/** 当前选中的目标 ID（用于渲染器高亮） */
+	/** 当前选中武器的开火状态 */
+	weaponCanFire: boolean;
+	weaponFireReason?: string;
+	/** 选中的目标 ID（用于开火） */
 	selectedTargetIds: string[];
-	/** 是否正在发送开火命令 */
+	/** 是否正在查询 */
+	isLoading: boolean;
+	/** 是否正在开火 */
 	isFiring: boolean;
-	/** 开火错误信息 */
+	/** 开火错误 */
 	fireError: string | null;
 }
 
 interface FireModeStoreActions {
-	/** 设置选中的武器（面板展开时调用） */
-	setSelectedWeapon: (
+	/** 选中舰船并批量查询所有武器 */
+	selectShip: (
+		ship: ShipState,
+		room: { send: (type: string, payload: unknown) => void }
+	) => void;
+	/** 接收批量查询结果 */
+	setAllAttackableTargetsFromServer: (result: AllAttackableTargetsResult) => void;
+	/** 选中武器（切换当前显示的武器） */
+	selectWeapon: (weapon: WeaponSlot) => void;
+	/** 单武器查询（用于刷新） */
+	queryWeaponTargets: (
 		ship: ShipState,
 		weapon: WeaponSlot,
-		allShips: Map<string, ShipState>
+		room: { send: (type: string, payload: unknown) => void }
 	) => void;
-	/** 清除选中武器（面板关闭时调用） */
-	clearSelectedWeapon: () => void;
-	/** 设置选中的目标 */
+	/** 接收单武器查询结果 */
+	setAttackableTargetsFromServer: (result: AttackableTargetsResult) => void;
+	/** 清除选中 */
+	clearSelection: () => void;
+	/** 设置选中目标 */
 	setSelectedTargets: (targetIds: string[]) => void;
-	/** 开始发送开火命令 */
+	/** 开火状态 */
 	startFiring: () => void;
-	/** 结束发送开火命令 */
 	endFiring: (error?: string | null) => void;
-	/** 清除错误信息 */
 	clearError: () => void;
-	/** 重置状态 */
+	/** 重置 */
 	reset: () => void;
 }
 
 const initialState: FireModeStoreState = {
+	selectedShip: null,
 	selectedWeapon: null,
-	attackerShip: null,
+	weaponsTargets: new Map(),
 	attackableTargets: [],
+	weaponCanFire: true,
+	weaponFireReason: undefined,
 	selectedTargetIds: [],
+	isLoading: false,
 	isFiring: false,
 	fireError: null,
 };
 
-/**
- * 计算目标可攻击性
- *
- * 使用 @vt/rules 的权威函数，与后端保持一致：
- * - angleBetween: 返回 0-360 范围角度
- * - angleDifference: 计算最小角度差
- * - distance: 计算距离
- *
- * 验证：
- * - 目标是否已摧毁
- * - 是否在射程内（含最小射程检查）
- * - 是否在射界内
- *
- * 注意：不区分友军/敌军，允许向任何人开火（包括误伤）
- */
-export function calculateTargetAttackability(
-	attacker: ShipState,
-	weapon: WeaponSlot,
-	target: ShipState
-): TargetAttackability {
-	// 已摧毁目标不可攻击
-	if (target.isDestroyed || target.hull.current <= 0) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: "目标已摧毁",
-			inRange: false,
-			inArc: false,
-			distance: 0,
-		};
-	}
-
-	// 计算武器挂载点的世界坐标（与后端 getWeaponWorldPosition 一致）
-	const headingRad = (attacker.transform.heading * Math.PI) / 180;
-	const mountOffsetX = weapon.mountOffsetX ?? 0;
-	const mountOffsetY = weapon.mountOffsetY ?? 0;
-	const mountWorldX =
-		attacker.transform.x +
-		mountOffsetX * Math.cos(headingRad) -
-		mountOffsetY * Math.sin(headingRad);
-	const mountWorldY =
-		attacker.transform.y +
-		mountOffsetX * Math.sin(headingRad) +
-		mountOffsetY * Math.cos(headingRad);
-
-	// 使用权威函数计算距离和角度
-	const dist = distance(mountWorldX, mountWorldY, target.transform.x, target.transform.y);
-	const angleToTarget = angleBetween(
-		mountWorldX,
-		mountWorldY,
-		target.transform.x,
-		target.transform.y
-	);
-
-	// 武器实际朝向（规范化到 0-360）
-	const weaponFacing =
-		(((attacker.transform.heading + (weapon.mountFacing ?? 0)) % 360) + 360) % 360;
-	const arcHalf = Math.max(0, weapon.arc ?? 90) / 2;
-
-	// 射程检查
-	const maxRange = weapon.range ?? 300;
-	const minRange = weapon.minRange ?? 0;
-
-	if (dist > maxRange) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `超出射程: ${Math.round(dist)} > ${maxRange}`,
-			inRange: false,
-			inArc: true,
-			distance: dist,
-		};
-	}
-
-	if (minRange > 0 && dist < minRange) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `距离过近: ${Math.round(dist)} < ${minRange}`,
-			inRange: false,
-			inArc: true,
-			distance: dist,
-		};
-	}
-
-	// 射界检查（使用权威 angleDifference）
-	const angleDiff = angleDifference(weaponFacing, angleToTarget);
-	if (angleDiff > arcHalf) {
-		return {
-			shipId: target.id,
-			canAttack: false,
-			reason: `不在射界内: 偏差 ${Math.round(angleDiff)}° > ${Math.round(arcHalf)}°`,
-			inRange: true,
-			inArc: false,
-			distance: dist,
-		};
-	}
-
-	// 可攻击（允许向任何人开火，包括友军误伤）
-	const isFriendly = target.faction === attacker.faction;
-
-	return {
-		shipId: target.id,
-		canAttack: true,
-		inRange: true,
-		inArc: true,
-		distance: dist,
-		estimatedDamage: weapon.damage,
-		isFriendly,
-	};
-}
-
-/**
- * 检查武器是否可以开火
- */
-export function checkWeaponCanFire(
-	ship: ShipState,
-	weapon: WeaponSlot
-): { canFire: boolean; reason?: string } {
-	// 舰船过载
-	if (ship.isOverloaded) {
-		return { canFire: false, reason: "舰船过载" };
-	}
-
-	// 武器冷却
-	if (weapon.cooldownRemaining > 0) {
-		return { canFire: false, reason: `冷却中 (${Math.round(weapon.cooldownRemaining)}s)` };
-	}
-
-	// 武器状态不是就绪
-	if (weapon.state !== "READY") {
-		return { canFire: false, reason: "武器未就绪" };
-	}
-
-	// 弹药耗尽
-	if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
-		return { canFire: false, reason: "弹药耗尽" };
-	}
-
-	// 本回合已射击
-	if (weapon.hasFiredThisTurn) {
-		return { canFire: false, reason: "本回合已射击" };
-	}
-
-	return { canFire: true };
-}
-
 export const useFireModeStore = create<FireModeStoreState & FireModeStoreActions>((set, get) => ({
 	...initialState,
 
-	setSelectedWeapon: (ship, weapon, allShips) => {
-		const attackableTargets: TargetAttackability[] = [];
-
-		// 遍历所有舰船，计算可攻击性（包括友军，允许误伤）
-		allShips.forEach((targetShip) => {
-			if (targetShip.id === ship.id) return; // 跳过自身（不能攻击自己）
-
-			const attackability = calculateTargetAttackability(ship, weapon, targetShip);
-			attackableTargets.push(attackability);
-		});
-
-		// 按距离排序（友军目标会有 isFriendly 标记）
-		attackableTargets.sort((a, b) => a.distance - b.distance);
-
+	/** 选中舰船并批量查询所有武器 */
+	selectShip: (ship, room) => {
 		set({
-			selectedWeapon: weapon,
-			attackerShip: ship,
-			attackableTargets,
+			selectedShip: ship,
+			selectedWeapon: null,
+			weaponsTargets: new Map(),
+			attackableTargets: [],
+			weaponCanFire: true,
+			weaponFireReason: undefined,
 			selectedTargetIds: [],
 			fireError: null,
+			isLoading: true,
+		});
+
+		// 批量查询所有武器
+		room.send(ClientCommand.CMD_GET_ALL_ATTACKABLE_TARGETS, {
+			shipId: ship.id,
 		});
 	},
 
-	clearSelectedWeapon: () => {
+	/** 接收批量查询结果 */
+	setAllAttackableTargetsFromServer: (result) => {
+		const weaponsTargets = new Map<string, AttackableTargetsResult>();
+		result.weapons.forEach(({ weaponInstanceId, result: r }) => {
+			weaponsTargets.set(weaponInstanceId, r);
+		});
+
+		// 如果有选中武器，更新当前显示的目标列表
+		const selectedWeapon = get().selectedWeapon;
+		let attackableTargets: TargetAttackability[] = [];
+		let weaponCanFire = true;
+		let weaponFireReason: string | undefined;
+
+		if (selectedWeapon) {
+			const weaponResult = weaponsTargets.get(selectedWeapon.instanceId);
+			if (weaponResult) {
+				attackableTargets = weaponResult.targets.filter(t => t.canAttack);
+				weaponCanFire = weaponResult.weaponCanFire;
+				weaponFireReason = weaponResult.weaponFireReason;
+			}
+		}
+
 		set({
-			selectedWeapon: null,
-			attackerShip: null,
-			attackableTargets: [],
+			weaponsTargets,
+			attackableTargets,
+			weaponCanFire,
+			weaponFireReason,
+			isLoading: false,
+		});
+	},
+
+	/** 选中武器（切换当前显示的武器） */
+	selectWeapon: (weapon) => {
+		const weaponsTargets = get().weaponsTargets;
+		const weaponResult = weaponsTargets.get(weapon.instanceId);
+
+		set({
+			selectedWeapon: weapon,
 			selectedTargetIds: [],
 			fireError: null,
+			// 如果已有查询结果，立即显示
+			attackableTargets: weaponResult?.targets.filter(t => t.canAttack) ?? [],
+			weaponCanFire: weaponResult?.weaponCanFire ?? true,
+			weaponFireReason: weaponResult?.weaponFireReason,
+		});
+	},
+
+	/** 单武器查询（用于刷新） */
+	queryWeaponTargets: (ship, weapon, room) => {
+		set({ isLoading: true });
+		room.send(ClientCommand.CMD_GET_ATTACKABLE_TARGETS, {
+			shipId: ship.id,
+			weaponInstanceId: weapon.instanceId,
+		});
+	},
+
+	/** 接收单武器查询结果 */
+	setAttackableTargetsFromServer: (result) => {
+		const weaponsTargets = get().weaponsTargets;
+		weaponsTargets.set(result.weaponInstanceId, result);
+
+		// 如果是当前选中的武器，更新显示
+		const selectedWeapon = get().selectedWeapon;
+		if (selectedWeapon?.instanceId === result.weaponInstanceId) {
+			set({
+				weaponsTargets: new Map(weaponsTargets),
+				attackableTargets: result.targets.filter(t => t.canAttack),
+				weaponCanFire: result.weaponCanFire,
+				weaponFireReason: result.weaponFireReason,
+				isLoading: false,
+			});
+		} else {
+			set({
+				weaponsTargets: new Map(weaponsTargets),
+				isLoading: false,
+			});
+		}
+	},
+
+	clearSelection: () => {
+		set({
+			selectedShip: null,
+			selectedWeapon: null,
+			weaponsTargets: new Map(),
+			attackableTargets: [],
+			weaponCanFire: true,
+			weaponFireReason: undefined,
+			selectedTargetIds: [],
+			fireError: null,
+			isLoading: false,
 		});
 	},
 
@@ -263,11 +231,7 @@ export const useFireModeStore = create<FireModeStoreState & FireModeStoreActions
 		if (error) {
 			set({ isFiring: false, fireError: error });
 		} else {
-			// 成功开火，清除状态
 			set({
-				selectedWeapon: null,
-				attackerShip: null,
-				attackableTargets: [],
 				selectedTargetIds: [],
 				fireError: null,
 				isFiring: false,

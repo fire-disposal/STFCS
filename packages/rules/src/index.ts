@@ -31,6 +31,7 @@ export {
 	calculateMovementRange,
 	getForwardVector,
 	getRightVector,
+	getMountWorldPosition,
 	vec2,
 	type MovementPlan,
 	type MovementValidation,

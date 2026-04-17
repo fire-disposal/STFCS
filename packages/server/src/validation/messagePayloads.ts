@@ -87,9 +87,14 @@ const parseMessage = <T>(
 	parser: (value: unknown) => T | null,
 	errorMessage: string
 ): T => {
-	const parsed = parser(payload);
-	if (!parsed) throw new Error(errorMessage);
-	return parsed;
+	try {
+		const parsed = parser(payload);
+		if (!parsed) throw new Error(errorMessage);
+		return parsed;
+	} catch (error) {
+		console.error(`[Validation Error] ${errorMessage}:`, error, "Payload:", payload);
+		throw error;
+	}
 };
 
 export const parseMoveTokenPayload = (payload: unknown): MoveTokenPayload =>
@@ -297,8 +302,20 @@ export const parseUpdateProfilePayload = (
 			if (!isRecord(value)) return null;
 			const nickname =
 				value.nickname === undefined ? undefined : String(value.nickname);
+			
+			// 仅允许 avatar 字段，且内容必须是 Base64 (以 data:image/ 开头)
 			const avatar = value.avatar === undefined ? undefined : String(value.avatar);
-			return { nickname, avatar };
+
+			if (avatar && avatar.length > 250000) {
+				throw new Error("头像图片数据过大");
+			}
+
+			// 严格检查 Base64 前缀，不允许 URL 或其他格式。
+			// 如果不是 Base64 且不为 undefined，则强制设为空字符串，确保 Schema 中不存脏数据。
+			const isBase64 = avatar && avatar.startsWith("data:image/");
+			const finalAvatar = isBase64 ? avatar : (avatar === undefined ? undefined : "");
+
+			return { nickname, avatar: finalAvatar };
 		},
 		"玩家资料更新命令格式错误"
 	);
@@ -315,4 +332,18 @@ export const parseKickPlayerPayload = (
 			return { playerId };
 		},
 		"踢人命令格式错误"
+	);
+
+export const parseTransferOwnerPayload = (
+	payload: unknown
+): { targetSessionId: string } =>
+	parseMessage(
+		payload,
+		(value) => {
+			if (!isRecord(value)) return null;
+			const targetSessionId = asString(value.targetSessionId);
+			if (!targetSessionId) return null;
+			return { targetSessionId };
+		},
+		"房主转移命令格式错误"
 	);

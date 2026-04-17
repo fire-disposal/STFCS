@@ -4,24 +4,51 @@
 
 import type { Client } from "@colyseus/core";
 import { PlayerRole } from "@vt/data";
-import { angleBetween, angleDifference, distance } from "@vt/rules";
+import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@vt/rules";
 import type { GameRoomState } from "../../schema/GameSchema.js";
 import type { ShipState, WeaponSlot } from "../../schema/ShipStateSchema.js";
+
+/** 
+ * 游戏逻辑错误类
+ * 用于携带错误分发代码，方便前端 UI 提示
+ */
+export class GameLogicError extends Error {
+	constructor(public message: string, public code?: string) {
+		super(message);
+		this.name = "GameLogicError";
+	}
+}
+
+/** 常用错误代码常量 */
+export const ERROR_CODES = {
+	UNAUTHORIZED: "AUTH_001",
+	WRONG_PHASE: "PHASE_001",
+	NOT_OWNER: "AUTH_002",
+	ALREADY_READY: "PHASE_002",
+	INSUFFICIENT_FLUX: "SHIP_001",
+	OUT_OF_AMMO: "WEAPON_001",
+	WEAPON_NOT_READY: "WEAPON_002",
+	OUT_OF_RANGE: "WEAPON_003",
+	TARGET_DESTROYED: "TARGET_001",
+	IS_OVERLOADED: "SHIP_002",
+};
 
 /** 验证操作权限 */
 export function validateAuthority(state: GameRoomState, client: Client, ship: ShipState): void {
 	const player = state.players.get(client.sessionId);
-	if (!player) throw new Error("玩家未注册");
+	if (!player) throw new GameLogicError("玩家未注册", ERROR_CODES.UNAUTHORIZED);
 	if (player.role === PlayerRole.DM) return;
-	if (state.currentPhase !== "PLAYER_TURN") throw new Error("当前不是玩家行动回合");
-	if (ship.ownerId !== client.sessionId) throw new Error("没有权限操作此舰船");
-	if (player.isReady) throw new Error("已结束本回合");
+	if (state.currentPhase !== "PLAYER_TURN") throw new GameLogicError("当前不是玩家行动回合", ERROR_CODES.WRONG_PHASE);
+	if (ship.ownerId !== client.sessionId) throw new GameLogicError("没有权限操作此舰船", ERROR_CODES.NOT_OWNER);
+	if (player.isReady) throw new GameLogicError("已结束本回合", ERROR_CODES.ALREADY_READY);
 }
 
 /** 验证 DM 权限 */
 export function validateDmAuthority(state: GameRoomState, client: Client): void {
 	const player = state.players.get(client.sessionId);
-	if (!player || player.role !== PlayerRole.DM) throw new Error("仅 DM 可执行此操作");
+	if (!player || player.role !== PlayerRole.DM) {
+		throw new GameLogicError("仅 DM 可执行此操作", ERROR_CODES.UNAUTHORIZED);
+	}
 }
 
 /** 标准化航向角度 */
@@ -29,14 +56,15 @@ export function normalizeHeading(value: number): number {
 	return ((value % 360) + 360) % 360;
 }
 
-/** 获取武器世界坐标位置 */
+/** 获取武器世界坐标位置（使用 @vt/rules 的权威函数） */
 export function getWeaponWorldPosition(ship: ShipState, weapon: WeaponSlot): { x: number; y: number } {
-	const headingRad = (ship.transform.heading * Math.PI) / 180;
-	const localX = weapon.mountOffsetX ?? 0;
-	const localY = weapon.mountOffsetY ?? 0;
-	const worldX = ship.transform.x + localX * Math.cos(headingRad) - localY * Math.sin(headingRad);
-	const worldY = ship.transform.y + localX * Math.sin(headingRad) + localY * Math.cos(headingRad);
-	return { x: worldX, y: worldY };
+	return getMountWorldPosition(
+		ship.transform.x,
+		ship.transform.y,
+		ship.transform.heading,
+		weapon.mountOffsetX ?? 0,
+		weapon.mountOffsetY ?? 0
+	);
 }
 
 /** 验证目标在武器射界内 */
@@ -48,7 +76,9 @@ export function assertTargetInWeaponArc(
 	const muzzle = getWeaponWorldPosition(attacker, weapon);
 	const angleToTarget = angleBetween(muzzle.x, muzzle.y, target.transform.x, target.transform.y);
 	const weaponFacing = normalizeHeading(attacker.transform.heading + weapon.mountFacing);
-	const arcHalf = Math.max(0, weapon.arc) / 2;
+	// 使用 getEffectiveArc() 获取有效射界（TURRET 用 arc，HARDPOINT 用 hardpointArc）
+	const effectiveArc = weapon.getEffectiveArc();
+	const arcHalf = Math.max(0, effectiveArc) / 2;
 	const diff = angleDifference(weaponFacing, angleToTarget);
 	if (diff > arcHalf) {
 		throw new Error(`目标不在武器射界内: 偏差 ${diff.toFixed(1)}° > ${arcHalf.toFixed(1)}°`);

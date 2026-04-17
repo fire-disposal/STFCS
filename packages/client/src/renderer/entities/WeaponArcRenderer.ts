@@ -13,7 +13,7 @@ import { useFireModeStore } from "@/state/stores/fireModeStore";
 import type { ShipState } from "@/sync/types";
 import type { WeaponSlot } from "@/sync/types";
 import { DamageType, WeaponState } from "@/sync/types";
-import { angleBetween, angleDifference, distance } from "@vt/rules";
+import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@vt/rules";
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -214,7 +214,8 @@ function drawWeaponArcs(
  * 1. 挂载点位置：相对于船体中心的偏移 (mountOffsetX, mountOffsetY)
  * 2. 武器实际朝向：舰船 heading + 武器 mountFacing
  * 3. 射界范围：以实际朝向为中心，arc 角度范围
- * 4. 最小射程：如果 > 0，显示空心扇形（中间有空洞）
+ * 4. 射程应用舰船射程比率：真实射程 = 武器面板射程 × rangeRatio
+ * 5. 最小射程：如果 > 0，显示空心扇形（中间有空洞）
  */
 function drawSingleWeaponArc(graphics: Graphics, ship: ShipState, weapon: WeaponSlot): void {
 	graphics.clear();
@@ -224,30 +225,31 @@ function drawSingleWeaponArc(graphics: Graphics, ship: ShipState, weapon: Weapon
 	const shipY = ship.transform.y;
 	const shipHeading = ship.transform.heading;
 
-	// 挂载点相对于船体中心的偏移
-	const mountOffsetX = weapon.mountOffsetX;
-	const mountOffsetY = weapon.mountOffsetY;
-
-	// 舰船朝向转换为弧度
-	const shipHeadingRad = (shipHeading * Math.PI) / 180;
-
-	// 将挂载点偏移从船体坐标系转换到世界坐标系
-	const mountWorldX =
-		shipX + mountOffsetX * Math.cos(shipHeadingRad) - mountOffsetY * Math.sin(shipHeadingRad);
-	const mountWorldY =
-		shipY + mountOffsetX * Math.sin(shipHeadingRad) + mountOffsetY * Math.cos(shipHeadingRad);
+	// 使用 @vt/rules 权威函数计算挂载点世界坐标
+	const mountPos = getMountWorldPosition(
+		shipX,
+		shipY,
+		shipHeading,
+		weapon.mountOffsetX,
+		weapon.mountOffsetY
+	);
+	const mountWorldX = mountPos.x;
+	const mountWorldY = mountPos.y;
 
 	// 武器实际朝向 = 舰船朝向 + 武器基准朝向
 	const weaponFacing = shipHeading + weapon.mountFacing;
 	const weaponFacingRad = (weaponFacing * Math.PI) / 180;
 
-	// 射界角度范围
-	const arc = weapon.arc || 90;
-	const arcRad = (arc * Math.PI) / 180;
+	// 获取有效射界：TURRET 用 arc，HARDPOINT 用 hardpointArc
+	const effectiveArc = weapon.mountType === "HARDPOINT"
+		? (weapon.hardpointArc ?? 20)
+		: (weapon.arc ?? 180);
+	const arcRad = (effectiveArc * Math.PI) / 180;
 
-	// 射程范围
-	const maxRange = weapon.range || 300;
-	const minRange = weapon.minRange || 0;
+	// 应用射程比率：真实射程 = 武器面板射程 × 舰船射程比率
+	const rangeRatio = ship.rangeRatio || 1.0;
+	const maxRange = (weapon.range || 300) * rangeRatio;
+	const minRange = (weapon.minRange || 0) * rangeRatio;
 
 	// 武器颜色（基于伤害类型）
 	const weaponColor = DAMAGE_TYPE_COLORS[weapon.damageType] ?? 0xff6b35;
@@ -393,25 +395,31 @@ function drawTargetLines(
 ): void {
 	graphics.clear();
 
-	// 计算武器挂载点的世界坐标
+	// 使用 @vt/rules 权威函数计算武器挂载点的世界坐标
 	const shipX = ship.transform.x;
 	const shipY = ship.transform.y;
 	const shipHeading = ship.transform.heading;
-	const shipHeadingRad = (shipHeading * Math.PI) / 180;
-
-	const mountOffsetX = weapon.mountOffsetX;
-	const mountOffsetY = weapon.mountOffsetY;
-
-	const mountWorldX =
-		shipX + mountOffsetX * Math.cos(shipHeadingRad) - mountOffsetY * Math.sin(shipHeadingRad);
-	const mountWorldY =
-		shipY + mountOffsetX * Math.sin(shipHeadingRad) + mountOffsetY * Math.cos(shipHeadingRad);
+	const mountPos = getMountWorldPosition(
+		shipX,
+		shipY,
+		shipHeading,
+		weapon.mountOffsetX,
+		weapon.mountOffsetY
+	);
+	const mountWorldX = mountPos.x;
+	const mountWorldY = mountPos.y;
 
 	// 武器实际朝向
 	const weaponFacing = shipHeading + weapon.mountFacing;
-	const maxRange = weapon.range || 300;
-	const minRange = weapon.minRange || 0;
-	const arc = weapon.arc || 90;
+
+	// 应用射程比率：真实射程 = 武器面板射程 × 舰船射程比率
+	const rangeRatio = ship.rangeRatio || 1.0;
+	const maxRange = (weapon.range || 300) * rangeRatio;
+	const minRange = (weapon.minRange || 0) * rangeRatio;
+	// 获取有效射界：TURRET 用 arc，HARDPOINT 用 hardpointArc
+	const effectiveArc = weapon.mountType === "HARDPOINT"
+		? (weapon.hardpointArc ?? 20)
+		: (weapon.arc ?? 180);
 
 	// 检查武器是否可以开火
 	const canFire = isWeaponReady(ship, weapon);
@@ -426,7 +434,7 @@ function drawTargetLines(
 			weaponFacing,
 			maxRange,
 			minRange,
-			arc,
+			effectiveArc,
 			target
 		);
 
@@ -563,19 +571,18 @@ function drawSelectedTargetsHighlight(
 	allShips: ShipState[],
 	selectedTargetIds: string[]
 ): void {
-	// 计算武器挂载点的世界坐标
+	// 使用 @vt/rules 权威函数计算武器挂载点的世界坐标
 	const shipX = ship.transform.x;
 	const shipY = ship.transform.y;
-	const shipHeadingRad = (ship.transform.heading * Math.PI) / 180;
-
-	const mountWorldX =
-		shipX +
-		weapon.mountOffsetX * Math.cos(shipHeadingRad) -
-		weapon.mountOffsetY * Math.sin(shipHeadingRad);
-	const mountWorldY =
-		shipY +
-		weapon.mountOffsetX * Math.sin(shipHeadingRad) +
-		weapon.mountOffsetY * Math.cos(shipHeadingRad);
+	const mountPos = getMountWorldPosition(
+		shipX,
+		shipY,
+		ship.transform.heading,
+		weapon.mountOffsetX,
+		weapon.mountOffsetY
+	);
+	const mountWorldX = mountPos.x;
+	const mountWorldY = mountPos.y;
 
 	// 为每个选中目标绘制高亮
 	for (const targetId of selectedTargetIds) {

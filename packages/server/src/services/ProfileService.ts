@@ -10,7 +10,8 @@
  */
 
 import { GAME_SAVE_VERSION, PROFILE_VERSION, MAX_VARIANTS_PER_PLAYER } from "../schema/constants.js";
-import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible } from "@vt/data";
+import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible, isWeaponCategoryCompatible } from "@vt/data";
+import { persistence } from "./PersistenceManager.js";
 import type {
 	PlayerProfile,
 	CustomVariant,
@@ -28,44 +29,17 @@ const DEFAULT_SETTINGS: PlayerSettings = {
 };
 
 /**
- * 内存档案存储
- */
-class MemoryProfileStore {
-	private profiles = new Map<string, PlayerProfile>();
-
-	async get(profileId: string): Promise<PlayerProfile | undefined> {
-		return this.profiles.get(profileId);
-	}
-
-	async save(profile: PlayerProfile): Promise<void> {
-		this.profiles.set(profile.id, profile);
-	}
-
-	async delete(profileId: string): Promise<void> {
-		this.profiles.delete(profileId);
-	}
-
-	async exists(profileId: string): Promise<boolean> {
-		return this.profiles.has(profileId);
-	}
-}
-
-/**
- * 玩家档案服务
+ * 玩家档案服务（基于 SQLite 持久化）
  */
 export class ProfileService {
-	private store = new MemoryProfileStore();
-
 	/**
 	 * 获取或创建玩家档案
-	 *
-	 * 如果档案不存在，创建新档案
 	 */
 	async getOrCreateProfile(sessionId: string, displayName?: string): Promise<PlayerProfile> {
-		let profile = await this.store.get(sessionId);
+		const profile = await persistence.profiles.get(sessionId);
 
 		if (!profile) {
-			profile = {
+			const newProfile: PlayerProfile = {
 				id: sessionId,
 				displayName: displayName || `Player_${sessionId.slice(0, 6)}`,
 				customVariants: [],
@@ -74,10 +48,36 @@ export class ProfileService {
 				createdAt: Date.now(),
 				updatedAt: Date.now(),
 			};
-			await this.store.save(profile);
+			await this.saveProfile(newProfile);
+			return newProfile;
 		}
 
+		// 加载变体
+		const variants = await persistence.variants.getByOwner(sessionId);
+		profile.customVariants = variants;
+
 		return profile;
+	}
+
+	/**
+	 * 保存玩家档案
+	 */
+	async saveProfile(profile: PlayerProfile): Promise<void> {
+		await persistence.profiles.save(profile);
+	}
+
+	/**
+	 * 保存变体
+	 */
+	async saveVariant(sessionId: string, variant: CustomVariant): Promise<void> {
+		await persistence.variants.save(sessionId, variant);
+	}
+
+	/**
+	 * 删除变体
+	 */
+	async deleteVariant(sessionId: string, variantId: string): Promise<void> {
+		await persistence.variants.delete(sessionId, variantId);
 	}
 
 	/**
@@ -87,7 +87,7 @@ export class ProfileService {
 		const profile = await this.getOrCreateProfile(sessionId);
 		profile.displayName = displayName;
 		profile.updatedAt = Date.now();
-		await this.store.save(profile);
+		await this.saveProfile(profile);
 	}
 
 	/**
@@ -97,11 +97,11 @@ export class ProfileService {
 		const profile = await this.getOrCreateProfile(sessionId);
 		profile.settings = { ...profile.settings, ...settings };
 		profile.updatedAt = Date.now();
-		await this.store.save(profile);
+		await this.saveProfile(profile);
 	}
 
 	/**
-	 * 保存自定义舰船变体
+	 * 保存自定义舰船变体 (带规则验证逻辑)
 	 *
 	 * 验证：
 	 * - 舰船规格存在
@@ -109,7 +109,7 @@ export class ProfileService {
 	 * - OP 点数计算
 	 * - 变体数量限制
 	 */
-	async saveVariant(
+	async createOrUpdateVariant(
 		sessionId: string,
 		variantId: string,
 		hullId: string,
@@ -119,8 +119,9 @@ export class ProfileService {
 	): Promise<CustomVariant> {
 		const profile = await this.getOrCreateProfile(sessionId);
 
-		// 检查变体数量限制
-		if (profile.customVariants.length >= MAX_VARIANTS_PER_PLAYER) {
+		// 检查变体数量限制 (如果是新增)
+		const isNew = !profile.customVariants.some(v => v.id === variantId);
+		if (isNew && profile.customVariants.length >= MAX_VARIANTS_PER_PLAYER) {
 			throw new Error(`变体数量已达上限 (${MAX_VARIANTS_PER_PLAYER})`);
 		}
 
@@ -153,17 +154,16 @@ export class ProfileService {
 			}
 
 			// 类型限制验证
-			if (mount.restrictedTypes && !mount.restrictedTypes.includes(weaponSpec.category)) {
+			if (!isWeaponCategoryCompatible(mount.slotCategory, weaponSpec.category)) {
 				throw new Error(
-					`挂载点 ${config.mountId}: 武器类型不符合限制`
+					`挂载点 ${config.mountId}: 武器类别 ${weaponSpec.category} 不兼容挂载点 ${mount.slotCategory}`
 				);
 			}
 
 			opUsed += weaponSpec.opCost;
 		}
 
-		// 检查是否已存在同名变体
-		const existingIndex = profile.customVariants.findIndex(v => v.id === variantId);
+		const existingVariant = profile.customVariants.find(v => v.id === variantId);
 
 		const variant: CustomVariant = {
 			id: variantId,
@@ -172,22 +172,13 @@ export class ProfileService {
 			description,
 			weaponLoadout,
 			opUsed,
-			createdAt: existingIndex >= 0
-				? profile.customVariants[existingIndex].createdAt
-				: Date.now(),
+			createdAt: existingVariant ? existingVariant.createdAt : Date.now(),
 			updatedAt: Date.now(),
-			isPublic: false,
+			isPublic: existingVariant ? existingVariant.isPublic : false,
 		};
 
-		// 更新或添加变体
-		if (existingIndex >= 0) {
-			profile.customVariants[existingIndex] = variant;
-		} else {
-			profile.customVariants.push(variant);
-		}
-
-		profile.updatedAt = Date.now();
-		await this.store.save(profile);
+		// 调用底层持久化
+		await this.saveVariant(sessionId, variant);
 
 		return variant;
 	}
@@ -201,18 +192,15 @@ export class ProfileService {
 	}
 
 	/**
-	 * 删除自定义变体
+	 * 删除自定义变体 (带状态检查)
 	 */
-	async deleteVariant(sessionId: string, variantId: string): Promise<boolean> {
+	async removeVariant(sessionId: string, variantId: string): Promise<boolean> {
 		const profile = await this.getOrCreateProfile(sessionId);
-		const index = profile.customVariants.findIndex(v => v.id === variantId);
+		const exists = profile.customVariants.some(v => v.id === variantId);
 
-		if (index < 0) return false;
+		if (!exists) return false;
 
-		profile.customVariants.splice(index, 1);
-		profile.updatedAt = Date.now();
-		await this.store.save(profile);
-
+		await this.deleteVariant(sessionId, variantId);
 		return true;
 	}
 
@@ -232,7 +220,7 @@ export class ProfileService {
 		if (!profile.favoriteVariants.includes(variantId)) {
 			profile.favoriteVariants.push(variantId);
 			profile.updatedAt = Date.now();
-			await this.store.save(profile);
+			await this.saveProfile(profile);
 		}
 	}
 
@@ -245,7 +233,7 @@ export class ProfileService {
 		if (index >= 0) {
 			profile.favoriteVariants.splice(index, 1);
 			profile.updatedAt = Date.now();
-			await this.store.save(profile);
+			await this.saveProfile(profile);
 		}
 	}
 
@@ -253,7 +241,7 @@ export class ProfileService {
 	 * 导出玩家档案（用于备份）
 	 */
 	async exportProfile(sessionId: string): Promise<PlayerProfile | undefined> {
-		return this.store.get(sessionId);
+		return this.getOrCreateProfile(sessionId);
 	}
 
 	/**
@@ -271,7 +259,83 @@ export class ProfileService {
 		}
 
 		profile.updatedAt = Date.now();
-		await this.store.save(profile);
+		await this.saveProfile(profile);
+
+		// 同时导入变体
+		for (const variant of profile.customVariants) {
+			await this.saveVariant(profile.id, variant);
+		}
+	}
+
+	/**
+	 * 更新玩家基础档案信息（全局功能，与房间无关）
+	 *
+	 * @param playerId 玩家标识（当前使用 displayName/nickname）
+	 * @param updates 更新内容（nickname, avatar）
+	 * @returns 更新后的档案摘要
+	 */
+	async updateBasicProfile(
+		playerId: string,
+		updates: { nickname?: string; avatar?: string }
+	): Promise<{ success: boolean; nickname: string; avatar: string }> {
+		// 验证 avatar 格式（必须是 Base64 或空）
+		if (updates.avatar !== undefined && updates.avatar !== "") {
+			if (!updates.avatar.startsWith("data:image/")) {
+				throw new Error("头像必须是 Base64 图片数据");
+			}
+			if (updates.avatar.length > 250000) {
+				throw new Error("头像图片数据过大");
+			}
+		}
+
+		// 验证 nickname 长度
+		const nickname = updates.nickname?.trim().slice(0, 24);
+
+		// 获取或创建档案
+		const profile = await this.getOrCreateProfile(playerId, nickname || playerId);
+
+		// 应用更新
+		if (nickname) {
+			profile.displayName = nickname;
+		}
+		if (updates.avatar !== undefined) {
+			profile.avatar = updates.avatar;
+		}
+		profile.updatedAt = Date.now();
+
+		// 持久化
+		await this.saveProfile(profile);
+
+		console.log(`[ProfileService] Updated basic profile for ${playerId}`, {
+			nickname: profile.displayName,
+			avatarSet: !!profile.avatar,
+			avatarLength: profile.avatar?.length || 0
+		});
+
+		return {
+			success: true,
+			nickname: profile.displayName,
+			avatar: profile.avatar || "",
+		};
+	}
+
+	/**
+	 * 获取玩家基础档案信息
+	 *
+	 * @param playerId 玩家标识
+	 * @returns 基础档案（nickname, avatar）
+	 */
+	async getBasicProfile(playerId: string): Promise<{ nickname: string; avatar: string }> {
+		const profile = await persistence.profiles.get(playerId);
+
+		if (!profile) {
+			return { nickname: playerId, avatar: "" };
+		}
+
+		return {
+			nickname: profile.displayName,
+			avatar: profile.avatar || "",
+		};
 	}
 }
 

@@ -74,6 +74,16 @@ export function serializeGameSave(
 		});
 	});
 
+	// 序列化玩家列表（包含头像和昵称）
+	const players: any[] = [];
+	state.players.forEach((p) => {
+		players.push({
+			shortId: p.shortId,
+			nickname: p.nickname || p.name,
+			avatar: p.avatar,
+		});
+	});
+
 	return {
 		id: `save_${Date.now()}_${roomId}`,
 		name: saveName,
@@ -87,7 +97,8 @@ export function serializeGameSave(
 		ships,
 		mapWidth: state.mapWidth,
 		mapHeight: state.mapHeight,
-	};
+		players, // 注入玩家信息
+	} as any;
 }
 
 /**
@@ -171,11 +182,17 @@ export function deserializeShipSave(data: ShipSave): ShipState {
 			weapon.displayName = mount.displayName ?? mount.id;
 			weapon.mountOffsetX = mount.position?.x ?? 0;
 			weapon.mountOffsetY = mount.position?.y ?? 0;
-			weapon.mountType = mount.type;
+			weapon.mountType = weaponSpec.mountType;  // 武器形态（从武器规格继承）
 			weapon.mountSize = mount.size;
 			weapon.mountFacing = mount.facing;
 			weapon.currentTurretAngle = savedWeapon.currentTurretAngle ?? mount.facing;
-			weapon.arc = mount.arc;
+			// 挂载点限制（从挂载点规格继承）
+			weapon.slotCategory = mount.slotCategory;
+			weapon.acceptsTurret = mount.acceptsTurret ?? true;
+			weapon.acceptsHardpoint = mount.acceptsHardpoint ?? true;
+			// 武器射界（从武器规格继承）
+			weapon.arc = weaponSpec.arc ?? 180;
+			weapon.hardpointArc = weaponSpec.hardpointArc ?? 20;
 
 			weapon.weaponSpecId = savedWeapon.weaponSpecId;
 			weapon.instanceId = savedWeapon.instanceId;

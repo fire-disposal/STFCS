@@ -6,9 +6,11 @@ import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 import {
 	DamageType,
 	WeaponCategory,
-	MountType,
+	WeaponMountType,
+	HARDPOINT_ARC,
 	WeaponState,
 	WeaponSlotSize,
+	SlotCategory,
 	ShieldType,
 	FluxState,
 	Faction,
@@ -16,9 +18,10 @@ import {
 import type {
 	DamageTypeValue,
 	WeaponCategoryValue,
-	MountTypeValue,
+	WeaponMountTypeValue,
 	WeaponStateValue,
 	WeaponSlotSizeValue,
+	SlotCategoryValue,
 	ShieldTypeValue,
 	FluxStateValue,
 	FactionValue,
@@ -31,11 +34,31 @@ export class WeaponSlot extends Schema {
 	@type("string") displayName: string = "";           // 挂载点显示名称（如"主炮"、"副炮"）
 	@type("number") mountOffsetX: number = 0;           // 挂载点位置 X（相对于船体中心）
 	@type("number") mountOffsetY: number = 0;           // 挂载点位置 Y（船头方向为 -Y）
-	@type("string") mountType: MountTypeValue = MountType.TURRET;
-	@type("string") mountSize: WeaponSlotSizeValue = WeaponSlotSize.MEDIUM;  // 挂载点尺寸
+	@type("string") mountType: WeaponMountTypeValue = WeaponMountType.TURRET; // 武器形态：TURRET / HARDPOINT
+	@type("string") mountSize: WeaponSlotSizeValue = WeaponSlotSize.MEDIUM;   // 挂载点尺寸
 	@type("number") mountFacing: number = 0;            // 武器基准朝向（相对于船体，0=朝船头）
 	@type("number") currentTurretAngle: number = 0;     // 炮塔当前朝向（相对于船体，仅 TURRET）
-	@type("number") arc: number = 180;                  // 射界角度范围
+
+	// === 挂载点限制（从挂载点规格继承） ===
+	@type("string") slotCategory: SlotCategoryValue = SlotCategory.UNIVERSAL_SLOT; // 挂载点类别
+	@type("boolean") acceptsTurret: boolean = true;     // 是否接受炮塔型武器
+	@type("boolean") acceptsHardpoint: boolean = true;  // 是否接受硬点型武器
+
+	// === 武器射界（从武器规格继承） ===
+	@type("number") arc: number = 180;                  // 炮塔型武器射界（TURRET 型使用）
+	@type("number") hardpointArc: number = HARDPOINT_ARC; // 硬点型武器射界（默认 20°）
+
+	/**
+	 * 获取武器有效射界
+	 * - TURRET 型：使用 arc 字段
+	 * - HARDPOINT 型：使用 hardpointArc 字段（默认 20°）
+	 */
+	getEffectiveArc(): number {
+		if (this.mountType === "HARDPOINT") {
+			return this.hardpointArc || HARDPOINT_ARC;
+		}
+		return this.arc || 180;
+	}
 
 	// === 武器规格 ===
 	@type("string") weaponSpecId: string = "";
@@ -172,6 +195,9 @@ export class HullState extends Schema {
 export class ArmorState extends Schema {
 	@type("number") maxPerQuadrant: number = 100;
 	@type(["number"]) quadrants = new ArraySchema<number>(100, 100, 100, 100, 100, 100);
+	// 护甲减伤属性（舰船固有属性）
+	@type("number") maxReductionRatio: number = 0.85;   // 最大护甲减伤比（默认85%）
+	@type("number") minReductionRatio: number = 0.1;    // 最小护甲减伤比（默认10%）
 	getQuadrant(i: number) { return this.quadrants[i] ?? 0; }
 	setQuadrant(i: number, v: number) { this.quadrants[i] = Math.max(0, Math.min(this.maxPerQuadrant, v)); }
 	takeDamage(i: number, n: number) {
@@ -208,9 +234,10 @@ export class FluxStateSchema extends Schema {
 export class ShieldState extends Schema {
 	@type("string") type: ShieldTypeValue = ShieldType.FRONT;
 	@type("boolean") active: boolean = false;
-	@type("number") orientation: number = 0;
-	@type("number") arc: number = 120;
-	@type("number") radius: number = 50;
+	@type("number") orientation: number = 0;        // 护盾朝向（相对于船体）
+	@type("number") arc: number = 120;              // 护盾覆盖角度范围（度）
+	@type("number") radius: number = 50;            // 护盾半径
+	@type("number") efficiency: number = 1.0;       // 护盾效率：吸收伤害→硬辐能转化倍率
 	@type("number") current: number = 100;
 	@type("number") max: number = 100;
 	activate() { this.active = true; }
@@ -233,6 +260,7 @@ export class ShipState extends Schema {
 	@type({ map: WeaponSlot }) weapons = new MapSchema<WeaponSlot>();
 	@type("number") maxSpeed: number = 0;
 	@type("number") maxTurnRate: number = 0;
+	@type("number") rangeRatio: number = 1.0;        // 射程比率：真实射程=面板射程×射程比率
 	@type("boolean") isOverloaded: boolean = false;
 	@type("number") overloadTime: number = 0;
 	@type("boolean") isDestroyed: boolean = false;

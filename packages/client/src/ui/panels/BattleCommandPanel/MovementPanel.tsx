@@ -35,7 +35,6 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 }) => {
 	const movementPhase = useGameStore((state) => state.movementPhase);
 	const setMovePhaseAction = useGameStore((state) => state.setMovePhase);
-	const executeMoveAction = useGameStore((state) => state.executeMove);
 
 	// 移动状态
 	const [moveValue, setMoveValue] = useState(0);
@@ -162,7 +161,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 				});
 			}
 
-			executeMoveAction(phase as MovementPhaseValue, command);
+			// 服务端会自动同步更新 ship.phaseAForwardUsed 等字段
 			notify.success(`移动执行成功 [Phase ${phase.slice(-1)}]`);
 
 			if (phase !== "PHASE_B") setDirectionLocked(true);
@@ -172,7 +171,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({
 			console.error("[Movement] Execute failed:", error);
 			notify.error("移动执行失败");
 		}
-	}, [ship, movementPhase, moveMode, moveValue, turnInput, networkManager, executeMoveAction]);
+	}, [ship, movementPhase, moveMode, moveValue, turnInput, networkManager]);
 
 	// 推进阶段
 	const handleAdvancePhase = useCallback(() => {

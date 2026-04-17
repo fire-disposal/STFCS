@@ -5,7 +5,7 @@
 export * from "./types.js";
 export { CommandDispatcher } from "./CommandDispatcher.js";
 
-// 导出 handlers 供直接使用
+// 导出 game handlers 供直接使用
 export {
 	handleMove,
 	handleAdvanceMovePhase,
@@ -15,4 +15,7 @@ export {
 	handleAssignShip,
 	validateAuthority,
 	validateDmAuthority,
-} from "./handlers/index.js";
+} from "./game/index.js";
+
+// 导出 system handlers
+export { handleUpdateProfile } from "./system/index.js";

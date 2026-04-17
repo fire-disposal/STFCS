@@ -99,6 +99,13 @@ export interface RoomListItemDTO {
 	metadata: RoomMetadata;
 }
 
+/** 档案更新成功响应 */
+export interface ProfileUpdatedDTO {
+	success: boolean;
+	nickname: string;
+	avatar: string;
+}
+
 /** 健康检查响应 */
 export interface HealthStatusDTO {
 	status: "ok" | "error";
@@ -112,6 +119,18 @@ export interface NetPongPayload {
 	pingMs: number;
 	jitterMs: number;
 	quality: ConnectionQualityValue;
+}
+
+/** 房间列表响应 */
+export interface RoomListDTO {
+	rooms: RoomListItemDTO[];
+}
+
+/** 房间删除结果响应 */
+export interface RoomDeleteDTO {
+	success: boolean;
+	roomId?: string;
+	error?: string;
 }
 
 // ==================== 存档接口 ====================
@@ -214,6 +233,7 @@ export interface CustomVariant {
 export interface PlayerProfile {
 	id: string;                    // 档案 ID（关联用户账号）
 	displayName: string;           // 显示名称
+	avatar?: string;               // 玩家头像 Base64 数据 (空则使用前端默认)
 	customVariants: CustomVariant[];  // 自定义变体列表
 	favoriteVariants: string[];    // 收藏的变体 ID
 	settings: PlayerSettings;      // 玩家设置

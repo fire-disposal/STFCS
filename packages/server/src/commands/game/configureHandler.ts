@@ -8,7 +8,7 @@
  */
 
 import type { Client } from "@colyseus/core";
-import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible, WeaponState } from "@vt/data";
+import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible, isWeaponCategoryCompatible, isWeaponMountTypeCompatible, WeaponState } from "@vt/data";
 import type { GameRoomState } from "../../schema/GameSchema.js";
 import type { ShipState } from "../../schema/ShipStateSchema.js";
 import { ObjectFactory } from "../../rooms/battle/ObjectFactory.js";
@@ -114,10 +114,17 @@ export function handleConfigureWeapon(
 		);
 	}
 
-	// 验证类型限制
-	if (mount.restrictedTypes && !mount.restrictedTypes.includes(weaponSpec.category)) {
+	// 验证类别兼容性（远行星号机制）
+	if (!isWeaponCategoryCompatible(mount.slotCategory, weaponSpec.category)) {
 		throw new Error(
-			`武器类型限制: 挂载点 ${mount.id} 仅支持 ${mount.restrictedTypes.join("/")} 类武器`
+			`武器类别不兼容: ${weaponSpec.name} (${weaponSpec.category}) 无法安装到 ${mount.slotCategory} 挂载点`
+		);
+	}
+
+	// 验证形态兼容性（远行星号机制）
+	if (!isWeaponMountTypeCompatible(mount.acceptsTurret, mount.acceptsHardpoint, weaponSpec.mountType)) {
+		throw new Error(
+			`武器形态不兼容: ${weaponSpec.name} (${weaponSpec.mountType}) 无法安装到此挂载点`
 		);
 	}
 
@@ -208,10 +215,17 @@ export function handleConfigureVariant(
 			);
 		}
 
-		// 类型限制验证
-		if (mount.restrictedTypes && !mount.restrictedTypes.includes(weaponSpec.category)) {
+		// 类别兼容性验证（远行星号机制）
+		if (!isWeaponCategoryCompatible(mount.slotCategory, weaponSpec.category)) {
 			throw new Error(
-				`挂载点 ${entry.mountId}: 武器 ${weaponSpec.name} 类型不符合限制`
+				`挂载点 ${entry.mountId}: 武器 ${weaponSpec.name} (${weaponSpec.category}) 不兼容 ${mount.slotCategory}`
+			);
+		}
+
+		// 形态兼容性验证（远行星号机制）
+		if (!isWeaponMountTypeCompatible(mount.acceptsTurret, mount.acceptsHardpoint, weaponSpec.mountType)) {
+			throw new Error(
+				`挂载点 ${entry.mountId}: 武器 ${weaponSpec.name} (${weaponSpec.mountType}) 形态不兼容`
 			);
 		}
 	}

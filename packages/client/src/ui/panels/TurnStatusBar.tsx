@@ -10,6 +10,7 @@
 import type { PlayerState, ShipState, PlayerRoleValue, GamePhaseValue } from "@/sync/types";
 import { Faction, PlayerRole, GamePhase } from "@/sync/types";
 import { Crown, User, CheckCircle, XCircle, Flag, Zap, MapPin } from "lucide-react";
+import { Avatar } from "@/ui/shared/Avatar";
 import React, { useMemo } from "react";
 import "./turn-status-bar.css";
 
@@ -198,8 +199,12 @@ const PlayerStatusCard: React.FC<{
 		<div
 			className={`player-card ${isCurrentPlayer ? "player-card--current" : ""} ${player.isReady ? "player-card--ready" : ""}`}
 		>
-			<span className="player-card__avatar">{player.avatar || "👤"}</span>
-			<span className="player-card__name">{player.nickname || player.name || `玩家${player.shortId}`}</span>
+			<span className="player-card__avatar">
+				<Avatar src={player.avatar} size={28} />
+			</span>
+			<span className="player-card__name">
+				{player.nickname || player.name || `玩家${player.shortId}`}
+			</span>
 			<span className="player-card__status">
 				{player.isReady ? (
 					<CheckCircle className="player-card__status-icon player-card__status-icon--ready" />

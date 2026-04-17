@@ -13,6 +13,8 @@ export { useShipRendering } from "./entities/ShipRenderer";
 export { useShipHUDRendering, ShipHUDManager, type ShipHUDRenderOptions } from "./entities/ShipHUDRenderer";
 export { useWeaponArcsRendering } from "./entities/WeaponArcRenderer";
 export { useArmorHexagonRendering } from "./entities/ArmorHexagonRenderer";
+export { useShieldArcRendering, type ShieldArcOptions } from "./entities/ShieldArcRenderer";
+export { useFluxIndicatorRendering, type FluxIndicatorOptions } from "./entities/FluxIndicatorRenderer";
 export { useMovementVisualRendering, type MovementPreviewState, type MoveMode, type MoveDirection } from "./entities/MovementVisualRenderer";
 export { useTargetMarkers, type TargetMarkerOptions } from "./entities/TargetMarkerRenderer";
 

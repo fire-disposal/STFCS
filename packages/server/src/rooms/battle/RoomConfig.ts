@@ -2,8 +2,8 @@
  * 战斗房间配置常量
  */
 
-/** 空房间自动销毁时间（毫秒） */
-export const EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
+/** 空房间自动销毁时间（毫秒） - 缩短到 30 秒 */
+export const EMPTY_ROOM_TTL_MS = 30 * 1000;
 
 /** 默认最大客户端数 */
 export const DEFAULT_MAX_CLIENTS = 8;

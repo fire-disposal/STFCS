@@ -34,15 +34,10 @@ export interface FireResult {
 /**
  * 处理武器开火命令
  *
- * 流程：
- * 1. 验证攻击者和目标（允许友军误伤）
- * 2. 验证武器状态
- * 3. 验证射界和射程
- * 4. 验证辐能容量
- * 5. 验证弹药
- * 6. 命中判定（预留骰子/DM控制）
- * 7. 应用伤害（仅命中时）
- * 8. 更新武器状态
+ * 流程规范：
+ * 1. 静态验证 (Check): 权限、范围、辐能、弹药
+ * 2. 扣除消耗 (Consume): 扣除弹药、增加武器发热/CD、增加舰船辐能
+ * 3. 结果判定 (Resolve): 命中判定、伤害计算、状态应用
  */
 export function handleFireWeapon(
 	state: GameRoomState,
@@ -50,79 +45,70 @@ export function handleFireWeapon(
 	payload: { attackerId: string; weaponId: string; targetId: string },
 	hitRollConfig?: HitRollConfig
 ): FireResult {
-	// === 1. 验证攻击者和目标 ===
+	// === 1. 环境与对象验证 ===
 	const attacker = state.ships.get(payload.attackerId);
 	const target = state.ships.get(payload.targetId);
 	if (!attacker) throw new Error("攻击舰船不存在");
 	if (!target) throw new Error("目标舰船不存在");
 
-	// 验证权限
 	validateAuthority(state, client, attacker);
+	
+	if (target.isDestroyed) throw new Error("目标已被摧毁");
+	if (attacker.isOverloaded) throw new Error("舰船过载，无法开火");
 
-	// 目标状态检查（不区分友军/敌军，允许误伤）
-	if (target.isDestroyed || target.hull.current <= 0) {
-		throw new Error("目标已被摧毁");
-	}
-
-	// 过载舰船无法开火
-	if (attacker.isOverloaded) {
-		throw new Error("舰船过载，无法开火");
-	}
-
-	// === 2. 验证武器 ===
 	const weapon = attacker.weapons.get(payload.weaponId);
 	if (!weapon) throw new Error("武器不存在");
+	if (weapon.state !== WeaponState.READY) throw new Error(`武器状态异常: ${weapon.state}`);
+	if (weapon.hasFiredThisTurn) throw new Error("本回合已射击");
 
-	// 武器状态检查
-	if (weapon.state !== WeaponState.READY) {
-		throw new Error(`武器状态异常: ${weapon.state}`);
-	}
-
-	// 本回合射击限制
-	if (weapon.hasFiredThisTurn) {
-		throw new Error("本回合已射击");
-	}
-
-	// === 3. 验证射界和射程 ===
+	// === 2. 射界与射程验证 ===
 	const { distanceToMuzzle: dist } = assertTargetInWeaponArc(attacker, weapon, target);
-	
-	// 射程检查
-	if (dist > weapon.range) {
-		throw new Error(`超出射程: ${dist.toFixed(0)} > ${weapon.range}`);
-	}
+	const effectiveRange = weapon.range * attacker.rangeRatio;
+	const effectiveMinRange = weapon.minRange * attacker.rangeRatio;
 
-	// 最小射程检查
-	if (weapon.minRange > 0 && dist < weapon.minRange) {
-		throw new Error(`距离过近: ${dist.toFixed(0)} < ${weapon.minRange}`);
-	}
+	if (dist > effectiveRange) throw new Error(`超出射程: ${dist.toFixed(0)} > ${effectiveRange.toFixed(0)}`);
+	if (effectiveMinRange > 0 && dist < effectiveMinRange) throw new Error(`距离过近: ${dist.toFixed(0)} < ${effectiveMinRange.toFixed(0)}`);
 
-	// === 4. 验证辐能容量 ===
+	// === 3. 资源预检 ===
 	const shotsToFire = weapon.burstSize || 1;
-	const totalFluxCost = weapon.fluxCost * shotsToFire;
+	const actualShots = weapon.maxAmmo > 0 ? Math.min(shotsToFire, weapon.currentAmmo) : shotsToFire;
+	if (actualShots <= 0) throw new Error("弹药耗尽");
 
+	const totalFluxCost = weapon.fluxCost * actualShots;
 	if (totalFluxCost > 0 && attacker.flux.total + totalFluxCost > attacker.flux.max) {
-		throw new Error(`辐能不足: 需要 ${totalFluxCost}, 当前 ${attacker.flux.max - attacker.flux.total} 可用`);
+		throw new Error(`辐能不足: 需要 ${totalFluxCost.toFixed(0)}，即将导致过载`);
 	}
 
-	// === 5. 验证弹药 ===
-	const actualShots = weapon.maxAmmo > 0
-		? Math.min(shotsToFire, weapon.currentAmmo)
-		: shotsToFire;
-
-	if (actualShots <= 0) {
-		throw new Error("弹药耗尽");
-	}
-
-	// === 6. 执行开火 ===
-	const fireSuccess = weapon.fire();
-	if (!fireSuccess) {
-		throw new Error("武器开火失败");
-	}
-
-	// 标记舰船已开火
+	// === 4. 执行扣除 (Consume) ===
+	// 标记舰船活动状态
 	attacker.hasFired = true;
+	
+	// 更新武器状态与消耗
+	weapon.fire(); // 内部处理弹药扣除和 hasFiredCheck
+	attacker.flux.addSoft(totalFluxCost);
+	
+	// 更新 CD 状态
+	weapon.cooldownRemaining = weapon.cooldownMax || GAME_CONFIG.DEFAULT_COOLDOWN;
+	weapon.state = WeaponState.COOLDOWN;
+	if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
+		weapon.state = WeaponState.OUT_OF_AMMO;
+	}
 
-	// === 7. 命中判定 + 应用伤害 ===
+	// === 5. 战斗结果判定 (Resolve) ===
+	return resolveCombatEffects(attacker, weapon, target, actualShots, hitRollConfig);
+}
+
+/**
+ * 内部辅助：处理伤害与命中的循环判定
+ * 分离出此函数是为了以后支持多目标的散弹或 AOE 逻辑
+ */
+function resolveCombatEffects(
+	attacker: ShipState,
+	weapon: WeaponSlot,
+	target: ShipState,
+	actualShots: number,
+	hitRollConfig?: HitRollConfig
+): FireResult {
 	let totalDamage = 0;
 	let totalEmp = 0;
 	let hitCount = 0;
@@ -130,60 +116,35 @@ export function handleFireWeapon(
 	const hitRollResults: HitRollResult[] = [];
 
 	for (let i = 0; i < actualShots; i++) {
-		// 连发武器：后续射击使用 fireBurst
-		if (i > 0) {
-			weapon.fireBurst();
-		}
-
-		// 命中判定
-		const hitResult = performHitRoll(attacker, weapon, target, hitRollConfig || { mode: HitRollMode.DETERMINISTIC });
+		// 命中判定（逻辑层）
+		const hitResult = performHitRoll(
+			attacker, 
+			weapon, 
+			target, 
+			hitRollConfig || { mode: HitRollMode.DETERMINISTIC }
+		);
 		hitRollResults.push(hitResult);
 
-		if (!hitResult.hit) {
-			// 未命中，跳过伤害计算
-			continue;
-		}
+		if (hitResult.hit) {
+			hitCount++;
+			// 伤害计算与应用（状态层）
+			const damageResult = applyDamage(attacker, weapon, target);
+			totalDamage += damageResult.damageApplied;
+			totalEmp += damageResult.empApplied;
 
-		hitCount++;
-
-		// 应用伤害（仅命中时）
-		const damageResult = applyDamage(attacker, weapon, target);
-		totalDamage += damageResult.damageApplied;
-		totalEmp += damageResult.empApplied;
-
-		if (damageResult.targetOverloaded) {
-			targetOverloaded = true;
-		}
-
-		// 目标摧毁后停止射击
-		if (target.isDestroyed) {
-			break;
+			if (damageResult.targetOverloaded) targetOverloaded = true;
+			if (target.isDestroyed) break; // 摧毁则停止连发
 		}
 	}
 
-	// === 8. 更新辐能 ===
-	// 根据实际射击次数（而非命中次数）计算辐能消耗
-	const fluxGenerated = weapon.fluxCost * actualShots;
-	attacker.flux.addSoft(fluxGenerated);
-
-	// === 9. 更新武器状态 ===
-	weapon.cooldownRemaining = weapon.cooldownMax || GAME_CONFIG.DEFAULT_COOLDOWN;
-	weapon.state = WeaponState.COOLDOWN;
-
-	if (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0) {
-		weapon.state = WeaponState.OUT_OF_AMMO;
-		weapon.reloadProgress = 0;
-	}
-
-	// === 10. 返回结果 ===
 	return {
 		success: true,
 		shotsFired: actualShots,
 		hits: hitCount,
 		damageApplied: totalDamage,
 		empApplied: totalEmp,
-		fluxGenerated: fluxGenerated,
-		targetOverloaded: targetOverloaded,
+		fluxGenerated: weapon.fluxCost * actualShots,
+		targetOverloaded,
 		targetDestroyed: target.isDestroyed,
 		hitRollResults,
 	};

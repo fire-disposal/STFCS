@@ -98,7 +98,7 @@ export type {
 } from "./schema/types.js";
 
 // 命令结果类型导出
-export type { FireResult, DamageResult, ConfigureResult } from "./commands/handlers/index.js";
+export type { FireResult, DamageResult, ConfigureResult } from "./commands/game/index.js";
 
 // Schema 容器类型（本地定义，避免循环依赖）
 export interface SchemaMap<T> {
@@ -153,10 +153,16 @@ export type {
 } from "./commands/types.js";
 
 // 服务层导出
-export { PlayerService, type OnlineProfile } from "./services/index.js";
-export { GameService } from "./services/index.js";
-export { SaveService, saveService } from "./services/index.js";
-export { ProfileService, profileService } from "./services/ProfileService.js";
+export { 
+    PlayerService, 
+    type OnlineProfile, 
+    SaveService, 
+    saveService, 
+    ProfileService, 
+    profileService,
+    PersistenceManager,
+    persistence 
+} from "./services/index.js";
 
 // 服务器启动代码
 import { createServer } from "http";
@@ -180,7 +186,12 @@ registerHttpRoutes(app);
 
 const server = createServer(app);
 const gameServer = new Server({
-	transport: new WebSocketTransport({ server, pingInterval: 3000 }),
+	transport: new WebSocketTransport({
+		server,
+		pingInterval: 3000,
+		// 允许大消息（头像 Base64 数据，前端压缩后约 15-50KB，预留 512KB）
+		maxPayload: 512 * 1024,
+	}),
 	greet: false,
 });
 

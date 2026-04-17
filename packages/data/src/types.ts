@@ -25,13 +25,91 @@ export const WeaponCategory = {
 export type WeaponCategoryValue =
 	(typeof WeaponCategory)[keyof typeof WeaponCategory];
 
-export const MountType = {
-	FIXED: "FIXED",
+/**
+ * 武器形态类型（Weapon Mount Type）
+ *
+ * 定义武器本身的形态，决定射界范围：
+ * - TURRET: 炮塔型，可旋转，射界由武器规格 arc 决定（通常 180°-360°）
+ * - HARDPOINT: 硬点型，固定在船体上，射界固定 ±10°（共 20°）
+ * - HIDDEN: 隐藏型，内置武器，不显示在挂载点
+ *
+ * ⚠️ 这是武器的属性，不是挂载点的属性
+ * 挂载点通过 acceptsTurret/acceptsHardpoint 字段限制可接受的武器形态
+ */
+export const WeaponMountType = {
 	TURRET: "TURRET",
+	HARDPOINT: "HARDPOINT",
 	HIDDEN: "HIDDEN",
 } as const;
 
-export type MountTypeValue = (typeof MountType)[keyof typeof MountType];
+export type WeaponMountTypeValue = (typeof WeaponMountType)[keyof typeof WeaponMountType];
+
+/** 兼容旧代码的别名（逐步迁移后移除） */
+export const MountType = WeaponMountType;
+export type MountTypeValue = WeaponMountTypeValue;
+
+/**
+ * 硬点型武器固定射界范围（度）
+ */
+export const HARDPOINT_ARC = 20; // ±10°
+
+/**
+ * 挂载点类别（Slot Category）
+ *
+ * 定义挂载点可接受的武器类别：
+ * - BALLISTIC_SLOT: 只能装弹道武器
+ * - ENERGY_SLOT: 只能装能量武器
+ * - MISSILE_SLOT: 只能装导弹
+ * - COMPOSITE_SLOT: 可装弹道或导弹
+ * - SYNERGY_SLOT: 可装能量或导弹
+ * - UNIVERSAL_SLOT: 可装任何类别
+ */
+export const SlotCategory = {
+	BALLISTIC_SLOT: "BALLISTIC_SLOT",
+	ENERGY_SLOT: "ENERGY_SLOT",
+	MISSILE_SLOT: "MISSILE_SLOT",
+	COMPOSITE_SLOT: "COMPOSITE_SLOT",
+	SYNERGY_SLOT: "SYNERGY_SLOT",
+	UNIVERSAL_SLOT: "UNIVERSAL_SLOT",
+} as const;
+
+export type SlotCategoryValue = (typeof SlotCategory)[keyof typeof SlotCategory];
+
+/**
+ * 挂载点类别与武器类别的兼容性映射
+ */
+export const SLOT_CATEGORY_COMPATIBILITY: Record<SlotCategoryValue, WeaponCategoryValue[]> = {
+	BALLISTIC_SLOT: ["BALLISTIC"],
+	ENERGY_SLOT: ["ENERGY"],
+	MISSILE_SLOT: ["MISSILE"],
+	COMPOSITE_SLOT: ["BALLISTIC", "MISSILE"],
+	SYNERGY_SLOT: ["ENERGY", "MISSILE"],
+	UNIVERSAL_SLOT: ["BALLISTIC", "ENERGY", "MISSILE", "SYNERGY"],
+};
+
+/**
+ * 检查武器类别是否与挂载点类别兼容
+ */
+export function isWeaponCategoryCompatible(
+	slotCategory: SlotCategoryValue,
+	weaponCategory: WeaponCategoryValue
+): boolean {
+	return SLOT_CATEGORY_COMPATIBILITY[slotCategory]?.includes(weaponCategory) ?? false;
+}
+
+/**
+ * 检查武器形态是否与挂载点形态限制兼容
+ */
+export function isWeaponMountTypeCompatible(
+	acceptsTurret: boolean,
+	acceptsHardpoint: boolean,
+	weaponMountType: WeaponMountTypeValue
+): boolean {
+	if (weaponMountType === "TURRET") return acceptsTurret;
+	if (weaponMountType === "HARDPOINT") return acceptsHardpoint;
+	if (weaponMountType === "HIDDEN") return true; // 隐藏武器不受限制
+	return false;
+}
 
 export const WeaponSlotSize = {
 	SMALL: "SMALL",
@@ -245,6 +323,8 @@ export const ClientCommand = {
 	CMD_CLEAR_OVERLOAD: "CMD_CLEAR_OVERLOAD",
 	CMD_SET_ARMOR: "CMD_SET_ARMOR",
 	CMD_ADVANCE_MOVE_PHASE: "CMD_ADVANCE_MOVE_PHASE",
+	CMD_GET_ATTACKABLE_TARGETS: "CMD_GET_ATTACKABLE_TARGETS",
+	CMD_GET_ALL_ATTACKABLE_TARGETS: "CMD_GET_ALL_ATTACKABLE_TARGETS",  // 批量查询所有武器
 
 	// 武器配置命令
 	CMD_CONFIGURE_WEAPON: "CMD_CONFIGURE_WEAPON",
@@ -268,6 +348,7 @@ export const ClientCommand = {
 	CMD_ROOM_DISSOLVE: "CMD_ROOM_DISSOLVE",
 	CMD_KICK_PLAYER: "CMD_KICK_PLAYER",
 	CMD_UPDATE_PROFILE: "CMD_UPDATE_PROFILE",
+	CMD_TRANSFER_OWNER: "CMD_TRANSFER_OWNER",
 } as const;
 export type ClientCommandValue = (typeof ClientCommand)[keyof typeof ClientCommand];
 
@@ -280,6 +361,14 @@ export interface Point {
 
 // ==================== 武器规格 ====================
 
+/**
+ * 武器规格定义
+ *
+ * 武器形态（mountType）决定射界：
+ * - TURRET: 射界由 arc 字段决定（通常 180°-360°）
+ * - HARDPOINT: 射界固定 20°（±10°），可使用 hardpointArc 自定义
+ * - HIDDEN: 内置武器，不显示在挂载点
+ */
 export interface WeaponSpec {
 	// 基础标识
 	id: string;
@@ -289,14 +378,15 @@ export interface WeaponSpec {
 	// 分类属性
 	category: WeaponCategoryValue;
 	damageType: DamageTypeValue;
-	mountType: MountTypeValue;
+	mountType: WeaponMountTypeValue;   // 武器形态：TURRET / HARDPOINT / HIDDEN
 	size: WeaponSlotSizeValue;         // 武器尺寸（必填）
 
 	// 战斗属性
 	damage: number;                    // 单发伤害
 	range: number;                     // 最大射程
 	minRange?: number;                 // 最小射程（0 = 无限制，近距离无法开火）
-	arc: number;                       // 射界角度范围
+	arc: number;                       // 炮塔型武器射界（TURRET 型使用）
+	hardpointArc?: number;             // 硬点型武器自定义射界（可选，默认 20°）
 	cooldown: number;                  // 冷却时间（秒）
 	fluxCost: number;                  // 辐能消耗（每发）
 	ignoresShields: boolean;           // 是否无视护盾
@@ -326,6 +416,15 @@ export interface WeaponSpec {
 /**
  * 武器挂载点规格
  *
+ * 挂载点属性（远行星号机制）：
+ * - slotCategory: 决定可接受的武器类别（Ballistic/Energy/Missile等）
+ * - acceptsTurret/acceptsHardpoint: 决定可接受的武器形态
+ * - size: 决定可接受的武器尺寸（向下兼容）
+ *
+ * 射界由武器规格决定：
+ * - TURRET 型武器：使用武器规格的 arc 字段
+ * - HARDPOINT 型武器：固定 20°（±10°）
+ *
  * 坐标系统说明（船体坐标系）：
  * - 船体中心为原点 (0, 0)
  * - X 轴：正方向朝右（从船头看向船尾时）
@@ -345,19 +444,19 @@ export interface WeaponMountSpec {
 	id: string;
 	displayName?: string;              // 挂载点显示名称（如"主炮"、"副炮"）
 
-	// 类型与尺寸
-	type: MountTypeValue;              // FIXED: 固定射界 ±10° / TURRET: 可旋转炮塔
-	size: WeaponSlotSizeValue;
+	// 类别限制
+	slotCategory: SlotCategoryValue;   // 挂载点类别：BALLISTIC_SLOT / ENERGY_SLOT 等
+
+	// 尺寸
+	size: WeaponSlotSizeValue;         // 挂载点尺寸：SMALL / MEDIUM / LARGE
+
+	// 形态限制（远行星号机制）
+	acceptsTurret: boolean;            // 是否接受炮塔型武器
+	acceptsHardpoint: boolean;         // 是否接受硬点型武器
 
 	// 位置与朝向（船体坐标系）
 	position: Point;                   // 相对船体中心的偏移位置
 	facing: number;                    // 基准朝向（度），0°=朝船头，90°=朝右
-
-	// 射界
-	arc: number;                       // 射界角度范围（度），以 facing 为中心
-
-	// 限制
-	restrictedTypes?: WeaponCategoryValue[]; // 限制武器类别（如只能装导弹）
 
 	// 默认配置
 	defaultWeapon?: string;            // 默认武器 ID
@@ -414,7 +513,15 @@ export interface ShipHullSpec {
 	shieldType: ShieldTypeValue;       // FRONT: 前盾（固定中心） / OMNI: 全盾（可调整）
 	shieldArc: number;                 // 护盾覆盖角度范围（度）
 	shieldRadius: number;              // 护盾半径（决定覆盖范围）
+	shieldEfficiency: number;          // 护盾效率：吸收伤害→硬辐能转化倍率（默认1.0）
 	shieldUpCost?: number;             // 每回合护盾维持的软辐能消耗
+
+	// 护甲减伤属性
+	maxArmorReductionRatio?: number;   // 最大护甲减伤比（默认0.85，即护甲最多吸收85%伤害）
+	minArmorReductionRatio?: number;   // 最小护甲减伤比（默认0.1，即护甲至少保留10%有效值）
+
+	// 射程修正
+	rangeRatio?: number;               // 射程比率（默认1.0，真实射程=面板射程×射程比率）
 
 	// 机动系统
 	maxSpeed: number;                  // 每阶段最大移动距离（单位）

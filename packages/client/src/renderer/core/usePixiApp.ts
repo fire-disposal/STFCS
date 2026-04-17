@@ -172,9 +172,17 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			shipIconsLayer.zIndex = 11;
 			shipIconsLayer.eventMode = "none";
 
+			const shieldArcsLayer = new Container();
+			shieldArcsLayer.zIndex = 12;
+			shieldArcsLayer.eventMode = "none";
+
 			const hexagonArmorLayer = new Container();
-			hexagonArmorLayer.zIndex = 12;
+			hexagonArmorLayer.zIndex = 13;
 			hexagonArmorLayer.eventMode = "none";
+
+			const fluxIndicatorsLayer = new Container();
+			fluxIndicatorsLayer.zIndex = 14;
+			fluxIndicatorsLayer.eventMode = "none";
 
 			world.addChild(
 				background,
@@ -190,7 +198,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				weaponArcsLayer,
 				movementVisualsLayer,
 				shipIconsLayer,
-				hexagonArmorLayer
+				shieldArcsLayer,
+				hexagonArmorLayer,
+				fluxIndicatorsLayer
 			);
 
 			// === HUD 层（独立于世界，固定像素大小） ===
@@ -231,7 +241,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,
 				shipIcons: shipIconsLayer,
+				shieldArcs: shieldArcsLayer,
 				hexagonArmor: hexagonArmorLayer,
+				fluxIndicators: fluxIndicatorsLayer,
 				// HUD 层
 				hud,
 				shipBars: shipBarsLayer,

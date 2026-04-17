@@ -4,6 +4,7 @@
  * 通过 WebSocket 与 SystemRoom 通信，处理系统级操作：
  * - 获取房间列表（实时推送）
  * - 远程删除房间（房主可通过此服务删除自己创建的房间）
+ * - 玩家档案更新（全局功能，与房间无关）
  */
 
 import type { RoomInfo } from "@/network/NetworkManager";
@@ -16,6 +17,20 @@ interface RoomListResponse {
 interface RoomDeleteResponse {
 	success: boolean;
 	roomId?: string;
+	error?: string;
+}
+
+interface ProfileUpdateResponse {
+	success: boolean;
+	nickname?: string;
+	avatar?: string;
+	error?: string;
+}
+
+interface ProfileGetResponse {
+	success: boolean;
+	nickname?: string;
+	avatar?: string;
 	error?: string;
 }
 
@@ -81,12 +96,21 @@ export class SystemService {
 						this.notifyRoomsListeners();
 					}
 				}
+				if (type === "PROFILE_UPDATED") {
+					// 触发全局事件（兼容 App.tsx 的事件监听）
+					if (payload && typeof payload === "object") {
+						window.dispatchEvent(new CustomEvent("stfcs-profile-updated", { detail: payload }));
+					}
+				}
 				this.emit(type, payload);
 			});
 		};
 
 		setupHandler("ROOM_LIST_RESPONSE");
 		setupHandler("ROOM_DELETE_RESPONSE");
+		setupHandler("PROFILE_UPDATE_RESPONSE");
+		setupHandler("PROFILE_GET_RESPONSE");
+		setupHandler("PROFILE_UPDATED");
 		setupHandler("ERROR");
 	}
 
@@ -186,6 +210,97 @@ export class SystemService {
 		return () => {
 			this.roomsListeners.delete(listener);
 		};
+	}
+
+	/**
+	 * 更新玩家档案（全局功能，与房间无关）
+	 *
+	 * @param playerId 玩家标识（当前使用 nickname）
+	 * @param profile 档案更新内容
+	 * @returns 更新后的档案信息
+	 */
+	async updateProfile(
+		playerId: string,
+		profile: { nickname?: string; avatar?: string }
+	): Promise<{ success: boolean; nickname: string; avatar: string }> {
+		await this.ensureConnected();
+
+		return new Promise((resolve, reject) => {
+			const timeoutMs = 10000;
+
+			const handler = (payload: unknown) => {
+				const response = payload as ProfileUpdateResponse;
+				if (response.success) {
+					resolve({
+						success: true,
+						nickname: response.nickname || "",
+						avatar: response.avatar || "",
+					});
+				} else {
+					reject(new Error(response.error || "更新档案失败"));
+				}
+			};
+
+			const errorHandler = (payload: unknown) => {
+				const error = payload as SystemError;
+				reject(new Error(error.message || "更新档案失败"));
+			};
+
+			this.once("PROFILE_UPDATE_RESPONSE", handler);
+			this.once("ERROR", errorHandler);
+			this.systemRoom!.send("PROFILE_UPDATE_REQUEST", { playerId, ...profile });
+
+			setTimeout(() => {
+				this.off("PROFILE_UPDATE_RESPONSE", handler);
+				this.off("ERROR", errorHandler);
+				if (!this.systemRoom) {
+					reject(new Error("连接已断开"));
+				}
+			}, timeoutMs);
+		});
+	}
+
+	/**
+	 * 获取玩家档案
+	 *
+	 * @param playerId 玩家标识
+	 * @returns 档案信息
+	 */
+	async getProfile(playerId: string): Promise<{ nickname: string; avatar: string }> {
+		await this.ensureConnected();
+
+		return new Promise((resolve, reject) => {
+			const timeoutMs = 10000;
+
+			const handler = (payload: unknown) => {
+				const response = payload as ProfileGetResponse;
+				if (response.success) {
+					resolve({
+						nickname: response.nickname || "",
+						avatar: response.avatar || "",
+					});
+				} else {
+					reject(new Error(response.error || "获取档案失败"));
+				}
+			};
+
+			const errorHandler = (payload: unknown) => {
+				const error = payload as SystemError;
+				reject(new Error(error.message || "获取档案失败"));
+			};
+
+			this.once("PROFILE_GET_RESPONSE", handler);
+			this.once("ERROR", errorHandler);
+			this.systemRoom!.send("PROFILE_GET_REQUEST", { playerId });
+
+			setTimeout(() => {
+				this.off("PROFILE_GET_RESPONSE", handler);
+				this.off("ERROR", errorHandler);
+				if (!this.systemRoom) {
+					reject(new Error("连接已断开"));
+				}
+			}, timeoutMs);
+		});
 	}
 
 	/**

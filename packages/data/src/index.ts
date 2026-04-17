@@ -8,7 +8,7 @@ export {
 	getAvailableWeapons,
 	getWeaponsBySize,
 	getWeaponsByCategory,
-	getCompatibleWeapons,
+	getWeaponsByMountType,
 	calculateOpCost,
 	WeaponSizeList,
 } from "./weapons.js";

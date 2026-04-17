@@ -17,9 +17,16 @@ import type {
 	RoomKickedDTO,
 	ShipCreatedDTO,
 	NetPongPayload,
+	ProfileUpdatedDTO,
 } from "../schema/types.js";
 
 export const toErrorDto = (message: string): ErrorDTO => ({ message });
+
+export const toProfileUpdatedDto = (nickname: string, avatar: string): ProfileUpdatedDTO => ({
+	success: true,
+	nickname,
+	avatar,
+});
 
 export const toRoleDto = (role: PlayerRoleValue): RoleDTO => ({ role });
 

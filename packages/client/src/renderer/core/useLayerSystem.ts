@@ -18,7 +18,9 @@
  * │   ├── [zIndex 9] weaponArcs (武器射界可视化)
  * │   ├── [zIndex 10] movementVisuals (移动预览箭头)
  * │   ├── [zIndex 11] shipIcons (舰船图标层)
- * │   └── [zIndex 12] hexagonArmor (护甲六边形)
+ * │   ├── [zIndex 12] shieldArcs (护盾辉光弧线)
+ * │   ├── [zIndex 13] hexagonArmor (护甲六边形)
+ * │   └── [zIndex 14] fluxIndicators (辐能/过载状态指示器)
  * │
  * └── hud (HUD层，独立于世界，固定像素大小，无变换)
  *     ├── [zIndex 0] shipBars (舰船血条 - 固定像素大小)
@@ -78,8 +80,12 @@ export interface LayerRegistry {
 	movementVisuals: Container;
 	/** [zIndex 11] 舰船图标层 */
 	shipIcons: Container;
-	/** [zIndex 12] 护甲六边形 */
+	/** [zIndex 12] 护盾辉光弧线 */
+	shieldArcs: Container;
+	/** [zIndex 13] 护甲六边形 */
 	hexagonArmor: Container;
+	/** [zIndex 14] 辐能/过载状态指示器 */
+	fluxIndicators: Container;
 
 	// === HUD 层（独立于世界） ===
 	/** HUD 层根容器 - 固定在画布中心，无变换 */

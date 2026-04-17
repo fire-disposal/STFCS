@@ -1,5 +1,6 @@
 import type { PlayerState, ShipState } from "@/sync/types";
 import { PlayerRole } from "@/sync/types";
+import { Avatar } from "@/ui/shared/Avatar";
 import React, { useMemo } from "react";
 
 const styles = {
@@ -490,15 +491,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 													...(isDM ? styles.playerItemDM : {}),
 												}}
 											>
-												<div
-													style={{
-														...styles.playerAvatar,
-														backgroundColor: isDM ? "#5a2a3a" : "#1a4a7a",
-														color: isDM ? "#ff9cb2" : "#43c1ff",
-													}}
-												>
-													{avatar}
-												</div>
+												<Avatar src={avatar} size={42} />
 
 												<div style={styles.playerInfo}>
 													<div style={styles.playerNameRow}>

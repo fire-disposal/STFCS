@@ -37,6 +37,11 @@ export class SaveRoom extends Room {
 		});
 	}
 
+	private handleRoomError(client: Client, code: string, error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		client.send("ERROR", { code, message });
+	}
+
 	onJoin(client: Client): void {
 		console.log("[SaveRoom] Client joined:", client.sessionId);
 	}
@@ -50,10 +55,7 @@ export class SaveRoom extends Room {
 			const summary = await saveService.listSaves();
 			client.send("SAVE_LIST_RESPONSE", { saves: summary.saves });
 		} catch (error) {
-			client.send("ERROR", {
-				code: "SAVE_LIST_ERROR",
-				message: error instanceof Error ? error.message : "获取存档列表失败",
-			});
+			this.handleRoomError(client, "SAVE_LIST_ERROR", error);
 		}
 	}
 
@@ -67,10 +69,7 @@ export class SaveRoom extends Room {
 			const save = await saveService.exportSave(id);
 			client.send("SAVE_LOAD_RESPONSE", { save: toSaveDetailDto(save) });
 		} catch (error) {
-			client.send("ERROR", {
-				code: "LOAD_ERROR",
-				message: error instanceof Error ? error.message : "加载失败",
-			});
+			this.handleRoomError(client, "LOAD_ERROR", error);
 		}
 	}
 
@@ -82,12 +81,9 @@ export class SaveRoom extends Room {
 
 			const id = (payload as { id: string }).id;
 			await saveService.deleteSave(id);
-			client.send("SAVE_DELETE_RESPONSE", { success: true });
+			client.send("SAVE_DELETE_RESPONSE", { success: true, id });
 		} catch (error) {
-			client.send("ERROR", {
-				code: "DELETE_ERROR",
-				message: error instanceof Error ? error.message : "删除失败",
-			});
+			this.handleRoomError(client, "DELETE_ERROR", error);
 		}
 	}
 
@@ -101,10 +97,7 @@ export class SaveRoom extends Room {
 			const save = await saveService.exportSave(id);
 			client.send("SAVE_EXPORT_RESPONSE", { success: true, save: toSaveDetailDto(save) });
 		} catch (error) {
-			client.send("ERROR", {
-				code: "EXPORT_ERROR",
-				message: error instanceof Error ? error.message : "导出失败",
-			});
+			this.handleRoomError(client, "EXPORT_ERROR", error);
 		}
 	}
 
@@ -112,17 +105,14 @@ export class SaveRoom extends Room {
 		try {
 			const saveData = payload as GameSave;
 
-			if (!saveData.id || !saveData.name) {
+			if (!saveData || !saveData.id || !saveData.name) {
 				throw new Error("无效的存档数据");
 			}
 
 			const id = await saveService.importSave(saveData);
 			client.send("SAVE_IMPORT_RESPONSE", { success: true, id });
 		} catch (error) {
-			client.send("ERROR", {
-				code: "IMPORT_ERROR",
-				message: error instanceof Error ? error.message : "导入失败",
-			});
+			this.handleRoomError(client, "IMPORT_ERROR", error);
 		}
 	}
 }

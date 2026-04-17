@@ -39,3 +39,4 @@ export {
 	useTurnCount,
 	useActiveFaction,
 } from "./useMultiplayerState";
+export { usePlayerProfile } from "./usePlayerProfile";

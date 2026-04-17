@@ -6,15 +6,14 @@
  */
 
 import type { RoomInfo } from "@/network/NetworkManager";
-import React, { useState, useMemo, useCallback } from "react";
-
-const AVATARS = ["👤", "🚀", "🛰️", "🤖", "🧠", "🛸"];
+import { notify } from "@/ui/shared/Notification";
+import { Avatar } from "@/ui/shared/Avatar";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 
 interface LobbyPageProps {
 	playerName: string;
 	profile: { nickname: string; avatar: string };
 	currentShortId: number | null;
-	currentRoomId: string | null;
 	rooms: RoomInfo[];
 	isLoading: boolean;
 	onCreateRoom: () => void;
@@ -29,7 +28,6 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	playerName,
 	profile,
 	currentShortId,
-	currentRoomId,
 	rooms,
 	isLoading,
 	onCreateRoom,
@@ -41,7 +39,21 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 }) => {
 	const [showProfile, setShowProfile] = useState(false);
 	const [nickname, setNickname] = useState(profile.nickname);
-	const [avatar, setAvatar] = useState(profile.avatar || "👤");
+	// 内部预览状态：如果是 Base64，则直接作为预览，如果是 "👤" 或 null，则为 null
+	const [previewAvatar, setPreviewAvatar] = useState<string | null>(
+		profile.avatar && profile.avatar.startsWith("data:image/") ? profile.avatar : null
+	);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	// 当外部 profile 更新时（例如服务器返回），同步内部预览状态
+	useEffect(() => {
+		setNickname(profile.nickname);
+		if (profile.avatar && profile.avatar.startsWith("data:image/")) {
+			setPreviewAvatar(profile.avatar);
+		} else {
+			setPreviewAvatar(null);
+		}
+	}, [profile]);
 
 	const stats = useMemo(
 		() => ({
@@ -57,6 +69,63 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 		[currentShortId]
 	);
 
+	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		// 检查文件类型
+		if (!file.type.startsWith("image/")) {
+			alert("请选择图片文件");
+			return;
+		}
+
+		// 检查大小 (最大 2MB，前端限制)
+		if (file.size > 2 * 1024 * 1024) {
+			alert("图片文件过大，请选择小于 2MB 的图片");
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			const data = event.target?.result as string;
+			const img = new Image();
+			img.onload = () => {
+				console.log("[LobbyPage] Image loaded for canvas processing:", img.width, "x", img.height);
+				// 使用 Canvas 裁剪并压缩为正方形
+				const canvas = document.createElement("canvas");
+				const size = 120; // 头像尺寸 120x120
+				canvas.width = size;
+				canvas.height = size;
+				const ctx = canvas.getContext("2d");
+				if (!ctx) {
+					notify.error("Canvas context error");
+					return;
+				}
+
+				// 计算裁剪区域 (居中正方形)
+				const minDim = Math.min(img.width, img.height);
+				const sx = (img.width - minDim) / 2;
+				const sy = (img.height - minDim) / 2;
+
+				ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+
+				// 转换为 Base64
+				const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+				console.log("[LobbyPage] Avatar data URL generated, length:", dataUrl.length);
+				setPreviewAvatar(dataUrl);
+				notify.success("头像解析成功，请点击保存完成更换");
+			};
+			img.onerror = () => {
+				notify.error("图片加载失败");
+			};
+			img.src = data;
+		};
+		reader.onerror = () => {
+			notify.error("文件读取失败");
+		};
+		reader.readAsDataURL(file);
+	};
+
 	return (
 		<div className="lobby-container">
 			<div className="lobby-grid" />
@@ -64,7 +133,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				<h2 className="lobby-title">🏠 游戏大厅</h2>
 				<div className="lobby-user-bar">
 					<span className="lobby-user-name">
-						{avatar} {profile.nickname || playerName}
+						<Avatar src={profile.avatar} size="medium" /> {profile.nickname || playerName}
 					</span>
 					<button
 						className="lobby-btn lobby-btn--secondary"
@@ -87,7 +156,6 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							className="lobby-btn lobby-btn--refresh"
 							data-magnetic
 							onClick={onRefresh}
-							disabled={isLoading}
 						>
 							🔄 刷新
 						</button>
@@ -104,7 +172,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							{rooms.map((room) => (
 								<div
 									key={room.roomId}
-									className={`lobby-room-card${currentRoomId === room.roomId ? " is-disabled" : ""}`}
+									className="lobby-room-card"
 								>
 									<div className="lobby-room-name">
 										{room.name}
@@ -125,19 +193,14 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 										) : (
 											<span className="lobby-room-badge lobby-room-badge--warning">等待房主</span>
 										)}
-										{currentRoomId === room.roomId ? (
-											<span className="lobby-room-badge lobby-room-badge--warning">
-												当前所在房间
-											</span>
-										) : isOwnRoom(room) ? (
+										{isOwnRoom(room) && (
 											<span className="lobby-room-badge lobby-room-badge--success">你的房间</span>
-										) : null}
+										)}
 									</div>
 									<div className="lobby-room-actions">
 										<button
 											className="lobby-btn lobby-btn--join"
 											data-magnetic
-											disabled={currentRoomId === room.roomId}
 											onClick={() => onJoinRoom(room.roomId)}
 										>
 											进入房间
@@ -201,6 +264,23 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				<div className="modal-overlay" onClick={() => setShowProfile(false)}>
 					<div className="modal-content lobby-modal" onClick={(e) => e.stopPropagation()}>
 						<h3 className="modal-title">玩家档案</h3>
+						<div className="lobby-avatar-preview">
+							<Avatar src={previewAvatar} size="large" />
+							<button
+								className="lobby-btn lobby-btn--small lobby-btn--secondary"
+								onClick={() => fileInputRef.current?.click()}
+							>
+								📤 上传图片
+							</button>
+							<input
+								type="file"
+								ref={fileInputRef}
+								style={{ display: "none" }}
+								accept="image/*"
+								onChange={handleFileChange}
+							/>
+						</div>
+						<div className="modal-label">修改昵称</div>
 						<input
 							className="modal-input"
 							value={nickname}
@@ -208,18 +288,6 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							placeholder="昵称（可选）"
 							maxLength={24}
 						/>
-						<div className="lobby-avatar-list">
-							{AVATARS.map((item) => (
-								<button
-									key={item}
-									className={`lobby-avatar-btn${avatar === item ? " is-active" : ""}`}
-									data-magnetic
-									onClick={() => setAvatar(item)}
-								>
-									{item}
-								</button>
-							))}
-						</div>
 						<div className="modal-actions">
 							<button className="modal-btn" onClick={() => setShowProfile(false)}>
 								取消
@@ -227,7 +295,10 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							<button
 								className="modal-btn modal-btn--primary"
 								onClick={() => {
-									onUpdateProfile({ nickname, avatar });
+									onUpdateProfile({
+										nickname,
+										avatar: previewAvatar || "", 
+									});
 									setShowProfile(false);
 								}}
 							>

@@ -45,20 +45,24 @@ export interface DamageResult {
 /**
  * 计算命中护甲象限
  *
- * 六象限系统（GDD 第 5.4 节）：
- * - 象限 0: 0°-60°（船头右前方）
- * - 象限 1: 60°-120°（右侧）
- * - 象限 2: 120°-180°（右后方）
- * - 象限 3: 180°-240°（左后方）
- * - 象限 4: 240°-300°（左侧）
- * - 象限 5: 300°-360°（左前方）
+ * 六象限系统（六边形护甲）：
+ *
+ * 象限定义（相对于船头朝向的角度范围）：
+ * - 象限 0 (FRONT_TOP):    330°-30°  (船头正前方)
+ * - 象限 1 (FRONT_BOTTOM): 270°-330° (船头下方/后下方)
+ * - 象限 2 (LEFT_TOP):     210°-270° (左侧前方)
+ * - 象限 3 (LEFT_BOTTOM):  150°-210° (左侧后方)
+ * - 象限 4 (RIGHT_TOP):    30°-90°   (右侧前方)
+ * - 象限 5 (RIGHT_BOTTOM): 90°-150°  (右侧后方)
+ *
+ * 注意：角度范围以船头为0°，顺时针方向增加
  *
  * @param target 目标舰船
  * @param attacker 攻击舰船
  * @returns 象限索引（0-5）
  */
 export function calculateArmorQuadrant(target: ShipState, attacker: ShipState): number {
-	// 计算命中角度（从目标视角看攻击者）
+	// 计算命中角度（从目标视角看攻击者，世界坐标系）
 	const hitAngle = angleBetween(
 		target.transform.x,
 		target.transform.y,
@@ -66,28 +70,49 @@ export function calculateArmorQuadrant(target: ShipState, attacker: ShipState): 
 		attacker.transform.y
 	);
 
-	// 计算相对于目标船头的角度
-	const relativeAngle = (((hitAngle - target.transform.heading) % 360) + 360) % 360;
+	// 计算相对于目标船头的角度（0° = 船头，顺时针）
+	const relativeAngle = normalizeAngle(hitAngle - target.transform.heading);
 
-	// 计算象限（每象限 60°）
-	return Math.floor(relativeAngle / 60) % 6;
+	// 根据角度范围确定象限
+	// 六边形护甲的象限边界
+	if (relativeAngle >= 330 || relativeAngle < 30) {
+		return 0; // FRONT_TOP (船头正前方)
+	} else if (relativeAngle >= 30 && relativeAngle < 90) {
+		return 4; // RIGHT_TOP (右侧前方)
+	} else if (relativeAngle >= 90 && relativeAngle < 150) {
+		return 5; // RIGHT_BOTTOM (右侧后方)
+	} else if (relativeAngle >= 150 && relativeAngle < 210) {
+		return 3; // LEFT_BOTTOM (左侧后方)
+	} else if (relativeAngle >= 210 && relativeAngle < 270) {
+		return 2; // LEFT_TOP (左侧前方)
+	} else {
+		return 1; // FRONT_BOTTOM (270°-330°, 船头下方)
+	}
 }
 
 /**
  * 判断命中位置是否在护盾覆盖范围内
  *
+ * 护盾朝向说明：
+ * - shield.orientation 是相对于船体的角度（船头为0°）
+ * - 需要加上舰船 heading 得到世界坐标系中的绝对朝向
+ * - 前盾(FRONT)：orientation 固定为 0°（船头方向）
+ * - 全盾(OMNI)：orientation 可调整（相对于船体）
+ *
  * @param target 目标舰船
- * @param hitAngle 命中角度（绝对角度）
+ * @param hitAngle 命中角度（绝对角度，世界坐标系）
  * @returns 是否在护盾范围内
  */
 export function isHitInShieldArc(target: ShipState, hitAngle: number): boolean {
 	if (!target.shield.active) return false;
 
-	// 护盾中心朝向
-	const shieldOrientation = target.shield.orientation;
+	// 护盾绝对朝向 = 舰船 heading + 护盾相对于船体的 orientation
+	const shieldAbsoluteOrientation = normalizeAngle(
+		target.transform.heading + target.shield.orientation
+	);
 
 	// 计算命中位置与护盾中心的偏差
-	const shieldDiff = angleDifference(shieldOrientation, hitAngle);
+	const shieldDiff = angleDifference(shieldAbsoluteOrientation, hitAngle);
 
 	// 护盾覆盖范围（±arc/2）
 	const arcHalf = target.shield.arc / 2;
@@ -96,45 +121,61 @@ export function isHitInShieldArc(target: ShipState, hitAngle: number): boolean {
 }
 
 /**
+ * 规范化角度到 0-360 范围
+ */
+function normalizeAngle(angle: number): number {
+	let normalized = angle % 360;
+	if (normalized < 0) normalized += 360;
+	return normalized;
+}
+
+/**
  * 计算护甲有效伤害
  *
  * 穿甲公式（GDD 第 5.3 节）：
  * - 穿甲强度 Z = 伤害 × 穿甲系数（伤害类型决定）
+ * - 有效护甲 C = max(当前护甲B, 最大护甲A × 最小护甲减伤比)
  * - 有效伤害 D = 伤害 × (Z / (Z + C))
- * - C = max(当前护甲, 最大护甲 × 最小减免比例)
+ * - 减伤上限检查：若 (伤害-D)/伤害 > 最大护甲减伤比，则 D = 伤害×(1-最大护甲减伤比)
  *
  * @param baseDamage 基础伤害
  * @param damageType 伤害类型
  * @param armorValue 当前护甲值
  * @param armorMax 最大护甲值
- * @returns 有效伤害
+ * @param maxReductionRatio 最大护甲减伤比（舰船属性，默认0.85）
+ * @param minReductionRatio 最小护甲减伤比（舰船属性，默认0.1）
+ * @returns 有效伤害和护甲损伤
  */
 export function calculateArmorDamage(
 	baseDamage: number,
 	damageType: DamageTypeValue,
 	armorValue: number,
-	armorMax: number
+	armorMax: number,
+	maxReductionRatio: number = 0.85,
+	minReductionRatio: number = 0.1
 ): { effectiveDamage: number; armorDamage: number } {
 	const mult = DAMAGE_MODIFIERS[damageType];
 
-	// 穿甲强度
+	// 穿甲强度 Z = 伤害 × 穿甲系数
 	const armorPenetration = baseDamage * mult.armor;
 
-	// 有效护甲（不低于最大护甲的 10%，防止完全免疫）
-	const minArmorRatio = 0.1;  // 最小减免比例
-	const effectiveArmor = Math.max(armorValue, armorMax * minArmorRatio);
+	// 有效护甲 C = max(当前护甲, 最大护甲 × 最小护甲减伤比)
+	// 防止护甲为零时完全免疫伤害
+	const effectiveArmor = Math.max(armorValue, armorMax * minReductionRatio);
 
-	// 计算有效伤害
+	// 有效伤害 D = 伤害 × (Z / (Z + C))
 	let effectiveDamage = baseDamage * (armorPenetration / (armorPenetration + effectiveArmor));
 
-	// 减伤上限检查（至少造成基础伤害的 15%）
-	const minDamageRatio = 0.15;
-	const minDamage = baseDamage * minDamageRatio;
-	if (effectiveDamage < minDamage) {
-		effectiveDamage = minDamage;
+	// 减伤上限检查：
+	// 若 (伤害 - D) / 伤害 > 最大护甲减伤比，即护甲吸收比例超过上限
+	// 则 D = 伤害 × (1 - 最大护甲减伤比)
+	const absorbedRatio = (baseDamage - effectiveDamage) / baseDamage;
+	if (absorbedRatio > maxReductionRatio) {
+		effectiveDamage = baseDamage * (1 - maxReductionRatio);
 	}
 
-	// 护甲损伤（不超过当前护甲值）
+	// 护甲损伤 = min(当前护甲值, 有效伤害)
+	// 护甲承受的伤害不超过其当前值
 	const armorDamage = Math.min(armorValue, effectiveDamage);
 
 	return { effectiveDamage, armorDamage };
@@ -195,8 +236,9 @@ export function applyDamage(
 			const shieldMult = DAMAGE_MODIFIERS[damageType].shield;
 			const shieldDamage = baseDamage * shieldMult;
 
-			// 产生硬辐能
-			const fluxGenerated = shieldDamage * GAME_CONFIG.SHIELD_FLUX_PER_DAMAGE;
+			// 产生硬辐能：使用舰船的护盾效率属性
+			// 公式：硬辐能 = 护盾吸收伤害 × 护盾效率
+			const fluxGenerated = shieldDamage * target.shield.efficiency;
 			target.flux.addHard(fluxGenerated);
 			result.fluxGenerated = fluxGenerated;
 
@@ -220,8 +262,19 @@ export function applyDamage(
 	const armorValue = target.armor.getQuadrant(quadrant);
 	const armorMax = target.armor.maxPerQuadrant;
 
+	// 使用舰船的护甲减伤比属性
+	const maxReductionRatio = target.armor.maxReductionRatio;
+	const minReductionRatio = target.armor.minReductionRatio;
+
 	// 计算护甲有效伤害
-	const armorResult = calculateArmorDamage(baseDamage, damageType, armorValue, armorMax);
+	const armorResult = calculateArmorDamage(
+		baseDamage,
+		damageType,
+		armorValue,
+		armorMax,
+		maxReductionRatio,
+		minReductionRatio
+	);
 
 	// 应用护甲损伤
 	target.armor.takeDamage(quadrant, armorResult.armorDamage);
@@ -274,12 +327,14 @@ export function estimateDamage(
 	expectedHullDamage: number;
 	willHitShield: boolean;
 	willOverload: boolean;
+	armorQuadrant: number;         // 预计受击象限
+	shieldOrientation: number;     // 护盾绝对朝向（用于UI显示）
 } {
 	const baseDamage = weapon.damage;
 	const damageType = weapon.damageType as DamageTypeValue;
 	const mult = DAMAGE_MODIFIERS[damageType];
 
-	// 计算命中角度
+	// 计算命中角度（从目标看攻击者）
 	const hitAngle = angleBetween(
 		target.transform.x,
 		target.transform.y,
@@ -287,12 +342,21 @@ export function estimateDamage(
 		attacker.transform.y
 	);
 
+	// 计算护盾绝对朝向
+	const shieldAbsoluteOrientation = normalizeAngle(
+		target.transform.heading + target.shield.orientation
+	);
+
 	// 护盾判定
 	const willHitShield = target.shield.active && !weapon.ignoresShields && isHitInShieldArc(target, hitAngle);
 
+	// 计算受击象限（无论护盾是否命中，都需要显示）
+	const armorQuadrant = calculateArmorQuadrant(target, attacker);
+
 	if (willHitShield) {
 		const shieldDamage = baseDamage * mult.shield;
-		const fluxGenerated = shieldDamage * GAME_CONFIG.SHIELD_FLUX_PER_DAMAGE;
+		// 使用舰船的护盾效率属性
+		const fluxGenerated = shieldDamage * target.shield.efficiency;
 		const willOverload = target.flux.total + fluxGenerated >= target.flux.max;
 
 		return {
@@ -302,15 +366,24 @@ export function estimateDamage(
 			expectedHullDamage: 0,
 			willHitShield: true,
 			willOverload: willOverload,
+			armorQuadrant,
+			shieldOrientation: shieldAbsoluteOrientation,
 		};
 	}
 
 	// 护甲判定
-	const quadrant = calculateArmorQuadrant(target, attacker);
-	const armorValue = target.armor.getQuadrant(quadrant);
+	const armorValue = target.armor.getQuadrant(armorQuadrant);
 	const armorMax = target.armor.maxPerQuadrant;
 
-	const armorResult = calculateArmorDamage(baseDamage, damageType, armorValue, armorMax);
+	// 使用舰船的护甲减伤比属性
+	const armorResult = calculateArmorDamage(
+		baseDamage,
+		damageType,
+		armorValue,
+		armorMax,
+		target.armor.maxReductionRatio,
+		target.armor.minReductionRatio
+	);
 	const hullDamage = armorResult.effectiveDamage * mult.hull;
 
 	return {
@@ -320,5 +393,7 @@ export function estimateDamage(
 		expectedHullDamage: hullDamage,
 		willHitShield: false,
 		willOverload: false,
+		armorQuadrant,
+		shieldOrientation: shieldAbsoluteOrientation,
 	};
 }

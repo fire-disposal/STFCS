@@ -168,5 +168,9 @@ export interface KickPlayerPayload {
 
 export interface UpdateProfilePayload {
 	nickname?: string;
-	avatar?: string;
+	avatar?: string; // 仅接受 Base64 图片数据 (data:image/...)
+}
+
+export interface TransferOwnerPayload {
+	targetSessionId: string;
 }

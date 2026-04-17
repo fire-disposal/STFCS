@@ -4,6 +4,14 @@
  * 移动阶段类型说明：
  * - MovePhaseValue: 服务端同步类型（PHASE_A/B/C）
  * - MovePhaseUIValue: 客户端 UI 状态类型（包含 NONE 表示未开始）
+ *
+ * ⚠️ 燃料池数据从服务端同步：
+ * - 燃料上限：通过 ShipState.maxSpeed/maxTurnRate 计算
+ *   - Phase A/C 前进上限：maxSpeed * 2
+ *   - Phase A/C 横移上限：maxSpeed
+ *   - Phase B 转向上限：maxTurnRate
+ * - 已用燃料：通过 ShipState.phaseAForwardUsed 等字段同步
+ * - UI 应直接使用服务端数据，不再在此 store 维护燃料池
  */
 
 import { create } from "zustand";
@@ -16,34 +24,13 @@ import type {
 	CameraState,
 	PlayerCamera,
 } from "@/sync/types";
-import { MovePhaseUI, type MovePhaseUIValue, type MovePhaseValue } from "@vt/data";
+import { MovePhaseUI, type MovePhaseUIValue } from "@vt/data";
 
 // 导出常量供组件使用
 export { MovePhaseUI };
 
 // 类型别名 - 保持向后兼容
 export type MovementPhaseValue = MovePhaseUIValue;
-
-export interface MovementCommand {
-	forward?: number;
-	strafe?: number;
-	turn?: number;
-}
-
-export interface FuelPool {
-	forwardMax: number;
-	forwardUsed: number;
-	strafeMax: number;
-	strafeUsed: number;
-	turnMax: number;
-	turnUsed: number;
-}
-
-export interface PhaseFuelState {
-	fuel: FuelPool;
-	isExecuting: boolean;
-	lastMove: MovementCommand | null;
-}
 
 // 本地聊天消息类型（普通对象）
 export interface LocalChatMessage {
@@ -53,15 +40,6 @@ export interface LocalChatMessage {
 	content: string;
 	timestamp: number;
 	type: string;
-}
-
-export interface MovementState {
-	currentPhase: MovementPhaseValue;
-	currentPlan?: { turnAngle: number };
-	isAnimating: boolean;
-	phaseA: PhaseFuelState;
-	phaseB: PhaseFuelState;
-	phaseC: PhaseFuelState;
 }
 
 interface GameState {
@@ -82,11 +60,6 @@ interface GameState {
 	camera: CameraState;
 	otherPlayersCameras: Map<string, PlayerCamera>;
 	movementPhase: MovementPhaseValue;
-	phaseA: PhaseFuelState;
-	phaseB: PhaseFuelState;
-	phaseC: PhaseFuelState;
-	shipMaxSpeed: number;
-	shipMaxTurnRate: number;
 	mapWidth: number;
 	mapHeight: number;
 	showGrid: boolean;
@@ -116,21 +89,13 @@ interface GameActions {
 	setCamera: (camera: Partial<CameraState>) => void;
 	setOtherPlayerCamera: (playerId: string, camera: PlayerCamera) => void;
 	removeOtherPlayerCamera: (playerId: string) => void;
-	startMovement: (maxSpeed: number, maxTurnRate: number) => void;
-	executeMove: (phase: MovementPhaseValue, command: MovementCommand) => void;
-	advanceMovePhase: () => void;
+	/** 设置移动阶段（由服务端 ship.movePhase 同步触发） */
 	setMovePhase: (phase: MovementPhaseValue) => void;
 	toggleGrid: () => void;
 	toggleWeaponArcs: () => void;
 	toggleMovementRange: () => void;
 	reset: () => void;
 }
-
-const initialPhaseFuel: PhaseFuelState = {
-	fuel: { forwardMax: 0, forwardUsed: 0, strafeMax: 0, strafeUsed: 0, turnMax: 0, turnUsed: 0 },
-	isExecuting: false,
-	lastMove: null,
-};
 
 const initialState: GameState = {
 	isConnected: false,
@@ -150,11 +115,6 @@ const initialState: GameState = {
 	camera: { x: 0, y: 0, zoom: 1, viewRotation: 0 },
 	otherPlayersCameras: new Map(),
 	movementPhase: "NONE",
-	phaseA: { ...initialPhaseFuel },
-	phaseB: { ...initialPhaseFuel },
-	phaseC: { ...initialPhaseFuel },
-	shipMaxSpeed: 0,
-	shipMaxTurnRate: 0,
 	mapWidth: 2000,
 	mapHeight: 2000,
 	showGrid: true,
@@ -215,29 +175,6 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 		return { otherPlayersCameras };
 	}),
 
-	startMovement: (maxSpeed, maxTurnRate) => set({
-		shipMaxSpeed: maxSpeed,
-		shipMaxTurnRate: maxTurnRate,
-		movementPhase: MovePhaseUI.PHASE_A,
-		phaseA: { ...initialPhaseFuel, fuel: { forwardMax: maxSpeed * 2, forwardUsed: 0, strafeMax: maxSpeed, strafeUsed: 0, turnMax: 0, turnUsed: 0 } },
-		phaseB: { ...initialPhaseFuel, fuel: { forwardMax: 0, forwardUsed: 0, strafeMax: 0, strafeUsed: 0, turnMax: maxTurnRate, turnUsed: 0 } },
-		phaseC: { ...initialPhaseFuel, fuel: { forwardMax: maxSpeed * 2, forwardUsed: 0, strafeMax: maxSpeed, strafeUsed: 0, turnMax: 0, turnUsed: 0 } },
-	}),
-	executeMove: (phase, command) => set((state) => {
-		const phaseState = phase === "PHASE_A" ? state.phaseA : phase === "PHASE_B" ? state.phaseB : state.phaseC;
-		const fuel = { ...phaseState.fuel };
-		if (command.forward) fuel.forwardUsed += Math.abs(command.forward);
-		if (command.strafe) fuel.strafeUsed += Math.abs(command.strafe);
-		if (command.turn) fuel.turnUsed += Math.abs(command.turn);
-		const key = phase === "PHASE_A" ? "phaseA" : phase === "PHASE_B" ? "phaseB" : "phaseC";
-		return { [key]: { ...phaseState, fuel, lastMove: command } };
-	}),
-	advanceMovePhase: () => set((state) => {
-		const phases: MovePhaseUIValue[] = [MovePhaseUI.PHASE_A, MovePhaseUI.PHASE_B, MovePhaseUI.PHASE_C];
-		const idx = phases.indexOf(state.movementPhase);
-		const next = idx < phases.length - 1 ? phases[idx + 1] : MovePhaseUI.PHASE_C;
-		return { movementPhase: next };
-	}),
 	setMovePhase: (phase) => set({ movementPhase: phase }),
 
 	toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),

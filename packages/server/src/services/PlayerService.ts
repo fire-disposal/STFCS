@@ -13,6 +13,7 @@
 
 import type { Client } from "@colyseus/core";
 import type { GameRoomState, PlayerState } from "../schema/GameSchema.js";
+import { persistence } from "./PersistenceManager.js";
 
 /** 在线玩家档案（轻量级） */
 export interface OnlineProfile {
@@ -27,15 +28,20 @@ export class PlayerService {
 	private usedShortIds = new Set<number>();
 
 	/** 注册玩家（自动分配 shortId） */
-	registerPlayer(
+	async registerPlayer(
 		client: Client,
 		state: GameRoomState,
 		options: { playerName?: string }
-	): { player: PlayerState; profile: OnlineProfile } {
+	): Promise<{ player: PlayerState; profile: OnlineProfile }> {
 		const player = state.players.get(client.sessionId);
 		if (!player) {
 			throw new Error("玩家未在房间状态中注册");
 		}
+
+		const nickname = options.playerName?.trim().slice(0, 24) || `Player_${client.sessionId.slice(0, 4)}`;
+
+		// 从持久化层加载 (以昵称为键，模拟用户系统)
+		const savedProfile = await persistence.profiles.get(nickname);
 
 		// 后端生成 shortId
 		const shortId = this.generateShortId();
@@ -46,32 +52,75 @@ export class PlayerService {
 		// 设置初始档案
 		const profile: OnlineProfile = {
 			shortId,
-			nickname: options.playerName?.trim().slice(0, 24) || `Player_${shortId}`,
-			avatar: "👤",
+			nickname: nickname,
+			avatar: savedProfile?.avatar || "",
 		};
 		this.profiles.set(client.sessionId, profile);
+
+		// 同时也确保状态同步
+		player.nickname = profile.nickname; // 确保同步到 Schema
+		player.avatar = profile.avatar;
 
 		return { player, profile };
 	}
 
 	/** 更新玩家档案 */
-	updateProfile(sessionId: string, updates: Partial<OnlineProfile>): OnlineProfile | null {
+	async updateProfile(sessionId: string, updates: Partial<OnlineProfile>): Promise<OnlineProfile | null> {
 		const existing = this.profiles.get(sessionId);
-		if (!existing) return null;
+		if (!existing) {
+			console.error(`[PlayerService] Cannot update profile: sessionId ${sessionId} not found`);
+			return null;
+		}
 
 		const updated: OnlineProfile = {
 			shortId: existing.shortId, // shortId 不可修改
 			nickname: updates.nickname?.trim().slice(0, 24) || existing.nickname,
-			avatar: updates.avatar?.trim().slice(0, 4) || existing.avatar,
+			avatar: updates.avatar || existing.avatar,
 		};
 
 		this.profiles.set(sessionId, updated);
+		console.log(`[PlayerService] Updated online profile for ${sessionId}`, {
+			nickname: updated.nickname,
+			avatarSet: !!updated.avatar,
+			avatarLength: updated.avatar?.length || 0
+		});
+
+		// 持久化到存储
+		try {
+			const profile = await persistence.profiles.get(updated.nickname);
+			
+			await persistence.profiles.save({
+				id: updated.nickname,
+				displayName: updated.nickname,
+				avatar: updated.avatar,
+				customVariants: profile?.customVariants || [],
+				favoriteVariants: profile?.favoriteVariants || [],
+				settings: profile?.settings || {
+					showWeaponArcs: true,
+					showGrid: true,
+					coordinatePrecision: "exact",
+					angleMode: "degrees",
+					theme: "dark"
+				},
+				createdAt: profile?.createdAt || Date.now(),
+				updatedAt: Date.now()
+			});
+			console.log(`[PlayerService] Persisted profile for ${updated.nickname} to storage`);
+		} catch (error) {
+			console.error(`[PlayerService] Failed to persist profile for ${updated.nickname}:`, error);
+		}
+
 		return updated;
 	}
 
 	/** 获取玩家档案 */
 	getProfile(sessionId: string): OnlineProfile | null {
 		return this.profiles.get(sessionId) ?? null;
+	}
+
+	/** 获取所有在线玩家档案 */
+	getAllProfiles(): OnlineProfile[] {
+		return Array.from(this.profiles.values());
 	}
 
 	/** 根据 shortId 获取 sessionId */

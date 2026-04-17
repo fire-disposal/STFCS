@@ -22,7 +22,10 @@ export function registerHttpRoutes(app: Express): void {
 		try {
 			const rooms = await matchMaker.query({ name: "battle" });
 
-			res.json(rooms.map((room) => toMatchmakeRoomDto(room)));
+			// 过滤空房间（clients === 0），避免显示不可加入的房间
+			const activeRooms = rooms.filter((room) => room.clients > 0);
+
+			res.json(activeRooms.map((room) => toMatchmakeRoomDto(room)));
 		} catch (error) {
 			console.error("[Server] Error in /matchmake:", error);
 			res.json([]);

@@ -12,8 +12,8 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import { notify } from "@/ui/shared/Notification";
-import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible, SIZE_COMPATIBILITY } from "@vt/data";
-import type { ShipHullSpec, WeaponSpec, WeaponSlotSizeValue } from "@vt/data";
+import { getShipHullSpec, getWeaponSpec, isWeaponSizeCompatible, isWeaponCategoryCompatible, isWeaponMountTypeCompatible, SIZE_COMPATIBILITY, SLOT_CATEGORY_COMPATIBILITY } from "@vt/data";
+import type { ShipHullSpec, WeaponSpec, WeaponSlotSizeValue, SlotCategoryValue } from "@vt/data";
 import { GameClient } from "@/sync/GameClient";
 import type { ConfigureWeaponPayload } from "@vt/schema-types";
 import {
@@ -127,8 +127,11 @@ export const WeaponSelectorPanel: React.FC<WeaponSelectorPanelProps> = ({
 			// 尺寸兼容
 			if (!isWeaponSizeCompatible(mount.size, weapon.size)) return false;
 
-			// 类型限制
-			if (mount.restrictedTypes && !mount.restrictedTypes.includes(weapon.category)) return false;
+			// 类别兼容（远行星号机制）
+			if (!isWeaponCategoryCompatible(mount.slotCategory, weapon.category)) return false;
+
+			// 形态兼容（远行星号机制）
+			if (!isWeaponMountTypeCompatible(mount.acceptsTurret, mount.acceptsHardpoint, weapon.mountType)) return false;
 
 			return true;
 		});
@@ -259,7 +262,7 @@ export const WeaponSelectorPanel: React.FC<WeaponSelectorPanelProps> = ({
 						>
 							<span className="weapon-selector__mount-size">{mount.size}</span>
 							<span className="weapon-selector__mount-id">{mount.id}</span>
-							<span className="weapon-selector__mount-type">{mount.type}</span>
+							<span className="weapon-selector__mount-type">{mount.slotCategory.replace("_SLOT", "")}</span>
 							{currentWeapon && (
 								<span className="weapon-selector__mount-current">
 									{currentWeapon.name}

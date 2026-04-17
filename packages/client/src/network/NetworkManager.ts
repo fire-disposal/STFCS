@@ -153,15 +153,22 @@ export class NetworkManager {
 
 	/** 离开房间 */
 	async leaveRoom(): Promise<void> {
+		// 立即清除状态（避免返回大厅时状态不一致）
 		this.lastRoomId = null;
 		this.lastPlayerName = null;
 		this.reconnectAttempts = 0;
 		this.isReconnecting = false;
+		this.playerShortId = null;
 
-		if (!this.currentRoom) return;
+		// 保存引用后立即清除（onLeave 回调可能延迟触发）
+		const room = this.currentRoom;
+		this.currentRoom = null;
+		this.gameClient = null;
+
+		if (!room) return;
 
 		try {
-			await this.currentRoom.leave();
+			await room.leave();
 		} catch (error) {
 			console.warn("[NetworkManager] leaveRoom error:", error);
 		}
@@ -311,7 +318,10 @@ export class NetworkManager {
 				window.dispatchEvent(new CustomEvent("stfcs-game-loaded", { detail: { saveId, saveName } }));
 			}
 		});
-
+		// 监听 PROFILE_UPDATED（档案更新确认）
+		room.onMessage("PROFILE_UPDATED", (payload: unknown) => {
+			window.dispatchEvent(new CustomEvent("stfcs-profile-updated", { detail: payload }));
+		});
 		// 监听业务错误
 		room.onMessage("error", (payload: unknown) => {
 			const message =
@@ -321,6 +331,16 @@ export class NetworkManager {
 						? payload
 						: "未知错误";
 			window.dispatchEvent(new CustomEvent("stfcs-room-error", { detail: message }));
+		});
+
+		// 监听可攻击目标查询结果（单武器）
+		room.onMessage("ATTACKABLE_TARGETS_RESULT", (payload: unknown) => {
+			window.dispatchEvent(new CustomEvent("stfcs-attackable-targets", { detail: payload }));
+		});
+
+		// 监听批量可攻击目标查询结果（舰船选中时）
+		room.onMessage("ALL_ATTACKABLE_TARGETS_RESULT", (payload: unknown) => {
+			window.dispatchEvent(new CustomEvent("stfcs-all-attackable-targets", { detail: payload }));
 		});
 
 		// 监听连接断开 - 触发自动重连

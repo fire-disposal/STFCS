@@ -16,6 +16,7 @@ import GamePage from "@/pages/GamePage";
 import { NetworkManager, type RoomInfo } from "@/network/NetworkManager";
 import { SystemService } from "@/services/SystemService";
 import { userService } from "@/services/UserService";
+import { usePlayerProfile } from "@/sync";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
 type AppState = "auth" | "lobby" | "game";
@@ -26,10 +27,23 @@ const App: React.FC = () => {
 	const networkManagerRef = useRef<NetworkManager | null>(null);
 	const systemServiceRef = useRef<SystemService | null>(null);
 	const [userName, setUserName] = useState<string>("");
+	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string } | null>(null);
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [pendingInviteRoomId, setPendingInviteRoomId] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const roomsUnsubscribeRef = useRef<(() => void) | null>(null);
+
+	// 初始化数据源
+	const currentRoom = networkManager?.getCurrentRoom() || null;
+	const syncedProfile = usePlayerProfile(currentRoom);
+
+	// 当进入房间后，使用从服务器同步回来的最新档案
+	useEffect(() => {
+		if (appState === "game" && syncedProfile.nickname) {
+			setUserProfile(syncedProfile);
+			setUserName(syncedProfile.nickname);
+		}
+	}, [appState, syncedProfile]);
 
 	// 初始化
 	useEffect(() => {
@@ -44,6 +58,7 @@ const App: React.FC = () => {
 		const restoredName = userService.restoreUsername();
 		if (restoredName) {
 			setUserName(restoredName);
+			setUserProfile({ nickname: restoredName, avatar: "" });
 			setAppState("lobby");
 			notify.success(`欢迎回来，${restoredName}！`);
 		}
@@ -63,12 +78,26 @@ const App: React.FC = () => {
 		if (!systemServiceRef.current || appState !== "lobby") return;
 
 		const systemService = systemServiceRef.current;
+		const currentUserName = networkManagerRef.current?.getProfile()?.nickname || userName;
+
 		systemService
 			.connect()
-			.then(() => {
+			.then(async () => {
 				const unsubscribe = systemService.subscribeRooms(setRooms);
 				systemService.requestRooms();
 				roomsUnsubscribeRef.current = unsubscribe;
+
+				// 从全局档案服务加载已保存的档案（仅首次加载）
+				if (currentUserName && !userProfile?.avatar) {
+					try {
+						const profile = await systemService.getProfile(currentUserName);
+						if (profile.avatar) {
+							setUserProfile({ nickname: profile.nickname, avatar: profile.avatar });
+						}
+					} catch (error) {
+						console.warn("[App] Failed to load profile from SystemService:", error);
+					}
+				}
 			})
 			.catch((error) => {
 				console.error("[App] SystemService connection error:", error);
@@ -83,13 +112,29 @@ const App: React.FC = () => {
 		const handleBusinessError = (event: CustomEvent<string>) => {
 			notify.error(event.detail);
 		};
+		const handleProfileUpdated = (event: CustomEvent<{ success: boolean; nickname: string; avatar: string }>) => {
+			if (event.detail.success) {
+				notify.success("玩家档案已持久化保存");
+				// 同步本地状态（确保与后端一致）
+				setUserProfile({
+					nickname: event.detail.nickname,
+					avatar: event.detail.avatar,
+				});
+				setUserName(event.detail.nickname);
+			}
+		};
 		window.addEventListener("stfcs-room-error", handleBusinessError as EventListener);
-		return () => window.removeEventListener("stfcs-room-error", handleBusinessError as EventListener);
+		window.addEventListener("stfcs-profile-updated", handleProfileUpdated as EventListener);
+		return () => {
+			window.removeEventListener("stfcs-room-error", handleBusinessError as EventListener);
+			window.removeEventListener("stfcs-profile-updated", handleProfileUpdated as EventListener);
+		};
 	}, []);
 
 	// 认证成功
 	const handleAuthenticated = useCallback((username: string) => {
 		setUserName(username);
+		setUserProfile({ nickname: username, avatar: "" });
 		userService.setUsername(username);
 		setAppState("lobby");
 		notify.success(`欢迎，${username}！`);
@@ -165,13 +210,38 @@ const App: React.FC = () => {
 		notify.info("已返回大厅");
 	}, []);
 
-	// 更新玩家档案
-	const handleUpdateProfile = useCallback((profile: { nickname?: string; avatar?: string }) => {
-		const gameClient = networkManagerRef.current?.getGameClient();
-		gameClient?.sendUpdateProfile(profile);
+	// 更新玩家档案（支持大厅和游戏房间两种场景）
+	const handleUpdateProfile = useCallback(
+		async (profile: { nickname?: string; avatar?: string }) => {
+			// 在游戏房间内：使用 GameClient（房间内同步）
+			const gameClient = networkManagerRef.current?.getGameClient();
+			if (gameClient) {
+				gameClient.sendUpdateProfile(profile);
+				return;
+			}
+
+			// 在大厅：使用 SystemService（全局档案）
+			if (systemServiceRef.current && userName) {
+				try {
+					await systemServiceRef.current.updateProfile(userName, profile);
+					// 成功后会通过 PROFILE_UPDATED 事件触发 UI 更新
+				} catch (error) {
+					notify.error(error instanceof Error ? error.message : "更新档案失败");
+				}
+			}
+		},
+		[userName]
+	);
+
+	// 刷新房间列表
+	const handleRefresh = useCallback(() => {
+		systemServiceRef.current?.requestRooms().catch((error) => {
+			console.error("[App] Failed to refresh rooms:", error);
+			notify.error("刷新房间列表失败");
+		});
 	}, []);
 
-	// 删除房间
+	// 删除房间（远程删除自己拥有的房间）
 	const handleDeleteRoom = useCallback(async (roomId: string) => {
 		const nm = networkManagerRef.current;
 		const ss = systemServiceRef.current;
@@ -182,17 +252,11 @@ const App: React.FC = () => {
 		}
 
 		try {
-			if (nm.getCurrentRoomId() === roomId) {
-				const gameClient = nm.getGameClient();
-				gameClient?.sendDissolveRoom();
-				setAppState("lobby");
-			} else {
-				// 远程删除需要 shortId，从房间列表获取
-				const room = rooms.find(r => r.roomId === roomId);
-				if (room?.metadata?.ownerShortId) {
-					await ss.deleteRoom(roomId, room.metadata.ownerShortId);
-					nm.clearRoomState(roomId);
-				}
+			// 远程删除需要 shortId，从房间列表获取
+			const room = rooms.find(r => r.roomId === roomId);
+			if (room?.metadata?.ownerShortId) {
+				await ss.deleteRoom(roomId, room.metadata.ownerShortId);
+				nm.clearRoomState(roomId);
 			}
 			notify.success("房间已删除");
 		} catch (e) {
@@ -212,15 +276,14 @@ const App: React.FC = () => {
 			{appState === "lobby" && (
 				<LobbyPage
 					playerName={userName}
-					profile={networkManager.getProfile() ?? { nickname: userName, avatar: "👤" }}
+					profile={userProfile ?? { nickname: userName, avatar: "" }}
 					currentShortId={networkManager.getShortId()}
-					currentRoomId={networkManager.getCurrentRoomId()}
 					rooms={rooms}
 					isLoading={isLoading}
 					onCreateRoom={handleCreateRoom}
 					onJoinRoom={handleJoinRoom}
 					onDeleteRoom={handleDeleteRoom}
-					onRefresh={() => systemServiceRef.current?.requestRooms()}
+					onRefresh={handleRefresh}
 					onLogout={handleLogout}
 					onUpdateProfile={handleUpdateProfile}
 				/>

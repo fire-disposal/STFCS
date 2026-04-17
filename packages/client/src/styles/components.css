@@ -1299,14 +1299,25 @@
 
 .lobby-user-bar {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: center;
 }
 
 .lobby-user-name {
-  font-size: 15px;
-  color: #8fbfd4;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.lobby-avatar--small {
+  width: 42px;
+  height: 42px;
+  font-size: 24px;
+  border-width: 2px;
 }
 
 .lobby-main {
@@ -1597,6 +1608,46 @@
   gap: 8px;
   margin: 16px 0;
   flex-wrap: wrap;
+}
+
+.lobby-avatar-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(74, 158, 255, 0.1);
+}
+
+.lobby-avatar-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 40, 71, 0.5);
+  border: 2px solid var(--color-primary);
+  border-radius: 0; /* 移除圆角 */
+  overflow: hidden;
+}
+
+.lobby-avatar--small {
+  width: 42px;
+  height: 42px;
+  font-size: 24px;
+  border-width: 2px;
+}
+
+.lobby-avatar--large {
+  width: 80px;
+  height: 80px;
+  font-size: 40px;
+  box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+.lobby-avatar-display img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .lobby-avatar-btn {
