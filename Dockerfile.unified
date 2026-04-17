@@ -1,4 +1,6 @@
 FROM node:24-alpine AS base
+# 增加 libc6-compat 解决 turbo 在 alpine 上的 254 退出码问题
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
@@ -23,33 +25,31 @@ COPY packages/schema-types ./packages/schema-types
 COPY packages/client ./packages/client
 
 # 利用 Turbo 进行全量构建
-# Turbo 会自动根据 package.json 中的依赖关系计算构建顺序
-# 并并行构建互不依赖的包
-RUN pnpm turbo build
+# 设置 CI 环境变量以禁用 daemon 并防止 254 退出码
+ENV CI=1
+RUN pnpm run build
 
 # Final runtime stage
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=2567
 
-# 复制完整的项目结构（不含源码），以保持 pnpm 的符号链接逻辑
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# 复制 deps 阶段的完整依赖基础结构（包含各个 package 的 node_modules 和 package.json）
+# 这能完美保持 pnpm 的符号链接结构
+COPY --from=deps /app /app
 
-# 复制构建后的产物
-COPY --from=builder /app/packages/server/dist ./packages/server/dist
-COPY --from=builder /app/packages/data/dist ./packages/data/dist
-COPY --from=builder /app/packages/rules/dist ./packages/rules/dist
+# 从 builder 补充 root package.json
+COPY --from=builder /app/package.json /app/package.json
+
+# 复制构建后的产物，覆盖到原来的目录中
+COPY --from=builder /app/packages/server/dist /app/packages/server/dist
+COPY --from=builder /app/packages/data/dist /app/packages/data/dist
+COPY --from=builder /app/packages/rules/dist /app/packages/rules/dist
 
 # 托管前端
-COPY --from=builder /app/packages/client/dist ./packages/server/dist/public
+COPY --from=builder /app/packages/client/dist /app/packages/server/dist/public
 
 WORKDIR /app/packages/server
-EXPOSE 2567
-
-# 移除重复的 CMD
-CMD ["node", "dist/index.js"]
-
 EXPOSE 2567
 
 CMD ["node", "dist/index.js"]
