@@ -22,10 +22,16 @@ COPY packages/schema-types ./packages/schema-types
 COPY packages/client ./packages/client
 
 # Build all packages
+# 关键：调整构建顺序以解决循环依赖
+# 1. 基础包
 RUN pnpm --filter @vt/data build && \
-    pnpm --filter @vt/rules build && \
-    pnpm --filter @vt/schema-types build && \
-    pnpm --filter @vt/server build && \
+    pnpm --filter @vt/rules build
+
+# 2. 先生成 server 的 .d.ts，让 schema-types 能够推导类型
+RUN pnpm --filter @vt/server build
+
+# 3. 构建 schema-types 和客户端
+RUN pnpm --filter @vt/schema-types build && \
     pnpm --filter client build
 
 # Final runtime stage
