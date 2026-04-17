@@ -89,12 +89,14 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
 	// 引用
 	const inputRef = useRef<HTMLInputElement>(null);
 	const isExternalChange = useRef(false);
+	
+	// 存储上次的坐标值，避免不必要的更新
+	const lastDisplayValueRef = useRef<string>("");
 
 	// 格式化当前坐标
 	const formatCurrentCoords = useCallback(() => {
 		const r = Number(viewRotation.toFixed(2));
 		const z = zoom.toFixed(2);
-		// 显示完整坐标 X,Y,R,Z
 		return `${Math.round(cameraX)},${Math.round(cameraY)},${r},${z}`;
 	}, [cameraX, cameraY, viewRotation, zoom]);
 
@@ -239,6 +241,7 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
 	}, []);
 
 	// 监听外部坐标变化（摄像机移动）
+	// 使用 ref 存储上次值，避免微小变化导致频繁更新
 	useEffect(() => {
 		if (isExternalChange.current) {
 			isExternalChange.current = false;
@@ -246,11 +249,19 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
 		}
 
 		// 只在 IDLE 状态下才同步外部坐标变化
-		// 如果用户正在编辑（EDITING/VALID/INVALID），不要覆盖用户输入
-		if (state === "IDLE") {
-			setInputValue(formatCurrentCoords());
+		if (state !== "IDLE") {
+			return;
 		}
-	}, [cameraX, cameraY, viewRotation, zoom, formatCurrentCoords, state]);
+
+		// 计算新值
+		const newValue = formatCurrentCoords();
+		
+		// 只有当显示值真正变化时才更新（避免微小浮点变化触发）
+		if (newValue !== lastDisplayValueRef.current) {
+			lastDisplayValueRef.current = newValue;
+			setInputValue(newValue);
+		}
+	}, [state, cameraX, cameraY, viewRotation, zoom]);
 
 	// 初始化
 	useEffect(() => {

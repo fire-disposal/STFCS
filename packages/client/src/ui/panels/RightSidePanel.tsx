@@ -52,7 +52,9 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 }) => {
 	const [activeTab, setActiveTab] = useState<TabId>("view");
 	const [isCollapsed, setIsCollapsed] = useState(false);
-	const { cameraPosition, zoom, viewRotation, setCameraPosition, setViewRotation, setZoom } =
+
+	// 合并 useUIStore 调用
+	const { cameraPosition, zoom, viewRotation, setCameraPosition, setViewRotation, setZoom, mapCursor } =
 		useUIStore();
 
 	const cameraAnimation = useCameraAnimation({
@@ -64,8 +66,6 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 		currentRotation: viewRotation,
 		currentZoom: zoom,
 	});
-
-	const { mapCursor } = useUIStore();
 
 	const tabs: TabDef[] = [
 		{ id: "view", label: "视图", Icon: Monitor },

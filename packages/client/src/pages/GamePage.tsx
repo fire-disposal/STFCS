@@ -46,8 +46,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		undefined
 	);
 	const mapSectionRef = useRef<HTMLDivElement | null>(null);
-	const selectedShipId = useGameStore((state) => state.selectedShipId);
-	const selectShip = useGameStore((state) => state.selectShip);
+	const selectedShipId = useUIStore((state) => state.selectedShipId);
+	const selectShip = useUIStore((state) => state.selectShip);
 
 	// 注意：不需要手动监听 ship_created/ship_destroyed
 	// Colyseus 的 MapSchema 会自动同步状态变化并触发 React 更新
@@ -106,20 +106,28 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		showMovementRange,
 	} = useUIStore();
 
-	// 地图控制
+	// 地图控制 - 使用 ref 存储当前位置避免无限循环
+	const cameraPositionRef = useRef(cameraPosition);
+	cameraPositionRef.current = cameraPosition;
+
 	const handleMapPan = useCallback(
 		(deltaX: number, deltaY: number) => {
 			const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotation);
-			setCameraPosition(cameraPosition.x - worldDelta.x, cameraPosition.y - worldDelta.y);
+			const { x, y } = cameraPositionRef.current;
+			setCameraPosition(x - worldDelta.x, y - worldDelta.y);
 		},
-		[cameraPosition.x, cameraPosition.y, setCameraPosition, zoom, viewRotation]
+		[setCameraPosition, zoom, viewRotation]
 	);
+
+	// 视图旋转 ref
+	const viewRotationRef = useRef(viewRotation);
+	viewRotationRef.current = viewRotation;
 
 	const handleMapRotate = useCallback(
 		(delta: number) => {
-			setViewRotation(normalizeRotation(viewRotation + delta));
+			setViewRotation(normalizeRotation(viewRotationRef.current + delta));
 		},
-		[viewRotation, setViewRotation]
+		[setViewRotation]
 	);
 
 	// 命令发送

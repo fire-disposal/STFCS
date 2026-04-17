@@ -63,6 +63,9 @@ export const CursorCoordinateInput: React.FC<CursorCoordinateInputProps> = ({
 
 	const inputRef = useRef<HTMLInputElement>(null);
 	const isExternalChange = useRef(false);
+	
+	// 存储上次的显示值，避免不必要的更新
+	const lastDisplayValueRef = useRef<string>("");
 
 	const formatCurrentCoords = useCallback(() => {
 		if (cursorX === null || cursorY === null) {
@@ -164,10 +167,19 @@ export const CursorCoordinateInput: React.FC<CursorCoordinateInputProps> = ({
 			return;
 		}
 
-		if (state === "IDLE") {
-			setInputValue(formatCurrentCoords());
+		if (state !== "IDLE") {
+			return;
 		}
-	}, [cameraX, cameraY, cursorX, cursorY, formatCurrentCoords, state]);
+
+		// 计算新值
+		const newValue = formatCurrentCoords();
+		
+		// 只有当显示值真正变化时才更新
+		if (newValue !== lastDisplayValueRef.current) {
+			lastDisplayValueRef.current = newValue;
+			setInputValue(newValue);
+		}
+	}, [state, cameraX, cameraY, cursorX, cursorY, viewRotation]);
 
 	useEffect(() => {
 		setInputValue(formatCurrentCoords());
