@@ -197,7 +197,8 @@ const publicPath = path.resolve(__dirname, "public");
 app.use(express.static(publicPath));
 
 // 处理 SPA 路由，确保刷新页面不 404
-app.get("*", (req, res, next) => {
+// Express 5 + path-to-regexp 8.x 要求使用 {*path} 语法替代 *
+app.get("{*path}", (req, res, next) => {
 	// 如果是 API 或 Colyseus 请求，跳过
 	if (req.url.startsWith("/matchmake") || req.url.startsWith("/health")) {
 		return next();
