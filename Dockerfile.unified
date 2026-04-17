@@ -6,7 +6,7 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Dependency stage
 FROM base AS deps
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/data/package.json ./packages/data/
 COPY packages/rules/package.json ./packages/rules/
 COPY packages/server/package.json ./packages/server/
