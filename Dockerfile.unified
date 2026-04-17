@@ -39,17 +39,22 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=2567
 
-# Copy server build results
-COPY --from=builder /app/packages/server/dist ./dist
-COPY --from=builder /app/packages/server/package.json ./package.json
-
-# Copy necessary dependencies for production
+# 复制完整的项目结构（不含源码），以保持 pnpm 的符号链接逻辑
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/data/node_modules ./packages/data/node_modules
-COPY --from=deps /app/packages/server/node_modules ./packages/server/node_modules
+COPY --from=builder /app/package.json ./package.json
 
-# Integrated Frontend: Copy client dist to server's public folder
-COPY --from=builder /app/packages/client/dist ./dist/public
+# 复制构建后的产物
+COPY --from=builder /app/packages/server/dist ./packages/server/dist
+COPY --from=builder /app/packages/data/dist ./packages/data/dist
+COPY --from=builder /app/packages/rules/dist ./packages/rules/dist
+
+# 托管前端
+COPY --from=builder /app/packages/client/dist ./packages/server/dist/public
+
+WORKDIR /app/packages/server
+EXPOSE 2567
+
+CMD ["node", "dist/index.js"]
 
 EXPOSE 2567
 
