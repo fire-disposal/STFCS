@@ -14,25 +14,18 @@ RUN pnpm install --frozen-lockfile
 
 # Build stage
 FROM deps AS builder
-COPY tsconfig.base.json ./
+COPY tsconfig.base.json turbo.json ./
+COPY package.json ./
 COPY packages/data ./packages/data
 COPY packages/rules ./packages/rules
 COPY packages/server ./packages/server
 COPY packages/schema-types ./packages/schema-types
 COPY packages/client ./packages/client
 
-# Build all packages
-# 关键：调整构建顺序以解决循环依赖
-# 1. 基础包
-RUN pnpm --filter @vt/data build && \
-    pnpm --filter @vt/rules build
-
-# 2. 先生成 server 的 .d.ts，让 schema-types 能够推导类型
-RUN pnpm --filter @vt/server build
-
-# 3. 构建 schema-types 和客户端
-RUN pnpm --filter @vt/schema-types build && \
-    pnpm --filter client build
+# 利用 Turbo 进行全量构建
+# Turbo 会自动根据 package.json 中的依赖关系计算构建顺序
+# 并并行构建互不依赖的包
+RUN pnpm turbo build
 
 # Final runtime stage
 FROM base AS runner
@@ -54,6 +47,7 @@ COPY --from=builder /app/packages/client/dist ./packages/server/dist/public
 WORKDIR /app/packages/server
 EXPOSE 2567
 
+# 移除重复的 CMD
 CMD ["node", "dist/index.js"]
 
 EXPOSE 2567
