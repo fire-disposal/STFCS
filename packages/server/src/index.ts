@@ -166,6 +166,8 @@ export {
 
 // 服务器启动代码
 import { createServer } from "http";
+import path from "path";
+import { fileURLToPath } from "url";
 import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import cors from "cors";
@@ -175,6 +177,9 @@ import { SaveRoom } from "./rooms/SaveRoom.js";
 import { SystemRoom } from "./rooms/SystemRoom.js";
 import { registerHttpRoutes } from "./http/registerRoutes.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const PORT = process.env.PORT || 2567;
 const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(",") || "*";
 
@@ -182,7 +187,28 @@ const app = express();
 app.use(cors({ origin: CORS_ORIGINS === "*" ? true : CORS_ORIGINS, credentials: true }));
 app.use(express.json());
 app.set("startedAt", Date.now());
+
+// 注册 API 路由
 registerHttpRoutes(app);
+
+// 单容器部署：托管前端静态文件
+// 注意：在 Docker 中我们将 client/dist 复制到 server/public
+const publicPath = path.resolve(__dirname, "public");
+app.use(express.static(publicPath));
+
+// 处理 SPA 路由，确保刷新页面不 404
+app.get("*", (req, res, next) => {
+	// 如果是 API 或 Colyseus 请求，跳过
+	if (req.url.startsWith("/matchmake") || req.url.startsWith("/health")) {
+		return next();
+	}
+	res.sendFile(path.join(publicPath, "index.html"), (err) => {
+		if (err) {
+			// 如果 index.html 不存在（例如 Node 直接运行时），交给后续处理
+			next();
+		}
+	});
+});
 
 const server = createServer(app);
 const gameServer = new Server({

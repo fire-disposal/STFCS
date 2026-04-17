@@ -82,7 +82,7 @@ jobs:
           echo "client_image=${LOWERED}-client" >> $GITHUB_OUTPUT
 
   build:
-    name: Build & Push Images
+    name: Build & Push Image
     needs: prepare
     runs-on: ubuntu-latest
     permissions:
@@ -101,34 +101,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Server
+      - name: Build and push Unified App
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./packages/server/Dockerfile
+          file: ./Dockerfile.unified
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/fire-disposal/stfcs-app:latest
+            ${{ env.REGISTRY }}/fire-disposal/stfcs-app:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Build and push Client
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./packages/client/Dockerfile
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            COMMIT_SHA=${{ github.sha }}
 
   deploy:
-    needs: [prepare, build]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: webfactory/ssh-agent@v0.9.0
@@ -141,17 +127,14 @@ jobs:
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             docker system prune -af
-            docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            docker pull ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-            docker rm -f stfcs-server stfcs-client || true
+            docker pull ghcr.io/fire-disposal/stfcs-app:latest
+            docker rm -f stfcs-app || true
             docker network create stfcs-network 2>/dev/null || true
-            docker run -d --name stfcs-server --restart unless-stopped --network stfcs-network \
-              -p 2567:2567 -e NODE_ENV=production -e PORT=2567 \
-              ${{ env.REGISTRY }}/${{ needs.prepare.outputs.server_image }}:latest
-            docker run -d --name stfcs-client --restart unless-stopped --network stfcs-network \
-              -p 3000:80 ${{ env.REGISTRY }}/${{ needs.prepare.outputs.client_image }}:latest
-            sleep 5
-            docker ps --filter name=stfcs
+            docker run -d --name stfcs-app --restart unless-stopped --network stfcs-network \
+              -p 2567:2567 -e NODE_ENV=production -e PORT=2567 -e CORS_ORIGINS=https://stfcs.205716.xyz \
+              ghcr.io/fire-disposal/stfcs-app:latest
+            sleep 10
+            docker ps --filter name=stfcs-app
           EOF
 
       - name: Health Check

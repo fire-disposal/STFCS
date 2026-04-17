@@ -6,16 +6,16 @@
 version: '3.8'
 
 services:
-  server:
-    image: ${SERVER_IMAGE:-ghcr.io/fire-disposal/stfcs-server}:${IMAGE_TAG:-latest}
-    container_name: stfcs-server
+  app:
+    image: ${APP_IMAGE:-ghcr.io/fire-disposal/stfcs-app}:${IMAGE_TAG:-latest}
+    container_name: stfcs-app
     restart: unless-stopped
     ports:
-      - "2567:2567"  # WebSocket and HTTP API
+      - "2567:2567"  # HTTP & WebSocket & Static Assets
     environment:
       - NODE_ENV=production
       - PORT=2567
-      - CORS_ORIGINS=https://stfcs.yourdomain.com
+      - CORS_ORIGINS=https://stfcs.205716.xyz
       - LOG_LEVEL=info
     networks:
       - stfcs-network
@@ -24,40 +24,7 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-
-  client:
-    image: ${CLIENT_IMAGE:-ghcr.io/fire-disposal/stfcs-client}:${IMAGE_TAG:-latest}
-    container_name: stfcs-client
-    restart: unless-stopped
-    ports:
-      - "80:80"  # HTTP
-    depends_on:
-      - server
-    networks:
-      - stfcs-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 128M
-        reservations:
-          cpus: '0.1'
-          memory: 64M
+      start_period: 15s
 
 networks:
   stfcs-network:

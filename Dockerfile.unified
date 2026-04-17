@@ -1,0 +1,50 @@
+FROM node:24-alpine AS base
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+
+# Dependency stage
+FROM base AS deps
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/data/package.json ./packages/data/
+COPY packages/rules/package.json ./packages/rules/
+COPY packages/server/package.json ./packages/server/
+COPY packages/schema-types/package.json ./packages/schema-types/
+COPY packages/client/package.json ./packages/client/
+RUN pnpm install --frozen-lockfile
+
+# Build stage
+FROM deps AS builder
+COPY tsconfig.base.json ./
+COPY packages/data ./packages/data
+COPY packages/rules ./packages/rules
+COPY packages/server ./packages/server
+COPY packages/schema-types ./packages/schema-types
+COPY packages/client ./packages/client
+
+# Build all packages
+RUN pnpm --filter @vt/data build && \
+    pnpm --filter @vt/rules build && \
+    pnpm --filter @vt/schema-types build && \
+    pnpm --filter @vt/server build && \
+    pnpm --filter client build
+
+# Final runtime stage
+FROM base AS runner
+ENV NODE_ENV=production
+ENV PORT=2567
+
+# Copy server build results
+COPY --from=builder /app/packages/server/dist ./dist
+COPY --from=builder /app/packages/server/package.json ./package.json
+
+# Copy necessary dependencies for production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/data/node_modules ./packages/data/node_modules
+COPY --from=deps /app/packages/server/node_modules ./packages/server/node_modules
+
+# Integrated Frontend: Copy client dist to server's public folder
+COPY --from=builder /app/packages/client/dist ./dist/public
+
+EXPOSE 2567
+
+CMD ["node", "dist/index.js"]
