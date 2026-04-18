@@ -1,0 +1,32 @@
+{
+	"$schema": "server-config-v1",
+	"$version": "1.0.0",
+	"description": "STFCS 服务器配置",
+
+	"game": {
+		"turnDurationSeconds": 10,
+		"defaultCooldown": 5,
+		"mapDefaultWidth": 2000,
+		"mapDefaultHeight": 2000,
+		"maxShipsPerRoom": 100,
+		"autoSaveInterval": 0,
+		"description": "游戏核心参数"
+	},
+
+	"room": {
+		"maxPlayers": 8,
+		"maxClientsLimit": 16,
+		"minClients": 2,
+		"emptyRoomTtlMs": 30000,
+		"ownerLeaveTtlMs": 300000,
+		"simulationIntervalMs": 50,
+		"description": "房间参数"
+	},
+
+	"connection": {
+		"reconnectionTimeoutMs": 60000,
+		"pingIntervalMs": 5000,
+		"heartbeatTimeoutMs": 15000,
+		"description": "连接参数"
+	}
+}

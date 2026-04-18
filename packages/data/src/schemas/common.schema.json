@@ -1,0 +1,98 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "common-v1",
+	"title": "STFCS Common Types",
+	"description": "通用类型定义，被其他Schema引用",
+
+	"definitions": {
+		"Texture": {
+			"type": "object",
+			"description": "贴图配置",
+			"required": ["sourceType"],
+			"properties": {
+				"sourceType": {
+					"type": "string",
+					"enum": ["url", "uploaded", "preset", "none"],
+					"description": "贴图来源类型"
+				},
+				"source": {
+					"type": "string",
+					"description": "贴图来源（URL或Base64数据）"
+				},
+				"transparentColor": {
+					"type": "string",
+					"description": "透明色（如 #FFFFFF）",
+					"pattern": "^#[0-9A-Fa-f]{6}$"
+				},
+				"transparencyTolerance": {
+					"type": "number",
+					"minimum": 0,
+					"maximum": 255,
+					"description": "透明色容差"
+				},
+				"offsetX": {
+					"type": "number",
+					"default": 0,
+					"description": "贴图X偏移"
+				},
+				"offsetY": {
+					"type": "number",
+					"default": 0,
+					"description": "贴图Y偏移"
+				},
+				"scale": {
+					"type": "number",
+					"default": 1.0,
+					"minimum": 0.1,
+					"maximum": 10,
+					"description": "缩放比例"
+				}
+			},
+			"additionalProperties": false
+		},
+		"Faction": {
+			"type": "string",
+			"enum": ["PLAYER", "ENEMY", "NEUTRAL"],
+			"description": "派系"
+		},
+		"FluxState": {
+			"type": "string",
+			"enum": ["NORMAL", "HIGH", "OVERLOADED", "VENTING"],
+			"description": "辐能状态"
+		},
+
+		"Metadata": {
+			"type": "object",
+			"description": "通用元数据",
+			"required": ["name"],
+			"properties": {
+				"name": {
+					"type": "string",
+					"description": "名称"
+				},
+				"description": {
+					"type": "string",
+					"description": "描述"
+				},
+				"author": {
+					"type": "string",
+					"description": "创建者"
+				},
+				"createdAt": {
+					"type": "integer",
+					"description": "创建时间戳"
+				},
+				"updatedAt": {
+					"type": "integer",
+					"description": "更新时间戳"
+				},
+				"tags": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "标签列表"
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}
