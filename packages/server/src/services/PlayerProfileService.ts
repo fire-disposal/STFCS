@@ -3,6 +3,7 @@
  */
 
 import { MemoryStorage } from "../storage/MemoryStorage.js";
+import { AssetService } from "./AssetService.js";
 
 // 使用构建后的类型
 // 简化类型定义
@@ -14,7 +15,6 @@ type SaveListItem = any;
 type SaveExport = any;
 type ShipJSON = any;
 type WeaponJSON = any;
-type Asset = any;
 
 // 存档统计类型
 interface SaveStats {
@@ -768,7 +768,10 @@ export class PlayerProfileService {
     return new Blob([jsonString]).size;
   }
   
-  // ========== 资产上传 ==========
+  // ========== 资产上传（已迁移到AssetService） ==========
+  
+  // 注意：这些方法已迁移到AssetService
+  // 保留向后兼容的接口，实际调用AssetService
   
   async uploadAvatar(
     userId: string,
@@ -776,28 +779,9 @@ export class PlayerProfileService {
     filename: string,
     mimeType: string
   ): Promise<string> {
-    const assetId = `asset:avatar_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    
-    const asset: Asset = {
-      $schema: 'asset-v1',
-      $id: assetId,
-      type: 'avatar',
-      filename,
-      mimeType,
-      size: buffer.length,
-      ownerId: `player:${userId}`,
-      uploadedAt: Date.now(),
-      data: buffer
-    };
-    
-    await this.storage.saveAsset(asset);
-    
-    // 更新玩家头像引用
-    const profile = await this.getOrCreateProfile(userId);
-    profile.avatarAssetId = assetId;
-    await this.storage.savePlayer(profile);
-    
-    return assetId;
+    // 创建AssetService实例
+    const assetService = new AssetService(this.storage);
+    return assetService.uploadAvatar(userId, buffer, filename, mimeType);
   }
   
   async uploadShipTexture(
@@ -806,27 +790,15 @@ export class PlayerProfileService {
     filename: string,
     mimeType: string
   ): Promise<string> {
-    const assetId = `asset:ship_tex_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    
-    const asset: Asset = {
-      $schema: 'asset-v1',
-      $id: assetId,
-      type: 'ship_texture',
-      filename,
-      mimeType,
-      size: buffer.length,
-      ownerId: `player:${userId}`,
-      uploadedAt: Date.now(),
-      data: buffer
-    };
-    
-    await this.storage.saveAsset(asset);
-    return assetId;
+    // 创建AssetService实例
+    const assetService = new AssetService(this.storage);
+    return assetService.uploadShipTexture(userId, buffer, filename, mimeType);
   }
   
   async getAssetData(assetId: string): Promise<Buffer | null> {
-    const asset = await this.storage.getAsset(assetId);
-    return asset?.data || null;
+    // 创建AssetService实例
+    const assetService = new AssetService(this.storage);
+    return assetService.getAssetData(assetId);
   }
   
   // ========== 预设加载（简化实现） ==========

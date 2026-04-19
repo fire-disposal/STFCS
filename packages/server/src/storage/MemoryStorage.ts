@@ -162,6 +162,25 @@ export class MemoryStorage {
     return this.assets.delete(assetId);
   }
   
+  async listAssets(): Promise<Asset[]> {
+    return Array.from(this.assets.values());
+  }
+  
+  async listAssetsByOwner(ownerId: string): Promise<Asset[]> {
+    const allAssets = await this.listAssets();
+    return allAssets.filter(asset => asset.ownerId === ownerId);
+  }
+  
+  async listAssetsByType(type: string): Promise<Asset[]> {
+    const allAssets = await this.listAssets();
+    return allAssets.filter(asset => asset.type === type);
+  }
+  
+  async listPublicAssets(): Promise<Asset[]> {
+    const allAssets = await this.listAssets();
+    return allAssets.filter(asset => asset.visibility === 'public');
+  }
+  
   async getAssetsByOwner(ownerId: string): Promise<Asset[]> {
     return Array.from(this.assets.values())
       .filter(asset => asset.ownerId === ownerId);

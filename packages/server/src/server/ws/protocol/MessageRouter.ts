@@ -13,6 +13,11 @@ import type { RoomManager } from "../../rooms/RoomManager.js";
 import type { PlayerProfileService } from "../../../services/PlayerProfileService.js";
 import { PlayerProfileHandler } from "./PlayerProfileHandler.js";
 import { ObjectCreationHandler } from "./ObjectCreationHandler.js";
+import { AssetHandler } from "./AssetHandler.js";
+import { AssetService } from "../../../services/AssetService.js";
+
+// 导入游戏引擎模块
+import { calculateShipWeaponTargets } from "../../../core/engine/rules/targeting.js";
 
 const logger = createLogger("msg-router");
 
@@ -25,9 +30,15 @@ export class MessageRouter {
   private roomMgr: RoomManager;
   private profileHandler: PlayerProfileHandler | null = null;
   private objectCreationHandler: ObjectCreationHandler | null = null;
+  private assetHandler: AssetHandler | null = null;
   private handlers = new Map<string, HandlerFn>();
 
-  constructor(connMgr: ConnectionManager, roomMgr: RoomManager, profileService?: PlayerProfileService) {
+  constructor(
+    connMgr: ConnectionManager, 
+    roomMgr: RoomManager, 
+    profileService?: PlayerProfileService,
+    assetService?: AssetService
+  ) {
     this.connMgr = connMgr;
     this.roomMgr = roomMgr;
     
@@ -37,6 +48,11 @@ export class MessageRouter {
     
     // 初始化对象创建处理器
     this.objectCreationHandler = new ObjectCreationHandler(connMgr, roomMgr);
+    
+    // 初始化资产处理器
+    if (assetService) {
+      this.assetHandler = new AssetHandler(connMgr, assetService);
+    }
     
     this.registerDefaultHandlers();
   }
@@ -117,11 +133,33 @@ export class MessageRouter {
       this.register('SAVE_LIST', (conn, msg) => this.profileHandler!.handleListSaves(conn, msg));
     }
     
-    // 对象创建处理器
-    if (this.objectCreationHandler) {
-      this.register(MsgType.OBJECT_CREATE, (conn, msg) => this.objectCreationHandler!.handleObjectCreate(conn, msg));
-      this.register(MsgType.OBJECT_CREATE_FROM_PROFILE, (conn, msg) => this.objectCreationHandler!.handleCreateFromProfile(conn, msg));
-    }
+     // 对象创建处理器
+     if (this.objectCreationHandler) {
+       this.register(MsgType.OBJECT_CREATE, (conn, msg) => this.objectCreationHandler!.handleObjectCreate(conn, msg));
+       this.register(MsgType.OBJECT_CREATE_FROM_PROFILE, (conn, msg) => this.objectCreationHandler!.handleCreateFromProfile(conn, msg));
+     }
+     
+     // 资产处理器
+     if (this.assetHandler) {
+       this.register(MsgType.ASSET_UPLOAD, (conn, msg) => this.assetHandler!.handleUploadAsset(conn, msg));
+       this.register(MsgType.AVATAR_UPLOAD, (conn, msg) => this.assetHandler!.handleUploadAvatar(conn, msg));
+       this.register(MsgType.TEXTURE_UPLOAD, (conn, msg) => this.assetHandler!.handleUploadTexture(conn, msg));
+       this.register(MsgType.ASSET_GET, (conn, msg) => this.assetHandler!.handleGetAsset(conn, msg));
+       this.register(MsgType.ASSET_DATA, (conn, msg) => this.assetHandler!.handleGetAssetData(conn, msg));
+       this.register(MsgType.ASSET_INFO, (conn, msg) => this.assetHandler!.handleGetAssetInfo(conn, msg));
+       this.register(MsgType.ASSET_LIST, (conn, msg) => this.assetHandler!.handleListAssets(conn, msg));
+       this.register(MsgType.ASSET_STATS, (conn, msg) => this.assetHandler!.handleGetAssetStats(conn, msg));
+       this.register(MsgType.ASSET_UPDATE, (conn, msg) => this.assetHandler!.handleUpdateAsset(conn, msg));
+       this.register(MsgType.ASSET_DELETE, (conn, msg) => this.assetHandler!.handleDeleteAsset(conn, msg));
+       this.register(MsgType.ASSET_SHARE, (conn, msg) => this.assetHandler!.handleShareAsset(conn, msg));
+       this.register(MsgType.ASSET_MAKE_PUBLIC, (conn, msg) => this.assetHandler!.handleMakeAssetPublic(conn, msg));
+       this.register(MsgType.ASSET_MAKE_PRIVATE, (conn, msg) => this.assetHandler!.handleMakeAssetPrivate(conn, msg));
+       
+       // 头像特定操作
+       this.register(MsgType.AVATAR_GET, (conn, msg) => this.assetHandler!.handleGetUserAvatar(conn, msg));
+       this.register(MsgType.AVATAR_DATA, (conn, msg) => this.assetHandler!.handleGetUserAvatarData(conn, msg));
+       this.register(MsgType.AVATAR_LIST, (conn, msg) => this.assetHandler!.handleListUserAvatars(conn, msg));
+     }
   }
 
 	private handleRoomList = (conn: Connection, msg: WSMessage): void => {
@@ -258,7 +296,6 @@ export class MessageRouter {
 		}
 
 		// 导入目标计算模块
-		const { calculateShipWeaponTargets } = require("../../core/engine/rules/targeting.js");
 		const potentialTargets = room.getShipTokens();
 		const result = calculateShipWeaponTargets(attacker, potentialTargets);
 

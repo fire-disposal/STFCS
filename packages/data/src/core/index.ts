@@ -30,6 +30,11 @@ export type {
 // 资产类型
 export type {
   Asset,
+  AssetType,
+  AssetUploadRequest,
+  AssetListItem,
+  AssetFilter,
+  AssetStats
 } from "./AssetTypes.js";
 
 // 舰船类型

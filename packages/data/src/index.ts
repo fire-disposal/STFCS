@@ -36,6 +36,11 @@ export type {
   SaveExport,
   TextureRef,
   Asset,
+  AssetType,
+  AssetUploadRequest,
+  AssetListItem,
+  AssetFilter,
+  AssetStats,
 
 } from "./core/index.js";
 

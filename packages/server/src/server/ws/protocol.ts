@@ -102,6 +102,37 @@ export const MsgType = {
 	SAVE_IMPORTED: "save:imported",
 	SAVES_CLEANED: "saves:cleaned",
 	
+	// 资产/贴图管理
+	ASSET_UPLOAD: "asset:upload",
+	ASSET_UPLOADED: "asset:uploaded",
+	AVATAR_UPLOAD: "avatar:upload",
+	AVATAR_UPLOADED: "avatar:uploaded",
+	TEXTURE_UPLOAD: "texture:upload",
+	TEXTURE_UPLOADED: "texture:uploaded",
+	ASSET_GET: "asset:get",
+	ASSET_DETAILS: "asset:details",
+	ASSET_DATA: "asset:data",
+	ASSET_INFO: "asset:info",
+	ASSET_LIST: "asset:list",
+	ASSET_STATS: "asset:stats",
+	ASSET_UPDATE: "asset:update",
+	ASSET_UPDATED: "asset:updated",
+	ASSET_DELETE: "asset:delete",
+	ASSET_DELETED: "asset:deleted",
+	ASSET_SHARE: "asset:share",
+	ASSET_SHARED: "asset:shared",
+	ASSET_MAKE_PUBLIC: "asset:make_public",
+	ASSET_MADE_PUBLIC: "asset:made_public",
+	ASSET_MAKE_PRIVATE: "asset:make_private",
+	ASSET_MADE_PRIVATE: "asset:made_private",
+	
+	// 头像特定操作
+	AVATAR_GET: "avatar:get",
+	AVATAR_DETAILS: "avatar:details",
+	AVATAR_NOT_FOUND: "avatar:not_found",
+	AVATAR_DATA: "avatar:data",
+	AVATAR_LIST: "avatar:list",
+	
 	// 对象创建
 	OBJECT_CREATE: "object:create",
 	OBJECT_CREATED: "object:created",

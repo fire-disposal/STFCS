@@ -27,6 +27,8 @@ import {
   applyDamageToShip
 } from "./Token.js";
 
+import { processTurnEndFlux } from "../engine/modules/flux.js";
+
 import type { 
   ComponentState, 
   WeaponComponentState,
@@ -344,7 +346,6 @@ export class GameStateManager {
         const shipToken = token as ShipTokenState;
         if (!shipToken.runtime.destroyed) {
           // 使用 flux.ts 中的 processTurnEndFlux 函数
-          const { processTurnEndFlux } = require("../../engine/modules/flux.js");
           processTurnEndFlux(shipToken);
         }
       }
