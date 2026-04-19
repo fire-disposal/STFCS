@@ -10,7 +10,7 @@ import type { Texture, Metadata } from "./CommonJsonTypes.js";
 
 export type WeaponCategoryType = "BALLISTIC" | "ENERGY" | "MISSILE" | "SYNERGY";
 export type DamageTypeType = "KINETIC" | "HIGH_EXPLOSIVE" | "ENERGY" | "FRAGMENTATION";
-export type WeaponStateType = "READY" | "COOLDOWN" | "DISABLED";
+export type WeaponStateType = "READY" | "COOLDOWN" | "DISABLED" | "FIRED";
 export type WeaponTagType = "ANTI_SHIP" | "PD" | "GUIDED" | "BALLISTIC" | "ENERGY" | "HE" | "BEAM" | "SUPPRESSION";
 
 // ==================== 状态效果类型 ====================

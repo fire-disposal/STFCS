@@ -51,12 +51,12 @@ export class ActionHandler {
     // 验证Action数据
     if (this.config.validateActions) {
       const validation = this.validateActionData(actionData);
-      if (!validation.valid) {
-        return {
-          success: false,
-          error: validation.error,
-        };
-      }
+    if (!validation.valid) {
+      return {
+        success: false,
+        ...(validation.error && { error: validation.error }),
+      };
+    }
     }
 
     // 创建GameAction
@@ -213,7 +213,7 @@ export class ActionHandler {
   /**
    * 验证结束回合Action
    */
-  private validateEndTurnAction(payload: any): { valid: boolean; error?: string } {
+  private validateEndTurnAction(_payload: any): { valid: boolean; error?: string } {
     // END_TURN action通常不需要payload
     return { valid: true };
   }

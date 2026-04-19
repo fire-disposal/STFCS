@@ -4,7 +4,6 @@
  */
 
 import type { GameState, GameAction, GameEvent } from "../types/common.js";
-import type { ShipJSON, WeaponJSON } from "@vt/data";
 
 /**
  * 引擎执行上下文
@@ -53,7 +52,7 @@ export function createEngineContext(
     case "TOGGLE_SHIELD":
     case "VENT_FLUX":
       if (payload.shipId) {
-        const ship = state.ships.get(payload.shipId);
+        const ship = state.tokens.get(payload.shipId);
         if (ship) {
           context.ship = ship;
         }
@@ -62,13 +61,13 @@ export function createEngineContext(
     
     case "ATTACK":
       if (payload.attackerId) {
-        const attacker = state.ships.get(payload.attackerId);
+        const attacker = state.tokens.get(payload.attackerId);
         if (attacker) {
           context.ship = attacker;
         }
       }
       if (payload.targetId) {
-        const target = state.ships.get(payload.targetId);
+        const target = state.tokens.get(payload.targetId);
         if (target) {
           context.targetShip = target;
         }
@@ -100,7 +99,7 @@ export function applyStateUpdates(
     if (key.startsWith("ship:")) {
       // 更新舰船状态
       const shipId = key.substring(5);
-      const ship = newState.ships.get(shipId);
+      const ship = newState.tokens.get(shipId);
       if (ship) {
         Object.assign(ship, value);
       }

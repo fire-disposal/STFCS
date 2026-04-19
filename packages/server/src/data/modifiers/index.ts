@@ -2,8 +2,6 @@
  * 全局修正系统管理 - 基于 @vt/data 权威设计
  */
 
-import { getGameRules } from "@vt/data";
-
 /** 修正类型 */
 export type ModifierType = 
   | "RANGE"
@@ -65,9 +63,9 @@ export interface ActiveModifier {
   scope: ModifierScope;
   effects: ModifierEffect[];
   appliedAt: number; // 应用时间戳
-  expiresAt?: number; // 过期时间戳
+  expiresAt: number | undefined; // 过期时间戳
   stacks: number; // 当前叠加层数
-  source?: string; // 来源（如技能ID、装备ID等）
+  source: string | undefined; // 来源（如技能ID、装备ID等）
 }
 
 /** 修正系统管理器 */
@@ -83,14 +81,6 @@ export class ModifierSystem {
    * 初始化默认修正器
    */
   private initializeDefaultModifiers(): void {
-    // 从data包获取游戏规则
-    const gameRules = getGameRules();
-    const defaultModifiers = gameRules.modifiers || [];
-
-    for (const modifier of defaultModifiers) {
-      this.addModifier(modifier);
-    }
-
     // 添加一些基础修正器
     this.addModifier({
       id: "range_penalty_far",
@@ -164,7 +154,7 @@ export class ModifierSystem {
     const existingIndex = activeMods.findIndex(m => m.modifierId === modifierId);
     
     if (existingIndex >= 0) {
-      const existing = activeMods[existingIndex];
+      const existing = activeMods[existingIndex]!;
       
       if (modifier.stackable) {
         // 可叠加：增加层数

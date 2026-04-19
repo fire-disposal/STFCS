@@ -4,7 +4,7 @@
  */
 
 import type { Point } from "../../types/common.js";
-import { angleBetween, normalizeAngle } from "./angle.js";
+import { normalizeAngle } from "./angle.js";
 
 /**
  * 六象限定义
@@ -31,7 +31,7 @@ export function getQuadrantIndex(quadrant: Quadrant): number {
  * 获取象限名称
  */
 export function getQuadrantName(index: number): Quadrant {
-  return QUADRANTS[Math.max(0, Math.min(5, index))];
+  return QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
 }
 
 /**
@@ -137,7 +137,8 @@ export function calculateQuadrantWeights(
   
   for (let i = 0; i < armorValues.length; i++) {
     // 护甲越低，权重越高（更容易击穿）
-    const armorRatio = armorValues[i] / (totalArmor || 1);
+    const armorValue = armorValues[i] ?? 0;
+    const armorRatio = armorValue / (totalArmor || 1);
     const weight = 1.0 - armorRatio;
     weights.set(i, weight);
   }
@@ -158,8 +159,9 @@ export function getBestAttackQuadrant(
   for (let i = 0; i < armorValues.length; i++) {
     if (excludeQuadrants.includes(i)) continue;
     
-    if (armorValues[i] < lowestArmor) {
-      lowestArmor = armorValues[i];
+    const armorValue = armorValues[i] ?? Infinity;
+    if (armorValue < lowestArmor) {
+      lowestArmor = armorValue;
       bestQuadrant = i;
     }
   }
@@ -171,14 +173,14 @@ export function getBestAttackQuadrant(
  * 计算象限可见性（考虑障碍物）
  */
 export function calculateQuadrantVisibility(
-  attackerPosition: Point,
-  targetPosition: Point,
-  targetHeading: number,
-  obstacles: any[] = []
+  _attackerPosition: Point,
+  _targetPosition: Point,
+  _targetHeading: number,
+  _obstacles: any[] = []
 ): boolean[] {
   const visibility = Array(6).fill(true);
-  const attackAngle = angleBetween(attackerPosition, targetPosition);
-  const hitQuadrant = calculateHitQuadrant(attackAngle, targetHeading);
+  // const attackAngle = angleBetween(attackerPosition, targetPosition);
+  // const hitQuadrant = calculateHitQuadrant(attackAngle, targetHeading);
   
   // 简化：只检查命中象限是否被障碍物阻挡
   // TODO: 实现实际的视线检查

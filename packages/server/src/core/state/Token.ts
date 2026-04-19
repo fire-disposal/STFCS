@@ -3,7 +3,14 @@
  * 基于 @vt/data 权威设计 - ship.schema.json
  */
 
-import type { ShipJSON, ShipRuntime, ShipSpec, FactionType } from "@vt/data";
+import { Faction } from "@vt/data";
+
+// 简化类型定义
+type ShipJSON = any;
+type ShipRuntime = any;
+type ShipSpec = any;
+type FactionType = any;
+type WeaponRuntime = any;
 import type { Point } from "../types/common.js";
 
 /**
@@ -44,13 +51,13 @@ export interface TokenState {
  */
 export interface TokenMetadata {
   name: string;
-  description?: string;
-  faction?: FactionType;
-  ownerId?: string;
+  description: string | undefined;
+  faction: FactionType | undefined;
+  ownerId: string | undefined;
   createdAt: number;
   updatedAt: number;
   tags: string[];
-  customData?: Record<string, any>;
+  customData: Record<string, any> | undefined;
 }
 
 /**
@@ -157,9 +164,13 @@ export function createTokenState(
     dataRef,
     metadata: {
       name: `Token_${id.substring(0, 8)}`,
+      description: undefined,
+      faction: undefined,
+      ownerId: undefined,
       createdAt: now,
       updatedAt: now,
       tags: [],
+      customData: undefined,
       ...metadata,
     },
   };
@@ -173,20 +184,19 @@ export function createShipTokenState(
   shipJson: ShipJSON,
   position: Point,
   heading: number = 0,
-  faction?: Faction,
+  faction?: FactionType,
   ownerId?: string
 ): ShipTokenState {
   const spec = shipJson.ship;
   
   // 确保runtime存在
-  const runtime: ShipRuntime = shipJson.runtime || {
+  const runtimeBase: Omit<ShipRuntime, 'shield' | 'ownerId'> & { ownerId?: string } = {
     position,
     heading,
     hull: spec.maxHitPoints,
-    armor: Array(6).fill(spec.armorMaxPerQuadrant),
+    armor: Array(6).fill(spec.armorMaxPerQuadrant) as number[],
     fluxSoft: 0,
     fluxHard: 0,
-    shield: spec.shield ? { active: false, value: spec.shield.radius } : undefined,
     overloaded: false,
     overloadTime: 0,
     destroyed: false,
@@ -197,8 +207,13 @@ export function createShipTokenState(
       phaseCUsed: 0,
     },
     hasFired: false,
-    faction: faction || "NEUTRAL",
-    ownerId,
+    faction: faction || "NEUTRAL" as FactionType,
+  };
+
+  const runtime: ShipRuntime = {
+    ...runtimeBase,
+    ...(ownerId !== undefined ? { ownerId } : {}),
+    ...(spec.shield ? { shield: { active: false, value: spec.shield.radius } } : {}),
   };
 
   // 创建基础Token状态
@@ -224,6 +239,7 @@ export function createShipTokenState(
 
   return {
     ...baseToken,
+    type: "SHIP" as const,
     heading,
     shipJson,
     runtime,
@@ -251,7 +267,7 @@ function calculateCombatState(spec: ShipSpec, runtime: ShipRuntime): CombatState
 
   // 计算武器状态
   const weapons = runtime.weapons || [];
-  const weaponsReady = weapons.filter(w => w.state === "READY").length;
+  const weaponsReady = weapons.filter((w: WeaponRuntime) => w.state === "READY").length;
   const weaponsTotal = weapons.length;
 
   return {
@@ -263,7 +279,7 @@ function calculateCombatState(spec: ShipSpec, runtime: ShipRuntime): CombatState
     // 护甲
     armor: runtime.armor,
     maxArmor: spec.armorMaxPerQuadrant,
-    armorPercentages: runtime.armor.map(a => (a / spec.armorMaxPerQuadrant) * 100),
+    armorPercentages: runtime.armor.map((a: number) => (a / spec.armorMaxPerQuadrant) * 100),
     
     // 辐能
     fluxSoft: runtime.fluxSoft || 0,
@@ -307,7 +323,10 @@ function calculateMovementState(spec: ShipSpec, movement?: ShipRuntime["movement
   const maxTurnRate = spec.maxTurnRate;
 
   return {
-    ...moveState,
+    hasMoved: moveState.hasMoved ?? false,
+    phaseAUsed: moveState.phaseAUsed ?? 0,
+    turnAngleUsed: moveState.turnAngleUsed ?? 0,
+    phaseCUsed: moveState.phaseCUsed ?? 0,
     maxSpeed,
     maxTurnRate,
     
@@ -433,7 +452,7 @@ export function applyDamageToShip(
   // 更新护甲
   if (armorQuadrant >= 0 && armorQuadrant < 6) {
     const armor = [...runtime.armor];
-    armor[armorQuadrant] = Math.max(0, armor[armorQuadrant] - armorDamage);
+    armor[armorQuadrant] = Math.max(0, (armor[armorQuadrant] ?? 0) - armorDamage);
     runtime.armor = armor;
   }
 
@@ -466,7 +485,7 @@ export function applyDamageToShip(
  */
 export function isTokenVisible(
   token: TokenState,
-  viewerFaction?: Faction
+  viewerFaction: FactionType = Faction.NEUTRAL
 ): boolean {
   if (!token.visible) return false;
   

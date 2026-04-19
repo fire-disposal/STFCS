@@ -1,178 +1,161 @@
 /**
- * 纯WebSocket服务器入口
+ * 简化的 WebSocket 服务器入口
  */
 
 import { WebSocketServer, WebSocket } from "ws";
 import { createLogger } from "../../infra/simple-logger.js";
 import { ConnectionManager } from "./connection.js";
+import { RoomManager } from "../rooms/RoomManager.js";
+import { MessageRouter } from "./protocol/MessageRouter.js";
+import { MemoryStorage } from "../../storage/MemoryStorage.js";
+import { PlayerProfileService } from "../../services/PlayerProfileService.js";
 import type { IncomingMessage } from "http";
+import { MsgType } from "./protocol.js";
 
 export interface WSServerOptions {
-  port: number;
-  pingInterval?: number;
-  pingTimeout?: number;
-  maxPayload?: number;
+	port: number;
+	maxPayload?: number;
 }
 
-/** 纯WebSocket服务器 */
+/** 纯 WebSocket 服务器 */
 export class WSServer {
   private wss: WebSocketServer;
-  private connectionManager: ConnectionManager;
+  private connMgr: ConnectionManager;
+  private roomMgr: RoomManager;
+  private storage: MemoryStorage;
+  private profileService: PlayerProfileService;
+  private router: MessageRouter;
   private logger = createLogger("ws-server");
 
   constructor(options: WSServerOptions) {
-    const {
-      port,
-      pingInterval = 30000,
-      pingTimeout = 10000,
-      maxPayload = 10 * 1024 * 1024, // 10MB
-    } = options;
+    const { port, maxPayload = 10 * 1024 * 1024 } = options;
 
-    this.wss = new WebSocketServer({
-      port,
-      maxPayload,
-    });
+    this.wss = new WebSocketServer({ port, maxPayload });
+    this.logger.info(`WebSocket server on port ${port}`);
+
+    // 初始化存储和服务
+    this.storage = new MemoryStorage();
+    this.profileService = new PlayerProfileService(this.storage);
     
-    this.logger.info(`Pure WebSocket server listening on port ${port}`);
-    this.connectionManager = new ConnectionManager();
+    this.connMgr = new ConnectionManager();
+    this.roomMgr = new RoomManager(this.connMgr);
+    this.router = new MessageRouter(this.connMgr, this.roomMgr, this.profileService);
 
-    this.setupEventHandlers();
-    this.startHealthCheck(pingInterval, pingTimeout);
+    this.setupHandlers();
   }
 
-  /** 设置事件处理器 */
-  private setupEventHandlers(): void {
-    this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-      this.handleConnection(ws, req);
-    });
+	/** 设置事件处理器 */
+	private setupHandlers(): void {
+		this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+			this.handleConnection(ws, req);
+		});
 
-    this.wss.on("error", (error: Error) => {
-      this.logger.error("WebSocket server error", error);
-    });
+		this.wss.on("error", (err: Error) => {
+			this.logger.error("WS server error:", err);
+		});
+	}
 
-    this.wss.on("close", () => {
-      this.logger.info("WebSocket server closed");
-    });
-  }
+	/** 处理新连接 */
+	private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+		const ip = req.socket.remoteAddress || "unknown";
+		const playerName = `Player_${Math.random().toString(36).slice(2, 6)}`;
+		const id = this.connMgr.addConnection(ws, ip, playerName);
 
-  /** 处理新连接 */
-  private handleConnection(ws: WebSocket, req: IncomingMessage): void {
-    const clientIp = req.socket.remoteAddress || "unknown";
-    const connectionId = this.connectionManager.addConnection(ws, clientIp);
+		this.logger.info(`Connected: ${playerName} (${id})`);
 
-    this.logger.info(`New connection established`, {
-      connectionId,
-      clientIp,
-      totalConnections: this.connectionManager.getConnectionCount(),
-    });
+		// 发送欢迎消息
+		this.connMgr.send(id, {
+			type: MsgType.CONNECTED,
+			payload: {
+				serverVersion: "1.0.0",
+				sessionId: id,
+				serverTime: Date.now(),
+			},
+		});
 
-    // 设置消息处理器
-    ws.on("message", (data: Buffer) => {
-      this.handleMessage(connectionId, data);
-    });
+		// 消息处理
+		ws.on("message", (data: Buffer) => {
+			const conn = this.connMgr.getConnection(id);
+			if (!conn) return;
 
-    // 设置关闭处理器
-    ws.on("close", (code: number, reason: Buffer) => {
-      this.handleClose(connectionId, code, reason.toString());
-    });
+			// 使用 connection manager 解析
+			this.connMgr.handleMessage(id, data);
+		});
 
-    // 设置错误处理器
-    ws.on("error", (error: Error) => {
-      this.handleError(connectionId, error);
-    });
+		// 关闭处理
+		ws.on("close", (_code: number, _reason: Buffer) => {
+			this.connMgr.removeConnection(id);
+		});
 
-    // 发送欢迎消息
-    this.sendWelcome(connectionId);
-  }
+		ws.on("error", (_err: Error) => {
+			this.connMgr.removeConnection(id);
+		});
+	}
 
-  /** 处理消息 */
-  private handleMessage(connectionId: string, data: Buffer): void {
-    try {
-      const message = JSON.parse(data.toString());
-      this.connectionManager.handleMessage(connectionId, message);
-    } catch (error) {
-      this.logger.warn(`Failed to parse message from ${connectionId}`, { error: String(error) });
-      this.connectionManager.sendError(connectionId, "INVALID_MESSAGE", "消息格式错误");
-    }
-  }
+	/** 启动服务器并设置路由 */
+	start(): void {
+		this.connMgr.handleMessage = (id: string, data: string | Buffer) => {
+			const conn = this.connMgr.getConnection(id);
+			if (!conn) return;
 
-  /** 处理连接关闭 */
-  private handleClose(connectionId: string, code: number, reason: string): void {
-    this.connectionManager.removeConnection(connectionId);
-    
-    this.logger.info(`Connection closed`, {
-      connectionId,
-      code,
-      reason: reason || "No reason",
-      totalConnections: this.connectionManager.getConnectionCount(),
-    });
-  }
+			conn.lastActivity = Date.now();
 
-  /** 处理错误 */
-  private handleError(connectionId: string, error: Error): void {
-    this.logger.error(`Connection error`, error, {
-      connectionId,
-    });
+			const { parseMsg, MsgType } = require("./protocol.js");
+			const message = parseMsg(data.toString());
+			if (!message) {
+				this.connMgr.sendError(id, "PARSE_ERROR", "Invalid message format");
+				return;
+			}
 
-    this.connectionManager.removeConnection(connectionId);
-  }
+			if (message.type === MsgType.HEARTBEAT) {
+				this.connMgr.send(id, {
+					type: MsgType.HEARTBEAT_ACK,
+					payload: {
+						clientTime: (message.payload as { clientTime?: number }).clientTime || Date.now(),
+						serverTime: Date.now(),
+						latency: 0,
+						sequence: (message.payload as { sequence?: number }).sequence || 0,
+					},
+				});
+				return;
+			}
 
-  /** 发送欢迎消息 */
-  private sendWelcome(connectionId: string): void {
-    this.connectionManager.send(connectionId, {
-      type: "WELCOME",
-      payload: {
-        connectionId,
-        serverTime: Date.now(),
-        protocolVersion: "1.0",
-        features: ["rooms", "matchmaking", "chat"],
-      },
-    });
-  }
+			// 使用 router 路由消息
+			this.router.route(conn, message);
+		};
+	}
 
-  /** 启动健康检查 */
-  private startHealthCheck(pingInterval: number, pingTimeout: number): void {
-    setInterval(() => {
-      this.connectionManager.healthCheck(pingTimeout);
-    }, pingInterval);
-  }
+	/** 广播消息 */
+	broadcast(message: unknown): void {
+		const data = JSON.stringify(message);
+		for (const client of this.wss.clients) {
+			if (client.readyState === WebSocket.OPEN) {
+				client.send(data);
+			}
+		}
+	}
 
-  /** 广播消息到所有连接 */
-  broadcast(message: any): void {
-    const data = JSON.stringify(message);
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(data);
-      }
-    });
-  }
+	/** 获取统计 */
+	getStats(): {
+		totalConnections: number;
+		totalRooms: number;
+	} {
+		return {
+			totalConnections: this.connMgr.getAllConnections().length,
+			totalRooms: this.roomMgr.getAllRooms().length,
+		};
+	}
 
-  /** 获取连接统计 */
-  getStats(): {
-    totalConnections: number;
-    activeConnections: number;
-    rooms: number;
-  } {
-    return {
-      totalConnections: this.connectionManager.getConnectionCount(),
-      activeConnections: this.connectionManager.getActiveConnectionCount(),
-      rooms: this.connectionManager.getRoomCount(),
-    };
-  }
-
-  /** 关闭服务器 */
-  close(): Promise<void> {
-    return new Promise((resolve) => {
-      // 关闭所有连接
-      this.wss.clients.forEach((client) => {
-        client.close(1000, "Server shutdown");
-      });
-
-      // 关闭服务器
-      this.wss.close(() => {
-        this.logger.info("WebSocket server shutdown complete");
-        resolve();
-      });
-    });
-  }
+	/** 关闭服务器 */
+	close(): Promise<void> {
+		return new Promise((resolve) => {
+			for (const client of this.wss.clients) {
+				client.close(1000, "Server shutdown");
+			}
+			this.wss.close(() => {
+				this.logger.info("Server shutdown");
+				resolve();
+			});
+		});
+	}
 }

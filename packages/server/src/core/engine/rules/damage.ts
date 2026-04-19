@@ -117,7 +117,7 @@ export function calculateDamage(
     result.hullDamage = hullDamage;
 
     // 检查是否被摧毁
-    const newHull = (targetRuntime.hull?.current || 0) - hullDamage;
+    const newHull = (targetRuntime.hull || 0) - hullDamage;
     if (newHull <= 0) {
       result.targetDestroyed = true;
     }

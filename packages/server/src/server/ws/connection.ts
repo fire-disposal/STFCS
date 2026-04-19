@@ -1,404 +1,181 @@
 /**
- * 连接管理器
+ * 简化的 WebSocket 连接管理器
+ *
+ * 职责：连接管理 + 消息路由
  */
 
-import { WebSocket } from "ws";
-import { v4 as uuidv4 } from "uuid";
+import type { WebSocket } from "ws";
 import { createLogger } from "../../infra/simple-logger.js";
-import { RoomManager } from "../rooms/RoomManager.js";
+import { parseMsg, serializeMsg, MsgType, errMsg } from "./protocol.js";
+import type { WSMessage } from "./protocol.js";
 
+/** 连接状态 */
 export interface Connection {
-  id: string;
-  ws: WebSocket;
-  ip: string;
-  connectedAt: number;
-  lastActivity: number;
-  roomId?: string;
-  userId?: string;
-  metadata: Record<string, any>;
+	ws: WebSocket;
+	id: string;
+	ip: string;
+	playerName: string;
+	roomId: string | undefined;
+	userId: string | undefined;
+	lastActivity: number;
 }
 
-export interface Message {
-  type: string;
-  payload: any;
-  requestId?: string;
+/** 消息处理器 */
+export interface MessageHandler {
+	(connection: Connection, message: WSMessage): void | Promise<void>;
 }
 
 /** 连接管理器 */
 export class ConnectionManager {
-  private connections = new Map<string, Connection>();
-  private roomManager: RoomManager;
-  private logger = createLogger("connection-manager");
+	private connections = new Map<string, Connection>();
+	private handlers = new Map<string, MessageHandler>();
+	private logger = createLogger("connection");
 
-  constructor() {
-    this.roomManager = new RoomManager(this);
-  }
+	// ==================== 连接管理 ====================
 
-  /** 添加新连接 */
-  addConnection(ws: WebSocket, ip: string): string {
-    const connectionId = uuidv4();
-    const now = Date.now();
+	addConnection(ws: WebSocket, ip: string, playerName: string): string {
+		const id = `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+		const conn: Connection = {
+			ws,
+			id,
+			ip,
+			playerName,
+			roomId: undefined,
+			userId: undefined,
+			lastActivity: Date.now(),
+		};
+		this.connections.set(id, conn);
+		this.logger.info(`Connected: ${playerName} (${id})`);
+		return id;
+	}
 
-    const connection: Connection = {
-      id: connectionId,
-      ws,
-      ip,
-      connectedAt: now,
-      lastActivity: now,
-      metadata: {},
-    };
+	removeConnection(id: string): void {
+		const conn = this.connections.get(id);
+		if (conn) {
+			this.connections.delete(id);
+			this.logger.info(`Disconnected: ${conn.playerName} (${id})`);
+		}
+	}
 
-    this.connections.set(connectionId, connection);
-    return connectionId;
-  }
+	getConnection(id: string): Connection | undefined {
+		return this.connections.get(id);
+	}
 
-  /** 移除连接 */
-  removeConnection(connectionId: string): boolean {
-    const connection = this.connections.get(connectionId);
-    if (connection) {
-      // 清理资源
-      if (connection.roomId && connection.userId) {
-        // 通知房间管理器玩家离开
-        this.roomManager.leaveRoom(connection.roomId, connection.userId);
-        this.logger.debug(`Player left room`, {
-          connectionId,
-          roomId: connection.roomId,
-          userId: connection.userId,
-        });
-      }
-    }
+	getAllConnections(): Connection[] {
+		return Array.from(this.connections.values());
+	}
 
-    return this.connections.delete(connectionId);
-  }
+	getRoomConnections(roomId: string): Connection[] {
+		return this.getAllConnections().filter((c) => c.roomId === roomId);
+	}
 
-  /** 获取连接 */
-  getConnection(connectionId: string): Connection | undefined {
-    return this.connections.get(connectionId);
-  }
+	// ==================== 消息路由 ====================
 
-  /** 更新连接活动时间 */
-  updateActivity(connectionId: string): void {
-    const connection = this.connections.get(connectionId);
-    if (connection) {
-      connection.lastActivity = Date.now();
-    }
-  }
+	registerHandler(type: string, handler: MessageHandler): void {
+		this.handlers.set(type, handler);
+	}
 
-  /** 加入房间 */
-  joinRoom(connectionId: string, roomId: string): boolean {
-    const connection = this.connections.get(connectionId);
-    if (!connection) return false;
+	registerHandlers(types: string[], handler: MessageHandler): void {
+		for (const type of types) {
+			this.handlers.set(type, handler);
+		}
+	}
 
-    connection.roomId = roomId;
-    
-    this.logger.debug(`Connection joined room`, {
-      connectionId,
-      roomId,
-    });
+	handleMessage(id: string, data: string | Buffer): void {
+		const conn = this.connections.get(id);
+		if (!conn) return;
 
-    return true;
-  }
+		conn.lastActivity = Date.now();
 
-  /** 离开房间 */
-  leaveRoom(connectionId: string): boolean {
-    const connection = this.connections.get(connectionId);
-    if (!connection || !connection.roomId) return false;
+		const message = parseMsg(data.toString());
+		if (!message) {
+			this.sendError(id, "PARSE_ERROR", "Invalid message format");
+			return;
+		}
 
-    const roomId = connection.roomId;
-    delete connection.roomId;
-    
-    this.logger.debug(`Connection left room`, {
-      connectionId,
-      userId: connection.userId,
-      roomId,
-    });
+		// 心跳直接处理
+		if (message.type === MsgType.HEARTBEAT) {
+			this.handleHeartbeat(conn, message);
+			return;
+		}
 
-    return true;
-  }
+		const handler = this.handlers.get(message.type);
+		if (!handler) {
+			this.sendError(id, "UNKNOWN_TYPE", `Unknown message type: ${message.type}`, message.id);
+			return;
+		}
 
-  /** 处理消息 */
-  handleMessage(connectionId: string, data: Buffer): void {
-    this.updateActivity(connectionId);
+		try {
+			const result = handler(conn, message);
+			if (result instanceof Promise) {
+				result.catch((err) => {
+					this.logger.error(`Handler error [${message.type}]:`, err);
+					this.sendError(id, "HANDLER_ERROR", "Internal error", message.id);
+				});
+			}
+		} catch (err) {
+			this.logger.error(`Sync handler error [${message.type}]:`, err);
+			this.sendError(id, "HANDLER_ERROR", "Internal error", message.id);
+		}
+	}
 
-    const connection = this.connections.get(connectionId);
-    if (!connection) {
-      this.logger.warn(`Message from unknown connection`, { connectionId });
-      return;
-    }
+	// ==================== 发送工具 ====================
 
-    // 解析消息
-    let message;
-    try {
-      message = JSON.parse(data.toString());
-    } catch (error) {
-      this.logger.warn(`Failed to parse message`, error, {
-        connectionId,
-      });
-      this.sendError(connectionId, "PARSE_ERROR", "消息解析失败");
-      return;
-    }
+	send(id: string, message: WSMessage): boolean {
+		const conn = this.connections.get(id);
+		if (!conn || conn.ws.readyState !== 1) return false;
+		try {
+			conn.ws.send(serializeMsg(message));
+			return true;
+		} catch {
+			return false;
+		}
+	}
 
-    // 验证消息格式
-    if (!message || typeof message !== "object" || !message.type || typeof message.type !== "string") {
-      this.sendError(connectionId, "INVALID_MESSAGE", "消息格式错误");
-      return;
-    }
+	sendError(id: string, code: string, message: string, requestId?: string): boolean {
+		return this.send(id, errMsg(code, message, requestId));
+	}
 
-    // 处理消息
-    try {
-      this.routeMessage(connection, message);
-    } catch (error) {
-      this.logger.error(`Error handling message`, error, {
-        connectionId,
-        messageType: message.type,
-      });
-      
-      this.sendError(connectionId, "INTERNAL_ERROR", "处理消息时发生错误");
-    }
-  }
+	broadcast(message: WSMessage, excludeId?: string): void {
+		const data = serializeMsg(message);
+		for (const [id, conn] of this.connections) {
+			if (excludeId && id === excludeId) continue;
+			if (conn.ws.readyState === 1) {
+				try {
+					conn.ws.send(data);
+				} catch {
+					// ignore
+				}
+			}
+		}
+	}
 
-  /** 路由消息 */
-  private routeMessage(connection: Connection, message: Message): void {
-    const { type, payload, requestId } = message;
+	broadcastToRoom(roomId: string, message: WSMessage, excludeId?: string): void {
+		for (const [id, conn] of this.connections) {
+			if (conn.roomId !== roomId) continue;
+			if (excludeId && id === excludeId) continue;
+			if (conn.ws.readyState === 1) {
+				try {
+					conn.ws.send(serializeMsg(message));
+				} catch {
+					// ignore
+				}
+			}
+		}
+	}
 
-    switch (type) {
-      case "AUTHENTICATE":
-        this.handleAuthenticate(connection, payload, requestId);
-        break;
-      case "JOIN_ROOM":
-        this.handleJoinRoom(connection, payload, requestId);
-        break;
-      case "LEAVE_ROOM":
-        this.handleLeaveRoom(connection, payload, requestId);
-        break;
-      case "PING":
-        this.handlePing(connection, requestId);
-        break;
-      default:
-        // 其他消息转发到房间处理器
-        if (connection.roomId) {
-          this.forwardToRoom(connection, message);
-        } else {
-          this.sendError(connection.id, "NOT_IN_ROOM", "未加入任何房间");
-        }
-    }
-  }
+	// ==================== 私有方法 ====================
 
-  /** 处理认证 */
-  private handleAuthenticate(
-    connection: Connection,
-    payload: any,
-    requestId?: string
-  ): void {
-    const { token, userId } = payload || {};
-
-    if (!token || !userId) {
-      this.sendError(connection.id, "INVALID_AUTH", "认证信息不完整", requestId);
-      return;
-    }
-
-    // 简化认证：验证token格式
-    if (typeof token !== "string" || token.length < 10) {
-      this.sendError(connection.id, "INVALID_TOKEN", "无效的token", requestId);
-      return;
-    }
-
-    // 认证成功
-    connection.userId = userId;
-    connection.metadata['authenticatedAt'] = Date.now();
-    connection.metadata['userId'] = userId;
-
-    this.send(connection.id, {
-      type: "AUTHENTICATED",
-      payload: { userId, authenticatedAt: Date.now() },
-      ...(requestId && { requestId }),
-    });
-  }
-
-  /** 处理加入房间 */
-  private handleJoinRoom(
-    connection: Connection,
-    payload: any,
-    requestId?: string
-  ): void {
-    const { roomId, playerName, username } = payload || {};
-    if (!roomId || typeof roomId !== "string") {
-      this.sendError(connection.id, "INVALID_ROOM", "房间ID无效", requestId);
-      return;
-    }
-
-    if (!username || typeof username !== "string") {
-      this.sendError(connection.id, "USERNAME_REQUIRED", "用户名是必需的", requestId);
-      return;
-    }
-
-    // 离开当前房间（如果已加入）
-    if (connection.roomId) {
-      this.leaveRoom(connection.id);
-    }
-
-    // 通过房间管理器加入房间
-    const success = this.roomManager.joinRoom(
-      roomId,
-      connection.id,
-      username,
-      playerName || username
-    );
-    
-    if (!success) {
-      this.sendError(connection.id, "JOIN_FAILED", "加入房间失败", requestId);
-      return;
-    }
-
-    // 更新连接的房间信息
-    connection.roomId = roomId;
-
-    this.send(connection.id, {
-      type: "ROOM_JOINED",
-      payload: { 
-        roomId, 
-        joinedAt: Date.now(),
-        playerName: playerName || connection.userId,
-      },
-      ...(requestId && { requestId }),
-    });
-  }
-
-  /** 处理离开房间 */
-  private handleLeaveRoom(
-    connection: Connection,
-    payload: any,
-    requestId?: string
-  ): void {
-    if (!connection.roomId) {
-      this.sendError(connection.id, "NOT_IN_ROOM", "未加入任何房间", requestId);
-      return;
-    }
-
-    const success = this.leaveRoom(connection.id);
-    if (!success) {
-      this.sendError(connection.id, "LEAVE_FAILED", "离开房间失败", requestId);
-      return;
-    }
-
-    this.send(connection.id, {
-      type: "ROOM_LEFT",
-      payload: { leftAt: Date.now() },
-      ...(requestId && { requestId }),
-    });
-  }
-
-  /** 处理ping */
-  private handlePing(connection: Connection, requestId?: string): void {
-    this.send(connection.id, {
-      type: "PONG",
-      payload: { serverTime: Date.now() },
-      ...(requestId && { requestId }),
-    });
-  }
-
-  /** 转发消息到房间 */
-  private forwardToRoom(connection: Connection, message: Message): void {
-    if (!connection.roomId || !connection.userId) {
-      this.sendError(connection.id, "NOT_IN_ROOM", "未加入任何房间", message.requestId);
-      return;
-    }
-
-    // 将消息转发到房间管理器
-    this.roomManager.handlePlayerMessage(connection.roomId, connection.userId, message);
-  }
-
-  /** 发送消息 */
-  send(connectionId: string, message: Message): void {
-    const connection = this.connections.get(connectionId);
-    if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    try {
-      const data = JSON.stringify(message);
-      connection.ws.send(data);
-    } catch (error) {
-      this.logger.error(`Failed to send message`, error, {
-        connectionId,
-      });
-    }
-  }
-
-  /** 发送错误消息 */
-  sendError(
-    connectionId: string,
-    code: string,
-    message: string,
-    requestId?: string
-  ): void {
-    this.send(connectionId, {
-      type: "ERROR",
-      payload: { code, message },
-      ...(requestId && { requestId }),
-    });
-  }
-
-  /** 广播消息到房间 */
-  broadcastToRoom(roomId: string, message: Message): void {
-    for (const connection of this.connections.values()) {
-      if (connection.roomId === roomId && connection.ws.readyState === WebSocket.OPEN) {
-        this.send(connection.id, message);
-      }
-    }
-  }
-
-  /** 健康检查 */
-  healthCheck(timeout: number): void {
-    const now = Date.now();
-    const timeoutConnections: string[] = [];
-
-    for (const [connectionId, connection] of this.connections.entries()) {
-      if (now - connection.lastActivity > timeout) {
-        timeoutConnections.push(connectionId);
-      }
-    }
-
-    // 关闭超时连接
-    for (const connectionId of timeoutConnections) {
-      this.logger.warn(`Closing timeout connection`, { connectionId });
-      const connection = this.connections.get(connectionId);
-      if (connection) {
-        connection.ws.close(1001, "Connection timeout");
-      }
-      this.removeConnection(connectionId);
-    }
-  }
-
-  /** 获取所有连接 */
-  getAllConnections(): Map<string, Connection> {
-    return this.connections;
-  }
-
-  /** 获取连接统计 */
-  getConnectionCount(): number {
-    return this.connections.size;
-  }
-
-  /** 获取活跃连接数 */
-  getActiveConnectionCount(): number {
-    let count = 0;
-    for (const connection of this.connections.values()) {
-      if (connection.ws.readyState === WebSocket.OPEN) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  /** 获取房间数（简化实现） */
-  getRoomCount(): number {
-    const rooms = new Set<string>();
-    for (const connection of this.connections.values()) {
-      if (connection.roomId) {
-        rooms.add(connection.roomId);
-      }
-    }
-    return rooms.size;
-  }
+	private handleHeartbeat(conn: Connection, message: WSMessage): void {
+		const payload = message.payload as { clientTime?: number; sequence?: number };
+		this.send(conn.id, {
+			type: MsgType.HEARTBEAT_ACK,
+			payload: {
+				clientTime: payload.clientTime || Date.now(),
+				serverTime: Date.now(),
+				latency: Date.now() - (payload.clientTime || Date.now()),
+				sequence: payload.sequence || 0,
+			},
+		});
+	}
 }

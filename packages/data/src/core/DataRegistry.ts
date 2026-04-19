@@ -11,8 +11,9 @@ import type {
 	ShipRuntime,
 	MountSpec,
 	Point,
-	Faction,
+	FactionType,
 } from "../core/index.js";
+
 
 /** ID 生成计数器 */
 let idCounter = 0;
@@ -40,7 +41,7 @@ export interface SaveJSON {
 		turn: {
 			count: number;
 			phase: string;
-			activeFaction: Faction;
+			activeFaction: FactionType;
 		};
 		map: {
 			width: number;
@@ -139,7 +140,7 @@ export class DataRegistry {
 		options: {
 			position?: Point;
 			heading?: number;
-			faction?: Faction;
+			faction?: FactionType;
 			ownerId?: string;
 			name?: string;
 		} = {}
@@ -173,7 +174,7 @@ export class DataRegistry {
 		options: {
 			position?: Point;
 			heading?: number;
-			faction?: Faction;
+			faction?: FactionType;
 			ownerId?: string;
 		}
 	): ShipRuntime {

@@ -44,8 +44,8 @@ export function createLogger(options: LoggerOptions = {}) {
 
 /** 全局日志器实例 */
 export const logger = createLogger({
-  level: process.env.LOG_LEVEL as LogLevel || "info",
-  pretty: process.env.NODE_ENV !== "production",
+  level: process.env['LOG_LEVEL'] as LogLevel || "info",
+  pretty: process.env['NODE_ENV'] !== "production",
 });
 
 /** 上下文日志器 */

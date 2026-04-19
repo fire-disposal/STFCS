@@ -2,12 +2,9 @@
  * 游戏状态管理 - 基于 @vt/data 权威设计
  */
 
-import { 
-  PlayerRole,
-} from "@vt/data";
-
 import type { FactionType, GamePhaseType } from "@vt/data";
-import type { GameState, PlayerState, ShipState, GameMetadata } from "../types/common.js";
+import type { GameState, PlayerState } from "../types/common.js";
+import type { TokenState, ShipTokenState } from "./Token.js";
 
 /** 游戏状态管理器 */
 export class GameStateManager {
@@ -20,7 +17,8 @@ export class GameStateManager {
       turn: 1,
       activeFaction: "PLAYER", // 保留基本派系概念，但简化逻辑
       players: new Map(),
-      ships: new Map(),
+      tokens: new Map(),
+      components: new Map(),
       metadata: {
         roomId,
         roomName,
@@ -54,31 +52,31 @@ export class GameStateManager {
     return true;
   }
 
-  // ==================== 舰船管理 ====================
+  // ==================== Token管理 ====================
 
-  addShip(shipState: ShipState): void {
-    this.state.ships.set(shipState.id, shipState);
+  addToken(token: TokenState): void {
+    this.state.tokens.set(token.id, token);
   }
 
-  removeShip(shipId: string): boolean {
-    return this.state.ships.delete(shipId);
+  removeToken(tokenId: string): boolean {
+    return this.state.tokens.delete(tokenId);
   }
 
-  getShip(shipId: string): ShipState | undefined {
-    return this.state.ships.get(shipId);
+  getToken(tokenId: string): TokenState | undefined {
+    return this.state.tokens.get(tokenId);
   }
 
-  updateShip(shipId: string, updates: Partial<ShipState>): boolean {
-    const ship = this.state.ships.get(shipId);
-    if (!ship) return false;
+  updateToken(tokenId: string, updates: Partial<TokenState>): boolean {
+    const token = this.state.tokens.get(tokenId);
+    if (!token) return false;
 
-    Object.assign(ship, updates);
+    Object.assign(token, updates);
     return true;
   }
 
   // ==================== 游戏流程管理 ====================
 
-  setPhase(phase: GamePhase): void {
+  setPhase(phase: GamePhaseType): void {
     this.state.phase = phase;
   }
 
@@ -86,7 +84,7 @@ export class GameStateManager {
     this.state.turn++;
   }
 
-  setActiveFaction(faction: Faction): void {
+  setActiveFaction(faction: FactionType): void {
     this.state.activeFaction = faction;
   }
 
@@ -96,15 +94,14 @@ export class GameStateManager {
     return Array.from(this.state.players.values());
   }
 
-  getAllShips(): ShipState[] {
-    return Array.from(this.state.ships.values());
+  getAllTokens(): TokenState[] {
+    return Array.from(this.state.tokens.values());
   }
 
-  getPlayerShips(playerId: string): ShipState[] {
-    // 简化：假设玩家ID与舰船所有者ID相同
-    return this.getAllShips().filter(ship => 
-      ship.shipJson.ship.ownerId === playerId
-    );
+  getPlayerShips(playerId: string): ShipTokenState[] {
+    return this.getAllTokens()
+      .filter((token): token is ShipTokenState => token.type === "SHIP")
+      .filter(ship => ship.runtime.ownerId === playerId);
   }
 
   // ==================== 状态快照 ====================
@@ -120,7 +117,7 @@ export class GameStateManager {
 
   // ==================== 验证接口 ====================
 
-  validateAction(playerId: string, actionType: string): { valid: boolean; error?: string } {
+  validateAction(playerId: string, _actionType: string): { valid: boolean; error?: string } {
     const player = this.getPlayer(playerId);
     if (!player) {
       return { valid: false, error: "玩家不存在" };

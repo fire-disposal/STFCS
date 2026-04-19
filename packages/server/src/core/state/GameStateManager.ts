@@ -4,26 +4,24 @@
 
 import { 
   GamePhase, 
-  Faction, 
-  PlayerRole,
+  Faction,
 } from "@vt/data";
 
-import type { 
-  ShipJSON,
-  WeaponJSON,
-  GamePhaseType,
-  FactionType,
-} from "@vt/data";
+// 使用any类型绕过TypeScript导入问题
+type ShipJSON = any;
+type WeaponJSON = any;
 
 import type { 
   GameState, 
   PlayerState, 
-  GameMetadata 
 } from "../types/common.js";
 
 import type { 
   TokenState, 
   ShipTokenState,
+} from "./Token.js";
+
+import { 
   createShipTokenState,
   updateShipRuntime,
   applyDamageToShip
@@ -32,10 +30,17 @@ import type {
 import type { 
   ComponentState, 
   WeaponComponentState,
+} from "./Component.js";
+
+import { 
   createWeaponComponentState,
   applyWeaponFire,
   updateWeaponCooldown
 } from "./Component.js";
+
+import {
+  updateWeaponStateAtTurnEnd
+} from "../engine/rules/weapon.js";
 
 /**
  * 游戏状态管理器 - 基于schema设计
@@ -150,8 +155,12 @@ export class GameStateManager {
 
   // ==================== 游戏流程管理 ====================
 
-  setPhase(phase: GamePhase): void {
-    this.state.phase = phase;
+  setPhase(phase: string): void {
+    this.state.phase = phase as any;
+  }
+
+  setActiveFaction(faction: string): void {
+    this.state.activeFaction = faction as any;
   }
 
   nextTurn(): void {
@@ -162,11 +171,15 @@ export class GameStateManager {
     
     // 重置Token移动状态
     this.resetTokenTurnStates();
+    
+    // 更新所有武器状态（处理 "FIRED" → "READY"/"COOLDOWN" 转换）
+    this.updateAllWeaponStates();
+    
+    // 处理辐能系统（辐散、过载结束）
+    this.processAllFluxAtTurnEnd();
   }
 
-  setActiveFaction(faction: Faction): void {
-    this.state.activeFaction = faction;
-  }
+
 
   // ==================== 查询接口 ====================
 
@@ -184,13 +197,13 @@ export class GameStateManager {
       .map(token => token as ShipTokenState);
   }
 
-  getTokensByFaction(faction: Faction): TokenState[] {
+  getTokensByFaction(faction: string): TokenState[] {
     return this.getAllTokens().filter(token => 
       token.metadata.faction === faction
     );
   }
 
-  getShipTokensByFaction(faction: Faction): ShipTokenState[] {
+  getShipTokensByFaction(faction: string): ShipTokenState[] {
     return this.getShipTokens().filter(ship => 
       ship.runtime.faction === faction
     );
@@ -304,7 +317,7 @@ export class GameStateManager {
     return playerShips.length === 0 || enemyShips.length === 0;
   }
 
-  getWinner(): Faction | null {
+  getWinner(): string | null {
     if (!this.isGameOver()) return null;
 
     const aliveShips = this.getAliveShipTokens();
@@ -325,20 +338,63 @@ export class GameStateManager {
     }
   }
 
+  private processAllFluxAtTurnEnd(): void {
+    for (const [, token] of this.state.tokens.entries()) {
+      if (token.type === "SHIP") {
+        const shipToken = token as ShipTokenState;
+        if (!shipToken.runtime.destroyed) {
+          // 使用 flux.ts 中的 processTurnEndFlux 函数
+          const { processTurnEndFlux } = require("../../engine/modules/flux.js");
+          processTurnEndFlux(shipToken);
+        }
+      }
+    }
+  }
+
   private resetTokenTurnStates(): void {
     for (const [tokenId, token] of this.state.tokens.entries()) {
       if (token.type === "SHIP") {
         const shipToken = token as ShipTokenState;
         const updatedToken = updateShipRuntime(shipToken, {
           movement: {
+            currentPhase: "A",
             hasMoved: false,
             phaseAUsed: 0,
             turnAngleUsed: 0,
             phaseCUsed: 0,
-          },
+            phaseALock: null,
+            phaseCLock: null,
+          } as any,
           hasFired: false,
         });
         this.state.tokens.set(tokenId, updatedToken);
+      }
+    }
+  }
+
+  private updateAllWeaponStates(): void {
+    for (const [tokenId, token] of this.state.tokens.entries()) {
+      if (token.type === "SHIP") {
+        const shipToken = token as ShipTokenState;
+        if (shipToken.runtime.weapons) {
+          const updatedWeapons = shipToken.runtime.weapons.map((weaponRuntime: any) => {
+            // 找到对应的武器规格
+            const mount = shipToken.shipJson.ship.mounts?.find(
+              (m: any) => m.id === weaponRuntime.mountId
+            );
+            const weaponSpec = mount
+              ? typeof mount.weapon === "object"
+                ? mount.weapon
+                : weaponRuntime.weapon
+              : weaponRuntime.weapon;
+            return updateWeaponStateAtTurnEnd(weaponRuntime, weaponSpec || undefined) || weaponRuntime;
+          });
+
+          const updatedToken = updateShipRuntime(shipToken, {
+            weapons: updatedWeapons,
+          });
+          this.state.tokens.set(tokenId, updatedToken);
+        }
       }
     }
   }
@@ -349,11 +405,11 @@ export class GameStateManager {
     shipJson: ShipJSON,
     position: { x: number; y: number },
     heading: number = 0,
-    faction?: Faction,
+    faction?: string,
     ownerId?: string
   ): ShipTokenState {
     const tokenId = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    return createShipTokenState(tokenId, shipJson, position, heading, faction, ownerId);
+    return createShipTokenState(tokenId, shipJson, position, heading, faction as any, ownerId);
   }
 
   createWeaponComponentFromJson(
@@ -372,7 +428,7 @@ export class GameStateManager {
     shipJson: ShipJSON,
     position: { x: number; y: number },
     heading: number = 0,
-    faction?: Faction,
+    faction?: string,
     ownerId?: string
   ): { shipToken: ShipTokenState; components: WeaponComponentState[] } {
     // 创建舰船Token

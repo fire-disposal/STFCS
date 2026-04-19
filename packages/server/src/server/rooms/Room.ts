@@ -6,7 +6,8 @@ import { v4 as uuidv4 } from "uuid";
 import { createLogger } from "../../infra/simple-logger.js";
 import { GameStateManager } from "../../core/state/GameStateManager.js";
 import type { ConnectionManager } from "../ws/connection.js";
-import type { FactionType } from "@vt/data";
+// 简化类型定义
+type FactionType = any;
 
 export interface RoomOptions {
   roomName: string;
@@ -373,6 +374,59 @@ export class Room {
     }
   }
 
+  /** 广播消息给特定阵营 */
+  broadcastToFaction(faction: string, message: any): void {
+    const players = this.stateManager.getAllPlayers();
+    for (const player of players) {
+      if (player.faction === faction) {
+        const connectionId = this.playerConnections.get(player.id);
+        if (connectionId) {
+          this.connectionManager.send(connectionId, message);
+        }
+      }
+    }
+  }
+
+  /** 发送消息给特定玩家 */
+  sendToPlayer(playerId: string, message: any): void {
+    this.send(playerId, message);
+  }
+
+  /** 广播消息给除特定玩家外的所有人 */
+  broadcastExcept(excludePlayerId: string, message: any): void {
+    for (const [playerId, connectionId] of this.playerConnections.entries()) {
+      if (playerId !== excludePlayerId) {
+        this.connectionManager.send(connectionId, message);
+      }
+    }
+  }
+
+  /** 广播消息给观察者 */
+  broadcastToSpectators(message: any): void {
+    const players = this.stateManager.getAllPlayers();
+    for (const player of players) {
+      if (player.role === "OBSERVER") {
+        const connectionId = this.playerConnections.get(player.id);
+        if (connectionId) {
+          this.connectionManager.send(connectionId, message);
+        }
+      }
+    }
+  }
+
+  /** 广播消息给玩家（非观察者） */
+  broadcastToPlayers(message: any): void {
+    const players = this.stateManager.getAllPlayers();
+    for (const player of players) {
+      if (player.role !== "OBSERVER") {
+        const connectionId = this.playerConnections.get(player.id);
+        if (connectionId) {
+          this.connectionManager.send(connectionId, message);
+        }
+      }
+    }
+  }
+
   // ==================== 房间管理 ====================
 
   /** 获取房间信息 */
@@ -505,5 +559,40 @@ export class Room {
   /** 获取游戏状态 */
   get gameState(): any {
     return this.getGameState();
+  }
+
+  /** 获取所有舰船Token */
+  getShipTokens(): import("../../core/state/Token.js").ShipTokenState[] {
+    return this.stateManager.getShipTokens();
+  }
+
+  /** 获取指定舰船 */
+  getShipToken(shipId: string): import("../../core/state/Token.js").ShipTokenState | undefined {
+    return this.stateManager.getShipToken(shipId);
+  }
+
+  /** 更新舰船Token runtime */
+  updateShipTokenRuntime(
+    shipId: string,
+    runtimeUpdates: Record<string, unknown>
+  ): boolean {
+    const token = this.stateManager.getShipToken(shipId);
+    if (!token) return false;
+
+    const updatedToken = {
+      ...token,
+      runtime: {
+        ...token.runtime,
+        ...runtimeUpdates,
+      },
+    };
+    this.stateManager.updateShipToken(shipId, updatedToken);
+
+    return true;
+  }
+
+  /** 获取状态管理器 */
+  getStateManager(): import("../../core/state/GameStateManager.js").GameStateManager {
+    return this.stateManager;
   }
 }

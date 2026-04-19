@@ -1,11 +1,73 @@
 /**
- * 移动模块
- * 基于 @vt/data 权威设计
+ * 移动模块 - ABC 阶段系统
+ *
+ * 符号约定：
+ * - 前后移动：向前为正，向后为负
+ * - 侧向移动：向左为正，向右为负
+ * - 资源消耗使用绝对值计算
+ *
+ * 阶段设计：
+ * - A阶段：平移（选择前后或左右之一，选定后锁定方向）
+ * - B阶段：旋转（消耗总角度资源）
+ * - C阶段：平移（选择前后或左右之一，选定后锁定方向）
+ * - 顺序：A → B → C，不可逆
+ * - 输入：移动距离和旋转角度强制为整数
  */
 
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createMoveEvent, createRotateEvent } from "../context.js";
-import { distance, angleBetween } from "../geometry/index.js";
+
+/** 移动阶段 */
+export type MovementPhase = "A" | "B" | "C" | "DONE";
+
+/** 平移方向锁定 */
+export type TranslationLock = "FORWARD_BACKWARD" | "LEFT_RIGHT" | null;
+
+/**
+ * 获取或初始化移动状态
+ */
+function getMovementState(ship: any): {
+  currentPhase: MovementPhase;
+  phaseAUsed: number;
+  turnAngleUsed: number;
+  phaseCUsed: number;
+  phaseALock: TranslationLock;
+  phaseCLock: TranslationLock;
+  hasMoved: boolean;
+} {
+  const defaultState = {
+    currentPhase: "A" as MovementPhase,
+    phaseAUsed: 0,
+    turnAngleUsed: 0,
+    phaseCUsed: 0,
+    phaseALock: null as TranslationLock,
+    phaseCLock: null as TranslationLock,
+    hasMoved: false,
+  };
+
+  if (!ship.runtime.movement) {
+    return defaultState;
+  }
+
+  return {
+    currentPhase: ship.runtime.movement.currentPhase || "A",
+    phaseAUsed: ship.runtime.movement.phaseAUsed || 0,
+    turnAngleUsed: ship.runtime.movement.turnAngleUsed || 0,
+    phaseCUsed: ship.runtime.movement.phaseCUsed || 0,
+    phaseALock: ship.runtime.movement.phaseALock || null,
+    phaseCLock: ship.runtime.movement.phaseCLock || null,
+    hasMoved: ship.runtime.movement.hasMoved || false,
+  };
+}
+
+/**
+ * 判断移动类型（前后 vs 左右）
+ * 正数：前后移动（forwardDistance > 0 向前，< 0 向后）
+ * 正数：侧向移动（strafeDistance > 0 向左，< 0 向右）
+ */
+function getTranslationType(isStrafe: boolean): TranslationLock {
+  return isStrafe ? "LEFT_RIGHT" : "FORWARD_BACKWARD";
+}
 
 /**
  * 应用移动Action
@@ -22,10 +84,8 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
   const updates = new Map<string, any>();
 
   if (action.type === "MOVE") {
-    // 处理移动
     const moveResult = processMovement(ship, payload);
     
-    // 更新舰船位置
     updates.set(`ship:${ship.id}`, {
       runtime: {
         ...ship.runtime,
@@ -34,19 +94,16 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
       },
     });
 
-    // 创建移动事件
     events.push(createMoveEvent(
       ship.id,
       ship.runtime.position,
       moveResult.newPosition,
-      payload.distance
+      Math.abs(payload.distance)
     ));
 
   } else if (action.type === "ROTATE") {
-    // 处理旋转
     const rotateResult = processRotation(ship, payload);
     
-    // 更新舰船朝向
     updates.set(`ship:${ship.id}`, {
       runtime: {
         ...ship.runtime,
@@ -55,73 +112,90 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
       },
     });
 
-    // 创建旋转事件
     events.push(createRotateEvent(
       ship.id,
       ship.runtime.heading || 0,
       rotateResult.newHeading,
       payload.angle
     ));
+  } else if (action.type === "ADVANCE_PHASE") {
+    const phaseResult = advancePhase(ship);
+    
+    updates.set(`ship:${ship.id}`, {
+      runtime: {
+        ...ship.runtime,
+        movement: phaseResult.newMovementState,
+      },
+    });
+
+    events.push({
+      type: "PHASE_ADVANCED",
+      shipId: ship.id,
+      fromPhase: phaseResult.fromPhase,
+      toPhase: phaseResult.toPhase,
+    });
   }
 
-  // 应用状态更新
   const newState = applyStateUpdates(state, updates);
-
   return { newState, events };
 }
 
 /**
- * 处理移动
+ * 处理移动（A/C阶段）
+ *
+ * payload:
+ *   - forwardDistance: 前后移动距离（正=前，负=后，0=不移动）
+ *   - strafeDistance: 侧向移动距离（正=左，负=右，0=不移动）
+ *   - 两者不能同时非零
  */
 function processMovement(ship: any, payload: any) {
-  const { distance: moveDistance, direction, phase } = payload;
+  const { forwardDistance = 0, strafeDistance = 0 } = payload;
   const currentPos = ship.runtime.position;
   const heading = ship.runtime.heading || 0;
-  const movement = ship.runtime.movement || {
-    hasMoved: false,
-    phaseAUsed: 0,
-    turnAngleUsed: 0,
-    phaseCUsed: 0,
-  };
+  const movement = getMovementState(ship);
 
-  // 计算新位置
+  // 计算新位置（浮点数精确计算）
   let newPosition = { ...currentPos };
   const rad = (heading * Math.PI) / 180;
 
-  switch (direction) {
-    case "FORWARD":
-      newPosition.x += Math.cos(rad) * moveDistance;
-      newPosition.y += Math.sin(rad) * moveDistance;
-      break;
-    case "BACKWARD":
-      newPosition.x -= Math.cos(rad) * moveDistance;
-      newPosition.y -= Math.sin(rad) * moveDistance;
-      break;
-    case "STRAFE_LEFT":
-      // 向左横移（垂直于船头方向）
-      newPosition.x += Math.cos(rad + Math.PI / 2) * moveDistance;
-      newPosition.y += Math.sin(rad + Math.PI / 2) * moveDistance;
-      break;
-    case "STRAFE_RIGHT":
-      // 向右横移
-      newPosition.x += Math.cos(rad - Math.PI / 2) * moveDistance;
-      newPosition.y += Math.sin(rad - Math.PI / 2) * moveDistance;
-      break;
+  // 前后移动（forwardDistance > 0 向前，< 0 向后）
+  if (forwardDistance !== 0) {
+    newPosition.x += Math.cos(rad) * forwardDistance;
+    newPosition.y += Math.sin(rad) * forwardDistance;
   }
+
+  // 侧向移动（strafeDistance > 0 向左，< 0 向右）
+  if (strafeDistance !== 0) {
+    // 向左：垂直于船头方向 +90°
+    // 向右：垂直于船头方向 -90°
+    const strafeRad = strafeDistance > 0
+      ? rad + Math.PI / 2   // 向左
+      : rad - Math.PI / 2;  // 向右
+    const absStrafe = Math.abs(strafeDistance);
+    newPosition.x += Math.cos(strafeRad) * absStrafe;
+    newPosition.y += Math.sin(strafeRad) * absStrafe;
+  }
+
+  // 确定移动类型和消耗
+  const isStrafe = strafeDistance !== 0;
+  const distance = isStrafe ? Math.abs(strafeDistance) : Math.abs(forwardDistance);
+  const directionType = getTranslationType(isStrafe);
 
   // 更新移动状态
   const newMovementState = { ...movement };
-  if (phase === "A") {
-    newMovementState.phaseAUsed = (movement.phaseAUsed || 0) + moveDistance;
-  } else if (phase === "C") {
-    newMovementState.phaseCUsed = (movement.phaseCUsed || 0) + moveDistance;
-  }
-  
-  // 检查是否用完移动力
-  const maxMove = ship.shipJson.ship.maxSpeed || 0;
-  const totalUsed = (newMovementState.phaseAUsed || 0) + (newMovementState.phaseCUsed || 0);
-  if (totalUsed >= maxMove) {
-    newMovementState.hasMoved = true;
+
+  if (movement.currentPhase === "A") {
+    newMovementState.phaseAUsed = movement.phaseAUsed + distance;
+    // 锁定方向
+    if (!movement.phaseALock) {
+      newMovementState.phaseALock = directionType;
+    }
+  } else if (movement.currentPhase === "C") {
+    newMovementState.phaseCUsed = movement.phaseCUsed + distance;
+    // 锁定方向
+    if (!movement.phaseCLock) {
+      newMovementState.phaseCLock = directionType;
+    }
   }
 
   return {
@@ -131,17 +205,12 @@ function processMovement(ship: any, payload: any) {
 }
 
 /**
- * 处理旋转
+ * 处理旋转（B阶段）
  */
 function processRotation(ship: any, payload: any) {
   const { angle } = payload;
   const currentHeading = ship.runtime.heading || 0;
-  const movement = ship.runtime.movement || {
-    hasMoved: false,
-    phaseAUsed: 0,
-    turnAngleUsed: 0,
-    phaseCUsed: 0,
-  };
+  const movement = getMovementState(ship);
 
   // 计算新朝向（规范化到0-360度）
   let newHeading = (currentHeading + angle) % 360;
@@ -149,13 +218,7 @@ function processRotation(ship: any, payload: any) {
 
   // 更新移动状态
   const newMovementState = { ...movement };
-  newMovementState.turnAngleUsed = (movement.turnAngleUsed || 0) + Math.abs(angle);
-  
-  // 检查是否用完转向角度
-  const maxTurn = ship.shipJson.ship.maxTurnRate || 0;
-  if (newMovementState.turnAngleUsed >= maxTurn) {
-    newMovementState.hasMoved = true;
-  }
+  newMovementState.turnAngleUsed = movement.turnAngleUsed + Math.abs(angle);
 
   return {
     newHeading,
@@ -164,79 +227,197 @@ function processRotation(ship: any, payload: any) {
 }
 
 /**
- * 检查移动合法性
+ * 推进到下一阶段
+ * A → B → C → DONE
+ */
+function advancePhase(ship: any): {
+  newMovementState: any;
+  fromPhase: MovementPhase;
+  toPhase: MovementPhase;
+} {
+  const movement = getMovementState(ship);
+  const fromPhase = movement.currentPhase;
+  let toPhase: MovementPhase;
+
+  switch (fromPhase) {
+    case "A":
+      toPhase = "B";
+      break;
+    case "B":
+      toPhase = "C";
+      break;
+    case "C":
+      toPhase = "DONE";
+      break;
+    case "DONE":
+      toPhase = "DONE";
+      break;
+    default:
+      toPhase = "A";
+  }
+
+  const newMovementState = {
+    ...movement,
+    currentPhase: toPhase,
+  };
+
+  if (toPhase === "DONE") {
+    newMovementState.hasMoved = true;
+  }
+
+  return {
+    newMovementState,
+    fromPhase,
+    toPhase,
+  };
+}
+
+// ==================== 验证函数 ====================
+
+/**
+ * 检查移动合法性（A/C阶段）
+ *
+ * 参数：
+ *   - forwardDistance: 前后移动（正=前，负=后）
+ *   - strafeDistance: 侧向移动（正=左，负=右）
+ *   - 两者不能同时非零
  */
 export function validateMovement(
   ship: any,
-  moveDistance: number,
-  direction: string,
-  phase: string
+  forwardDistance: number,
+  strafeDistance: number
 ): { valid: boolean; error?: string } {
   const maxMove = ship.shipJson.ship.maxSpeed || 0;
-  const movement = ship.runtime.movement || {
-    phaseAUsed: 0,
-    phaseCUsed: 0,
-    turnAngleUsed: 0,
-  };
+  const movement = getMovementState(ship);
 
-  // 检查是否已移动
-  if (ship.runtime.movement?.hasMoved) {
-    return { valid: false, error: "Ship has already moved this turn" };
+  // 检查是否已完成移动
+  if (movement.hasMoved || movement.currentPhase === "DONE") {
+    return { valid: false, error: "Ship has already completed movement this turn" };
   }
 
-  // 检查移动距离
-  if (moveDistance <= 0) {
-    return { valid: false, error: "Move distance must be positive" };
+  // 检查是否过载
+  if (ship.runtime.overloaded) {
+    return { valid: false, error: "Ship is overloaded and cannot move" };
   }
 
-  // 检查阶段移动力
-  let usedInPhase = 0;
-  if (phase === "A") {
-    usedInPhase = movement.phaseAUsed || 0;
-  } else if (phase === "C") {
-    usedInPhase = movement.phaseCUsed || 0;
+  // 检查当前阶段
+  if (movement.currentPhase !== "A" && movement.currentPhase !== "C") {
+    return { valid: false, error: `Cannot move in phase ${movement.currentPhase}` };
   }
 
-  if (usedInPhase + moveDistance > maxMove) {
-    return { valid: false, error: `Exceeds available move distance in phase ${phase}` };
+  // 检查整数输入
+  if (!Number.isInteger(forwardDistance) || !Number.isInteger(strafeDistance)) {
+    return { valid: false, error: "Move distance must be an integer" };
   }
 
-  // 检查总移动力
-  const totalUsed = (movement.phaseAUsed || 0) + (movement.phaseCUsed || 0);
-  if (totalUsed + moveDistance > maxMove) {
-    return { valid: false, error: "Exceeds total available move distance" };
+  // 检查不能同时前后和侧移
+  if (forwardDistance !== 0 && strafeDistance !== 0) {
+    return { valid: false, error: "Cannot move forward/backward and strafe simultaneously" };
+  }
+
+  // 检查至少有一个非零
+  if (forwardDistance === 0 && strafeDistance === 0) {
+    return { valid: false, error: "No movement specified" };
+  }
+
+  // 确定移动类型和距离
+  const isStrafe = strafeDistance !== 0;
+  const distance = isStrafe ? Math.abs(strafeDistance) : Math.abs(forwardDistance);
+  const directionType = getTranslationType(isStrafe);
+
+  // 检查方向锁定
+  const currentLock = movement.currentPhase === "A" ? movement.phaseALock : movement.phaseCLock;
+  
+  if (currentLock && currentLock !== directionType) {
+    return {
+      valid: false,
+      error: `Direction locked to ${currentLock === "FORWARD_BACKWARD" ? "forward/backward" : "left/right"} in phase ${movement.currentPhase}`,
+    };
+  }
+
+  // 检查阶段资源
+  const usedInPhase = movement.currentPhase === "A" ? movement.phaseAUsed : movement.phaseCUsed;
+  if (usedInPhase + distance > maxMove) {
+    return { valid: false, error: `Exceeds available move distance in phase ${movement.currentPhase}` };
   }
 
   return { valid: true };
 }
 
 /**
- * 检查旋转合法性
+ * 检查旋转合法性（B阶段）
  */
 export function validateRotation(
   ship: any,
   angle: number
 ): { valid: boolean; error?: string } {
   const maxTurn = ship.shipJson.ship.maxTurnRate || 0;
-  const movement = ship.runtime.movement || {
-    turnAngleUsed: 0,
-  };
+  const movement = getMovementState(ship);
 
-  // 检查是否已移动
-  if (ship.runtime.movement?.hasMoved) {
-    return { valid: false, error: "Ship has already moved this turn" };
+  // 检查是否已完成移动
+  if (movement.hasMoved || movement.currentPhase === "DONE") {
+    return { valid: false, error: "Ship has already completed movement this turn" };
   }
 
-  // 检查转向角度
-  if (Math.abs(angle) <= 0) {
-    return { valid: false, error: "Turn angle must be non-zero" };
+  // 检查是否过载
+  if (ship.runtime.overloaded) {
+    return { valid: false, error: "Ship is overloaded and cannot rotate" };
+  }
+
+  // 检查当前阶段
+  if (movement.currentPhase !== "B") {
+    return { valid: false, error: `Cannot rotate in phase ${movement.currentPhase}` };
+  }
+
+  // 检查整数输入
+  if (!Number.isInteger(angle) || angle === 0) {
+    return { valid: false, error: "Turn angle must be a non-zero integer" };
   }
 
   // 检查可用转向角度
-  const usedTurn = movement.turnAngleUsed || 0;
-  if (usedTurn + Math.abs(angle) > maxTurn) {
+  if (movement.turnAngleUsed + Math.abs(angle) > maxTurn) {
     return { valid: false, error: `Exceeds available turn angle (${maxTurn} degrees)` };
   }
 
   return { valid: true };
+}
+
+/**
+ * 检查阶段推进合法性
+ */
+export function validatePhaseAdvance(ship: any): { valid: boolean; error?: string } {
+  const movement = getMovementState(ship);
+
+  if (movement.hasMoved || movement.currentPhase === "DONE") {
+    return { valid: false, error: "Ship has already completed movement this turn" };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * 获取移动状态摘要（用于前端显示）
+ */
+export function getMovementStatus(ship: any): {
+  currentPhase: MovementPhase;
+  phaseAAvailable: number;
+  phaseCAvailable: number;
+  turnAngleAvailable: number;
+  phaseALock: TranslationLock;
+  phaseCLock: TranslationLock;
+  canMove: boolean;
+} {
+  const maxMove = ship.shipJson?.ship?.maxSpeed || 0;
+  const maxTurn = ship.shipJson?.ship?.maxTurnRate || 0;
+  const movement = getMovementState(ship);
+
+  return {
+    currentPhase: movement.currentPhase,
+    phaseAAvailable: maxMove - movement.phaseAUsed,
+    phaseCAvailable: maxMove - movement.phaseCUsed,
+    turnAngleAvailable: maxTurn - movement.turnAngleUsed,
+    phaseALock: movement.phaseALock,
+    phaseCLock: movement.phaseCLock,
+    canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
+  };
 }

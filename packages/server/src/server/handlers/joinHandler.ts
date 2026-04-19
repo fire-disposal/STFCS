@@ -87,7 +87,7 @@ export class JoinHandler {
     if (!validation.valid) {
       return {
         success: false,
-        error: validation.error,
+        ...(validation.error && { error: validation.error }),
       };
     }
 
@@ -99,13 +99,13 @@ export class JoinHandler {
       id: playerData.id,
       sessionId: playerData.sessionId,
       name: playerData.name,
-      nickname: playerData.nickname,
       role: (playerData.role as PlayerRoleValue) || PlayerRole.PLAYER,
       faction: faction as FactionType,
       ready: false,
       connected: true,
       pingMs: 0,
-      avatar: playerData.avatar,
+      ...(playerData.nickname && { nickname: playerData.nickname }),
+      ...(playerData.avatar && { avatar: playerData.avatar }),
     };
 
     try {
@@ -324,10 +324,10 @@ export class JoinHandler {
     }
 
     const stateManager = match.getStateManager();
-    const playerCount = stateManager.getShipsByFaction(FactionValue.PLAYER).length;
-    const enemyCount = stateManager.getShipsByFaction(FactionValue.ENEMY).length;
+    const playerCount = stateManager.getShipTokensByFaction(Faction.PLAYER).length;
+    const enemyCount = stateManager.getShipTokensByFaction(Faction.ENEMY).length;
 
-    return playerCount <= enemyCount ? FactionValue.PLAYER : FactionValue.ENEMY;
+    return playerCount <= enemyCount ? Faction.PLAYER : Faction.ENEMY;
   }
 
   /**

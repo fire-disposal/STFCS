@@ -56,6 +56,7 @@ export const WeaponState = {
 	READY: "READY",
 	COOLDOWN: "COOLDOWN",
 	DISABLED: "DISABLED",
+	FIRED: "FIRED",
 } as const;
 
 export const ArmorQuadrant = {

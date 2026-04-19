@@ -1,7 +1,6 @@
 /**
- * 协议处理器导出
+ * 简化的 WebSocket 协议处理层
  */
 
-export * from "./ProtocolHandler.js";
-export * from "./GameCommandHandler.js";
-export * from "./RoomProtocolHandler.js";
+export { MessageRouter } from "./MessageRouter.js";
+export type { HandlerFn } from "./MessageRouter.js";

@@ -3,7 +3,7 @@
  * 基于 @vt/data 权威设计 - weapon.schema.json
  */
 
-import type { WeaponJSON, WeaponRuntime, WeaponSpec } from "@vt/data";
+import type { WeaponJSON, WeaponSpec } from "@vt/data";
 
 /**
  * 组件类型 - 基于schema设计
@@ -112,11 +112,11 @@ export interface StatusEffect {
  */
 export interface ComponentMetadata {
   name: string;
-  description?: string;
+  description: string | undefined;
   createdAt: number;
   updatedAt: number;
   tags: string[];
-  customData?: Record<string, any>;
+  customData: Record<string, any> | undefined;
 }
 
 /**
@@ -148,9 +148,11 @@ export function createComponentState(
     visible: true,
     metadata: {
       name: `Component_${id.substring(0, 8)}`,
+      description: undefined,
       createdAt: now,
       updatedAt: now,
       tags: [],
+      customData: undefined,
       ...metadata,
     },
   };
@@ -174,9 +176,9 @@ export function createWeaponComponentState(
     mountId,
     weaponJson.$id,
     {
-      name: weaponJson.metadata.name || `Weapon_${id.substring(0, 8)}`,
-      description: weaponJson.metadata.description,
-      tags: weaponJson.metadata.tags || [],
+      name: weaponJson.metadata?.name || `Weapon_${id.substring(0, 8)}`,
+      description: weaponJson.metadata?.description,
+      tags: weaponJson.metadata?.tags || [],
       ...metadata,
     }
   );
@@ -186,6 +188,7 @@ export function createWeaponComponentState(
 
   return {
     ...baseComponent,
+    type: "WEAPON" as const,
     weaponJson,
     spec,
     combatState,
@@ -255,7 +258,7 @@ function updateWeaponCombatState(
   weapon: WeaponComponentState,
   runtime: ComponentRuntime
 ): WeaponComponentState {
-  const cooldownPercentage = runtime.cooldownRemaining > 0 
+  const cooldownPercentage = runtime.cooldownRemaining > 0 && weapon.spec.cooldown
     ? (runtime.cooldownRemaining / weapon.spec.cooldown) * 100 
     : 0;
 
@@ -448,7 +451,7 @@ export function getWeaponSpecSummary(weapon: WeaponComponentState): {
   const spec = weapon.spec;
   
   return {
-    damage: `${spec.damage}${spec.projectilesPerShot > 1 ? `×${spec.projectilesPerShot}` : ''}`,
+    damage: `${spec.damage}${(spec.projectilesPerShot || 1) > 1 ? `×${spec.projectilesPerShot || 1}` : ''}`,
     range: `${spec.range}`,
     type: spec.damageType,
     flux: `${spec.fluxCostPerShot || 0}`,

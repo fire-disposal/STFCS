@@ -86,10 +86,10 @@ export class Broadcaster {
     // 可靠广播策略（默认）
     this.addStrategy({
       name: "reliable",
-      shouldBroadcast: (event, scope) => true,
-      getDeliveryPriority: (event, scope) => {
+      shouldBroadcast: (_event, _scope) => true,
+      getDeliveryPriority: (_event, _scope) => {
         // 根据事件类型确定优先级
-        switch (event.type) {
+        switch (_event.type) {
           case "DAMAGE":
           case "SHIP_DESTROYED":
             return 100; // 高优先级
@@ -108,18 +108,18 @@ export class Broadcaster {
     // 优化广播策略（减少带宽）
     this.addStrategy({
       name: "optimized",
-      shouldBroadcast: (event, scope) => {
+      shouldBroadcast: (_event, _scope) => {
         // 过滤掉不重要的频繁事件
         const frequentEvents = ["POSITION_UPDATE", "FLUX_UPDATE"];
-        return !frequentEvents.includes(event.type);
+        return !frequentEvents.includes(_event.type);
       },
-      transformMessage: (event, scope) => {
+      transformMessage: (_event, _scope) => {
         // 压缩消息
         return {
-          type: event.type,
-          payload: this.compressPayload(event.payload),
-          timestamp: event.timestamp,
-          scope,
+          type: _event.type,
+          payload: this.compressPayload(_event.payload),
+          timestamp: _event.timestamp,
+          scope: _scope,
           priority: 20,
         };
       },
@@ -128,12 +128,12 @@ export class Broadcaster {
     // 全量广播策略（调试用）
     this.addStrategy({
       name: "verbose",
-      shouldBroadcast: (event, scope) => true,
-      transformMessage: (event, scope) => ({
-        type: event.type,
-        payload: event.payload,
-        timestamp: event.timestamp,
-        scope,
+      shouldBroadcast: (_event, _scope) => true,
+      transformMessage: (_event, _scope) => ({
+        type: _event.type,
+        payload: _event.payload,
+        timestamp: _event.timestamp,
+        scope: _scope,
         priority: 5,
       }),
     });
@@ -257,7 +257,10 @@ export class Broadcaster {
         if (!messagesByRoom.has(room)) {
           messagesByRoom.set(room, []);
         }
-        messagesByRoom.get(room)!.push({ message, scope });
+        const roomMessages = messagesByRoom.get(room);
+        if (roomMessages) {
+          roomMessages.push({ message, scope });
+        }
       }
 
       // 发送消息
@@ -333,28 +336,28 @@ export class Broadcaster {
     try {
       switch (scope.target) {
         case "ALL":
-          room.broadcast(message.type, message.payload);
+          room.broadcast({ type: message.type, payload: message.payload });
           break;
         case "FACTION":
           if (scope.faction) {
-            room.broadcastToFaction(scope.faction, message.type, message.payload);
+            room.broadcastToFaction(scope.faction, { type: message.type, payload: message.payload });
           }
           break;
         case "PLAYER":
           if (scope.playerId) {
-            room.sendToPlayer(scope.playerId, message.type, message.payload);
+            room.sendToPlayer(scope.playerId, { type: message.type, payload: message.payload });
           }
           break;
         case "EXCEPT_PLAYER":
           if (scope.playerId) {
-            room.broadcastExcept(message.type, message.payload, scope.playerId);
+            room.broadcastExcept(scope.playerId, { type: message.type, payload: message.payload });
           }
           break;
         case "SPECTATORS_ONLY":
-          room.broadcastToSpectators(message.type, message.payload);
+          room.broadcastToSpectators({ type: message.type, payload: message.payload });
           break;
         case "PLAYERS_ONLY":
-          room.broadcastToPlayers(message.type, message.payload);
+          room.broadcastToPlayers({ type: message.type, payload: message.payload });
           break;
       }
     } catch (error) {
@@ -406,7 +409,7 @@ export class Broadcaster {
    * 获取目标键
    */
   private getTargetKey(scope: BroadcastScope): string {
-    const parts = [scope.target];
+    const parts: string[] = [scope.target];
     
     if (scope.faction) parts.push(`faction:${scope.faction}`);
     if (scope.playerId) parts.push(`player:${scope.playerId}`);
@@ -425,7 +428,10 @@ export class Broadcaster {
     const scope: BroadcastScope = { target: parts[0] as BroadcastTarget };
 
     for (let i = 1; i < parts.length; i++) {
-      const [type, value] = parts[i].split(":");
+      const part = parts[i];
+      if (!part) continue;
+      const [type, value] = part.split(":");
+      if (!value) continue;
       
       switch (type) {
         case "faction":

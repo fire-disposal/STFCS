@@ -6,7 +6,7 @@ import { createLogger } from "../infra/simple-logger.js";
 import { Match } from "./Match.js";
 import type { FactionType } from "@vt/data";
 import { Faction } from "@vt/data";
-import type { GameState } from "../core/types/common.js";
+
 
 type TurnPhase = "MOVEMENT" | "COMBAT" | "END";
 
@@ -31,8 +31,8 @@ const DEFAULT_CONFIG: TurnManagerConfig = {
 interface TurnTimer {
   turnStartTime: number;
   phaseStartTime: number;
-  turnTimeout?: NodeJS.Timeout;
-  phaseTimeout?: NodeJS.Timeout;
+  turnTimeout: NodeJS.Timeout | undefined;
+  phaseTimeout: NodeJS.Timeout | undefined;
 }
 
 /** 回合管理器 */
@@ -54,6 +54,8 @@ export class TurnManager {
     this.timer = {
       turnStartTime: Date.now(),
       phaseStartTime: Date.now(),
+      turnTimeout: undefined,
+      phaseTimeout: undefined,
     };
 
     logger.info("Turn manager created", { roomId: match.roomId, config: this.config });
@@ -113,7 +115,7 @@ export class TurnManager {
 
     // 更新回合历史
     if (this.turnHistory.length > 0) {
-      const currentTurn = this.turnHistory[this.turnHistory.length - 1];
+      const currentTurn = this.turnHistory[this.turnHistory.length - 1]!;
       currentTurn.endTime = Date.now();
     }
 
@@ -164,7 +166,7 @@ export class TurnManager {
       return;
     }
 
-    const nextPhase = this.getNextPhase(state.turnPhase);
+    const nextPhase = this.getNextPhase(state.turnPhase as TurnPhase);
     
     // 更新阶段
     // 注意：这里需要扩展GameStateManager以支持阶段管理
@@ -213,12 +215,10 @@ export class TurnManager {
   private getNextFaction(currentFaction: FactionType): FactionType {
     // 简化：玩家→敌人→玩家循环
     switch (currentFaction) {
-      case FactionValue.PLAYER:
+      case Faction.PLAYER:
         return Faction.ENEMY as FactionType;
-        return Faction.PLAYER as FactionType;
-        return Faction.PLAYER as FactionType;
       default:
-        return FactionValue.PLAYER as Faction;
+        return Faction.PLAYER as FactionType;
     }
   }
 
@@ -235,10 +235,10 @@ export class TurnManager {
 
     const currentIndex = phaseOrder.indexOf(currentPhase);
     if (currentIndex === -1 || currentIndex >= phaseOrder.length - 1) {
-      return phaseOrder[0]; // 循环回到第一阶段
+      return phaseOrder[0]!; // 循环回到第一阶段
     }
 
-    return phaseOrder[currentIndex + 1];
+    return phaseOrder[currentIndex + 1]!;
   }
 
   /**
@@ -246,7 +246,7 @@ export class TurnManager {
    */
   recordAction(): void {
     if (this.turnHistory.length > 0) {
-      const currentTurn = this.turnHistory[this.turnHistory.length - 1];
+      const currentTurn = this.turnHistory[this.turnHistory.length - 1]!;
       currentTurn.actions++;
     }
   }

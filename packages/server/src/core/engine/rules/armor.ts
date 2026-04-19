@@ -2,7 +2,7 @@
  * 护甲计算规则
  */
 
-import type { ShipJSON } from "@vt/data";
+
 
 /** 六象限护甲系统 */
 export const ARMOR_QUADRANTS = [
@@ -35,7 +35,7 @@ export function calculateHitQuadrant(
 
 /** 获取象限名称 */
 export function getQuadrantName(index: number): ArmorQuadrant {
-  return ARMOR_QUADRANTS[Math.max(0, Math.min(0, index))];
+  return ARMOR_QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
 }
 
 /** 计算护甲值（考虑损坏） */
@@ -79,7 +79,7 @@ export function calculateArmorRepair(
 /** 检查护甲是否被击穿 */
 export function isArmorBreached(
   armorValue: number,
-  attackDamage: number,
+  _attackDamage: number,
   penetration: number
 ): boolean {
   return penetration > armorValue * 0.8; // 穿透超过80%护甲值视为击穿

@@ -6,14 +6,31 @@
 
 // 通用类型
 export type {
-	TextureSourceType,
-	Texture,
-	FactionType,
-	FluxStateType,
-	GamePhaseType,
-	Metadata,
-	createTexture,
+  TextureSourceType,
+  Texture,
+  FactionType,
+  FluxStateType,
+  GamePhaseType,
+  Metadata,
+  createTexture,
 } from "./CommonJsonTypes.js";
+
+// 玩家档案类型
+export type {
+  PlayerProfile,
+  GameSave,
+  SaveMetadata,
+  SaveCreationRequest,
+  SaveUpdateRequest,
+  SaveListItem,
+  SaveExport,
+  TextureRef,
+} from "./PlayerTypes.js";
+
+// 资产类型
+export type {
+  Asset,
+} from "./AssetTypes.js";
 
 // 舰船类型
 export type {

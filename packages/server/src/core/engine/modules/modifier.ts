@@ -134,13 +134,15 @@ function processModifierApplication(state: any, payload: any) {
  * 获取目标舰船
  */
 function getTargetShips(state: any, targetType: string, targetId?: string, _faction?: string): any[] {
-  const ships = Array.from(state.ships.values());
+  const ships = Array.from(state.tokens.values());
   
   switch (targetType) {
-    case "SHIP":
-      return targetId ? [state.ships.get(targetId)].filter(Boolean) : [];
+    case "SHIP": {
+      const ship = targetId ? state.tokens.get(targetId) : undefined;
+      return ship ? [ship] : [];
+    }
     case "FACTION":
-      return ships.filter(ship => ship.runtime.faction === _faction);
+      return ships.filter((ship: any) => ship.runtime?.faction === _faction);
     case "ALL":
       return ships;
     default:
@@ -226,7 +228,7 @@ export function updateStatusEffects(state: any): { shipUpdates: Map<string, any>
   const shipUpdates = new Map<string, any>();
   const expiredEffects = new Map<string, any[]>();
 
-  for (const [shipId, ship] of state.ships.entries()) {
+  for (const [shipId, ship] of state.tokens.entries()) {
     if (!ship.runtime.statusEffects || ship.runtime.statusEffects.length === 0) {
       continue;
     }
@@ -363,7 +365,7 @@ export function validateModifierApplication(
 
   // 检查目标是否存在
   if (payload.targetType === "SHIP" && payload.targetId) {
-    const targetShip = state.ships.get(payload.targetId);
+    const targetShip = state.tokens.get(payload.targetId);
     if (!targetShip) {
       return { valid: false, error: "Target ship not found" };
     }

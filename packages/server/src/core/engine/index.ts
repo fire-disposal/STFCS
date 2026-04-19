@@ -6,5 +6,5 @@
 export * from "./applyAction.js";
 export * from "./context.js";
 export * from "./modules/index.js";
-export * from "./geometry/index.js";
-export * from "./rules/index.js";
+export * as geometry from "./geometry/index.js";
+export * as rules from "./rules/index.js";

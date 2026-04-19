@@ -28,9 +28,9 @@ export interface WeaponAttackResult {
  */
 export function calculateWeaponAttack(
   weaponSpec: WeaponJSON["weapon"],
-  weaponRuntime: WeaponJSON["runtime"],
+  _weaponRuntime: WeaponJSON["runtime"],
   attackerSpec: ShipJSON["ship"],
-  attackerRuntime: ShipJSON["runtime"],
+  _attackerRuntime: ShipJSON["runtime"],
   targetSpec: ShipJSON["ship"],
   targetRuntime: ShipJSON["runtime"],
   attackerPosition: Point,
@@ -48,6 +48,10 @@ export function calculateWeaponAttack(
     targetDestroyed: false,
     targetOverloaded: false,
   };
+
+  if (!targetRuntime) {
+    return result;
+  }
 
   // 1. 检查射程
   const dist = distance(attackerPosition, targetPosition);
@@ -124,7 +128,6 @@ export function calculateWeaponAttack(
     // 穿甲计算
     const penetration = armorDamage * 0.5; // 简化穿甲系数
     const armorReduction = Math.max(0, armorValue - penetration);
-    const actualArmorDamage = Math.min(armorDamage, armorValue);
 
     // 剩余伤害穿透
     if (armorReduction > 0) {
@@ -133,7 +136,7 @@ export function calculateWeaponAttack(
   }
 
   // 9. 检查目标状态
-  const newHull = (targetRuntime.hull?.current || 0) - result.damage;
+  const newHull = (targetRuntime.hull || 0) - result.damage;
   result.targetDestroyed = newHull <= 0;
 
   // 10. 检查过载
@@ -187,10 +190,9 @@ export function calculateDamageModifier(
  * 计算武器冷却
  */
 export function calculateWeaponCooldown(
-  weaponSpec: WeaponJSON["weapon"],
+  _weaponSpec: WeaponJSON["weapon"],
   currentCooldown: number
 ): number {
-  const cooldown = weaponSpec.cooldown || 0;
   return Math.max(0, currentCooldown - 1); // 每回合减少1
 }
 
@@ -200,29 +202,64 @@ export function calculateWeaponCooldown(
 export function isWeaponReady(
   weaponRuntime: WeaponJSON["runtime"]
 ): boolean {
-  return weaponRuntime.state === "READY" && weaponRuntime.cooldownRemaining <= 0;
+  if (!weaponRuntime) return false;
+  return weaponRuntime.state === "READY";
 }
 
 /**
- * 计算武器状态
+ * 武器开火后状态更新
+ * 将武器状态设为 "FIRED"（本回合已开火）
  */
-export function updateWeaponState(
-  weaponRuntime: WeaponJSON["runtime"],
-  fired: boolean
+export function setWeaponFired(
+  weaponRuntime: WeaponJSON["runtime"]
 ): WeaponJSON["runtime"] {
-  const newState = { ...weaponRuntime };
+  if (!weaponRuntime) return weaponRuntime;
 
-  if (fired) {
-    newState.state = "COOLDOWN";
-    newState.cooldownRemaining = 1; // 简化：冷却1回合
-  } else {
-    if (newState.state === "COOLDOWN" && newState.cooldownRemaining > 0) {
-      newState.cooldownRemaining = Math.max(0, newState.cooldownRemaining - 1);
-      if (newState.cooldownRemaining === 0) {
-        newState.state = "READY";
-      }
+  return {
+    ...weaponRuntime,
+    state: "FIRED",
+  } as WeaponJSON["runtime"];
+}
+
+/**
+ * 回合结束时处理武器状态转换
+ * - "FIRED" → "READY" (cooldown=0) 或 "COOLDOWN" (cooldown>0)
+ * - "COOLDOWN" → cooldownRemaining--, 若到0则变为 "READY"
+ */
+export function updateWeaponStateAtTurnEnd(
+  weaponRuntime: WeaponJSON["runtime"],
+  weaponSpec?: WeaponJSON["weapon"]
+): WeaponJSON["runtime"] {
+  if (!weaponRuntime) return weaponRuntime;
+
+  // 处理本回合已开火的武器
+  if (weaponRuntime.state === "FIRED") {
+    const cooldown = weaponSpec?.cooldown || 0;
+    if (cooldown <= 0) {
+      // 无冷却，直接恢复就绪
+      return {
+        ...weaponRuntime,
+        state: "READY",
+      } as WeaponJSON["runtime"];
+    } else {
+      // 进入冷却
+      return {
+        ...weaponRuntime,
+        state: "COOLDOWN",
+        cooldownRemaining: cooldown,
+      } as WeaponJSON["runtime"];
     }
   }
 
-  return newState;
+  // 处理冷却中的武器
+  if (weaponRuntime.state === "COOLDOWN" && (weaponRuntime.cooldownRemaining || 0) > 0) {
+    const newCooldown = Math.max(0, (weaponRuntime.cooldownRemaining || 0) - 1);
+    return {
+      ...weaponRuntime,
+      state: newCooldown === 0 ? "READY" : "COOLDOWN",
+      cooldownRemaining: newCooldown,
+    } as WeaponJSON["runtime"];
+  }
+
+  return weaponRuntime;
 }

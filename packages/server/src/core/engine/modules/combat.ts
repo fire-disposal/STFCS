@@ -5,7 +5,7 @@
 
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createAttackEvent, createDamageEvent, createShipDestroyedEvent } from "../context.js";
-import { calculateWeaponAttack, updateWeaponState } from "../rules/weapon.js";
+import { calculateWeaponAttack, setWeaponFired } from "../rules/weapon.js";
 import { calculateDamage } from "../rules/damage.js";
 
 /**
@@ -71,21 +71,14 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
     updates.set(`ship:${targetShip.id}`, targetUpdates);
 
     // 创建伤害事件
-    events.push(createDamageEvent({
-      targetId: targetShip.id,
-      damage: damageResult.damageApplied,
-      damageType: (weapon.weapon as any)?.damageType || "KINETIC",
-      sourceId: ship.id,
-      weaponId: payload.weaponId,
-      shieldHit: damageResult.shieldHit,
-      armorHit: damageResult.armorHit,
-      armorQuadrant: damageResult.armorQuadrant,
-      hullDamage: damageResult.hullDamage,
-      armorDamage: damageResult.armorDamage,
-      fluxGenerated: damageResult.fluxGenerated,
-      targetDestroyed: damageResult.targetDestroyed,
-      targetOverloaded: damageResult.targetOverloaded,
-    }));
+    events.push(createDamageEvent(
+      targetShip.id,
+      damageResult.damageApplied,
+      (weapon.weapon as any)?.damageType || "KINETIC",
+      ship.id,
+      damageResult.shieldHit,
+      damageResult.armorHit
+    ));
 
     // 如果目标被摧毁，创建摧毁事件
     if (damageResult.targetDestroyed) {
@@ -105,15 +98,16 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
 
 /**
  * 更新武器状态（开火后）
+ * 将指定武器设为 "FIRED" 状态
  */
 function updateWeaponAfterFire(weapons: any[], weaponId: string): any[] {
   if (!weapons) return weapons;
   
   return weapons.map(weapon => {
     if (weapon.mountId === weaponId) {
-      return updateWeaponState(weapon, true);
+      return setWeaponFired(weapon);
     }
-    return updateWeaponState(weapon, false);
+    return weapon;
   });
 }
 
@@ -192,7 +186,7 @@ export function validateAttack(
   }
 
   // 检查武器
-  const weapon = attacker.runtime.weapons?.find((w: any) => w.mountId === weaponId);
+  const weapon = attacker.runtime.weapons?.find((w: { mountId: string }) => w.mountId === weaponId);
   if (!weapon) {
     return { valid: false, error: "Weapon not found" };
   }

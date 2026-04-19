@@ -4,22 +4,19 @@
 
 import type { 
   ShipJSON, 
-  WeaponJSON, 
-  ShipRuntime, 
-  WeaponRuntime,
+  ShipRuntime,
   FactionType,
   PlayerRoleValue,
-  GamePhaseType,
-  TurnPhase,
-  FactionTurnPhase,
-  TokenType,
-  TokenTurnState,
-  ClientCommand,
-  Point
+  GamePhaseType
 } from "@vt/data";
 
-import type { TokenState, ShipTokenState } from "../state/Token.js";
-import type { ComponentState, WeaponComponentState } from "../state/Component.js";
+import type { TokenState, TokenType } from "../state/Token.js";
+import type { ComponentState } from "../state/Component.js";
+
+// 本地定义这些类型（@vt/data 中不存在）
+export type TurnPhase = string;
+export type FactionTurnPhase = string;
+export type TokenTurnState = string;
 
 // ==================== 游戏状态类型 ====================
 

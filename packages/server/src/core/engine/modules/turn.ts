@@ -13,7 +13,7 @@ import { applyFlux } from "./flux.js";
 export function applyTurn(context: EngineContext): { newState: any; events: any[] } {
   const { state, action } = context;
   
-  const events = [];
+  const events: any[] = [];
   const updates = new Map<string, any>();
 
   if (action.type === "END_TURN") {
@@ -24,32 +24,30 @@ export function applyTurn(context: EngineContext): { newState: any; events: any[
     updates.set("game", turnResult.newGameState);
 
     // 创建回合变化事件
-    events.push(createTurnChangeEvent({
-      turn: turnResult.newGameState.turn,
-      activeFaction: turnResult.newGameState.activeFaction,
-      previousTurn: state.turn,
-      previousFaction: state.activeFaction,
-      phase: turnResult.newGameState.phase,
-      factionTurnPhase: turnResult.newGameState.factionTurnPhase,
-    }));
+    events.push(createTurnChangeEvent(
+      turnResult.newGameState.turn,
+      turnResult.newGameState.activeFaction,
+      state.turn,
+      state.activeFaction
+    ));
+
+    // 应用回合更新
+    const stateAfterTurn = applyStateUpdates(state, updates);
 
     // 处理回合结束时的其他逻辑（辐能消散等）
     const fluxContext = {
       ...context,
-      state: { ...state, ...turnResult.newGameState },
+      state: stateAfterTurn,
     };
     const fluxResult = applyFlux(fluxContext);
     
-    // 合并状态更新
-    for (const [key, value] of fluxResult.stateUpdates.entries()) {
-      updates.set(key, value);
-    }
-    
     // 合并事件
     events.push(...fluxResult.events);
+
+    return { newState: fluxResult.newState, events };
   }
 
-  // 应用状态更新
+  // 应用状态更新（非 END_TURN 时）
   const newState = applyStateUpdates(state, updates);
 
   return { newState, events };
@@ -88,7 +86,7 @@ function processEndTurn(state: any) {
   }
 
   // 重置所有舰船的移动和开火状态
-  for (const [shipId, ship] of newGameState.ships.entries()) {
+  for (const [_shipId, ship] of newGameState.tokens.entries()) {
     if (!ship.runtime.destroyed) {
       ship.runtime.movement = {
         hasMoved: false,
@@ -174,7 +172,7 @@ export function getTurnInfo(state: any): {
     state.factionTurnPhase
   );
 
-  const aliveShips = Array.from(state.ships.values()).filter(
+  const aliveShips = Array.from(state.tokens.values()).filter(
     (ship: any) => !ship.runtime.destroyed
   );
 

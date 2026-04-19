@@ -31,12 +31,17 @@ export type GamePhaseType = "DEPLOYMENT" | "PLAYER_ACTION" | "DM_ACTION" | "TURN
 // ==================== 元数据类型 ====================
 
 export interface Metadata {
-	name: string;
-	description?: string;
-	author?: string;
-	createdAt?: number;
-	updatedAt?: number;
-	tags?: string[];
+  name: string;
+  description?: string;
+  author?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  tags?: string[];
+  
+  // 玩家档案扩展字段
+  owner?: string;        // player:xxx
+  isPresetCopy?: boolean;
+  originalPresetId?: string;
 }
 
 // ==================== 辅助函数 ====================

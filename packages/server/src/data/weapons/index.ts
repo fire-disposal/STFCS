@@ -15,10 +15,9 @@ export class WeaponDataManager {
   /**
    * 加载预设武器
    */
-  async loadPresetWeapons(): Promise<WeaponJSON[]> {
+  loadPresetWeapons(): WeaponJSON[] {
     try {
-      const presetWeapons = await this.registry.loadPresetWeapons();
-      return presetWeapons;
+      return this.registry.getAllWeapons().filter(w => w.$id.startsWith("preset:"));
     } catch (error) {
       console.error("Failed to load preset weapons:", error);
       return [];
@@ -28,34 +27,33 @@ export class WeaponDataManager {
   /**
    * 根据ID获取武器
    */
-  getWeaponById(weaponId: string): WeaponJSON | null {
+  getWeaponById(weaponId: string): WeaponJSON | undefined {
     try {
-      return this.registry.getWeapon(weaponId);
+      return this.registry.getWeaponJSON(weaponId);
     } catch (error) {
       console.error(`Failed to get weapon ${weaponId}:`, error);
-      return null;
+      return undefined;
     }
   }
 
   /**
    * 验证武器数据
    */
-  validateWeapon(weaponData: any): { valid: boolean; errors?: string[] } {
-    try {
-      const result = this.registry.validateWeapon(weaponData);
-      return result;
-    } catch (error) {
-      return {
-        valid: false,
-        errors: [`Validation error: ${error}`],
-      };
+  validateWeapon(weaponData: unknown): { valid: boolean; errors?: string[] } {
+    if (!weaponData || typeof weaponData !== "object") {
+      return { valid: false, errors: ["Invalid weapon data"] };
     }
+    const weapon = weaponData as WeaponJSON;
+    if (!weapon.$id || !weapon.weapon) {
+      return { valid: false, errors: ["Missing required fields: $id, weapon"] };
+    }
+    return { valid: true };
   }
 
   /**
    * 创建运行时武器状态
    */
-  createRuntimeWeapon(weaponJson: WeaponJSON, mountId: string): WeaponJSON["runtime"] {
+  createRuntimeWeapon(_weaponJson: WeaponJSON, mountId: string): WeaponJSON["runtime"] {
     return {
       mountId,
       state: "READY",
@@ -143,7 +141,7 @@ export class WeaponDataManager {
 
     const dps = (spec.damage * projectiles * burstCount) / cooldown;
     const fluxPerSecond = spec.fluxCostPerShot / cooldown;
-    const effectiveRange = spec.range * (spec.rangeModifier || 1.0);
+    const effectiveRange = spec.range;
 
     return { dps, fluxPerSecond, effectiveRange };
   }

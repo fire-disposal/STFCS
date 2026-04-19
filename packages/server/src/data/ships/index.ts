@@ -15,11 +15,9 @@ export class ShipDataManager {
   /**
    * 加载预设舰船
    */
-  async loadPresetShips(): Promise<ShipJSON[]> {
+  loadPresetShips(): ShipJSON[] {
     try {
-      // 从 @vt/data 加载预设
-      const presetShips = await this.registry.loadPresetShips();
-      return presetShips;
+      return this.registry.getPresetShips();
     } catch (error) {
       console.error("Failed to load preset ships:", error);
       return [];
@@ -29,28 +27,27 @@ export class ShipDataManager {
   /**
    * 根据ID获取舰船
    */
-  getShipById(shipId: string): ShipJSON | null {
+  getShipById(shipId: string): ShipJSON | undefined {
     try {
-      return this.registry.getShip(shipId);
+      return this.registry.getShipJSON(shipId);
     } catch (error) {
       console.error(`Failed to get ship ${shipId}:`, error);
-      return null;
+      return undefined;
     }
   }
 
   /**
    * 验证舰船数据
    */
-  validateShip(shipData: any): { valid: boolean; errors?: string[] } {
-    try {
-      const result = this.registry.validateShip(shipData);
-      return result;
-    } catch (error) {
-      return {
-        valid: false,
-        errors: [`Validation error: ${error}`],
-      };
+  validateShip(shipData: unknown): { valid: boolean; errors?: string[] } {
+    if (!shipData || typeof shipData !== "object") {
+      return { valid: false, errors: ["Invalid ship data"] };
     }
+    const ship = shipData as ShipJSON;
+    if (!ship.$id || !ship.ship) {
+      return { valid: false, errors: ["Missing required fields: $id, ship"] };
+    }
+    return { valid: true };
   }
 
   /**
@@ -58,15 +55,19 @@ export class ShipDataManager {
    */
   createRuntimeShip(shipJson: ShipJSON, ownerId?: string): ShipJSON["runtime"] {
     const spec = shipJson.ship;
-    
-    return {
+    const weapons = spec.mounts?.map(mount => ({
+      mountId: mount.id,
+      state: "READY" as const,
+      cooldownRemaining: 0,
+    }));
+
+    const runtime: ShipJSON["runtime"] = {
       position: { x: 0, y: 0 },
       heading: 0,
       hull: spec.maxHitPoints,
       armor: Array(6).fill(spec.armorMaxPerQuadrant || 100),
       fluxSoft: 0,
       fluxHard: 0,
-      shield: spec.shield ? { active: false, value: 100 } : undefined,
       overloaded: false,
       destroyed: false,
       movement: {
@@ -76,14 +77,12 @@ export class ShipDataManager {
         phaseCUsed: 0,
       },
       hasFired: false,
-      weapons: spec.mounts?.map(mount => ({
-        mountId: mount.id,
-        state: "READY",
-        cooldownRemaining: 0,
-      })),
       faction: "PLAYER",
-      ownerId,
+      ...(ownerId !== undefined ? { ownerId } : {}),
+      ...(spec.shield ? { shield: { active: false, value: spec.shield.radius } } : {}),
+      ...(weapons ? { weapons } : {}),
     };
+    return runtime;
   }
 
   /**
