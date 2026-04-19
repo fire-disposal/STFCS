@@ -49,10 +49,7 @@ export const WeaponMountSection: React.FC<WeaponMountSectionProps> = ({
 			facing: 0,
 			arc: 180,
 			size: "SMALL",
-			mountType: "turret",
 			slotCategory: "UNIVERSAL_SLOT",
-			acceptsTurret: true,
-			acceptsHardpoint: true,
 			builtin: false,
 		};
 		onChange([...mounts, newMount]);
@@ -120,7 +117,7 @@ export const WeaponMountSection: React.FC<WeaponMountSectionProps> = ({
 										{mount.builtin && <span style={{ color: "#e74c3c", marginLeft: "4px" }}>内置</span>}
 									</span>
 									<span className="ship-customization-mount-item__meta">
-										{mount.size} | {mount.mountType === "turret" ? "炮塔" : "硬点"} | {mount.slotCategory}
+										{mount.size} | {mount.slotCategory}
 									</span>
 								</div>
 

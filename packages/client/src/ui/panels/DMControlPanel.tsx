@@ -203,7 +203,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
 	// 普通玩家列表（排除 DM）
 	const regularPlayers = useMemo(() => {
-		return players.filter((p) => p.role !== PlayerRole.DM);
+		return players.filter((p) => p.role !== PlayerRole.OWNER);
 	}, [players]);
 
 	// 选中的舰船对象

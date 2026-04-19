@@ -2,7 +2,7 @@
  * 阶段状态条组件
  *
  * 显示在顶部状态栏中央的长条组件：
- * - 当前阶段（部署 / 玩家回合 / DM 回合 / 结算）
+ * - 当前阶段（部署 / 玩家回合 / 结算）
  * - 回合数
  * - 活跃阵营
  * - 阶段进度指示
@@ -10,13 +10,13 @@
 
 import type { PlayerRoleValue } from "@/sync/types";
 import { Faction } from "@/sync/types";
-import { Crown, MapPin, User, Zap } from "lucide-react";
+import { Crown, MapPin, Skull, User, Zap } from "lucide-react";
 import React, { useMemo } from "react";
 
 const phaseNames: Record<string, string> = {
 	DEPLOYMENT: "部署阶段",
 	PLAYER_TURN: "玩家回合",
-	DM_TURN: "DM 回合",
+	DM_TURN: "DM回合",
 	END_PHASE: "结算阶段",
 };
 
@@ -30,7 +30,7 @@ interface PhaseConfig {
 const phases: PhaseConfig[] = [
 	{ id: "DEPLOYMENT", name: "部署", color: "#9b59b6", Icon: MapPin },
 	{ id: "PLAYER_TURN", name: "玩家", color: "#4a9eff", Icon: User },
-	{ id: "DM_TURN", name: "DM", color: "#ff6f8f", Icon: Crown },
+	{ id: "DM_TURN", name: "DM", color: "#e74c3c", Icon: Skull },
 	{ id: "END_PHASE", name: "结算", color: "#f1c40f", Icon: Zap },
 ];
 

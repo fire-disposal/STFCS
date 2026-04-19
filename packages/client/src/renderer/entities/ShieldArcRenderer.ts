@@ -28,7 +28,7 @@ const SHIELD_GLOW_LAYERS = 3;
 /** 阵营护盾颜色 */
 const FACTION_SHIELD_COLORS: Record<string, number> = {
 	[Faction.PLAYER]: 0x4fc3ff,   // 蓝色
-	[Faction.DM]: 0xff7f9f,        // 红色
+	[Faction.NEUTRAL]: 0xff7f9f,        // 红色
 };
 
 /**

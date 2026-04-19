@@ -2,35 +2,39 @@
 	"compilerOptions": {
 		"target": "ES2022",
 		"module": "ESNext",
+		"lib": [
+			"ES2022"
+		],
 		"moduleResolution": "bundler",
-		"experimentalDecorators": true,
-		"useDefineForClassFields": false,
-		"lib": ["ES2022", "ES2023.Array"],
-		"strict": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,
-		"declaration": true,
-		"declarationMap": true,
-		"sourceMap": true,
+		"verbatimModuleSyntax": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noPropertyAccessFromIndexSignature": true,
+		"allowUnusedLabels": false,
+		"allowUnreachableCode": false,
+		"exactOptionalPropertyTypes": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"checkJs": true,
 		"outDir": "./dist",
-		"types": ["node", "vitest/globals"],
-		"baseUrl": "../..",
-		"paths": {
-			"@vt/data": ["packages/data/src/index.ts"],
-			"@vt/rules": ["packages/rules/src/index.ts"],
-			"@vt/rules/math": ["packages/rules/src/math/index.ts"]
-		}
+		"rootDir": "./src"
 	},
 	"include": [
-		"src/index.ts",
-		"src/rooms/**/*.ts",
-		"src/commands/**/*.ts",
-		"src/services/**/*.ts",
-		"src/http/**/*.ts",
-		"src/schema/**/*.ts",
-		"src/types/**/*.ts"
+		"src/**/*"
 	],
-	"exclude": ["node_modules", "dist", "**/__tests__/*", "**/*.backup.ts"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		"**/*.test.ts",
+		"**/*.spec.ts"
+	]
 }

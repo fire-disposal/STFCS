@@ -20,11 +20,13 @@ export interface Texture {
 
 // ==================== 派系类型 ====================
 
-export type Faction = "PLAYER" | "ENEMY" | "NEUTRAL";
-
+export type FactionType = "PLAYER" | "ENEMY" | "NEUTRAL";
 // ==================== 辐能状态 ====================
 
-export type FluxState = "NORMAL" | "HIGH" | "OVERLOADED" | "VENTING";
+export type FluxStateType = "NORMAL" | "HIGH" | "OVERLOADED" | "VENTING";
+// ==================== 游戏阶段类型 ====================
+
+export type GamePhaseType = "DEPLOYMENT" | "PLAYER_ACTION" | "DM_ACTION" | "TURN_END";
 
 // ==================== 元数据类型 ====================
 

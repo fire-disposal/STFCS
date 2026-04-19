@@ -50,7 +50,7 @@ export const TurnStatusBar: React.FC<TurnStatusBarProps> = ({
 
 		players.forEach((p) => {
 			if (!p.connected) return; // 排除断开的玩家
-			if (p.role === PlayerRole.DM) {
+			if (p.role === PlayerRole.OWNER) {
 				dmPlayers.push(p);
 			} else {
 				// 根据所控制舰船的派系分类
@@ -78,7 +78,7 @@ export const TurnStatusBar: React.FC<TurnStatusBarProps> = ({
 
 	const canEndTurn = useMemo(() => {
 		if (!currentPlayer) return false;
-		if (currentPlayer.role === PlayerRole.DM) return currentPhase === GamePhase.DM_TURN;
+		if (currentPlayer.role === PlayerRole.OWNER) return currentPhase === GamePhase.PLAYER_TURN;
 		return currentPhase === GamePhase.PLAYER_TURN;
 	}, [currentPlayer, currentPhase]);
 

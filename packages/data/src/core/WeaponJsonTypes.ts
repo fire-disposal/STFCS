@@ -8,10 +8,10 @@ import type { Texture, Metadata } from "./CommonJsonTypes.js";
 
 // ==================== 武器枚举类型 ====================
 
-export type WeaponCategory = "BALLISTIC" | "ENERGY" | "MISSILE" | "SYNERGY";
-export type DamageType = "KINETIC" | "HIGH_EXPLOSIVE" | "ENERGY" | "FRAGMENTATION";
-export type WeaponState = "READY" | "COOLDOWN" | "DISABLED";
-export type WeaponTag = "ANTI_SHIP" | "PD" | "GUIDED" | "BALLISTIC" | "ENERGY" | "HE" | "BEAM" | "SUPPRESSION";
+export type WeaponCategoryType = "BALLISTIC" | "ENERGY" | "MISSILE" | "SYNERGY";
+export type DamageTypeType = "KINETIC" | "HIGH_EXPLOSIVE" | "ENERGY" | "FRAGMENTATION";
+export type WeaponStateType = "READY" | "COOLDOWN" | "DISABLED";
+export type WeaponTagType = "ANTI_SHIP" | "PD" | "GUIDED" | "BALLISTIC" | "ENERGY" | "HE" | "BEAM" | "SUPPRESSION";
 
 // ==================== 状态效果类型 ====================
 
@@ -27,8 +27,8 @@ export interface StatusEffect {
 // ==================== 武器规格类型（扁平化） ====================
 
 export interface WeaponSpec {
-	category: WeaponCategory;
-	damageType: DamageType;
+	category: WeaponCategoryType;
+	damageType: DamageTypeType;
 	size: "SMALL" | "MEDIUM" | "LARGE";
 	damage: number;
 	projectilesPerShot?: number;
@@ -39,7 +39,7 @@ export interface WeaponSpec {
 	allowsMultipleTargets?: boolean;
 	burstCount?: number;
 	opCost?: number;
-	tags?: WeaponTag[];
+	tags?: WeaponTagType[];
 	texture?: Texture;
 }
 
@@ -47,9 +47,10 @@ export interface WeaponSpec {
 
 export interface WeaponRuntime {
 	mountId: string;
-	state: WeaponState;
+	state: WeaponStateType;
 	cooldownRemaining?: number;
 	statusEffects?: StatusEffect[];
+	weapon?: WeaponSpec; // 引用武器规格
 }
 
 // ==================== 完整武器JSON类型 ====================
@@ -57,7 +58,6 @@ export interface WeaponRuntime {
 export interface WeaponJSON {
 	"$schema": "weapon-v2";
 	"$id": string;
-	"$source"?: "preset" | "custom"; // 已弃用，保留兼容
 
 	weapon: WeaponSpec;
 	runtime?: WeaponRuntime;

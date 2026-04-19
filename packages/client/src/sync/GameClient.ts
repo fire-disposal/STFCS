@@ -39,7 +39,7 @@ import type {
 	KickPlayerPayload,
 	UpdateProfilePayload,
 	NetPingPayload,
-} from "@vt/schema-types";
+} from "@vt/server/commands/types";
 
 export class GameClient {
 	constructor(private room: Room<GameRoomState>) {}

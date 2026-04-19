@@ -48,11 +48,6 @@ function getWeaponStatusDetail(ship: ShipState, weapon: WeaponSlot): WeaponStatu
 		const progress = Math.max(0, Math.min(100, ((cooldownMax - weapon.cooldownRemaining) / cooldownMax) * 100));
 		return { canFire: false, state: WeaponState.COOLDOWN, stateLabel: "冷却", reason: `冷却中 (${Math.round(weapon.cooldownRemaining)}s)`, cooldownProgress: progress };
 	}
-	if (weapon.state === WeaponState.OUT_OF_AMMO || (weapon.maxAmmo > 0 && weapon.currentAmmo <= 0)) {
-		const reloadProgress = weapon.reloadProgress || 0;
-		const progress = Math.max(0, Math.min(100, (reloadProgress / (weapon.reloadTime || 1)) * 100));
-		return { canFire: false, state: WeaponState.OUT_OF_AMMO, stateLabel: "装填", reason: "弹药耗尽", reloadProgress: progress };
-	}
 	if (weapon.state !== WeaponState.READY) {
 		return { canFire: false, state: weapon.state, stateLabel: "异常", reason: "武器状态异常" };
 	}

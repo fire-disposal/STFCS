@@ -52,7 +52,7 @@ export const WeaponCustomizationModal: React.FC<WeaponCustomizationModalProps> =
 	const [isPD, setIsPD] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 
-	const isDM = playerRole === PlayerRole.DM;
+	const isOwner = playerRole === PlayerRole.OWNER;
 
 	const damageTypeColors: Record<DamageTypeValue, string> = {
 		KINETIC: "#4a9eff",
@@ -62,7 +62,7 @@ export const WeaponCustomizationModal: React.FC<WeaponCustomizationModalProps> =
 	};
 
 	const handleSave = useCallback(async () => {
-		if (!isDM) {
+		if (!isOwner) {
 			notify.error("仅DM可创建武器");
 			return;
 		}
@@ -95,9 +95,9 @@ export const WeaponCustomizationModal: React.FC<WeaponCustomizationModalProps> =
 		} finally {
 			setIsSaving(false);
 		}
-	}, [isDM, name, category, size, damageType, damage, range, arc, fluxCost, cooldown, opCost, isPD, networkManager, onClose]);
+	}, [isOwner, name, category, size, damageType, damage, range, arc, fluxCost, cooldown, opCost, isPD, networkManager, onClose]);
 
-	if (!isDM) {
+	if (!isOwner) {
 		return (
 			<div className="game-modal-overlay" onClick={onClose}>
 				<div className="game-modal" onClick={(e) => e.stopPropagation()}>

@@ -1,14 +1,19 @@
 /**
  * Core JSON Types 模块导出
  *
- * 提供所有JSON模型的类型定义和运行时常量
+ * 提供所有JSON模型的类型定义
  */
 
-// 运行时枚举常量
-export * from "./RuntimeEnums.js";
-
 // 通用类型
-export * from "./CommonJsonTypes.js";
+export type {
+	TextureSourceType,
+	Texture,
+	FactionType,
+	FluxStateType,
+	GamePhaseType,
+	Metadata,
+	createTexture,
+} from "./CommonJsonTypes.js";
 
 // 舰船类型
 export type {
@@ -28,10 +33,10 @@ export type {
 	WeaponJSON,
 	WeaponSpec,
 	WeaponRuntime,
-	WeaponCategory,
-	DamageType,
-	WeaponState,
-	WeaponTag,
+	WeaponCategoryType,
+	DamageTypeType,
+	WeaponStateType,
+	WeaponTagType,
 	StatusEffect,
 	WeaponIdFormat,
 } from "./WeaponJsonTypes.js";

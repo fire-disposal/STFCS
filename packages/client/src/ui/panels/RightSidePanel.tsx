@@ -30,7 +30,7 @@ interface RightSidePanelProps {
 		ownerId?: string;
 		name?: string;
 	}) => void;
-	onCreateTestShip: (faction: "player" | "dm", x: number, y: number) => void;
+	onCreateTestShip: (faction: "player" | "owner", x: number, y: number) => void;
 	onClearOverload: (shipId: string) => void;
 	onSetArmor: (shipId: string, section: number, value: number) => void;
 	onAssignShip: (shipId: string, targetSessionId: string) => void;
@@ -70,7 +70,7 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 	const tabs: TabDef[] = [
 		{ id: "view", label: "视图", Icon: Monitor },
 		{ id: "log", label: "日志", Icon: FileText },
-		...(isDM ? [{ id: "dm", label: "DM", Icon: Palette } as TabDef] : []),
+		...(isOwner ? [{ id: "owner", label: "管理", Icon: Palette } as TabDef] : []),
 	];
 
 	const ToggleButton = ({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) => (
@@ -115,12 +115,12 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
 							<CombatLogPanel isOpen={true} onClose={() => setActiveTab("view")} />
 						)}
 
-						{activeTab === "dm" && isDM && (
+						{activeTab === "owner" && isOwner && (
 							<div className="dm-panel">
 								<DMObjectCreator
 									onCreateObject={onCreateObject}
 									players={players
-										.filter((p) => p.role !== "DM")
+										.filter((p) => p.role !== "OWNER")
 										.map((p) => ({
 											sessionId: p.sessionId,
 											name: p.nickname || p.name,

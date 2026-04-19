@@ -38,7 +38,7 @@ const FLUX_CRITICAL_THRESHOLD = 0.9;  // 90% - 红色临界
 /** 阵营颜色 */
 const FACTION_COLORS: Record<string, number> = {
 	[Faction.PLAYER]: 0x4fc3ff,
-	[Faction.DM]: 0xff7f9f,
+	[Faction.NEUTRAL]: 0xff7f9f,
 };
 
 /** 辐能环颜色 */

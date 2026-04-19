@@ -4,7 +4,7 @@
  * 基于 schemas/ship.schema.json 生成的类型
  */
 
-import type { Texture, Faction, Metadata, StatusEffect } from "./CommonJsonTypes.js";
+import type { Texture, FactionType, Metadata} from "./CommonJsonTypes.js";
 import type { WeaponJSON, WeaponRuntime } from "./WeaponJsonTypes.js";
 
 // ==================== 基础几何类型 ====================
@@ -86,9 +86,8 @@ export interface ShipRuntime {
 	movement?: MovementState;
 	hasFired?: boolean;
 	weapons?: WeaponRuntime[];
-	faction?: Faction;
+	faction?: FactionType;
 	ownerId?: string;
-	statusEffects?: StatusEffect[];
 }
 
 // ==================== 完整舰船JSON类型 ====================

@@ -14,7 +14,7 @@ import { useFireModeStore } from "@/state/stores/fireModeStore";
 import type { ShipState } from "@/sync/types";
 import type { WeaponSlot } from "@/sync/types";
 import { DamageType, WeaponState } from "@/sync/types";
-import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@vt/rules";
+import { angleBetween, angleDifference, distance, getMountWorldPosition } from "@/utils/math";
 import { Graphics } from "pixi.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";

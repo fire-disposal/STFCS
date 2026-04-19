@@ -67,11 +67,11 @@ export const ArmorQuadrant = {
 	LF: "LF", // 300°~360° 左前
 } as const;
 
-export const FluxState = {
-	NORMAL: "NORMAL",
-	HIGH: "HIGH",
-	OVERLOADED: "OVERLOADED",
-	VENTING: "VENTING",
+export const GamePhase = {
+	DEPLOYMENT: "DEPLOYMENT",
+	PLAYER_ACTION: "PLAYER_ACTION",
+	DM_ACTION: "DM_ACTION",
+	TURN_END: "TURN_END",
 } as const;
 
 export const Faction = {
@@ -100,7 +100,7 @@ export const ChatMessageType = {
 	COMBAT: "combat",
 } as const;
 
-export const GamePhase = {
+export const GamePhaseEnum = {
 	DEPLOYMENT: "DEPLOYMENT",
 	PLAYER_ACTION: "PLAYER_ACTION",
 	DM_ACTION: "DM_ACTION",

@@ -1,7 +1,7 @@
 /**
- * 规则配置加载器
+ * 游戏规则配置加载器
  *
- * 从 JSON 文件加载所有游戏规则配置
+ * 从JSON文件加载所有游戏规则配置，提供类型安全的配置访问
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -9,14 +9,14 @@ import { resolve, dirname } from "path";
 
 const CONFIGS_DIR = resolve(dirname(new URL(import.meta.url).pathname), "configs");
 
-/** 缓存 */
+/** 配置缓存 */
 const cache: Map<string, any> = new Map();
 
 /** 配置文件映射 */
 const CONFIG_FILES = {
-	"gameRules": "game-rules.json",
-	"serverConfig": "server-config.json",
-};
+	gameRules: "game-rules.json",
+	serverConfig: "server-config.json",
+} as const;
 
 /** 已加载标记 */
 let loaded = false;

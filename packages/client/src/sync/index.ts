@@ -8,7 +8,7 @@ export * from "./types";
 // 命令发送
 export { GameClient } from "./GameClient";
 
-// Payload 类型从 @vt/schema-types 导入（与后端 100% 同步）
+// Payload 类型从 @vt/server/commands/types 导入（与后端 100% 同步）
 export type {
 	MoveTokenPayload,
 	ToggleShieldPayload,
@@ -26,7 +26,7 @@ export type {
 	KickPlayerPayload,
 	UpdateProfilePayload,
 	NetPingPayload,
-} from "@vt/schema-types";
+} from "@vt/server/commands/types";
 
 // Hooks
 export { useCurrentGameRoom } from "./useCurrentGameRoom";

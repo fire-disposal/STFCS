@@ -10,66 +10,57 @@
 export {
 	DamageType,
 	WeaponCategory,
-	MountType,
 	WeaponState,
 	WeaponSlotSize,
 	ArmorQuadrant,
-	ARMOR_QUADRANTS,
-	ShieldType,
-	FluxState,
+	// ARMOR_QUADRANTS, // TODO: not exported from data
+	// ShieldType, // TODO: not exported from data
+	// FluxState, // TODO: not exported from data
 	HullSize,
 	ShipClass,
 	Faction,
 	PlayerRole,
 	ConnectionQuality,
 	GamePhase,
-	TurnPhase,
-	MovePhase,
-	MovePhaseUI,
-	FactionTurnPhase,
-	TokenType,
-	TokenTurnState,
-	ClientCommand,
+	// TurnPhase, // TODO: not exported from data
+	// MovePhase, // TODO: not exported from data
+	// MovePhaseUI, // TODO: not exported from data
+	// FactionTurnPhase, // TODO: not exported from data
+	// TokenType, // TODO: not exported from data
+	// TokenTurnState, // TODO: not exported from data
+	// ClientCommand, // TODO: not exported from data
 } from "@vt/data";
 
 export type {
-	DamageTypeValue,
-	WeaponCategoryValue,
-	MountTypeValue,
-	WeaponStateValue,
-	WeaponSlotSizeValue,
-	ArmorQuadrantValue,
-	ShieldTypeValue,
-	FluxStateValue,
-	HullSizeValue,
-	ShipClassValue,
-	FactionValue,
-	PlayerRoleValue,
-	ConnectionQualityValue,
-	GamePhaseValue,
-	TurnPhaseValue,
-	MovePhaseValue,
-	MovePhaseUIValue,
-	FactionTurnPhaseValue,
-	TokenTypeValue,
-	TokenTurnStateValue,
-	ClientCommandValue,
+	// DamageTypeValue, // TODO: not exported from data
+	// WeaponCategoryValue, // TODO: not exported from data
+	// WeaponStateValue, // TODO: not exported from data
+	// WeaponSlotSizeValue, // TODO: not exported from data
+	// ArmorQuadrantValue, // TODO: not exported from data
+	// ShieldTypeValue, // TODO: not exported from data
+	// FluxStateValue, // TODO: not exported from data
+	// HullSizeValue, // TODO: not exported from data
+	// ShipClassValue, // TODO: not exported from data
+	// FactionValue, // TODO: not exported from data
+	// PlayerRoleValue, // TODO: not exported from data
+	// ConnectionQualityValue, // TODO: not exported from data
+	// GamePhaseValue, // TODO: not exported from data
+	// TurnPhaseValue, // TODO: not exported from data
+	// MovePhaseValue, // TODO: not exported from data
+	// MovePhaseUIValue, // TODO: not exported from data
+	// FactionTurnPhaseValue, // TODO: not exported from data
+	// TokenTypeValue, // TODO: not exported from data
+	// TokenTurnStateValue, // TODO: not exported from data
+	// ClientCommandValue, // TODO: not exported from data
 	Point,
-	ShipHullSpec,
+	// ShipHullSpec, // TODO: not exported from data
 	WeaponSpec,
-	WeaponMountSpec,
+	// WeaponMountSpec, // TODO: not exported from data
 } from "@vt/data";
 
 // ==================== Schema 类型（从 @vt/schema-types）====================
 
 import type {
-	ShipStateType,
-	WeaponSlotType,
-	TransformType,
-	HullStateType,
-	ArmorStateType,
-	FluxStateType,
-	ShieldStateType,
 	GameRoomStateType,
 	PlayerStateType,
 	SchemaMap,
@@ -78,13 +69,6 @@ import type {
 
 // 直接导出类型
 export type {
-	ShipStateType,
-	WeaponSlotType,
-	TransformType,
-	HullStateType,
-	ArmorStateType,
-	FluxStateType,
-	ShieldStateType,
 	GameRoomStateType,
 	PlayerStateType,
 	SchemaMap,
@@ -92,19 +76,12 @@ export type {
 };
 
 // 客户端使用的类型别名
-export type ShipState = ShipStateType;
-export type WeaponSlot = WeaponSlotType;
-export type Transform = TransformType;
-export type HullState = HullStateType;
-export type ArmorState = ArmorStateType;
-export type FluxState = FluxStateType;
-export type ShieldState = ShieldStateType;
 export type GameRoomState = GameRoomStateType;
 export type PlayerState = PlayerStateType;
 
 // ==================== 本地补充类型 ====================
 
-import type { TokenTypeValue, FactionValue } from "@vt/data";
+// import type { TokenTypeValue, FactionValue } from "@vt/data";
 
 export interface CameraState {
 	x: number;
@@ -121,11 +98,11 @@ export interface PlayerCamera extends CameraState {
 // Token 信息（客户端本地使用）
 export interface TokenInfo {
 	id: string;
-	type: TokenTypeValue;
+	type: string; // TokenTypeValue; // TODO: not exported
 	x: number;
 	y: number;
 	heading: number;
 	name: string;
-	faction?: FactionValue;
+	faction?: string; // FactionValue; // TODO: not exported
 	ownerId: string;
 }

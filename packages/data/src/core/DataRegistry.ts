@@ -202,17 +202,23 @@ export class DataRegistry {
 			weapons: this.createWeaponRuntimeStates(spec.mounts ?? []),
 			faction: options.faction ?? "PLAYER",
 			ownerId: options.ownerId ?? "",
-			statusEffects: [],
 		};
 	}
 
 	private createWeaponRuntimeStates(mounts: MountSpec[]): ShipRuntime["weapons"] {
-		return mounts.map((mount) => ({
-			mountId: mount.id,
-			state: "READY",
-			cooldownRemaining: 0,
-			statusEffects: [],
-		}));
+		return mounts.map((mount) => {
+			const weaponSpec = typeof mount.weapon === 'string' 
+				? this.getWeaponJSON(mount.weapon)?.weapon
+				: mount.weapon?.weapon;
+			
+			return {
+				mountId: mount.id,
+				state: "READY",
+				cooldownRemaining: 0,
+				statusEffects: [],
+				weapon: weaponSpec,
+			};
+		});
 	}
 
 	getAllShips(): ShipJSON[] {

@@ -84,7 +84,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const isPlayerTurn = room?.state?.currentPhase === GamePhase.PLAYER_TURN;
 	const canControlSelectedShip = useMemo(() => {
 		if (!selectedShip || !currentPlayer) return false;
-		if (currentPlayer.role === PlayerRole.DM) return true;
+		if (currentPlayer.role === PlayerRole.OWNER) return true;
 		return (
 			currentPlayer.role === PlayerRole.PLAYER &&
 			isPlayerTurn &&
@@ -171,7 +171,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				x,
 				y,
 				heading: 0,
-				faction: faction === "player" ? Faction.PLAYER : Faction.DM,
+				faction: faction === "player" ? Faction.PLAYER : Faction.NEUTRAL,
 			});
 		},
 		[room]
@@ -281,7 +281,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		);
 	}
 
-	const isDM = currentPlayer?.role === PlayerRole.DM;
+	const isOwner = currentPlayer?.role === PlayerRole.OWNER;
 
 	return (
 		<div className="game-layout">
@@ -309,7 +309,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</div>
 
 				<div className="game-layout__top-bar-right">
-					{isDM && (
+					{isOwner && (
 						<button
 							data-magnetic
 							className="game-btn game-btn--dm"
@@ -363,7 +363,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 				{/* 右侧面板 - 视图/日志/DM */}
 				<RightSidePanel
-					isDM={isDM}
+					isOwner={isOwner}
 					ships={ships}
 					players={players}
 					onCreateObject={createObject}
@@ -401,9 +401,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				currentSessionId={room.sessionId || ""}
 				currentPhase={room.state.currentPhase || "DEPLOYMENT"}
 				onToggleReady={toggleReady}
-				canManagePlayers={isDM}
-				onKickPlayer={isDM ? kickPlayer : undefined}
-				onInvitePlayer={isDM ? invitePlayer : undefined}
+				canManagePlayers={isOwner}
+				onKickPlayer={isOwner ? kickPlayer : undefined}
+				onInvitePlayer={isOwner ? invitePlayer : undefined}
 				onCloseRoom={undefined}
 				onSaveRoom={undefined}
 				onLeaveRoom={onLeaveRoom}

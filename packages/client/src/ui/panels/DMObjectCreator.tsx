@@ -1,4 +1,4 @@
-import { getAvailableShips, type ShipHullSpec } from "@vt/data";
+import { dataRegistry, type ShipHullSpec } from "@vt/data";
 import type { FactionValue } from "@/sync/types";
 import { Faction } from "@/sync/types";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Palette, Rocket, Sparkles } from "lucide-react";
@@ -133,13 +133,13 @@ export const DMObjectCreator: React.FC<DMObjectCreatorProps> = ({ onCreateObject
 		heading: "",
 		x: "",
 		y: "",
-		faction: Faction.DM,
+		faction: Faction.NEUTRAL,
 		ownerId: "",
 		name: "",
 	});
 
-	const availableShips = useMemo(() => getAvailableShips(), []);
-	const selectedShip = useMemo(() => availableShips.find((s) => s.id === form.hullId), [availableShips, form.hullId]);
+	const availableShips = useMemo(() => dataRegistry.getPresetShips(), []);
+	const selectedShip = useMemo(() => availableShips.find((s) => s.$id === form.hullId), [availableShips, form.hullId]);
 
 	const cursorX = mapCursor ? Number(mapCursor.x.toFixed(1)) : null;
 	const cursorY = mapCursor ? Number(mapCursor.y.toFixed(1)) : null;
