@@ -4,7 +4,7 @@
  * 与 @vt/data schema 对齐的持久化领域模型
  */
 
-import type { ShipJSON, SaveJSON, FactionType, PlayerRoleValue } from "@vt/data";
+import type { ShipJSON, GameSave, Faction, PlayerRoleValue } from "@vt/data";
 
 // ==================== 基础类型 ====================
 
@@ -49,7 +49,7 @@ export interface UserStats {
 
 /** 用户偏好设置 */
 export interface UserPreferences {
-	defaultFaction: FactionType;
+	defaultFaction: Faction;
 	showDamageNumbers: boolean;
 	showMovementRange: boolean;
 	showWeaponRange: boolean;
@@ -63,7 +63,7 @@ export interface UserProfile extends BaseEntity {
 	nickname?: string;
 	avatar?: string; // base64 data URL or URL
 	role: PlayerRoleValue;
-	faction: FactionType;
+	faction: Faction;
 	ready: boolean;
 	connected: boolean;
 	pingMs: number;
@@ -111,7 +111,7 @@ export interface RoomArchiveMetadata {
 	maxPlayers: number;
 	playerCount: number;
 	totalTurns: number;
-	winnerFaction?: FactionType;
+	winnerFaction?: Faction;
 	gameDuration: number; // 毫秒
 }
 
@@ -119,7 +119,7 @@ export interface RoomArchiveMetadata {
 export interface RoomArchive extends BaseEntity {
 	name: string;
 	description?: string;
-	saveJson: SaveJSON; // 基于 @vt/data SaveJSON 的完整存档数据
+	saveJson: GameSave; // 基于 @vt/data GameSave 的完整存档数据
 	metadata: RoomArchiveMetadata;
 	playerIds: string[]; // 参与玩家ID列表
 	isAutoSave: boolean; // 是否为自动存档

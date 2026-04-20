@@ -75,15 +75,6 @@ export class WeaponDataManager {
   }
 
   /**
-   * 按类别筛选武器
-   */
-  getWeaponsByCategory(category: string): WeaponJSON[] {
-    return this.getAllWeapons().filter(
-      weapon => weapon.weapon.category === category
-    );
-  }
-
-  /**
    * 按尺寸筛选武器
    */
   getWeaponsBySize(size: string): WeaponJSON[] {

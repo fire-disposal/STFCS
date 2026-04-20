@@ -1,142 +1,114 @@
 /**
- * 100% WebSocket服务器入口
+ * STFCS Socket.IO 服务器入口
  */
 
+import { createServer } from "http";
+import { Server as IOServer } from "socket.io";
 import { createLogger } from "./infra/simple-logger.js";
-import { WSServer } from "./server/ws/server.js";
+import { RoomManager } from "./server/rooms/RoomManager.js";
+import { setupSocketIO } from "./server/socketio/handler.js";
 
 const logger = createLogger("server");
 
-/** 服务器配置 */
 interface ServerConfig {
-  wsPort: number;
-  pingInterval?: number;
-  pingTimeout?: number;
-  maxPayload?: number;
+	port: number;
+	corsOrigin?: string;
 }
 
 const DEFAULT_CONFIG: ServerConfig = {
-  wsPort: 3001,
-  pingInterval: 30000,
-  pingTimeout: 10000,
-  maxPayload: 10 * 1024 * 1024, // 10MB
+	port: 3001,
+	corsOrigin: "*",
 };
 
-/** 纯WebSocket服务器 */
 export class STFCServer {
-  private config: ServerConfig;
-  private wsServer: WSServer | null = null;
-  private isShuttingDown = false;
+	private config: ServerConfig;
+	private httpServer: ReturnType<typeof createServer> | null = null;
+	private io: IOServer | null = null;
+	private roomManager: RoomManager;
+	private isShuttingDown = false;
 
-  constructor(config: Partial<ServerConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-  }
+	constructor(config: Partial<ServerConfig> = {}) {
+		this.config = { ...DEFAULT_CONFIG, ...config };
+		this.roomManager = new RoomManager();
+	}
 
-  /** 启动服务器 */
-  async start(): Promise<void> {
-    try {
-      // 启动纯WebSocket服务器
-      const wsOptions: any = {
-        port: this.config.wsPort,
-      };
-      if (this.config.pingInterval !== undefined) {
-        wsOptions.pingInterval = this.config.pingInterval;
-      }
-      if (this.config.pingTimeout !== undefined) {
-        wsOptions.pingTimeout = this.config.pingTimeout;
-      }
-      if (this.config.maxPayload !== undefined) {
-        wsOptions.maxPayload = this.config.maxPayload;
-      }
-      this.wsServer = new WSServer(wsOptions);
+	async start(): Promise<void> {
+		try {
+			this.httpServer = createServer();
+			this.io = new IOServer(this.httpServer, {
+				cors: { origin: this.config.corsOrigin },
+				maxHttpBufferSize: 10 * 1024 * 1024, // 10MB
+			});
 
-      // 设置优雅关闭
-      this.setupGracefulShutdown();
+			setupSocketIO(this.io, this.roomManager);
 
-      logger.info("STFCS WebSocket server started successfully", {
-        wsPort: this.config.wsPort,
-        environment: process.env['NODE_ENV'] || "development",
-      });
+			this.httpServer.listen(this.config.port, () => {
+				logger.info("STFCS Socket.IO server started", {
+					port: this.config.port,
+					env: process.env["NODE_ENV"] || "development",
+				});
+			});
 
-    } catch (error) {
-      logger.error("Failed to start server", error);
-      throw error;
-    }
-  }
+			this.setupGracefulShutdown();
+		} catch (error) {
+			logger.error("Failed to start server", error);
+			throw error;
+		}
+	}
 
-  /** 设置优雅关闭 */
-  private setupGracefulShutdown(): void {
-    const shutdown = async (signal: string) => {
-      if (this.isShuttingDown) return;
-      
-      this.isShuttingDown = true;
-      logger.info(`Received ${signal}, starting graceful shutdown`);
+	private setupGracefulShutdown(): void {
+		const shutdown = async (signal: string) => {
+			if (this.isShuttingDown) return;
+			this.isShuttingDown = true;
+			logger.info(`Received ${signal}, shutting down`);
 
-      try {
-        // 关闭WebSocket服务器
-        if (this.wsServer) {
-          await this.wsServer.close();
-          logger.info("WebSocket server closed");
-        }
+			try {
+				this.io?.close();
+				this.httpServer?.close();
+				this.roomManager.cleanupAllRooms();
+				logger.info("Graceful shutdown completed");
+				process.exit(0);
+			} catch (error) {
+				logger.error("Error during shutdown", error);
+				process.exit(1);
+			}
+		};
 
-        logger.info("Graceful shutdown completed");
-        process.exit(0);
-      } catch (error) {
-        logger.error("Error during shutdown", error);
-        process.exit(1);
-      }
-    };
+		process.on("SIGTERM", () => shutdown("SIGTERM"));
+		process.on("SIGINT", () => shutdown("SIGINT"));
+		process.on("uncaughtException", (error) => {
+			logger.error("Uncaught exception", error);
+			shutdown("UNCAUGHT_EXCEPTION");
+		});
+	}
 
-    // 注册信号处理器
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("SIGINT", () => shutdown("SIGINT"));
+	getRoomManager(): RoomManager {
+		return this.roomManager;
+	}
 
-    // 未捕获异常处理
-    process.on("uncaughtException", (error) => {
-      logger.error("Uncaught exception", error);
-      shutdown("UNCAUGHT_EXCEPTION");
-    });
-
-    process.on("unhandledRejection", (reason, promise) => {
-      logger.error("Unhandled rejection", { reason, promise });
-      shutdown("UNHANDLED_REJECTION");
-    });
-  }
-
-  /** 获取WebSocket服务器（用于测试） */
-  getWSServer(): WSServer | null {
-    return this.wsServer;
-  }
-
-  /** 获取服务器统计 */
-  getStats(): any {
-    return this.wsServer ? this.wsServer.getStats() : null;
-  }
+	getStats() {
+		return {
+			rooms: this.roomManager.getStats(),
+		};
+	}
 }
 
-// 如果直接运行此文件，启动服务器
+// 直接运行时启动
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = new STFCServer();
-  
-  server.start().catch((error) => {
-    logger.error("Failed to start server", error);
-    process.exit(1);
-  });
+	const server = new STFCServer();
+	server.start().catch((error) => {
+		logger.error("Failed to start server", error);
+		process.exit(1);
+	});
 }
 
-// 导出主要组件
+// ==================== 导出 ====================
 export { createLogger } from "./infra/simple-logger.js";
-export { WSServer } from "./server/ws/server.js";
-export { ConnectionManager } from "./server/ws/connection.js";
-export { RoomManager } from "./server/rooms/RoomManager.js";
-export { Room } from "./server/rooms/Room.js";
+export { RoomManager, Room, type RoomTransportCallbacks } from "./server/rooms/index.js";
 export { GameStateManager } from "./core/state/GameStateManager.js";
-
-// 导出新创建的模块
 export { gameRuntime, GameRuntime } from "./runtime/index.js";
 export { Match } from "./runtime/index.js";
 export { TurnManager } from "./runtime/index.js";
-
 export { shipDataManager, weaponDataManager, componentDataManager, modifierSystem } from "./data/index.js";
-export { actionHandler, createJoinHandler } from "./server/handlers/index.js";
+export { actionHandler, ActionHandler } from "./server/handlers/index.js";
 export { broadcaster } from "./server/broadcast/index.js";

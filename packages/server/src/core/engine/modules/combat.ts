@@ -7,6 +7,7 @@ import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createAttackEvent, createDamageEvent, createShipDestroyedEvent } from "../context.js";
 import { calculateWeaponAttack, setWeaponFired } from "../rules/weapon.js";
 import { calculateDamage } from "../rules/damage.js";
+import { calculateModifiedValue } from "./modifier.js";
 
 /**
  * 应用战斗Action
@@ -36,14 +37,19 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
   );
 
   // 更新攻击者状态
-  const attackerUpdates = {
-    runtime: {
-      ...ship.runtime,
-      hasFired: true,
-      weapons: updateWeaponAfterFire(ship.runtime.weapons, payload.weaponId),
-    },
-  };
-  updates.set(`ship:${ship.id}`, attackerUpdates);
+	const newAttackerRuntime = {
+		...ship.runtime,
+		hasFired: true,
+		weapons: updateWeaponAfterFire(ship.runtime.weapons, payload.weaponId),
+	};
+
+	// 武器开火产生软辐能（攻击者）
+	// 远行星号规则：武器开火产生的辐能为软辐能
+	const weaponFluxCost = (weapon.weapon as any)?.fluxCostPerShot || 0;
+	newAttackerRuntime.fluxSoft = (newAttackerRuntime.fluxSoft || 0) + weaponFluxCost;
+
+	const attackerUpdates = { runtime: newAttackerRuntime };
+	updates.set(`ship:${ship.id}`, attackerUpdates);
 
   // 创建攻击事件
   events.push(createAttackEvent(
@@ -54,17 +60,25 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
     attackResult.hit
   ));
 
-  // 如果命中，处理伤害
-  if (attackResult.hit && attackResult.damage > 0) {
-    // 计算详细伤害
-    const damageResult = calculateDamage(
-      targetShip.shipJson.ship,
-      targetShip.runtime,
-      attackResult.damage,
-      weapon.weapon?.damageType || "KINETIC",
-      ship.runtime.position, // 攻击者位置作为命中点
-      targetShip.runtime.position
-    );
+// 如果命中，处理伤害
+	if (attackResult.hit && attackResult.damage > 0) {
+		// 应用攻击者增伤修正（damageDealt）
+		const attackerDamageDealt = calculateModifiedValue(1.0, ship.runtime, "damageDealt");
+		// 应用目标减伤/易伤修正（damageTaken）
+		const targetDamageTaken = calculateModifiedValue(1.0, targetShip.runtime, "damageTaken");
+
+		// 最终伤害 = 基础伤害 × 攻击者增伤 × 目标易伤
+		const finalDamage = attackResult.damage * attackerDamageDealt * targetDamageTaken;
+
+		// 计算详细伤害
+		const damageResult = calculateDamage(
+			targetShip.shipJson.ship,
+			targetShip.runtime,
+			finalDamage,
+			(weapon.weapon as any)?.damageType || "KINETIC",
+			ship.runtime.position, // 攻击者位置作为命中点
+			targetShip.runtime.position
+		);
 
     // 更新目标状态
     const targetUpdates = applyDamageToShip(targetShip, damageResult);
@@ -136,13 +150,12 @@ function applyDamageToShip(ship: any, damageResult: any): any {
   }
 
   // 更新辐能
-  if (damageResult.shieldHit) {
-    // 护盾命中产生硬辐能
-    newRuntime.fluxHard = (newRuntime.fluxHard || 0) + damageResult.fluxGenerated;
-  } else {
-    // 直接命中产生软辐能
-    newRuntime.fluxSoft = (newRuntime.fluxSoft || 0) + damageResult.fluxGenerated;
-  }
+	// 远行星号规则：
+	// - 护盾吸收攻击 → 目标产生硬辐能
+	// - 直接命中护甲/船体 → 不产生额外辐能（武器开火辐能在攻击者身上）
+	if (damageResult.shieldHit && damageResult.fluxGenerated > 0) {
+		newRuntime.fluxHard = (newRuntime.fluxHard || 0) + damageResult.fluxGenerated;
+	}
 
   // 检查过载
   const totalFlux = (newRuntime.fluxSoft || 0) + (newRuntime.fluxHard || 0);

@@ -2,7 +2,7 @@
  * 游戏状态管理 - 基于 @vt/data 权威设计
  */
 
-import type { FactionType, GamePhaseType } from "@vt/data";
+import type { Faction, GamePhase } from "@vt/data";
 import type { GameState, PlayerState } from "../types/common.js";
 import type { TokenState, ShipTokenState } from "./Token.js";
 
@@ -76,7 +76,7 @@ export class GameStateManager {
 
   // ==================== 游戏流程管理 ====================
 
-  setPhase(phase: GamePhaseType): void {
+  setPhase(phase: GamePhase): void {
     this.state.phase = phase;
   }
 
@@ -84,7 +84,7 @@ export class GameStateManager {
     this.state.turn++;
   }
 
-  setActiveFaction(faction: FactionType): void {
+  setActiveFaction(faction: Faction): void {
     this.state.activeFaction = faction;
   }
 

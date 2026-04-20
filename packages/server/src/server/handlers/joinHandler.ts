@@ -6,8 +6,8 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { gameRuntime } from "../../runtime/index.js";
 import { RoomManager } from "../rooms/RoomManager.js";
 import type { PlayerState } from "../../core/types/common.js";
-import type { FactionType, PlayerRoleValue } from "@vt/data";
 import { Faction, PlayerRole } from "@vt/data";
+import type { PlayerRoleValue } from "@vt/data";
 
 const logger = createLogger("join-handler");
 
@@ -100,7 +100,7 @@ export class JoinHandler {
       sessionId: playerData.sessionId,
       name: playerData.name,
       role: (playerData.role as PlayerRoleValue) || PlayerRole.PLAYER,
-      faction: faction as FactionType,
+      faction: faction as Faction,
       ready: false,
       connected: true,
       pingMs: 0,
@@ -365,7 +365,7 @@ export class JoinHandler {
    * 检查是否为有效阵营
    */
   private isValidFaction(faction: string): boolean {
-    return Object.values(Faction).includes(faction as FactionType);
+    return Object.values(Faction).includes(faction as Faction);
   }
 
   /**

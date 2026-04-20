@@ -12,6 +12,7 @@
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createFluxChangeEvent } from "../context.js";
 import type { ShipTokenState } from "../../state/Token.js";
+import { calculateModifiedValue } from "./modifier.js";
 
 /**
  * 辐能计算结果
@@ -42,7 +43,9 @@ export function getFluxCapacity(ship: ShipTokenState): number {
 }
 
 export function getFluxDissipation(ship: ShipTokenState): number {
-	return ship.shipJson.ship.fluxDissipation || 0;
+	// 应用 fluxDissipation modifier
+	const baseDissipation = ship.shipJson.ship.fluxDissipation || 0;
+	return calculateModifiedValue(baseDissipation, ship.runtime, "fluxDissipation");
 }
 
 export function getTotalFlux(ship: ShipTokenState): number {
@@ -184,17 +187,31 @@ export function endOverload(ship: ShipTokenState): void {
 
 // ==================== 辐散 ====================
 
+/**
+ * 辐散处理
+ *
+ * 规则：
+ * - 软辐能：每回合下降 fluxDissipation 点
+ * - 硬辐能：护盾开启时不可消散，护盾关闭时可消散
+ */
 export function dissipateFlux(ship: ShipTokenState): FluxCalculationResult {
 	const runtime = ship.runtime;
 	const dissipation = getFluxDissipation(ship);
+	const shieldActive = runtime.shield?.active ?? false;
 
 	let newFluxSoft = runtime.fluxSoft || 0;
 	let newFluxHard = runtime.fluxHard || 0;
 	let overloadChanged = false;
 
-	// 软辐能散逸
+	// 软辐能散逸（始终可消散）
 	if (dissipation > 0 && newFluxSoft > 0) {
 		newFluxSoft = Math.max(0, newFluxSoft - dissipation);
+	}
+
+	// 硬辐能散逸（仅护盾关闭时）
+	// 远行星号规则：护盾开启时硬辐能不可通过辐散降低
+	if (!shieldActive && dissipation > 0 && newFluxHard > 0) {
+		newFluxHard = Math.max(0, newFluxHard - dissipation);
 	}
 
 	// 检查过载是否结束

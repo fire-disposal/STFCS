@@ -4,7 +4,6 @@
 
 import { createLogger } from "../infra/simple-logger.js";
 import { Match } from "./Match.js";
-import type { FactionType } from "@vt/data";
 import { Faction } from "@vt/data";
 
 
@@ -42,7 +41,7 @@ export class TurnManager {
   private timer: TurnTimer;
   private turnHistory: Array<{
     turn: number;
-    faction: FactionType;
+    faction: Faction;
     startTime: number;
     endTime?: number;
     actions: number;
@@ -64,7 +63,7 @@ export class TurnManager {
   /**
    * 开始新回合
    */
-  startNewTurn(faction: FactionType): void {
+  startNewTurn(faction: Faction): void {
     const stateManager = this.match.getStateManager();
     const currentTurn = stateManager.getState().turn;
     
@@ -212,13 +211,13 @@ export class TurnManager {
   /**
    * 获取下一个阵营
    */
-  private getNextFaction(currentFaction: FactionType): FactionType {
+  private getNextFaction(currentFaction: Faction): Faction {
     // 简化：玩家→敌人→玩家循环
     switch (currentFaction) {
       case Faction.PLAYER:
-        return Faction.ENEMY as FactionType;
+        return Faction.ENEMY as Faction;
       default:
-        return Faction.PLAYER as FactionType;
+        return Faction.PLAYER as Faction;
     }
   }
 
@@ -296,7 +295,7 @@ export class TurnManager {
    */
   getTurnHistory(limit?: number): Array<{
     turn: number;
-    faction: FactionType;
+    faction: Faction;
     startTime: number;
     endTime?: number;
     duration?: number | undefined;

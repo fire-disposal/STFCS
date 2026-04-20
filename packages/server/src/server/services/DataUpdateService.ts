@@ -49,7 +49,7 @@ export function checkPermission(
 	objectOwnerId?: string
 ): PermissionCheck {
 	// DM 拥有所有权限
-	if (player.role === "DM") {
+	if (player.role === "OWNER") {
 		return { allowed: true, isDM: true };
 	}
 

@@ -7,6 +7,7 @@
 
 import type { ShipTokenState } from "../../state/Token.js";
 import { distance, angleBetween } from "../geometry/index.js";
+import { type MountSpec, type WeaponRuntime, type WeaponSpec } from "@vt/data";
 
 /**
  * 武器目标信息
@@ -176,17 +177,17 @@ export function calculateShipWeaponTargets(
  */
 function calculateWeaponTargets(
 	attacker: ShipTokenState,
-	mount: import("@vt/data").MountSpec,
-	weaponRuntime: import("@vt/data").WeaponRuntime,
-	weaponSpec: import("@vt/data").WeaponSpec,
+	mount: MountSpec,
+	weaponRuntime: WeaponRuntime,
+	weaponSpec: WeaponSpec,
 	targets: ShipTokenState[]
 ): WeaponTargetingResult {
 	const effectiveRange = weaponSpec.range * (attacker.shipJson.ship.rangeModifier || 1.0);
 	const minRange = weaponSpec.minRange || 0;
 	const mountFacing = mount.facing || 0;
 
-	// 射界计算：TURRET = 360°, HARDPOINT = 受限（简化：前方 120°）
-	const arc = mount.mountType === "TURRET" ? 360 : 120;
+	// 射界直接使用 mount.arc（度）。360 = 全向炮塔，20 = 固定挂载
+	const arc = mount.arc;
 
 	// ===== UI 状态判断 =====
 	// 优先级：已开火 > 不可用 > 待命有目标 > 待命无目标
@@ -229,7 +230,7 @@ function calculateWeaponTargets(
 	const result: WeaponTargetingResult = {
 		mountId: mount.id,
 		weaponName: mount.displayName || mount.id,
-		weaponSpec: weaponSpec.category,
+		weaponSpec: weaponSpec.damageType,
 		state: weaponRuntime.state,
 		isReady: weaponRuntime.state === "READY",
 		range: effectiveRange,
@@ -266,9 +267,9 @@ function calculateWeaponTargets(
 		// 检查射程
 		const inRange = dist >= minRange && dist <= effectiveRange;
 
-		// 检查射界（仅对 HARDPOINT）
+		// 检查射界（arc < 360 时需要检查）
 		let inArc = true;
-		if (mount.mountType === "HARDPOINT") {
+		if (arc < 360) {
 			// 计算目标相对攻击者的角度
 			const targetAngle = angleBetween(
 				attacker.runtime.position,

@@ -2,13 +2,7 @@
  * 核心类型定义 - 基于 @vt/data 权威设计
  */
 
-import type { 
-  ShipJSON, 
-  ShipRuntime,
-  FactionType,
-  PlayerRoleValue,
-  GamePhaseType
-} from "@vt/data";
+import type { ShipJSON, ShipRuntime, Faction, GamePhase, PlayerRoleValue } from "@vt/data";
 
 import type { TokenState, TokenType } from "../state/Token.js";
 import type { ComponentState } from "../state/Component.js";
@@ -23,9 +17,9 @@ export type TokenTurnState = string;
 /** 游戏状态快照 - 基于data包schema设计 */
 export interface GameState {
   id: string;
-  phase: GamePhaseType;
+  phase: GamePhase;
   turn: number;
-  activeFaction: FactionType;
+  activeFaction: Faction;
   players: Map<string, PlayerState>;
   tokens: Map<string, TokenState>; // 所有Token（舰船、站台、小行星等）
   components: Map<string, ComponentState>; // 所有组件（武器、引擎等）
@@ -41,7 +35,7 @@ export interface PlayerState {
   name: string;
   nickname?: string;
   role: PlayerRoleValue;
-  faction: FactionType;
+  faction: Faction;
   ready: boolean;
   connected: boolean;
   pingMs: number;

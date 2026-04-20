@@ -12,6 +12,7 @@
 import type { ShipTokenState } from "../../state/Token.js";
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createShieldToggleEvent } from "../context.js";
+import { calculateModifiedValue } from "./modifier.js";
 
 /**
  * 护盾开启结果
@@ -296,11 +297,16 @@ export function getShieldStatus(ship: ShipTokenState): {
 export function calculateShieldAbsorption(
 	damage: number,
 	damageType: string,
-	shieldSpec: any
+	shieldSpec: any,
+	runtime?: any
 ): { absorbedDamage: number; fluxGenerated: number } {
-	const efficiency = shieldSpec.efficiency || 1.0;
-	
-	// 根据伤害类型计算护盾伤害倍率
+	// 应用 shieldEfficiency modifier
+	const baseEfficiency = shieldSpec.efficiency || 1.0;
+	const efficiency = runtime
+		? calculateModifiedValue(baseEfficiency, runtime, "shieldEfficiency")
+		: baseEfficiency;
+
+	// 根据伤害类型计算护盾伤害倍率（从 game-rules.json 获取）
 	let shieldMultiplier = 1.0;
 	switch (damageType) {
 		case "KINETIC":

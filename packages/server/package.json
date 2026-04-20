@@ -1,46 +1,50 @@
 {
-	"name": "@vt/server",
-	"version": "1.0.0",
-	"description": "STFCS Backend Server - New Architecture",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"type": "module",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		}
-	},
-	"scripts": {
-		"dev": "tsup src/index.ts --format esm --sourcemap --watch --onSuccess \"node --enable-source-maps dist/index.js\"",
-		"start": "node dist/index.js",
-		"build": "tsup src/index.ts --format esm --dts --sourcemap",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"lint": "biome lint src --diagnostic-level=error",
-		"lint:fix": "biome lint --write src --diagnostic-level=error",
-		"format": "biome format --write src",
-		"format:check": "biome format src"
-	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"packageManager": "pnpm@10.32.1",
-	"dependencies": {
-		"@vt/data": "workspace:*",
-		"ws": "^8.18.0",
-		"uuid": "^11.0.6",
-		"pino": "^9.6.0",
-		"pino-pretty": "^13.0.0"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
-		"@types/node": "^25.4.0",
-		"@types/ws": "^8.5.14",
-		"@types/uuid": "^10.0.0",
-		"tsup": "^8.5.1",
-		"typescript": "~5.9.3",
-		"vitest": "^3.2.4"
-	}
+  "name": "@vt/server",
+  "version": "1.0.0",
+  "description": "STFCS Backend Server - New Architecture",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsup src/index.ts --format esm --sourcemap --watch --onSuccess \"node --enable-source-maps dist/index.js\"",
+    "dev:socketio": "tsup src/socketio-index.ts --format esm --sourcemap --watch --onSuccess \"node --enable-source-maps dist/socketio-index.js\"",
+    "start": "node dist/index.js",
+    "start:socketio": "node dist/socketio-index.js",
+    "build": "tsup src/index.ts src/socketio-index.ts --format esm --dts --sourcemap",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome lint src --diagnostic-level=error",
+    "lint:fix": "biome lint --write src --diagnostic-level=error",
+    "format": "biome format --write src",
+    "format:check": "biome format src"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.32.1",
+  "dependencies": {
+    "@types/socket.io": "^3.0.2",
+    "@vt/data": "workspace:*",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^11.0.6",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^25.4.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.14",
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
 }

@@ -4,9 +4,11 @@
  */
 
 import type { WeaponJSON, ShipJSON, DamageTypeValue } from "@vt/data";
-import { getGameRules } from "@vt/data";
+import { GAME_RULES } from "@vt/data";
+
 import type { Point } from "../../types/common.js";
 import { distance, angleBetween } from "../geometry/index.js";
+import { calculateModifiedValue } from "../modules/modifier.js";
 
 /**
  * 武器攻击结果
@@ -82,7 +84,7 @@ export function calculateWeaponAttack(
 
   // 6. 计算伤害类型修正
   const damageType = weaponSpec.damageType as DamageTypeValue;
-  const gameRules = getGameRules();
+  const gameRules = GAME_RULES;
   const damageModifiers = gameRules.combat.damageModifiers;
   const modifier = damageModifiers[damageType] || {
     shieldMultiplier: 1,
@@ -101,14 +103,17 @@ export function calculateWeaponAttack(
     const angleDiff = Math.abs(((hitAngle - shieldAngle + 180) % 360) - 180);
 
     if (angleDiff <= shieldArc / 2) {
-      result.shieldHit = true;
-      const shieldDamage = totalDamage * modifier.shieldMultiplier;
-      const efficiency = targetSpec.shield.efficiency || 1;
-      const shieldFlux = shieldDamage * efficiency;
-      
-      result.fluxGenerated += shieldFlux;
-      result.damage = 0; // 护盾完全阻挡伤害
-    }
+		result.shieldHit = true;
+		const shieldDamage = totalDamage * modifier.shieldMultiplier;
+
+		// 应用护盾效率 modifier
+		const baseEfficiency = targetSpec.shield.efficiency || 1;
+		const efficiency = calculateModifiedValue(baseEfficiency, targetRuntime, "shieldEfficiency");
+		const shieldFlux = shieldDamage * efficiency;
+
+		result.fluxGenerated += shieldFlux;
+		result.damage = 0; // 护盾完全阻挡伤害
+	}
   }
 
   // 8. 计算护甲命中

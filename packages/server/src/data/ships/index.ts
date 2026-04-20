@@ -69,6 +69,7 @@ export class ShipDataManager {
       fluxSoft: 0,
       fluxHard: 0,
       overloaded: false,
+      overloadTime: 0,
       destroyed: false,
       movement: {
         hasMoved: false,

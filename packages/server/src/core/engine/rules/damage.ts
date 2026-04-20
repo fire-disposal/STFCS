@@ -3,9 +3,11 @@
  */
 
 import type { ShipJSON, DamageTypeValue } from "@vt/data";
-import { getGameRules } from "@vt/data";
+import { GAME_RULES } from "@vt/data";
+
 import type { Point } from "../../types/common.js";
 import { angleBetween } from "../geometry/angle.js";
+import { calculateModifiedValue } from "../modules/modifier.js";
 
 export interface DamageResult {
   damageApplied: number;
@@ -55,7 +57,7 @@ export function calculateDamage(
   };
 
   // 从data包获取伤害修正系数
-  const gameRules = getGameRules();
+  const gameRules = GAME_RULES;
   const damageModifiers = gameRules.combat.damageModifiers;
   const modifier = damageModifiers[damageType] || {
     shieldMultiplier: 1,
@@ -73,12 +75,16 @@ export function calculateDamage(
     const angleDiff = Math.abs(((hitAngle - shieldAngle + 180) % 360) - 180);
 
     if (angleDiff <= shieldArc / 2) {
-      result.shieldHit = true;
-      const shieldDamage = remainingDamage * modifier.shieldMultiplier;
-      const efficiency = targetSpec.shield.efficiency || 1;
-      const fluxGenerated = shieldDamage * efficiency;
+		result.shieldHit = true;
+		const shieldDamage = remainingDamage * modifier.shieldMultiplier;
 
-      result.fluxGenerated = fluxGenerated;
+		// 应用护盾效率 modifier
+		// 远行星号规则：硬辐能 = 吸收伤害 × 护盾效率
+		const baseEfficiency = targetSpec.shield.efficiency || 1;
+		const efficiency = calculateModifiedValue(baseEfficiency, targetRuntime, "shieldEfficiency");
+		const fluxGenerated = shieldDamage * efficiency;
+
+		result.fluxGenerated = fluxGenerated;
 
       // 检查过载
       const newFluxHard = (targetRuntime.fluxHard || 0) + fluxGenerated;

@@ -16,6 +16,7 @@
 
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createMoveEvent, createRotateEvent } from "../context.js";
+import { calculateModifiedValue } from "./modifier.js";
 
 /** 移动阶段 */
 export type MovementPhase = "A" | "B" | "C" | "DONE";
@@ -283,12 +284,14 @@ function advancePhase(ship: any): {
  *   - 两者不能同时非零
  */
 export function validateMovement(
-  ship: any,
-  forwardDistance: number,
-  strafeDistance: number
+	ship: any,
+	forwardDistance: number,
+	strafeDistance: number
 ): { valid: boolean; error?: string } {
-  const maxMove = ship.shipJson.ship.maxSpeed || 0;
-  const movement = getMovementState(ship);
+	// 应用 speed modifier
+	const baseMaxSpeed = ship.shipJson.ship.maxSpeed || 0;
+	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
+	const movement = getMovementState(ship);
 
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {
@@ -348,11 +351,13 @@ export function validateMovement(
  * 检查旋转合法性（B阶段）
  */
 export function validateRotation(
-  ship: any,
-  angle: number
+	ship: any,
+	angle: number
 ): { valid: boolean; error?: string } {
-  const maxTurn = ship.shipJson.ship.maxTurnRate || 0;
-  const movement = getMovementState(ship);
+	// 应用 turnRate modifier
+	const baseMaxTurn = ship.shipJson.ship.maxTurnRate || 0;
+	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
+	const movement = getMovementState(ship);
 
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {
@@ -399,25 +404,28 @@ export function validatePhaseAdvance(ship: any): { valid: boolean; error?: strin
  * 获取移动状态摘要（用于前端显示）
  */
 export function getMovementStatus(ship: any): {
-  currentPhase: MovementPhase;
-  phaseAAvailable: number;
-  phaseCAvailable: number;
-  turnAngleAvailable: number;
-  phaseALock: TranslationLock;
-  phaseCLock: TranslationLock;
-  canMove: boolean;
+	currentPhase: MovementPhase;
+	phaseAAvailable: number;
+	phaseCAvailable: number;
+	turnAngleAvailable: number;
+	phaseALock: TranslationLock;
+	phaseCLock: TranslationLock;
+	canMove: boolean;
 } {
-  const maxMove = ship.shipJson?.ship?.maxSpeed || 0;
-  const maxTurn = ship.shipJson?.ship?.maxTurnRate || 0;
-  const movement = getMovementState(ship);
+	// 应用 speed 和 turnRate modifier
+	const baseMaxSpeed = ship.shipJson?.ship?.maxSpeed || 0;
+	const baseMaxTurn = ship.shipJson?.ship?.maxTurnRate || 0;
+	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
+	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
+	const movement = getMovementState(ship);
 
-  return {
-    currentPhase: movement.currentPhase,
-    phaseAAvailable: maxMove - movement.phaseAUsed,
-    phaseCAvailable: maxMove - movement.phaseCUsed,
-    turnAngleAvailable: maxTurn - movement.turnAngleUsed,
-    phaseALock: movement.phaseALock,
-    phaseCLock: movement.phaseCLock,
-    canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
-  };
+	return {
+		currentPhase: movement.currentPhase,
+		phaseAAvailable: maxMove - movement.phaseAUsed,
+		phaseCAvailable: maxMove - movement.phaseCUsed,
+		turnAngleAvailable: maxTurn - movement.turnAngleUsed,
+		phaseALock: movement.phaseALock,
+		phaseCLock: movement.phaseCLock,
+		canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
+	};
 }

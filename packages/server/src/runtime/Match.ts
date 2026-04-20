@@ -6,7 +6,7 @@ import { createLogger } from "../infra/simple-logger.js";
 import { GameStateManager } from "../core/state/GameStateManager.js";
 import { applyAction } from "../core/engine/applyAction.js";
 import type { GameState, GameAction, GameEvent } from "../core/types/common.js";
-import type { GamePhaseType } from "@vt/data";
+import type { GamePhase } from "@vt/data";
 import { Faction } from "@vt/data";
 
 const logger = createLogger("match");
@@ -183,7 +183,7 @@ export class Match {
   /**
    * 获取当前阶段
    */
-  getPhase(): GamePhaseType {
+  getPhase(): GamePhase {
     const state = this.stateManager.getState();
     return state.phase;
   }
