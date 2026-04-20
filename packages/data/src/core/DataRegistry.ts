@@ -2,8 +2,16 @@
  * DataRegistry - 数据注册器核心
  *
  * 统一管理所有舰船和武器 JSON 数据
+ * 所有数据写入均通过 Zod Schema 验证，确保运行时类型安全
  */
 
+import {
+	ShipJSONSchema,
+	WeaponJSONSchema,
+	ShipRuntimeSchema,
+	GameSaveSchema,
+	ExportJSONSchema,
+} from "../core/GameSchemas.js";
 import type {
 	ShipJSON,
 	WeaponJSON,
@@ -11,86 +19,37 @@ import type {
 	ShipRuntime,
 	MountSpec,
 	Point,
-	FactionType,
+	Faction,
+	GameSave,
+	ExportJSON,
 } from "../core/index.js";
 
-
-/** ID 生成计数器 */
 let idCounter = 0;
 
-/** 生成唯一ID */
 function generateId(prefix: string): string {
 	idCounter++;
-	const timestamp = Date.now().toString(36);
-	const counter = idCounter.toString(36);
-	return `${prefix}:${timestamp}_${counter}`;
+	return `${prefix}:${Date.now().toString(36)}_${idCounter.toString(36)}`;
 }
 
-/** 存档JSON类型 */
-export interface SaveJSON {
-	$schema: string;
-	$id: string;
-	metadata?: {
-		name: string;
-		description?: string;
-		createdAt?: number;
-		updatedAt?: number;
-		roomId?: string;
-	};
-	room?: {
-		turn: {
-			count: number;
-			phase: string;
-			activeFaction: FactionType;
-		};
-		map: {
-			width: number;
-			height: number;
-		};
-		players: any[];
-	};
-	ships: ShipJSON[];
-}
-
-/** 导出JSON类型 */
-export interface ExportJSON {
-	$schema: string;
-	$type: "SHIP" | "WEAPON" | "FLEET";
-	$exportedAt: string;
-	ship?: ShipJSON;
-	weapon?: WeaponJSON;
-	fleet?: {
-		name: string;
-		description?: string;
-		ships: ShipJSON[];
-	};
-}
-
-/** DataRegistry 配置 */
 interface DataRegistryConfig {
 	autoLoadPresets: boolean;
 	presetsPath?: string;
 }
 
-/** 数据注册器 */
 export class DataRegistry {
-	private ships: Map<string, ShipJSON> = new Map();
-	private weapons: Map<string, WeaponJSON> = new Map();
-	private saves: Map<string, SaveJSON> = new Map();
-	private initialized: boolean = false;
+	private ships = new Map<string, ShipJSON>();
+	private weapons = new Map<string, WeaponJSON>();
+	private saves = new Map<string, GameSave>();
+	private initialized = false;
 
 	constructor(config: DataRegistryConfig = { autoLoadPresets: true }) {
-		if (config.autoLoadPresets) {
-			this.initialize();
-		}
+		if (config.autoLoadPresets) this.initialize();
 	}
 
 	initialize(): void {
-		if (this.initialized) {
-			return;
-		}
+		if (this.initialized) return;
 		this.initialized = true;
-		console.log(`[DataRegistry] Initialized`);
+		console.log("[DataRegistry] Initialized");
 	}
 
 	getShipJSON(id: string): ShipJSON | undefined {
@@ -103,16 +62,19 @@ export class DataRegistry {
 		return this.weapons.get(id);
 	}
 
-	registerShip(ship: ShipJSON): void {
+	/** 注册舰船（自动 Zod 验证） */
+	registerShip(raw: unknown): ShipJSON {
 		this.ensureInitialized();
 
-		if (!ship.$id || !ship.$id.startsWith("ship:")) {
+		const ship = ShipJSONSchema.parse(raw);
+
+		if (!ship.$id.startsWith("ship:")) {
 			throw new Error(`Invalid ship ID format: ${ship.$id}`);
 		}
 
 		this.ships.set(ship.$id, ship);
 
-		// 注册挂载点中的武器对象
+		// 级联注册挂载点武器
 		if (ship.ship.mounts) {
 			for (const mount of ship.ship.mounts) {
 				if (typeof mount.weapon === "object") {
@@ -122,17 +84,22 @@ export class DataRegistry {
 		}
 
 		console.log(`[DataRegistry] Registered ship: ${ship.$id}`);
+		return ship;
 	}
 
-	registerWeapon(weapon: WeaponJSON): void {
+	/** 注册武器（自动 Zod 验证） */
+	registerWeapon(raw: unknown): WeaponJSON {
 		this.ensureInitialized();
 
-		if (!weapon.$id || (!weapon.$id.startsWith("weapon:") && !weapon.$id.startsWith("preset:"))) {
+		const weapon = WeaponJSONSchema.parse(raw);
+
+		if (!weapon.$id.startsWith("weapon:") && !weapon.$id.startsWith("preset:")) {
 			throw new Error(`Invalid weapon ID format: ${weapon.$id}`);
 		}
 
 		this.weapons.set(weapon.$id, weapon);
 		console.log(`[DataRegistry] Registered weapon: ${weapon.$id}`);
+		return weapon;
 	}
 
 	createShipInstance(
@@ -140,56 +107,45 @@ export class DataRegistry {
 		options: {
 			position?: Point;
 			heading?: number;
-			faction?: FactionType;
+			faction?: Faction;
 			ownerId?: string;
 			name?: string;
 		} = {}
 	): ShipJSON {
 		this.ensureInitialized();
 
-		const preset = this.getShipJSON(presetId.startsWith("preset:") ? presetId : `preset:${presetId}`);
+		const resolvedId = presetId.startsWith("preset:") ? presetId : `preset:${presetId}`;
+		const preset = this.getShipJSON(resolvedId);
+		if (!preset) throw new Error(`Preset ship not found: ${presetId}`);
 
-		if (!preset) {
-			throw new Error(`Preset ship not found: ${presetId}`);
-		}
-
-		const instance: ShipJSON = JSON.parse(JSON.stringify(preset));
-
-		instance.$id = generateId("ship");
-		instance.$presetRef = preset.$id;
-		instance.metadata = {
+		// 深拷贝并重新生成 ID
+		const raw = JSON.parse(JSON.stringify(preset));
+		raw.$id = generateId("ship");
+		raw.$presetRef = preset.$id;
+		raw.metadata = {
 			...preset.metadata,
 			name: options.name ?? preset.metadata.name,
 			createdAt: Date.now(),
 		};
+		raw.runtime = this.buildRuntime(raw.ship, options);
 
-		instance.runtime = this.createDefaultRuntime(instance.ship, options);
-		this.registerShip(instance);
-
-		return instance;
+		return this.registerShip(raw);
 	}
 
-	private createDefaultRuntime(
+	private buildRuntime(
 		spec: ShipSpec,
-		options: {
-			position?: Point;
-			heading?: number;
-			faction?: FactionType;
-			ownerId?: string;
-		}
+		options: { position?: Point; heading?: number; faction?: Faction; ownerId?: string }
 	): ShipRuntime {
 		const armorMax = spec.armorMaxPerQuadrant;
 
-		return {
+		return ShipRuntimeSchema.parse({
 			position: options.position ?? { x: 0, y: 0 },
 			heading: options.heading ?? 0,
 			hull: spec.maxHitPoints,
 			armor: [armorMax, armorMax, armorMax, armorMax, armorMax, armorMax],
 			fluxSoft: 0,
 			fluxHard: 0,
-			shield: spec.shield
-				? { active: false, value: 0 }
-				: undefined,
+			shield: spec.shield ? { active: false, value: 0 } : undefined,
 			overloaded: false,
 			overloadTime: 0,
 			destroyed: false,
@@ -200,21 +156,22 @@ export class DataRegistry {
 				phaseCUsed: 0,
 			},
 			hasFired: false,
-			weapons: this.createWeaponRuntimeStates(spec.mounts ?? []),
+			weapons: this.buildWeaponRuntimes(spec.mounts ?? []),
 			faction: options.faction ?? "PLAYER",
 			ownerId: options.ownerId ?? "",
-		};
+		});
 	}
 
-	private createWeaponRuntimeStates(mounts: MountSpec[]): ShipRuntime["weapons"] {
+	private buildWeaponRuntimes(mounts: MountSpec[]): ShipRuntime["weapons"] {
 		return mounts.map((mount) => {
-			const weaponSpec = typeof mount.weapon === 'string' 
-				? this.getWeaponJSON(mount.weapon)?.weapon
-				: mount.weapon?.weapon;
-			
+			const weaponSpec =
+				typeof mount.weapon === "string"
+					? this.getWeaponJSON(mount.weapon)?.weapon
+					: mount.weapon?.weapon;
+
 			return {
 				mountId: mount.id,
-				state: "READY",
+				state: "READY" as const,
 				cooldownRemaining: 0,
 				statusEffects: [],
 				weapon: weaponSpec,
@@ -233,11 +190,11 @@ export class DataRegistry {
 	}
 
 	getPresetShips(): ShipJSON[] {
-		return this.getAllShips().filter((ship) => ship.$id.startsWith("preset:"));
+		return this.getAllShips().filter((s) => s.$id.startsWith("preset:"));
 	}
 
 	getCustomShips(): ShipJSON[] {
-		return this.getAllShips().filter((ship) => !ship.$id.startsWith("preset:"));
+		return this.getAllShips().filter((s) => !s.$id.startsWith("preset:"));
 	}
 
 	deleteShip(id: string): boolean {
@@ -252,15 +209,10 @@ export class DataRegistry {
 
 	updateShip(id: string, updates: Partial<ShipJSON>): ShipJSON | undefined {
 		const ship = this.ships.get(id);
-		if (!ship) {
-			return undefined;
-		}
+		if (!ship) return undefined;
+		if (ship.$id.startsWith("preset:")) throw new Error(`Cannot modify preset ship: ${id}`);
 
-		if (ship.$id.startsWith("preset:")) {
-			throw new Error(`Cannot modify preset ship: ${id}`);
-		}
-
-		const updated: ShipJSON = {
+		const raw = {
 			...ship,
 			...updates,
 			metadata: {
@@ -270,44 +222,41 @@ export class DataRegistry {
 			},
 		};
 
-		this.ships.set(id, updated);
-		return updated;
+		return this.registerShip(raw);
 	}
 
 	exportShip(id: string): ExportJSON {
 		this.ensureInitialized();
 
 		const ship = this.getShipJSON(id);
-		if (!ship) {
-			throw new Error(`Ship not found: ${id}`);
-		}
+		if (!ship) throw new Error(`Ship not found: ${id}`);
 
-		const exportShip: ShipJSON = JSON.parse(JSON.stringify(ship));
-		exportShip.runtime = undefined;
-		exportShip.$id = `export:${id.split(":")[1]}`;
+		const raw = JSON.parse(JSON.stringify(ship));
+		raw.runtime = undefined;
+		raw.$id = `export:${id.split(":")[1]}`;
 
-		return {
+		return ExportJSONSchema.parse({
 			$schema: "export-v1",
 			$type: "SHIP",
 			$exportedAt: new Date().toISOString(),
-			ship: exportShip,
-		};
+			ship: raw,
+		});
 	}
 
-	importShip(exportJson: ExportJSON, ownerId: string): ShipJSON {
+	importShip(raw: unknown, ownerId: string): ShipJSON {
 		this.ensureInitialized();
 
+		const exportJson = ExportJSONSchema.parse(raw);
 		if (exportJson.$type !== "SHIP" || !exportJson.ship) {
 			throw new Error("Invalid export format: expected SHIP type");
 		}
 
-		const ship = JSON.parse(JSON.stringify(exportJson.ship));
+		const shipRaw = JSON.parse(JSON.stringify(exportJson.ship));
+		shipRaw.$id = generateId("ship");
 
-		ship.$id = generateId("ship");
-
-		// 注册挂载点中的武器对象
-		if (ship.ship?.mounts) {
-			for (const mount of ship.ship.mounts) {
+		// 级联注册挂载点武器
+		if (shipRaw.ship?.mounts) {
+			for (const mount of shipRaw.ship.mounts) {
 				if (typeof mount.weapon === "object") {
 					mount.weapon.$id = generateId("weapon");
 					this.registerWeapon(mount.weapon);
@@ -315,14 +264,13 @@ export class DataRegistry {
 			}
 		}
 
-		if (!ship.runtime) {
-			ship.runtime = this.createDefaultRuntime(ship.ship, { ownerId, faction: "PLAYER" });
+		if (!shipRaw.runtime) {
+			shipRaw.runtime = this.buildRuntime(shipRaw.ship, { ownerId, faction: "PLAYER" });
 		} else {
-			ship.runtime.ownerId = ownerId;
+			shipRaw.runtime.ownerId = ownerId;
 		}
 
-		this.registerShip(ship);
-		return ship;
+		return this.registerShip(shipRaw);
 	}
 
 	serializeSave(
@@ -331,10 +279,10 @@ export class DataRegistry {
 			name: string;
 			description?: string;
 			roomId?: string;
-			room?: SaveJSON["room"];
+			room?: GameSave["room"];
 		}
-	): SaveJSON {
-		return {
+	): GameSave {
+		return GameSaveSchema.parse({
 			$schema: "save-v1",
 			$id: generateId("save"),
 			metadata: {
@@ -346,53 +294,39 @@ export class DataRegistry {
 			},
 			room: meta.room,
 			ships,
-		};
+			createdAt: Date.now(),
+		});
 	}
 
-	deserializeSave(saveJson: SaveJSON): ShipJSON[] {
-		for (const ship of saveJson.ships) {
+	deserializeSave(raw: unknown): ShipJSON[] {
+		const save = GameSaveSchema.parse(raw);
+		for (const ship of save.ships) {
 			this.registerShip(ship);
 		}
-		this.saves.set(saveJson.$id, saveJson);
-		return saveJson.ships;
+		this.saves.set(save.$id, save);
+		return save.ships;
 	}
 
-	getSave(id: string): SaveJSON | undefined {
+	getSave(id: string): GameSave | undefined {
 		return this.saves.get(id);
 	}
 
 	private ensureInitialized(): void {
-		if (!this.initialized) {
-			this.initialize();
-		}
+		if (!this.initialized) this.initialize();
 	}
 
 	clear(): void {
 		for (const [id, ship] of this.ships) {
-			if (!id.startsWith("preset:")) {
-				this.ships.delete(id);
-			}
+			if (!id.startsWith("preset:")) this.ships.delete(id);
 		}
-
 		for (const [id, weapon] of this.weapons) {
-			if (!id.startsWith("preset:")) {
-				this.weapons.delete(id);
-			}
+			if (!id.startsWith("preset:")) this.weapons.delete(id);
 		}
-
 		this.saves.clear();
 		console.log("[DataRegistry] Cleared custom data");
 	}
 
-	getStats(): {
-		totalShips: number;
-		presetShips: number;
-		customShips: number;
-		totalWeapons: number;
-		presetWeapons: number;
-		customWeapons: number;
-		saves: number;
-	} {
+	getStats() {
 		const allShips = this.getAllShips();
 		const allWeapons = this.getAllWeapons();
 		return {

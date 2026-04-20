@@ -39,10 +39,6 @@
 			"referenceAngle": "heading",
 			"normalizeToHeading": true,
 			"singleHitQuadrant": true
-		},
-		"shieldInteraction": {
-			"fluxGenerationOnBlock": true,
-			"fluxType": "HARD"
 		}
 	}
 }

@@ -1,183 +1,72 @@
 /**
- * 游戏规则配置加载器
+ * 游戏规则配置
  *
- * 从JSON文件加载所有游戏规则配置，提供类型安全的配置访问
+ * 保留 game-rules.json 以便 DM 调整规则参数。
+ * 服务器配置已移除（移至 server 包）。
  */
 
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
+import { z } from "zod";
 
-const CONFIGS_DIR = resolve(dirname(new URL(import.meta.url).pathname), "configs");
+const CONFIGS_DIR = resolve(dirname(new URL(import.meta.url).pathname));
 
-/** 配置缓存 */
-const cache: Map<string, any> = new Map();
+// ==================== Zod Schema ====================
 
-/** 配置文件映射 */
-const CONFIG_FILES = {
-	gameRules: "game-rules.json",
-	serverConfig: "server-config.json",
-} as const;
+export const DamageModifierSchema = z.object({
+	shieldMultiplier: z.number(),
+	armorMultiplier: z.number(),
+	hullMultiplier: z.number(),
+});
 
-/** 已加载标记 */
-let loaded = false;
+export const ArmorQuadrantDefSchema = z.object({
+	id: z.number(),
+	name: z.string(),
+	angleRange: z.object({
+		start: z.number(),
+		end: z.number(),
+	}),
+});
 
-/**
- * 加载所有配置
- */
-export function loadAllConfigs(): void {
-	if (loaded) return;
+export const GameRulesSchema = z.object({
+	$schema: z.string(),
+	description: z.string(),
+	movement: z.object({
+		phases: z.object({
+			order: z.array(z.string()),
+			strictOrder: z.boolean(),
+			cannotSkip: z.boolean(),
+		}),
+		budget: z.object({
+			forwardMultiplier: z.number(),
+			backwardMultiplier: z.number(),
+			strafeMultiplier: z.number(),
+			turnMultiplier: z.number(),
+		}),
+		restrictions: z.object({
+			overloaded: z.object({ movementDisabled: z.boolean() }),
+			destroyed: z.object({ movementDisabled: z.boolean() }),
+		}),
+	}),
+	combat: z.object({
+		damageModifiers: z.record(z.string(), DamageModifierSchema),
+		armorQuadrants: z.object({
+			definitions: z.array(ArmorQuadrantDefSchema),
+			referenceAngle: z.string(),
+			normalizeToHeading: z.boolean(),
+			singleHitQuadrant: z.boolean(),
+		}),
+		// 辐能规则固定，不再配置化：
+		// - 武器开火 → 软辐能（攻击者）
+		// - 护盾维持 → 软辐能
+		// - 护盾吸收攻击 → 硬辐能（被攻击者）
+		// - 护盾开启时硬辐能不可消散
+	}),
+});
 
-	for (const [key, filename] of Object.entries(CONFIG_FILES)) {
-		const filepath = resolve(CONFIGS_DIR, filename);
-		if (existsSync(filepath)) {
-			const content = readFileSync(filepath, "utf-8");
-			const config = JSON.parse(content);
-			cache.set(key, config);
-			console.log(`[RuleConfigs] Loaded ${filename}`);
-		} else {
-			console.warn(`[RuleConfigs] Missing config: ${filename}`);
-		}
-	}
+export type GameRules = z.infer<typeof GameRulesSchema>;
 
-	loaded = true;
-}
-
-/**
- * 获取游戏核心规则配置
- */
-export function getGameRules(): GameRulesConfig {
-	ensureLoaded();
-	return cache.get("gameRules") ?? getDefaultGameRules();
-}
-
-/**
- * 获取服务器配置
- */
-export function getServerConfig(): ServerConfig {
-	ensureLoaded();
-	return cache.get("serverConfig") ?? getDefaultServerConfig();
-}
-
-/**
- * 热重载所有配置
- */
-export function reloadConfigs(): void {
-	cache.clear();
-	loaded = false;
-	loadAllConfigs();
-}
-
-/**
- * 确保已加载
- */
-function ensureLoaded(): void {
-	if (!loaded) {
-		loadAllConfigs();
-	}
-}
-
-// ==================== 类型定义 ====================
-
-export interface DamageModifierEntry {
-	shieldMultiplier: number;
-	armorMultiplier: number;
-	hullMultiplier: number;
-}
-
-export type DamageModifiersMap = Record<string, DamageModifierEntry>;
-
-export interface GameRulesConfig {
-	$schema: string;
-	description: string;
-	movement: {
-		phases: {
-			order: string[];
-			strictOrder: boolean;
-			cannotSkip: boolean;
-		};
-		budget: {
-			forwardMultiplier: number;
-			backwardMultiplier: number;
-			strafeMultiplier: number;
-			turnMultiplier: number;
-		};
-		restrictions: {
-			overloaded: { movementDisabled: boolean };
-			destroyed: { movementDisabled: boolean };
-		};
-	};
-	combat: {
-		damageModifiers: DamageModifiersMap;
-		armorQuadrants: {
-			definitions: Array<{
-				id: number;
-				name: string;
-				angleRange: {
-					start: number;
-					end: number;
-				};
-			}>;
-			referenceAngle: string;
-			normalizeToHeading: boolean;
-			singleHitQuadrant: boolean;
-		};
-		shieldInteraction: {
-			fluxGenerationOnBlock: boolean;
-			fluxType: string;
-		};
-	};
-}
-
-export interface ServerConfig {
-	$schema: string;
-	$version: string;
-	description: string;
-	game: {
-		turnDurationSeconds: number;
-		defaultCooldown: number;
-		mapDefaultWidth: number;
-		mapDefaultHeight: number;
-		maxShipsPerRoom: number;
-		autoSaveInterval: number;
-		description: string;
-	};
-	room: {
-		maxPlayers: number;
-		maxClientsLimit: number;
-		minClients: number;
-		emptyRoomTtlMs: number;
-		ownerLeaveTtlMs: number;
-		simulationIntervalMs: number;
-		description: string;
-	};
-	connection: {
-		reconnectionTimeoutMs: number;
-		pingIntervalMs: number;
-		heartbeatTimeoutMs: number;
-		description: string;
-	};
-}
-
-// ==================== 游戏全局配置 ====================
-
-/**
- * 获取游戏全局配置（从 server-config.json 加载）
- */
-export function getGameConfig() {
-	const serverConfig = getServerConfig();
-	return {
-		DEFAULT_COOLDOWN: serverConfig.game.defaultCooldown,
-		MAP_DEFAULT_WIDTH: serverConfig.game.mapDefaultWidth,
-		MAP_DEFAULT_HEIGHT: serverConfig.game.mapDefaultHeight,
-		MAX_PLAYERS_PER_ROOM: serverConfig.room.maxPlayers,
-		RECONNECTION_TIMEOUT_MS: serverConfig.connection.reconnectionTimeoutMs,
-	} as const;
-}
-
-/** 游戏全局配置常量（懒加载） */
-export const GAME_CONFIG = getGameConfig();
-
-// ==================== 游戏规则 ====================
+// ==================== 常量 ====================
 
 export const SIZE_COMPATIBILITY: Record<string, string[]> = {
 	SMALL: ["SMALL"],
@@ -185,16 +74,23 @@ export const SIZE_COMPATIBILITY: Record<string, string[]> = {
 	LARGE: ["SMALL", "MEDIUM", "LARGE"],
 };
 
-export function isWeaponSizeCompatible(
-	mountSize: string,
-	weaponSize: string
-): boolean {
+export function isWeaponSizeCompatible(mountSize: string, weaponSize: string): boolean {
 	return SIZE_COMPATIBILITY[mountSize]?.includes(weaponSize) ?? false;
 }
 
-// ==================== 默认配置 ====================
+// ==================== 加载器 ====================
 
-function getDefaultGameRules(): GameRulesConfig {
+const RULES_FILE = resolve(CONFIGS_DIR, "game-rules.json");
+
+function loadGameRules(): GameRules {
+	if (existsSync(RULES_FILE)) {
+		const raw = JSON.parse(readFileSync(RULES_FILE, "utf-8"));
+		return GameRulesSchema.parse(raw);
+	}
+	return getDefaultGameRules();
+}
+
+function getDefaultGameRules(): GameRules {
 	return {
 		$schema: "rules-v1",
 		description: "STFCS 游戏核心规则配置",
@@ -224,8 +120,8 @@ function getDefaultGameRules(): GameRulesConfig {
 			},
 			armorQuadrants: {
 				definitions: [
-					{ id: 0, name: "RF", angleRange: { start: 0,   end: 60  } },
-					{ id: 1, name: "RR", angleRange: { start: 60,  end: 120 } },
+					{ id: 0, name: "RF", angleRange: { start: 0, end: 60 } },
+					{ id: 1, name: "RR", angleRange: { start: 60, end: 120 } },
 					{ id: 2, name: "RB", angleRange: { start: 120, end: 180 } },
 					{ id: 3, name: "LB", angleRange: { start: 180, end: 240 } },
 					{ id: 4, name: "LL", angleRange: { start: 240, end: 300 } },
@@ -235,42 +131,10 @@ function getDefaultGameRules(): GameRulesConfig {
 				normalizeToHeading: true,
 				singleHitQuadrant: true,
 			},
-			shieldInteraction: {
-				fluxGenerationOnBlock: true,
-				fluxType: "HARD",
-			},
 		},
 	};
 }
 
-function getDefaultServerConfig(): ServerConfig {
-	return {
-		$schema: "server-config-v1",
-		$version: "1.0.0",
-		description: "STFCS 服务器配置",
-		game: {
-			turnDurationSeconds: 10,
-			defaultCooldown: 5,
-			mapDefaultWidth: 2000,
-			mapDefaultHeight: 2000,
-			maxShipsPerRoom: 100,
-			autoSaveInterval: 0,
-			description: "游戏核心参数",
-		},
-		room: {
-			maxPlayers: 8,
-			maxClientsLimit: 16,
-			minClients: 2,
-			emptyRoomTtlMs: 30000,
-			ownerLeaveTtlMs: 300000,
-			simulationIntervalMs: 50,
-			description: "房间参数",
-		},
-		connection: {
-			reconnectionTimeoutMs: 60000,
-			pingIntervalMs: 5000,
-			heartbeatTimeoutMs: 15000,
-			description: "连接参数",
-		},
-	};
-}
+// ==================== 导出单例 ====================
+
+export const GAME_RULES = loadGameRules();
