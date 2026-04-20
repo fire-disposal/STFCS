@@ -2,7 +2,7 @@
  * 持久化层 - 统一导出
  *
  * 提供 Repository 模式和内存存储实现
- * 未来可无缝切换 MongoDB 等外部存储
+ * MongoDB 实现可通过 mongoose 子模块切换
  */
 
 // 类型定义
@@ -20,6 +20,9 @@ export type {
 	RoomArchive,
 } from "./types.js";
 
+// WeaponBuild 类型（从内存实现导出）
+export type { WeaponBuild } from "./memory/MemoryWeaponRepository.js";
+
 // 接口
 export type { Repository, QueryableRepository, StorageProvider } from "./interfaces.js";
 
@@ -28,8 +31,12 @@ export {
 	MemoryBaseRepository,
 	MemoryUserRepository,
 	MemoryShipRepository,
+	MemoryWeaponRepository,
 	MemoryRoomSaveRepository,
 } from "./memory/index.js";
 
+// MongoDB 实现
+export { connectMongo, disconnectMongo, mongoRepositories, type MongoConfig } from "./mongoose/index.js";
+
 // 管理器
-export { PersistenceManager } from "./PersistenceManager.js";
+export { PersistenceManager, persistence, type PersistenceType } from "./PersistenceManager.js";

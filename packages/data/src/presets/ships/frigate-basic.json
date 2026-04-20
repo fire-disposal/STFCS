@@ -1,0 +1,51 @@
+{
+	"$schema": "ship-v2",
+	"$id": "preset:frigate-basic",
+	"metadata": {
+		"name": "标准护卫舰",
+		"description": "基础护卫舰配置，适合新手",
+		"author": "STFCS"
+	},
+	"ship": {
+		"size": "FRIGATE",
+		"class": "STRIKE",
+		"width": 40,
+		"length": 60,
+		"maxHitPoints": 800,
+		"armorMaxPerQuadrant": 100,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.85,
+		"fluxCapacity": 200,
+		"fluxDissipation": 10,
+		"maxSpeed": 150,
+		"maxTurnRate": 30,
+		"shield": {
+			"type": "OMNI",
+			"arc": 360,
+			"radius": 50,
+			"efficiency": 1.0,
+			"upkeep": 0
+		},
+		"mounts": [
+			{
+				"id": "mount-front-1",
+				"displayName": "前炮塔",
+				"position": { "x": 0, "y": 25 },
+				"facing": 0,
+				"arc": 60,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			},
+			{
+				"id": "mount-front-2",
+				"displayName": "前炮塔",
+				"position": { "x": 0, "y": 25 },
+				"facing": 0,
+				"arc": 60,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

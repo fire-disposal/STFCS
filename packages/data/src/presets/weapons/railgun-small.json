@@ -1,0 +1,20 @@
+{
+	"$schema": "weapon-v2",
+	"$id": "preset:railgun-small",
+	"metadata": {
+		"name": "小型轨道炮",
+		"description": "标准小型动能武器，高射速低伤害",
+		"author": "STFCS"
+	},
+	"weapon": {
+		"damageType": "KINETIC",
+		"size": "SMALL",
+		"damage": 50,
+		"projectilesPerShot": 1,
+		"range": 400,
+		"minRange": 50,
+		"cooldown": 0.5,
+		"fluxCostPerShot": 5,
+		"tags": ["BALLISTIC", "ANTI_SHIP"]
+	}
+}

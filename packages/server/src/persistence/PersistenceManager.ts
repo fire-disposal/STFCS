@@ -1,49 +1,96 @@
 /**
  * 持久化管理器
  *
- * 统一管理所有 Repository，提供便捷的访问方式
+ * 统一管理所有 Repository
+ * 支持内存存储和 MongoDB 切换
  */
 
+import type { Repository, QueryableRepository } from "./interfaces.js";
+import type { UserProfile, ShipBuild, RoomArchive } from "./types.js";
+import type { WeaponBuild } from "./memory/MemoryWeaponRepository.js";
 import {
 	MemoryUserRepository,
 	MemoryShipRepository,
+	MemoryWeaponRepository,
 	MemoryRoomSaveRepository,
 } from "./memory/index.js";
 
-/**
- * 持久化管理器
- */
-export class PersistenceManager {
-	/** 用户档案 Repository */
-	users: MemoryUserRepository;
-	/** 舰船自定义 Repository */
-	ships: MemoryShipRepository;
-	/** 房间存档 Repository */
-	roomSaves: MemoryRoomSaveRepository;
+export type PersistenceType = "memory" | "mongo";
 
-	constructor(
-		users: MemoryUserRepository,
-		ships: MemoryShipRepository,
-		roomSaves: MemoryRoomSaveRepository
-	) {
-		this.users = users;
-		this.ships = ships;
-		this.roomSaves = roomSaves;
+interface Repositories {
+	users: Repository<UserProfile> & QueryableRepository<UserProfile>;
+	ships: Repository<ShipBuild> & QueryableRepository<ShipBuild> & {
+		findByOwner(ownerId: string): Promise<ShipBuild[]>;
+		findPresets(): Promise<ShipBuild[]>;
+		findCustomByOwner(ownerId: string): Promise<ShipBuild[]>;
+		findPublic(): Promise<ShipBuild[]>;
+		incrementUsage(id: string): Promise<ShipBuild | null>;
+		clear(): void;
+	};
+	weapons: Repository<WeaponBuild> & QueryableRepository<WeaponBuild> & {
+		findByOwner(ownerId: string): Promise<WeaponBuild[]>;
+		findPresets(): Promise<WeaponBuild[]>;
+		findCustomByOwner(ownerId: string): Promise<WeaponBuild[]>;
+		findByDamageType(damageType: string): Promise<WeaponBuild[]>;
+		findBySize(size: string): Promise<WeaponBuild[]>;
+		incrementUsage(id: string): Promise<WeaponBuild | null>;
+		clear(): void;
+	};
+	roomSaves: Repository<RoomArchive> & QueryableRepository<RoomArchive>;
+}
+
+export class PersistenceManager implements Repositories {
+	users: Repositories["users"];
+	ships: Repositories["ships"];
+	weapons: Repositories["weapons"];
+	roomSaves: Repositories["roomSaves"];
+
+	private type: PersistenceType;
+
+	constructor(repos: Repositories, type: PersistenceType = "memory") {
+		this.users = repos.users;
+		this.ships = repos.ships;
+		this.weapons = repos.weapons;
+		this.roomSaves = repos.roomSaves;
+		this.type = type;
 	}
 
-	/** 创建默认的内存存储管理器 */
+	getType(): PersistenceType {
+		return this.type;
+	}
+
+	/** 创建内存存储（默认） */
 	static createMemory(): PersistenceManager {
 		return new PersistenceManager(
-			new MemoryUserRepository(),
-			new MemoryShipRepository(),
-			new MemoryRoomSaveRepository()
+			{
+				users: new MemoryUserRepository(),
+				ships: new MemoryShipRepository(),
+				weapons: new MemoryWeaponRepository(),
+				roomSaves: new MemoryRoomSaveRepository(),
+			},
+			"memory"
 		);
 	}
 
-	/** 清空所有数据（谨慎使用） */
+	/** 根据环境变量自动选择 */
+	static create(): PersistenceManager {
+		const type = (process.env["PERSISTENCE_TYPE"] ?? "memory") as PersistenceType;
+		
+		if (type === "mongo") {
+			throw new Error("MongoDB persistence requires explicit connection. Use connectMongo() first.");
+		}
+		
+		return PersistenceManager.createMemory();
+	}
+
+	/** 清空所有数据 */
 	async clearAll(): Promise<void> {
-		this.users.clear();
-		this.ships.clear();
-		this.roomSaves.clear();
+		if (this.type === "memory") {
+			(this.ships as MemoryShipRepository).clear();
+			(this.weapons as MemoryWeaponRepository).clear();
+		}
 	}
 }
+
+/** 全局默认实例（内存存储） */
+export const persistence = PersistenceManager.createMemory();

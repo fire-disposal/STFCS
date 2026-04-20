@@ -32,12 +32,14 @@
   "dependencies": {
     "@types/socket.io": "^3.0.2",
     "@vt/data": "workspace:*",
+    "mongoose": "^9.4.1",
     "socket.io": "^4.8.3",
     "uuid": "^11.0.6",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/mongoose": "^5.11.97",
     "@types/node": "^25.4.0",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.14",

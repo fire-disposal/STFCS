@@ -1,0 +1,78 @@
+{
+	"$schema": "ship-v2",
+	"$id": "preset:cruiser-assault",
+	"metadata": {
+		"name": "突击巡洋舰",
+		"description": "重型巡洋舰，高火力配置",
+		"author": "STFCS"
+	},
+	"ship": {
+		"size": "CRUISER",
+		"class": "ASSAULT",
+		"width": 80,
+		"length": 140,
+		"maxHitPoints": 5000,
+		"armorMaxPerQuadrant": 400,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.85,
+		"fluxCapacity": 1000,
+		"fluxDissipation": 50,
+		"maxSpeed": 70,
+		"maxTurnRate": 15,
+		"shield": {
+			"type": "OMNI",
+			"arc": 360,
+			"radius": 120,
+			"efficiency": 0.9,
+			"upkeep": 10
+		},
+		"mounts": [
+			{
+				"id": "mount-front-1",
+				"displayName": "前主炮",
+				"position": { "x": 0, "y": 60 },
+				"facing": 0,
+				"arc": 90,
+				"size": "LARGE",
+				"weapon": "preset:missile-large"
+			},
+			{
+				"id": "mount-front-2",
+				"displayName": "前副炮",
+				"position": { "x": -20, "y": 50 },
+				"facing": 20,
+				"arc": 120,
+				"size": "MEDIUM",
+				"weapon": "preset:laser-medium"
+			},
+			{
+				"id": "mount-front-3",
+				"displayName": "前副炮",
+				"position": { "x": 20, "y": 50 },
+				"facing": -20,
+				"arc": 120,
+				"size": "MEDIUM",
+				"weapon": "preset:laser-medium"
+			},
+			{
+				"id": "mount-side-left",
+				"displayName": "左侧炮",
+				"position": { "x": -30, "y": 0 },
+				"facing": 90,
+				"arc": 120,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			},
+			{
+				"id": "mount-side-right",
+				"displayName": "右侧炮",
+				"position": { "x": 30, "y": 0 },
+				"facing": -90,
+				"arc": 120,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

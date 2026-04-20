@@ -1,0 +1,20 @@
+{
+	"$schema": "weapon-v2",
+	"$id": "preset:missile-large",
+	"metadata": {
+		"name": "大型导弹发射器",
+		"description": "重型高爆导弹，高伤害低射速",
+		"author": "STFCS"
+	},
+	"weapon": {
+		"damageType": "HIGH_EXPLOSIVE",
+		"size": "LARGE",
+		"damage": 500,
+		"projectilesPerShot": 1,
+		"range": 1000,
+		"minRange": 200,
+		"cooldown": 5.0,
+		"fluxCostPerShot": 100,
+		"tags": ["GUIDED", "HE", "ANTI_SHIP"]
+	}
+}

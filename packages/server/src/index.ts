@@ -118,6 +118,38 @@ export { GameStateManager } from "./core/state/GameStateManager.js";
 export { gameRuntime, GameRuntime } from "./runtime/index.js";
 export { Match } from "./runtime/index.js";
 export { TurnManager } from "./runtime/index.js";
-export { shipDataManager, weaponDataManager, componentDataManager, modifierSystem } from "./data/index.js";
+
+export {
+	PresetLoader,
+	PresetService,
+	ShipBuildService,
+	WeaponService,
+	ComponentService,
+	componentService,
+	ModifierService,
+	modifierService,
+	AssetService,
+	PlayerAvatarStorageService,
+	PlayerProfileService,
+	SimpleObjectCreationService,
+} from "./services/index.js";
+
+export {
+	PersistenceManager,
+	persistence,
+	MemoryBaseRepository,
+	MemoryUserRepository,
+	MemoryShipRepository,
+	MemoryWeaponRepository,
+	MemoryRoomSaveRepository,
+	connectMongo,
+	disconnectMongo,
+	mongoRepositories,
+	type ShipBuild,
+	type WeaponBuild,
+	type PersistenceType,
+	type MongoConfig,
+} from "./persistence/index.js";
+
 export { actionHandler, ActionHandler } from "./server/handlers/index.js";
 export { broadcaster } from "./server/broadcast/index.js";

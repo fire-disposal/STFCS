@@ -1,0 +1,60 @@
+{
+	"$schema": "ship-v2",
+	"$id": "preset:destroyer-standard",
+	"metadata": {
+		"name": "标准驱逐舰",
+		"description": "中型驱逐舰，均衡火力与防护",
+		"author": "STFCS"
+	},
+	"ship": {
+		"size": "DESTROYER",
+		"class": "COMBAT",
+		"width": 60,
+		"length": 100,
+		"maxHitPoints": 2000,
+		"armorMaxPerQuadrant": 200,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.85,
+		"fluxCapacity": 500,
+		"fluxDissipation": 25,
+		"maxSpeed": 100,
+		"maxTurnRate": 20,
+		"shield": {
+			"type": "OMNI",
+			"arc": 360,
+			"radius": 80,
+			"efficiency": 1.0,
+			"upkeep": 5
+		},
+		"mounts": [
+			{
+				"id": "mount-front-1",
+				"displayName": "前主炮",
+				"position": { "x": 0, "y": 40 },
+				"facing": 0,
+				"arc": 90,
+				"size": "MEDIUM",
+				"weapon": "preset:laser-medium"
+			},
+			{
+				"id": "mount-front-2",
+				"displayName": "前副炮",
+				"position": { "x": -15, "y": 35 },
+				"facing": 15,
+				"arc": 60,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			},
+			{
+				"id": "mount-front-3",
+				"displayName": "前副炮",
+				"position": { "x": 15, "y": 35 },
+				"facing": -15,
+				"arc": 60,
+				"size": "SMALL",
+				"weapon": "preset:railgun-small"
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

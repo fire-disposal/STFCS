@@ -11,6 +11,9 @@ export * from "./core/index.js";
 export { GAME_RULES, GameRulesSchema, DamageModifierSchema, ArmorQuadrantDefSchema } from "./configs/index.js";
 export type { GameRules } from "./configs/index.js";
 
+// ==================== 预设数据 ====================
+export { presetShips, presetWeapons, type PresetShip, type PresetWeapon } from "./presets/index.js";
+
 // ==================== 类型值别名（兼容性）====================
 import {
 	GamePhase,
