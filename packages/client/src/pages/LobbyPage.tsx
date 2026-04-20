@@ -5,7 +5,7 @@
  * 使用 CSS 类名而非内联样式
  */
 
-import type { RoomInfo } from "@/network/NetworkManager";
+import type { RoomInfo } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Avatar } from "@/ui/shared/Avatar";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";

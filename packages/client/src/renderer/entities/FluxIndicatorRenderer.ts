@@ -1,56 +1,29 @@
 /**
  * 辐能/过载状态指示器渲染器
- *
- * 渲染策略：
- * - 在舰船周围显示辐能条（环形进度条风格）
- * - 辐能条颜色：蓝色（正常）→ 黄色（接近上限）→ 红色（即将过载）
- * - 过载状态时显示过载警告图标和剩余时间
- * - 排散状态时显示排散进度动画
- *
- * 设计文档要求：
- * - Token上方显示辐能值和结构值
- * - 点选Token后可查看各区域护甲状况
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipState } from "@/sync/types";
-import { Faction, FluxState } from "@/sync/types";
+import type { ShipRuntime } from "@vt/data";
+import { FluxState } from "@vt/data";
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
 
-/** 辐能环半径偏移（相对于舰船） */
 const FLUX_RING_RADIUS = 45;
-
-/** 辐能环宽度 */
 const FLUX_RING_WIDTH = 6;
-
-/** 过载警告图标大小 */
 const OVERLOAD_ICON_SIZE = 16;
-
-/** 过载时间文本偏移 */
 const OVERLOAD_TEXT_OFFSET_Y = 20;
+const FLUX_WARNING_THRESHOLD = 0.7;
+const FLUX_CRITICAL_THRESHOLD = 0.9;
 
-/** 辐能百分比阈值 */
-const FLUX_WARNING_THRESHOLD = 0.7;   // 70% - 黄色警告
-const FLUX_CRITICAL_THRESHOLD = 0.9;  // 90% - 红色临界
-
-/** 阵营颜色 */
-const FACTION_COLORS: Record<string, number> = {
-	[Faction.PLAYER]: 0x4fc3ff,
-	[Faction.NEUTRAL]: 0xff7f9f,
-};
-
-/** 辐能环颜色 */
 const FLUX_COLORS = {
-	NORMAL: 0x4fc3ff,      // 蓝色 - 正常
-	WARNING: 0xffce66,     // 黄色 - 接近上限
-	CRITICAL: 0xff5d7e,    // 红色 - 即将过载
-	OVERLOADED: 0xff2d4a,  // 深红 - 过载状态
-	VENTING: 0x57e38d,     // 绿色 - 排散状态
+	NORMAL: 0x4fc3ff,
+	WARNING: 0xffce66,
+	CRITICAL: 0xff5d7e,
+	OVERLOADED: 0xff2d4a,
+	VENTING: 0x57e38d,
 };
 
-/** 过载时间文本样式 */
 const overloadTextStyle = new TextStyle({
 	fill: 0xff5d7e,
 	fontSize: 10,
@@ -59,9 +32,6 @@ const overloadTextStyle = new TextStyle({
 	stroke: { color: 0x081423, width: 2 },
 });
 
-/**
- * 获取辐能环颜色
- */
 function getFluxColor(fluxPercent: number, fluxState: string): number {
 	if (fluxState === FluxState.OVERLOADED) return FLUX_COLORS.OVERLOADED;
 	if (fluxState === FluxState.VENTING) return FLUX_COLORS.VENTING;
@@ -70,9 +40,6 @@ function getFluxColor(fluxPercent: number, fluxState: string): number {
 	return FLUX_COLORS.NORMAL;
 }
 
-/**
- * 绘制辐能环（环形进度条）
- */
 function drawFluxRing(
 	graphics: Graphics,
 	radius: number,
@@ -84,51 +51,35 @@ function drawFluxRing(
 	const width = FLUX_RING_WIDTH;
 	const color = getFluxColor(fluxPercent, fluxState);
 
-	// 过载状态：显示完整红色环 + 脉冲效果（通过透明度变化模拟）
 	if (fluxState === FluxState.OVERLOADED) {
-		// 绘制完整红色环
 		graphics.arc(0, 0, radius, 0, Math.PI * 2);
 		graphics.stroke({ color: FLUX_COLORS.OVERLOADED, width, alpha: 0.8 });
-
-		// 内层闪烁环（模拟脉冲）
 		graphics.arc(0, 0, radius - width / 2, 0, Math.PI * 2);
 		graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
 		return;
 	}
 
-	// 排散状态：显示绿色环，逐渐减少
 	if (fluxState === FluxState.VENTING) {
 		const ventAngle = Math.PI * 2 * (1 - fluxPercent);
 		graphics.arc(0, 0, radius, 0, ventAngle);
 		graphics.stroke({ color: FLUX_COLORS.VENTING, width, alpha: 0.9 });
-
-		// 显示排散进度文本（可选）
 		return;
 	}
 
-	// 正常状态：显示辐能进度环
 	const fluxAngle = Math.PI * 2 * fluxPercent;
 
-	// 背景环（灰色）
 	graphics.arc(0, 0, radius, 0, Math.PI * 2);
 	graphics.stroke({ color: 0x1a2a3a, width: width, alpha: 0.5 });
 
-	// 进度环（彩色）
 	graphics.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + fluxAngle);
 	graphics.stroke({ color, width, alpha: 0.95 });
 
-	// 高光效果
 	graphics.arc(0, 0, radius + 2, -Math.PI / 2, -Math.PI / 2 + fluxAngle);
 	graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.2 });
 }
 
-/**
- * 绘制过载警告图标（闪电形状）
- */
 function drawOverloadWarning(graphics: Graphics, size: number): void {
 	graphics.clear();
-
-	// 闪电形状
 	const halfSize = size / 2;
 	graphics.poly([
 		halfSize * 0.3, -halfSize,
@@ -141,6 +92,20 @@ function drawOverloadWarning(graphics: Graphics, size: number): void {
 	]);
 	graphics.fill({ color: 0xff5d7e, alpha: 0.9 });
 	graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.5 });
+}
+
+function computeFluxState(ship: ShipRuntime & { id: string; fluxCapacity?: number }): { percent: number; state: string } {
+	const fluxSoft = ship.fluxSoft ?? 0;
+	const fluxHard = ship.fluxHard ?? 0;
+	const capacity = ship.fluxCapacity ?? 100;
+	const total = fluxSoft + fluxHard;
+	const percent = total / capacity;
+
+	if (ship.overloaded) return { percent: 1, state: FluxState.OVERLOADED };
+	if (ship.venting) return { percent, state: FluxState.VENTING };
+	if (percent >= FLUX_CRITICAL_THRESHOLD) return { percent, state: FluxState.HIGH };
+	if (percent >= FLUX_WARNING_THRESHOLD) return { percent, state: FluxState.HIGH };
+	return { percent, state: FluxState.NORMAL };
 }
 
 export interface FluxIndicatorCacheItem {
@@ -160,18 +125,19 @@ export interface FluxIndicatorCacheItem {
 }
 
 export interface FluxIndicatorOptions {
-	/** 是否显示辐能指示器 */
 	show?: boolean;
+	fluxCapacity?: number;
 }
 
 export function useFluxIndicatorRendering(
 	layers: LayerRegistry | null,
-	ships: ShipState[],
+	ships: (ShipRuntime & { id: string; fluxCapacity?: number })[],
 	options: FluxIndicatorOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, FluxIndicatorCacheItem>>(new Map());
 	const showFluxIndicators = useUIStore((state) => state.showFluxIndicators);
 	const show = options.show ?? showFluxIndicators;
+	const defaultCapacity = options.fluxCapacity ?? 100;
 
 	useEffect(() => {
 		if (!layers) return;
@@ -179,7 +145,6 @@ export function useFluxIndicatorRendering(
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.id));
 
-		// 清理已删除舰船的辐能指示器
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
 				layers.fluxIndicators.removeChild(item.root);
@@ -187,22 +152,20 @@ export function useFluxIndicatorRendering(
 			}
 		}
 
-		// 更新或创建辐能指示器
 		for (const ship of ships) {
 			const cached = cache.get(ship.id);
 			if (!cached) {
-				createFluxIndicator(layers, cache, ship);
+				createFluxIndicator(layers, cache, ship, defaultCapacity);
 				continue;
 			}
 
-			if (shouldUpdateFlux(cached, ship)) {
-				updateFluxIndicator(cached, ship);
+			if (shouldUpdateFlux(cached, ship, defaultCapacity)) {
+				updateFluxIndicator(cached, ship, defaultCapacity);
 			}
 		}
 
-		// 控制图层可见性
 		layers.fluxIndicators.visible = show;
-	}, [layers, ships, show]);
+	}, [layers, ships, show, defaultCapacity]);
 
 	useEffect(() => {
 		return () => {
@@ -211,22 +174,23 @@ export function useFluxIndicatorRendering(
 	}, []);
 }
 
-function shouldUpdateFlux(cached: FluxIndicatorCacheItem, ship: ShipState): boolean {
-	if (!cached.lastState) return true;
+function shouldUpdateFlux(
+	cached: FluxIndicatorCacheItem,
+	ship: ShipRuntime & { id: string; fluxCapacity?: number },
+	defaultCapacity: number
+): boolean {
+	if (!cached.lastState || !ship.position) return true;
 
 	const last = cached.lastState;
+	const dx = Math.abs(ship.position.x - last.x);
+	const dy = Math.abs(ship.position.y - last.y);
+	const dHeading = Math.abs(ship.heading - last.heading);
 
-	// 位置变化
-	const dx = Math.abs(ship.transform.x - last.x);
-	const dy = Math.abs(ship.transform.y - last.y);
-	const dHeading = Math.abs(ship.transform.heading - last.heading);
-
-	// 辐能状态变化
-	const fluxPercent = ship.flux.percent / 100;
+	const flux = computeFluxState({ ...ship, fluxCapacity: ship.fluxCapacity ?? defaultCapacity });
 	const fluxChanged =
-		fluxPercent !== last.fluxPercent ||
-		ship.flux.state !== last.fluxState ||
-		ship.isOverloaded !== last.isOverloaded ||
+		flux.percent !== last.fluxPercent ||
+		flux.state !== last.fluxState ||
+		ship.overloaded !== last.isOverloaded ||
 		ship.overloadTime !== last.overloadTime;
 
 	return dx > 0.5 || dy > 0.5 || dHeading > 1 || fluxChanged;
@@ -235,36 +199,37 @@ function shouldUpdateFlux(cached: FluxIndicatorCacheItem, ship: ShipState): bool
 function createFluxIndicator(
 	layers: LayerRegistry,
 	cache: Map<string, FluxIndicatorCacheItem>,
-	ship: ShipState
+	ship: ShipRuntime & { id: string; fluxCapacity?: number },
+	defaultCapacity: number
 ): void {
-	const root = new Container();
-	root.position.set(ship.transform.x, ship.transform.y);
-	root.rotation = (ship.transform.heading * Math.PI) / 180;
+	if (!ship.position) return;
 
+	const root = new Container();
+	root.position.set(ship.position.x, ship.position.y);
+
+	const capacity = ship.fluxCapacity ?? defaultCapacity;
+	const flux = computeFluxState({ ...ship, fluxCapacity: capacity });
 	const radius = FLUX_RING_RADIUS;
 
-	// 辐能环
 	const fluxRing = new Graphics();
-	drawFluxRing(fluxRing, radius, ship.flux.percent / 100, ship.flux.state);
+	drawFluxRing(fluxRing, radius, flux.percent, flux.state);
 	root.addChild(fluxRing);
 
-	// 过载警告图标
 	const overloadIcon = new Graphics();
-	if (ship.isOverloaded) {
+	if (ship.overloaded) {
 		drawOverloadWarning(overloadIcon, OVERLOAD_ICON_SIZE);
 	}
 	overloadIcon.position.set(0, -radius - OVERLOAD_ICON_SIZE / 2);
-	overloadIcon.visible = ship.isOverloaded;
+	overloadIcon.visible = ship.overloaded ?? false;
 	root.addChild(overloadIcon);
 
-	// 过载时间文本
 	const overloadText = new Text({
-		text: formatOverloadTime(ship.overloadTime),
+		text: formatOverloadTime(ship.overloadTime ?? 0),
 		style: overloadTextStyle,
 	});
 	overloadText.anchor.set(0.5, 0.5);
 	overloadText.position.set(0, -radius - OVERLOAD_TEXT_OFFSET_Y);
-	overloadText.visible = ship.isOverloaded && ship.overloadTime > 0;
+	overloadText.visible = (ship.overloaded ?? false) && (ship.overloadTime ?? 0) > 0;
 	root.addChild(overloadText);
 
 	layers.fluxIndicators.addChild(root);
@@ -275,54 +240,53 @@ function createFluxIndicator(
 		overloadIcon,
 		overloadText,
 		lastState: {
-			x: ship.transform.x,
-			y: ship.transform.y,
-			heading: ship.transform.heading,
-			fluxPercent: ship.flux.percent / 100,
-			fluxState: ship.flux.state,
-			isOverloaded: ship.isOverloaded,
-			overloadTime: ship.overloadTime,
+			x: ship.position.x,
+			y: ship.position.y,
+			heading: ship.heading,
+			fluxPercent: flux.percent,
+			fluxState: flux.state,
+			isOverloaded: ship.overloaded ?? false,
+			overloadTime: ship.overloadTime ?? 0,
 		},
 	});
 }
 
-function updateFluxIndicator(cached: FluxIndicatorCacheItem, ship: ShipState): void {
-	cached.root.position.set(ship.transform.x, ship.transform.y);
-	// 辐能环不随舰船旋转（保持固定方向，便于玩家阅读）
-	// cached.root.rotation = (ship.transform.heading * Math.PI) / 180;
+function updateFluxIndicator(
+	cached: FluxIndicatorCacheItem,
+	ship: ShipRuntime & { id: string; fluxCapacity?: number },
+	defaultCapacity: number
+): void {
+	if (!ship.position) return;
 
+	cached.root.position.set(ship.position.x, ship.position.y);
+
+	const capacity = ship.fluxCapacity ?? defaultCapacity;
+	const flux = computeFluxState({ ...ship, fluxCapacity: capacity });
 	const radius = FLUX_RING_RADIUS;
-	const fluxPercent = ship.flux.percent / 100;
 
-	// 更新辐能环
-	drawFluxRing(cached.fluxRing, radius, fluxPercent, ship.flux.state);
+	drawFluxRing(cached.fluxRing, radius, flux.percent, flux.state);
 
-	// 更新过载警告图标
-	cached.overloadIcon.visible = ship.isOverloaded;
-	if (ship.isOverloaded) {
+	cached.overloadIcon.visible = ship.overloaded ?? false;
+	if (ship.overloaded) {
 		drawOverloadWarning(cached.overloadIcon, OVERLOAD_ICON_SIZE);
 	}
 
-	// 更新过载时间文本
-	cached.overloadText.visible = ship.isOverloaded && ship.overloadTime > 0;
-	if (ship.isOverloaded && ship.overloadTime > 0) {
+	cached.overloadText.visible = (ship.overloaded ?? false) && (ship.overloadTime ?? 0) > 0;
+	if (ship.overloaded && ship.overloadTime) {
 		cached.overloadText.text = formatOverloadTime(ship.overloadTime);
 	}
 
 	cached.lastState = {
-		x: ship.transform.x,
-		y: ship.transform.y,
-		heading: ship.transform.heading,
-		fluxPercent,
-		fluxState: ship.flux.state,
-		isOverloaded: ship.isOverloaded,
-		overloadTime: ship.overloadTime,
+		x: ship.position.x,
+		y: ship.position.y,
+		heading: ship.heading,
+		fluxPercent: flux.percent,
+		fluxState: flux.state,
+		isOverloaded: ship.overloaded ?? false,
+		overloadTime: ship.overloadTime ?? 0,
 	};
 }
 
-/**
- * 格式化过载时间显示
- */
 function formatOverloadTime(time: number): string {
 	if (time <= 0) return "";
 	const seconds = Math.ceil(time);

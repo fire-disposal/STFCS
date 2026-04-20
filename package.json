@@ -10,7 +10,7 @@
 		"format:check": "turbo run format:check --continue",
 		"test": "turbo run test --continue",
 		"build": "turbo run build --continue",
-		"dev": "pnpm --filter @vt/data build && pnpm --filter @vt/rules build && turbo run dev --filter=@vt/server --filter=client",
+		"dev": "pnpm --filter @vt/data build && turbo run dev --filter=@vt/server --filter=client",
 		"dev:legacy": "turbo run dev",
 		"dev:server": "turbo run dev:server",
 		"dev:client": "turbo run dev:client",

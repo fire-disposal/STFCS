@@ -1,8 +1,7 @@
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
-import { useGameStore } from "@/state/stores";
 import { useUIStore } from "@/state/stores/uiStore";
 import { Application } from "@pixi/react";
-import type { ShipState } from "@/sync/types";
+import type { ShipViewModel, MovementPreviewState } from "../types";
 import React, { useEffect, useMemo, useRef } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
@@ -14,13 +13,12 @@ import { usePixiApp } from "./usePixiApp";
 import { useShipRendering } from "../entities/ShipRenderer";
 import { useShipHUDRendering } from "../entities/ShipHUDRenderer";
 import { useStarfieldRendering } from "../systems/StarfieldRenderer";
-import { useWeaponArcsRendering } from "../entities/WeaponArcRenderer";
 import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
-import { useMovementVisualRendering, type MovementPreviewState } from "../entities/MovementVisualRenderer";
+import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 
 interface GameCanvasProps {
-	ships: ShipState[];
+	ships: ShipViewModel[];
 	zoom: number;
 	cameraX: number;
 	cameraY: number;
@@ -65,7 +63,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	onSelectShip,
 	onPanDelta,
 	onRotateDelta,
-	showWeaponArcs = false,
+	showWeaponArcs: _showWeaponArcs = false,
 	showMovementRange = false,
 	showBackground = true,
 	onClick,
@@ -75,7 +73,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
-	const selectShipAction = useGameStore((state) => state.selectShip);
+	const selectShipAction = useUIStore((state) => state.selectShip);
 	const { setZoom, setCameraPosition, setMapCursor, mapCursor, showLabels, showEffects, showShipIcons } = useUIStore();
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
@@ -124,14 +122,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		{ showHpBars: showLabels, showLabels: showLabels }
 	);
 
-	useWeaponArcsRendering(layerSystem.layers, ships, selectedShipId, {
-		showWeaponArcs,
-		showMovementRange: false,
-	});
 	useArmorHexagonRendering(layerSystem.layers, ships);
-	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId, {
+	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview, {
 		show: showMovementRange,
-		preview: movementPreview,
 	});
 	useGridRendering(layerSystem.layers, showGrid);
 

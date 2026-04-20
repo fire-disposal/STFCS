@@ -1,56 +1,22 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { getAvatar } from "@/sync";
+import React, { useMemo } from "react";
 
 interface AvatarProps {
-	/** 直接传入图片 Base64 数据 */
 	src?: string | null;
-	/** 玩家 shortId，从全局存储获取头像（优先级低于 src） */
-	shortId?: number;
 	size?: "small" | "medium" | "large" | number;
 	className?: string;
 	fallback?: string;
 }
 
-/**
- * 统一头像组件
- *
- * 职责：
- * - 识别 Base64 图片数据
- * - 支持 shortId 从全局存储获取头像
- * - 监听全局缓存更新事件，自动刷新
- * - 当 src 和 shortId 都无效时，渲染默认 👤 Emoji
- * - 统一处理视觉样式
- */
 export const Avatar: React.FC<AvatarProps> = ({
 	src,
-	shortId,
 	size = "medium",
 	className = "",
 	fallback = "👤"
 }) => {
-	// 监听缓存更新事件，触发重新渲染
-	const [cacheVersion, setCacheVersion] = useState(0);
-
-	useEffect(() => {
-		const handleCacheUpdate = (event: CustomEvent<{ shortId: number; avatar: string }>) => {
-			// 如果更新的是当前头像，触发重新渲染
-			if (shortId !== undefined && event.detail.shortId === shortId) {
-				setCacheVersion(v => v + 1);
-			}
-		};
-
-		window.addEventListener("stfcs-avatar-cache-updated", handleCacheUpdate as EventListener);
-		return () => {
-			window.removeEventListener("stfcs-avatar-cache-updated", handleCacheUpdate as EventListener);
-		};
-	}, [shortId]);
-
-	// 优先使用 src，其次从全局存储获取
 	const imageSrc = useMemo(() => {
 		if (src && src.startsWith("data:image/")) return src;
-		if (shortId !== undefined) return getAvatar(shortId);
 		return null;
-	}, [src, shortId, cacheVersion]); // cacheVersion 变化时重新计算
+	}, [src]);
 
 	const isImage = imageSrc && imageSrc.startsWith("data:image/");
 

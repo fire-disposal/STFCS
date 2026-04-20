@@ -7,9 +7,9 @@
 const ENV = {
   // 开发环境
   DEVELOPMENT: {
-    API_BASE_URL: 'http://localhost:3000',
-    WS_BASE_URL: 'ws://localhost:3000',
-    ASSETS_BASE_URL: 'http://localhost:3000/assets',
+    API_BASE_URL: 'http://localhost:3001',
+    WS_BASE_URL: 'ws://localhost:3001',
+    ASSETS_BASE_URL: 'http://localhost:3001/assets',
   },
   
   // 测试环境

@@ -1,4 +1,4 @@
-import type { GameRoomState, PlayerRoleValue, ShipState } from "@/sync/types";
+import type { PlayerRole } from "@vt/data";
 import { create } from "zustand";
 
 // 交互模式枚举
@@ -14,7 +14,7 @@ interface UIState {
 	// 连接状态
 	isConnected: boolean;
 	connectionError: string | null;
-	playerRole: PlayerRoleValue | null;
+	playerRole: PlayerRole | null;
 	roomId: string | null;
 
 	// 选中的舰船及交互模式
@@ -68,7 +68,7 @@ interface UIActions {
 	// 连接相关
 	setConnected: (connected: boolean) => void;
 	setConnectionError: (error: string | null) => void;
-	setPlayerRole: (role: PlayerRoleValue | null) => void;
+	setPlayerRole: (role: PlayerRole | null) => void;
 	setRoomId: (roomId: string | null) => void;
 
 	// 选择相关
@@ -238,8 +238,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
  * 用于在React组件外访问同步的游戏状态
  */
 interface GameStateRef {
-	state: GameRoomState | null;
-	ships: Map<string, ShipState>;
+	state: any;
+	ships: Map<string, any>;
 	currentPhase: string;
 	turnCount: number;
 }
@@ -251,17 +251,13 @@ export const gameStateRef: GameStateRef = {
 	turnCount: 1,
 };
 
-/**
- * 更新游戏状态引用
- */
-export function updateGameStateRef(state: GameRoomState): void {
+export function updateGameStateRef(state: any): void {
 	gameStateRef.state = state;
-	gameStateRef.currentPhase = state.currentPhase;
+	gameStateRef.currentPhase = state.phase;
 	gameStateRef.turnCount = state.turnCount;
 
-	// 同步舰船数据
 	gameStateRef.ships.clear();
-	for (const [key, ship] of (state.ships as unknown as Map<string, ShipState>).entries()) {
+	for (const [key, ship] of (state.ships as unknown as Map<string, any>).entries()) {
 		gameStateRef.ships.set(key, ship);
 	}
 }

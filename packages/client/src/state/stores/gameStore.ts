@@ -1,38 +1,12 @@
-/**
- * gameStore - Zustand 状态管理
- *
- * 移动阶段类型说明：
- * - MovePhaseValue: 服务端同步类型（PHASE_A/B/C）
- * - MovePhaseUIValue: 客户端 UI 状态类型（包含 NONE 表示未开始）
- *
- * ⚠️ 燃料池数据从服务端同步：
- * - 燃料上限：通过 ShipState.maxSpeed/maxTurnRate 计算
- *   - Phase A/C 前进上限：maxSpeed * 2
- *   - Phase A/C 横移上限：maxSpeed
- *   - Phase B 转向上限：maxTurnRate
- * - 已用燃料：通过 ShipState.phaseAForwardUsed 等字段同步
- * - UI 应直接使用服务端数据，不再在此 store 维护燃料池
- */
-
 import { create } from "zustand";
-import type {
-	ShipState,
-	PlayerState,
-	GamePhaseValue,
-	FactionValue,
-	PlayerRoleValue,
-	CameraState,
-	PlayerCamera,
-} from "@/sync/types";
-import { MovePhaseUI, type MovePhaseUIValue } from "@vt/data";
+import { GamePhase, Faction, PlayerRole } from "@vt/data";
+import type { RoomPlayerState, ShipRuntime } from "@vt/data";
+import type { MovePhaseUIValue } from "@/types";
+import { MovePhaseUI } from "@/types";
 
-// 导出常量供组件使用
 export { MovePhaseUI };
-
-// 类型别名 - 保持向后兼容
 export type MovementPhaseValue = MovePhaseUIValue;
 
-// 本地聊天消息类型（普通对象）
 export interface LocalChatMessage {
 	id: string;
 	senderId: string;
@@ -42,17 +16,29 @@ export interface LocalChatMessage {
 	type: string;
 }
 
+export interface CameraState {
+	x: number;
+	y: number;
+	zoom: number;
+	viewRotation?: number;
+	followingShipId?: string | null;
+}
+
+export interface PlayerCamera extends CameraState {
+	playerId: string;
+}
+
 interface GameState {
 	isConnected: boolean;
 	connectionError: string | null;
 	roomId: string | null;
-	playerRole: PlayerRoleValue | null;
+	playerRole: PlayerRole | null;
 	playerSessionId: string | null;
-	currentPhase: GamePhaseValue;
+	currentPhase: GamePhase;
 	turnCount: number;
-	activeFaction: FactionValue;
-	ships: Map<string, ShipState>;
-	players: Map<string, PlayerState>;
+	activeFaction: Faction;
+	ships: Map<string, ShipRuntime & { id: string }>;
+	players: Map<string, RoomPlayerState>;
 	chatMessages: LocalChatMessage[];
 	selectedShipId: string | null;
 	selectedTargetId: string | null;
@@ -71,14 +57,14 @@ interface GameActions {
 	setConnected: (connected: boolean) => void;
 	setConnectionError: (error: string | null) => void;
 	setRoomId: (roomId: string | null) => void;
-	setPlayerRole: (role: PlayerRoleValue | null) => void;
+	setPlayerRole: (role: PlayerRole | null) => void;
 	setPlayerSessionId: (sessionId: string | null) => void;
-	setPhase: (phase: GamePhaseValue) => void;
+	setPhase: (phase: GamePhase) => void;
 	setTurnCount: (count: number) => void;
-	setActiveFaction: (faction: FactionValue) => void;
-	setShip: (ship: ShipState) => void;
+	setActiveFaction: (faction: Faction) => void;
+	setShip: (ship: ShipRuntime & { id: string }) => void;
 	removeShip: (id: string) => void;
-	setPlayer: (player: PlayerState) => void;
+	setPlayer: (player: RoomPlayerState) => void;
 	removePlayer: (id: string) => void;
 	setChatMessages: (messages: LocalChatMessage[]) => void;
 	addChatMessage: (message: LocalChatMessage) => void;
@@ -89,7 +75,6 @@ interface GameActions {
 	setCamera: (camera: Partial<CameraState>) => void;
 	setOtherPlayerCamera: (playerId: string, camera: PlayerCamera) => void;
 	removeOtherPlayerCamera: (playerId: string) => void;
-	/** 设置移动阶段（由服务端 ship.movePhase 同步触发） */
 	setMovePhase: (phase: MovementPhaseValue) => void;
 	toggleGrid: () => void;
 	toggleWeaponArcs: () => void;
@@ -103,9 +88,9 @@ const initialState: GameState = {
 	roomId: null,
 	playerRole: null,
 	playerSessionId: null,
-	currentPhase: "DEPLOYMENT",
+	currentPhase: GamePhase.DEPLOYMENT,
 	turnCount: 1,
-	activeFaction: "PLAYER",
+	activeFaction: Faction.PLAYER,
 	ships: new Map(),
 	players: new Map(),
 	chatMessages: [],
@@ -114,7 +99,7 @@ const initialState: GameState = {
 	selectedWeaponId: null,
 	camera: { x: 0, y: 0, zoom: 1, viewRotation: 0 },
 	otherPlayersCameras: new Map(),
-	movementPhase: "NONE",
+	movementPhase: MovePhaseUI.NONE,
 	mapWidth: 2000,
 	mapHeight: 2000,
 	showGrid: true,

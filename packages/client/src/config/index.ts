@@ -13,15 +13,13 @@ function getDefaultWsUrl(): string {
 			hostname === "::1";
 
 		if (isLocalHost) {
-			return `${wsProtocol}://${hostname}:2567`;
+			return `${wsProtocol}://${hostname}:3001`;
 		}
 
-		// 在生产环境下，Nginx 会处理包含 /matchmake 等路径的请求并转发到后端端口
-		// Colyseus 客户端会自动将这个 URL 处理为后端基础地址
 		return `${wsProtocol}://${host}`;
 	}
 
-	return "ws://localhost:2567";
+	return "ws://localhost:3001";
 }
 
 export const DEFAULT_WS_URL = getDefaultWsUrl();
