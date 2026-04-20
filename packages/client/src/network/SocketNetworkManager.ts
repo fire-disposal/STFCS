@@ -34,6 +34,10 @@ export interface AuthResult {
 	success: boolean;
 	playerId?: string;
 	playerName?: string;
+	profile?: {
+		nickname: string;
+		avatar: string;
+	};
 	error?: string;
 }
 
@@ -103,7 +107,11 @@ export class SocketNetworkManager {
 
 		return new Promise((resolve) => {
 			this.socket!.emit("auth", { playerName });
-			this.socket!.once("auth:success", (data: { playerId: string; playerName: string }) => {
+			this.socket!.once("auth:success", (data: {
+				playerId: string;
+				playerName: string;
+				profile?: { nickname: string; avatar: string };
+			}) => {
 				this.playerId = data.playerId;
 				this.playerName = data.playerName;
 				logger.info("Authenticated", { playerId: data.playerId });
@@ -127,26 +135,69 @@ export class SocketNetworkManager {
 		});
 	}
 
+	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string }; error?: string }> {
+		if (!this.socket?.connected) {
+			return { success: false, error: "Not connected" };
+		}
+
+		return new Promise((resolve) => {
+			this.socket!.emit("profile:get", (result: any) => {
+				resolve(result);
+			});
+		});
+	}
+
+	async updateProfile(profile: {
+		nickname?: string;
+		avatar?: string;
+	}): Promise<{ success: boolean; profile?: { nickname: string; avatar: string }; error?: string }> {
+		if (!this.socket?.connected) {
+			return { success: false, error: "Not connected" };
+		}
+
+		return new Promise((resolve) => {
+			this.socket!.emit("profile:update", profile, (result: any) => {
+				resolve(result);
+			});
+		});
+	}
+
 	async createRoom(options: RoomCreateOptions): Promise<RoomJoinResult> {
 		if (!this.socket?.connected || !this.playerId) {
 			return { success: false, error: "Not authenticated" };
 		}
 
 		return new Promise((resolve) => {
+			const timeoutId = setTimeout(() => {
+				resolve({ success: false, error: "Room creation timeout" });
+			}, 10000); // 10秒超时
+
+			const cleanup = () => {
+				clearTimeout(timeoutId);
+				this.socket!.off("room:created", onRoomCreated);
+				this.socket!.off("error", onError);
+			};
+
+			const onRoomCreated = (data: { roomId: string; roomName: string }) => {
+				cleanup();
+				this.currentRoomId = data.roomId;
+				logger.info("Room created and joined", { roomId: data.roomId });
+				resolve({ success: true, roomId: data.roomId });
+			};
+
+			const onError = (err: { code: string; message: string }) => {
+				if (err.code === "ROOM_CREATE_FAILED") {
+					cleanup();
+					resolve({ success: false, error: err.message });
+				}
+			};
+
 			this.socket!.emit("room:create", {
 				roomName: options.roomName,
 				maxPlayers: options.maxPlayers ?? 4,
 			});
-			this.socket!.once("room:created", (data: { roomId: string; roomName: string }) => {
-				this.currentRoomId = data.roomId;
-				logger.info("Room created and joined", { roomId: data.roomId });
-				resolve({ success: true, roomId: data.roomId });
-			});
-			this.socket!.once("error", (err: { code: string; message: string }) => {
-				if (err.code === "ROOM_CREATE_FAILED") {
-					resolve({ success: false, error: err.message });
-				}
-			});
+			this.socket!.once("room:created", onRoomCreated);
+			this.socket!.once("error", onError);
 		});
 	}
 

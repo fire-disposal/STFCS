@@ -32,8 +32,6 @@
   "dependencies": {
     "@types/socket.io": "^3.0.2",
     "@vt/data": "workspace:*",
-    "pino": "^9.6.0",
-    "pino-pretty": "^13.0.0",
     "socket.io": "^4.8.3",
     "uuid": "^11.0.6",
     "ws": "^8.18.0"

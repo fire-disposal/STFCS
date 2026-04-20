@@ -4,6 +4,8 @@
 
 import { createServer } from "http";
 import { Server as IOServer } from "socket.io";
+import { resolve } from "path";
+import { fileURLToPath } from "url";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handler.js";
@@ -93,8 +95,15 @@ export class STFCServer {
 	}
 }
 
-// 直接运行时启动
-if (import.meta.url === `file://${process.argv[1]}`) {
+// 直接运行时启动（兼容 Windows/Unix 路径差异）
+const isDirectRun = (() => {
+	const entryPath = process.argv[1];
+	if (!entryPath) return false;
+
+	return resolve(fileURLToPath(import.meta.url)) === resolve(entryPath);
+})();
+
+if (isDirectRun) {
 	const server = new STFCServer();
 	server.start().catch((error) => {
 		logger.error("Failed to start server", error);

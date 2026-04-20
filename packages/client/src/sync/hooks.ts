@@ -26,14 +26,14 @@ export interface SocketRoom {
 }
 
 export function useSocketRoom(
-	networkManager: SocketNetworkManager,
+	networkManager: SocketNetworkManager | null | undefined,
 	onLeaveRoom?: () => void
 ): SocketRoom | null {
 	const [roomState, setRoomState] = useState<SocketRoomState | null>(null);
 	const stateRef = useRef<SocketRoomState | null>(null);
 
 	useEffect(() => {
-		if (!networkManager.isConnected()) return;
+		if (!networkManager || !networkManager.isConnected()) return;
 
 		const handleStateFull = (state: any) => {
 			const newState: SocketRoomState = {
@@ -88,27 +88,34 @@ export function useSocketRoom(
 		networkManager.on("state:delta", handleStateDelta);
 		networkManager.on("disconnect", handleDisconnect);
 
-		const existingState = networkManager.getGameState();
+		const existingState = networkManager?.getGameState();
 		if (existingState) {
 			handleStateFull(existingState);
 		}
 
 		return () => {
-			networkManager.off("state:full", handleStateFull);
-			networkManager.off("state:delta", handleStateDelta);
-			networkManager.off("disconnect", handleDisconnect);
+			if (networkManager) {
+				networkManager.off("state:full", handleStateFull);
+				networkManager.off("state:delta", handleStateDelta);
+				networkManager.off("disconnect", handleDisconnect);
+			}
 		};
 	}, [networkManager, onLeaveRoom]);
 
 	const send = useCallback(
 		async (event: string, payload: unknown) => {
+			if (!networkManager) {
+				throw new Error("Network manager is not available");
+			}
 			return networkManager.send(event, payload);
 		},
 		[networkManager]
 	);
 
 	const leave = useCallback(() => {
-		networkManager.leaveRoom();
+		if (networkManager) {
+			networkManager.leaveRoom();
+		}
 		if (onLeaveRoom) onLeaveRoom();
 	}, [networkManager, onLeaveRoom]);
 
@@ -142,21 +149,21 @@ export function useShips(room: SocketRoom | null): any[] {
 
 		updateShips();
 
-		return () => {};
+		return () => { };
 	}, [room?.state?.ships]);
 
 	return ships;
 }
 
 export function useRoomList(
-	networkManager: SocketNetworkManager,
+	networkManager: SocketNetworkManager | null | undefined,
 	refreshKey?: number
 ): { rooms: RoomInfo[]; isLoading: boolean; refresh: () => void } {
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 
 	const fetchRooms = useCallback(async () => {
-		if (!networkManager.isConnected()) return;
+		if (!networkManager || !networkManager.isConnected()) return;
 		setIsLoading(true);
 		try {
 			const list = await networkManager.getRoomList();

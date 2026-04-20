@@ -8,6 +8,7 @@
 import { Server as IOServer, Socket } from "socket.io";
 import { createLogger } from "../../infra/simple-logger.js";
 import { RoomManager } from "../rooms/RoomManager.js";
+import { PlayerAvatarStorageService } from "../../services/PlayerAvatarStorageService.js";
 import { actionHandler } from "../handlers/actionHandler.js";
 import {
 	validateActionPayload,
@@ -16,21 +17,73 @@ import {
 import type { SocketIOActionEvent } from "@vt/data";
 
 const logger = createLogger("socketio");
+const playerAvatarStorage = new PlayerAvatarStorageService();
 
 export function setupSocketIO(io: IOServer, roomManager: RoomManager) {
 	io.on("connection", (socket: Socket) => {
 		logger.info("Client connected", { socketId: socket.id });
 
 		// 认证
-		socket.on("auth", (data: { playerName: string }) => {
+		socket.on("auth", async (data: { playerName: string }) => {
 			if (!data.playerName) {
 				socket.emit("error", { code: "AUTH_FAILED", message: "playerName required" });
 				return;
 			}
+
+			const playerName = data.playerName.trim();
+			if (!playerName) {
+				socket.emit("error", { code: "AUTH_FAILED", message: "playerName required" });
+				return;
+			}
+
 			socket.data.playerId = `player_${socket.id}`;
-			socket.data.playerName = data.playerName;
-			socket.emit("auth:success", { playerId: socket.data.playerId, playerName: data.playerName });
+			socket.data.playerName = playerName;
+
+			const profile = await playerAvatarStorage.getClientProfile(playerName);
+			socket.emit("auth:success", {
+				playerId: socket.data.playerId,
+				playerName,
+				profile,
+			});
 		});
+
+		socket.on("profile:get", async (callback?: (result: any) => void) => {
+			if (!socket.data.playerName) {
+				const result = { success: false, error: "Not authenticated" };
+				callback ? callback(result) : socket.emit("error", result);
+				return;
+			}
+
+			const profile = await playerAvatarStorage.getClientProfile(socket.data.playerName);
+			const result = { success: true, profile };
+			if (callback) callback(result);
+			else socket.emit("profile:updated", profile);
+		});
+
+		socket.on(
+			"profile:update",
+			async (
+				data: { nickname?: string; avatar?: string },
+				callback?: (result: { success: boolean; error?: string; profile?: { nickname: string; avatar: string } }) => void
+			) => {
+				if (!socket.data.playerName) {
+					const result = { success: false, error: "Not authenticated" };
+					callback ? callback(result) : socket.emit("error", result);
+					return;
+				}
+
+				try {
+					const profile = await playerAvatarStorage.upsertProfile(socket.data.playerName, data ?? {});
+					const result = { success: true, profile };
+					callback?.(result);
+					socket.emit("profile:updated", profile);
+				} catch (error: unknown) {
+					const message = error instanceof Error ? error.message : "Failed to update profile";
+					const result = { success: false, error: message };
+					callback ? callback(result) : socket.emit("error", result);
+				}
+			}
+		);
 
 		// 房间：创建
 		socket.on("room:create", (options: { roomName: string; maxPlayers?: number }) => {

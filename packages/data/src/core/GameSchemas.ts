@@ -597,7 +597,10 @@ export const AssetSchema = z.object({
 	updatedAt: z.number().optional(),
 	visibility: z.enum(["private", "public", "shared"]),
 	sharedWith: z.array(z.string()).optional(),
-	data: z.instanceof(Buffer).optional(),
+	data: z.custom<Uint8Array>(
+		(val): val is Uint8Array => val instanceof Uint8Array,
+		{ message: "Expected Uint8Array or Buffer" }
+	).optional(),
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
@@ -605,7 +608,10 @@ export const AssetUploadRequestSchema = z.object({
 	type: AssetTypeSchema,
 	filename: z.string(),
 	mimeType: z.string(),
-	buffer: z.instanceof(Buffer),
+	buffer: z.custom<Uint8Array>(
+		(val): val is Uint8Array => val instanceof Uint8Array,
+		{ message: "Expected Uint8Array or Buffer" }
+	),
 	metadata: AssetSchema.shape.metadata.optional(),
 	visibility: z.enum(["private", "public", "shared"]).optional(),
 	sharedWith: z.array(z.string()).optional(),

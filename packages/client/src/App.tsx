@@ -23,7 +23,7 @@ const App: React.FC = () => {
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const { rooms, isLoading: roomsLoading } = useRoomList(
-		networkManager!,
+		networkManager,
 		refreshKey
 	);
 
@@ -43,7 +43,7 @@ const App: React.FC = () => {
 				manager.authenticate(restoredName).then((result) => {
 					if (result.success) {
 						setUserName(restoredName);
-						setUserProfile({ nickname: restoredName, avatar: "" });
+						setUserProfile(result.profile ?? { nickname: restoredName, avatar: "" });
 						setAppState("lobby");
 						notify.success(`欢迎回来，${restoredName}！`);
 						setRefreshKey(Date.now());
@@ -63,7 +63,7 @@ const App: React.FC = () => {
 		const result = await networkManagerRef.current.authenticate(username);
 		if (result.success) {
 			setUserName(username);
-			setUserProfile({ nickname: username, avatar: "" });
+			setUserProfile(result.profile ?? { nickname: username, avatar: "" });
 			userService.setUsername(username);
 			setAppState("lobby");
 			notify.success(`欢迎，${username}！`);
@@ -127,13 +127,17 @@ const App: React.FC = () => {
 
 	const handleUpdateProfile = useCallback(
 		async (profile: { nickname?: string; avatar?: string }) => {
-			setUserProfile({
-				nickname: profile.nickname || userName,
-				avatar: profile.avatar || "",
-			});
+			if (!networkManagerRef.current) return;
+			const result = await networkManagerRef.current.updateProfile(profile);
+			if (!result.success || !result.profile) {
+				notify.error(result.error || "玩家档案保存失败");
+				return;
+			}
+
+			setUserProfile(result.profile);
 			notify.success("玩家档案已保存");
 		},
-		[userName]
+		[]
 	);
 
 	const handleDeleteRoom = useCallback(async (_roomId: string) => {

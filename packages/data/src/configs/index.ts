@@ -1,15 +1,11 @@
 /**
  * 游戏规则配置
  *
- * 保留 game-rules.json 以便 DM 调整规则参数。
- * 服务器配置已移除（移至 server 包）。
+ * 前端兼容版本：使用硬编码规则，移除 fs 依赖
+ * 服务器端可以有自己的配置加载逻辑
  */
 
-import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
 import { z } from "zod";
-
-const CONFIGS_DIR = resolve(dirname(new URL(import.meta.url).pathname));
 
 // ==================== Zod Schema ====================
 
@@ -78,63 +74,55 @@ export function isWeaponSizeCompatible(mountSize: string, weaponSize: string): b
 	return SIZE_COMPATIBILITY[mountSize]?.includes(weaponSize) ?? false;
 }
 
-// ==================== 加载器 ====================
+// ==================== 默认游戏规则 ====================
 
-const RULES_FILE = resolve(CONFIGS_DIR, "game-rules.json");
-
-function loadGameRules(): GameRules {
-	if (existsSync(RULES_FILE)) {
-		const raw = JSON.parse(readFileSync(RULES_FILE, "utf-8"));
-		return GameRulesSchema.parse(raw);
-	}
-	return getDefaultGameRules();
-}
-
-function getDefaultGameRules(): GameRules {
-	return {
-		$schema: "rules-v1",
-		description: "STFCS 游戏核心规则配置",
-		movement: {
-			phases: {
-				order: ["PHASE_A", "PHASE_TURN", "PHASE_C"],
-				strictOrder: true,
-				cannotSkip: true,
-			},
-			budget: {
-				forwardMultiplier: 2.0,
-				backwardMultiplier: 2.0,
-				strafeMultiplier: 1.0,
-				turnMultiplier: 1.0,
-			},
-			restrictions: {
-				overloaded: { movementDisabled: true },
-				destroyed: { movementDisabled: true },
-			},
+export const DEFAULT_GAME_RULES: GameRules = {
+	$schema: "rules-v1",
+	description: "STFCS 游戏核心规则配置",
+	movement: {
+		phases: {
+			order: ["PHASE_A", "PHASE_TURN", "PHASE_C"],
+			strictOrder: true,
+			cannotSkip: true,
 		},
-		combat: {
-			damageModifiers: {
-				KINETIC: { shieldMultiplier: 2.0, armorMultiplier: 0.5, hullMultiplier: 1.0 },
-				HIGH_EXPLOSIVE: { shieldMultiplier: 0.5, armorMultiplier: 2.0, hullMultiplier: 1.0 },
-				ENERGY: { shieldMultiplier: 1.0, armorMultiplier: 1.0, hullMultiplier: 1.0 },
-				FRAGMENTATION: { shieldMultiplier: 0.25, armorMultiplier: 0.25, hullMultiplier: 1.0 },
-			},
-			armorQuadrants: {
-				definitions: [
-					{ id: 0, name: "RF", angleRange: { start: 0, end: 60 } },
-					{ id: 1, name: "RR", angleRange: { start: 60, end: 120 } },
-					{ id: 2, name: "RB", angleRange: { start: 120, end: 180 } },
-					{ id: 3, name: "LB", angleRange: { start: 180, end: 240 } },
-					{ id: 4, name: "LL", angleRange: { start: 240, end: 300 } },
-					{ id: 5, name: "LF", angleRange: { start: 300, end: 360 } },
-				],
-				referenceAngle: "heading",
-				normalizeToHeading: true,
-				singleHitQuadrant: true,
-			},
+		budget: {
+			forwardMultiplier: 2.0,
+			backwardMultiplier: 2.0,
+			strafeMultiplier: 1.0,
+			turnMultiplier: 1.0,
 		},
-	};
-}
+		restrictions: {
+			overloaded: { movementDisabled: true },
+			destroyed: { movementDisabled: true },
+		},
+	},
+	combat: {
+		damageModifiers: {
+			KINETIC: { shieldMultiplier: 2.0, armorMultiplier: 0.5, hullMultiplier: 1.0 },
+			HIGH_EXPLOSIVE: { shieldMultiplier: 0.5, armorMultiplier: 2.0, hullMultiplier: 1.0 },
+			ENERGY: { shieldMultiplier: 1.0, armorMultiplier: 1.0, hullMultiplier: 1.0 },
+			FRAGMENTATION: { shieldMultiplier: 0.25, armorMultiplier: 0.25, hullMultiplier: 1.0 },
+		},
+		armorQuadrants: {
+			definitions: [
+				{ id: 0, name: "RF", angleRange: { start: 0, end: 60 } },
+				{ id: 1, name: "RR", angleRange: { start: 60, end: 120 } },
+				{ id: 2, name: "RB", angleRange: { start: 120, end: 180 } },
+				{ id: 3, name: "LB", angleRange: { start: 180, end: 240 } },
+				{ id: 4, name: "LL", angleRange: { start: 240, end: 300 } },
+				{ id: 5, name: "LF", angleRange: { start: 300, end: 360 } },
+			],
+			referenceAngle: "heading",
+			normalizeToHeading: true,
+			singleHitQuadrant: true,
+		},
+	},
+};
 
-// ==================== 导出单例 ====================
+// ==================== 导出单例（兼容性）====================
 
-export const GAME_RULES = loadGameRules();
+/**
+ * @deprecated 使用 DEFAULT_GAME_RULES 代替
+ * 保持向后兼容，但不再从文件加载
+ */
+export const GAME_RULES = DEFAULT_GAME_RULES;

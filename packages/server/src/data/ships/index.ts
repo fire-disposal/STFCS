@@ -2,7 +2,8 @@
  * 舰船数据管理 - 基于 @vt/data 权威设计
  */
 
-import { DataRegistry, type ShipJSON } from "@vt/data";
+import { type ShipJSON } from "@vt/data";
+import { DataRegistry } from "../DataRegistry.js";
 
 /** 舰船数据管理器 */
 export class ShipDataManager {

@@ -2,7 +2,8 @@
  * 武器数据管理 - 基于 @vt/data 权威设计
  */
 
-import { DataRegistry, type WeaponJSON } from "@vt/data";
+import { type WeaponJSON } from "@vt/data";
+import { DataRegistry } from "../DataRegistry.js";
 
 /** 武器数据管理器 */
 export class WeaponDataManager {
@@ -100,7 +101,7 @@ export class WeaponDataManager {
     if (!weapon) return false;
 
     const weaponSize = weapon.weapon.size;
-    
+
     // 尺寸兼容性规则
     const sizeHierarchy = {
       "SMALL": ["SMALL"],
