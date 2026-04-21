@@ -1,0 +1,92 @@
+/**
+ * Radix 战斗面板样式（迁移后）
+ */
+
+.rbp-shell {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 380px;
+    background: rgba(9, 20, 36, 0.97);
+    border-top: 1px solid rgba(74, 158, 255, 0.35);
+    z-index: 1000;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    will-change: height, box-shadow;
+    transition: height 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.rbp-shell--collapsed {
+    height: 40px;
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.35);
+}
+
+.rbp-shell--expanded {
+    height: 380px;
+}
+
+.rbp-header {
+    height: 38px;
+    padding: 0 8px;
+    border-bottom: 1px solid rgba(74, 158, 255, 0.22);
+    background: rgba(5, 13, 24, 0.96);
+    transition: border-color 220ms ease, background-color 220ms ease;
+}
+
+.rbp-collapsed-bar {
+    opacity: 0.96;
+    flex: 1;
+}
+
+.rbp-tabs-scroll {
+    flex: 1;
+    overflow: hidden;
+}
+
+.rbp-tabs-list {
+    white-space: nowrap;
+}
+
+.rbp-content-scroll {
+    height: calc(100% - 38px);
+    transition: opacity 170ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.rbp-content-scroll--hidden {
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+}
+
+.rbp-content {
+    padding: 10px;
+    min-height: 100%;
+}
+
+.rbp-empty,
+.rbp-empty-state {
+    min-height: 180px;
+}
+
+.rbp-hangar {
+    min-height: 100%;
+}
+
+.rbp-card-active {
+    border: 1px solid rgba(74, 158, 255, 0.5);
+    background: rgba(18, 34, 56, 0.85);
+}
+
+.rbp-hangar-grid {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .rbp-shell--expanded {
+        height: 420px;
+    }
+}

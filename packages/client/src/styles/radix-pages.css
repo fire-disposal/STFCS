@@ -1,0 +1,106 @@
+/* Radix 迁移页面样式（Auth + Lobby） */
+
+.radix-grid-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image:
+        linear-gradient(rgba(74, 158, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74, 158, 255, 0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+}
+
+.radix-auth-shell,
+.radix-lobby-shell {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px;
+    background: radial-gradient(circle at top, rgba(27, 65, 112, 0.35), rgba(8, 13, 28, 0.96));
+}
+
+.radix-auth-shell {
+    align-items: center;
+}
+
+.radix-surface-card {
+    position: relative;
+    backdrop-filter: blur(8px);
+    background: linear-gradient(160deg, rgba(9, 24, 44, 0.92), rgba(7, 14, 27, 0.96));
+    border: 1px solid rgba(74, 158, 255, 0.26);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+.radix-auth-side {
+    min-width: 250px;
+}
+
+.radix-auth-form-wrap {
+    width: min(420px, 100%);
+}
+
+.radix-auth-logo {
+    display: inline-flex;
+    margin-bottom: 8px;
+    font-size: 28px;
+    color: #7fb6ff;
+}
+
+.radix-inline-error {
+    color: #ff9aa7;
+    font-size: 12px;
+    padding: 8px 10px;
+    background: rgba(255, 80, 80, 0.12);
+    border: 1px solid rgba(255, 80, 80, 0.2);
+}
+
+.radix-label {
+    display: inline-flex;
+}
+
+.radix-lobby-content {
+    width: min(1320px, 100%);
+    z-index: 1;
+}
+
+.radix-lobby-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 12px;
+    min-height: 0;
+}
+
+.radix-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    gap: 8px;
+    opacity: 0.9;
+}
+
+.radix-room-scroll {
+    height: min(58vh, 620px);
+}
+
+.radix-full-btn {
+    width: 100%;
+}
+
+@media (max-width: 1080px) {
+    .radix-lobby-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+
+    .radix-auth-shell,
+    .radix-lobby-shell {
+        padding: 12px;
+    }
+}

@@ -1,15 +1,15 @@
 /**
  * 游戏视图组件
- * 
+ *
  * 现代 RTS 风格布局：
  * - 顶栏：阶段信息 + 快捷操作
  * - 中央：战术地图
- * - 右侧：信息面板（可折叠）
- * - 底部：选中单位操作栏
+ * - 底部：新的战斗面板（类文件夹设计）
  */
 
 import type { RoomPlayerState } from "@vt/data";
-import { Faction, GamePhase, PlayerRole } from "@vt/data";
+import type { ShipJSON } from "@vt/data";
+import { GamePhase, PlayerRole } from "@vt/data";
 import type { ShipViewModel } from "@/renderer";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -17,10 +17,17 @@ import { useSocketRoom, useShips } from "@/sync";
 import { ClientCommand } from "@/sync/types";
 import { notify } from "@/ui/shared/Notification";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
-import { Crown, LogOut, Settings, Users, ChevronLeft, ChevronRight, CheckCircle, XCircle, Shield, Zap, Navigation2 } from "lucide-react";
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { SocketNetworkManager } from "@/network";
 import "@/styles/game-layout.css";
+
+// 导入新的底部战斗面板组件
+import BattlePanel from "@/ui/panels/BattlePanel";
+import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
+import RealityEditPanel from "@/ui/panels/RealityEditPanel";
+import HangarPanel from "@/ui/panels/HangarPanel";
+import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -39,7 +46,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const room = useSocketRoom(networkManager, onLeaveRoom);
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
-	const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+	const [hangarShips, setHangarShips] = useState<ShipJSON[]>([]);
+	const [hangarLoading, setHangarLoading] = useState(false);
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const selectShip = useUIStore((state) => state.selectShip);
@@ -92,23 +100,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		catch (error) { console.error("[GameView] Send command error:", error); notify.error("命令发送失败"); }
 	}, [room]);
 
-	const createTestShip = useCallback((faction: "player" | "owner", x: number, y: number) => {
-		if (!room) return;
-		room.send(ClientCommand.CMD_CREATE_OBJECT, {
-			type: "ship", hullId: "frigate_assault", x, y, heading: 0,
-			faction: faction === "player" ? Faction.PLAYER : Faction.NEUTRAL,
-		});
-	}, [room]);
-
-	const nextPhase = useCallback(() => {
-		if (!room) return;
-		room.send(ClientCommand.CMD_NEXT_PHASE, {});
-	}, [room]);
-
-	const toggleReady = useCallback(() => {
-		networkManager.setReady(!currentPlayer?.isReady);
-	}, [networkManager, currentPlayer?.isReady]);
-
 	const invitePlayer = useCallback(async () => {
 		if (!room) return;
 		const link = networkManager.buildInviteLink(room.roomId);
@@ -132,13 +123,39 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		useUIStore.getState().setZoom(1);
 	}, [setCameraPosition, setViewRotation]);
 
+	useEffect(() => {
+		let disposed = false;
+
+		const loadHangar = async () => {
+			setHangarLoading(true);
+			const result = await networkManager.getLoadout();
+			if (disposed) return;
+
+			if (!result.success || !result.loadout) {
+				notify.error(result.error || "机库数据加载失败");
+				setHangarShips([]);
+				setHangarLoading(false);
+				return;
+			}
+
+			setHangarShips(result.loadout.ships || []);
+			setHangarLoading(false);
+		};
+
+		void loadHangar();
+
+		return () => {
+			disposed = true;
+		};
+	}, [networkManager]);
+
 	if (!room || !room.state) {
 		return <div className="game-loading"><span>连接中...</span></div>;
 	}
 
 	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "#4a9eff"
 		: room.state.currentPhase === GamePhase.DM_ACTION ? "#ff6f8f"
-		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
+			: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
 
 	return (
 		<div className="game-view">
@@ -187,110 +204,73 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						onRotateDelta={handleMapRotate}
 					/>
 				</section>
-
-				<aside className={`game-sidebar ${rightPanelCollapsed ? "game-sidebar--collapsed" : ""}`}>
-					<button className="sidebar-toggle" onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}>
-						{rightPanelCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-					</button>
-
-					{!rightPanelCollapsed && (
-						<div className="sidebar-content">
-							{selectedShip ? (
-								<div className="sidebar-section">
-									<div className="ship-header">
-										<span className="ship-header__id">{selectedShip.id.slice(-6)}</span>
-										{selectedShip.overloaded && <span className="ship-badge ship-badge--overload">过载</span>}
-										{selectedShip.shield?.active && <span className="ship-badge ship-badge--shield">护盾</span>}
-									</div>
-
-									<div className="ship-stats">
-										<div className="stat-row">
-											<span className="stat-label">HULL</span>
-											<div className="stat-bar">
-												<div className="stat-bar__fill stat-bar__fill--hull" style={{ width: `${(selectedShip.hull / (selectedShip.hullMax || 100)) * 100}%` }} />
-											</div>
-											<span className="stat-value">{selectedShip.hull}</span>
-										</div>
-
-										{selectedShip.shield && (
-											<div className="stat-row">
-												<span className="stat-label">SHIELD</span>
-												<div className="stat-bar">
-													<div className="stat-bar__fill stat-bar__fill--shield" style={{ width: `${(selectedShip.shield.value / 100) * 100}%` }} />
-												</div>
-												<span className="stat-value">{selectedShip.shield.value}</span>
-											</div>
-										)}
-
-										{(selectedShip.fluxSoft || selectedShip.fluxHard) && (
-											<div className="stat-row">
-												<span className="stat-label">FLUX</span>
-												<div className="stat-bar">
-													<div className="stat-bar__fill stat-bar__fill--flux" style={{ width: `${((selectedShip.fluxSoft || 0) + (selectedShip.fluxHard || 0)) / (selectedShip.fluxCapacity || 100) * 100}%` }} />
-												</div>
-												<span className="stat-value">{(selectedShip.fluxSoft || 0) + (selectedShip.fluxHard || 0)}</span>
-											</div>
-										)}
-									</div>
-
-									<div className="ship-actions">
-										<button className="action-btn" onClick={handleToggleShield} disabled={!canControlSelectedShip}><Shield size={14} /> 护盾</button>
-										<button className="action-btn" onClick={handleVent} disabled={!canControlSelectedShip}><Zap size={14} /> 辐散</button>
-									</div>
-								</div>
-							) : (
-								<div className="sidebar-empty">选择舰船查看详情</div>
-							)}
-
-							{isOwner && (
-								<div className="sidebar-section sidebar-section--dm">
-									<div className="section-title">DM 控制</div>
-									<div className="dm-actions">
-										<button className="action-btn" onClick={() => createTestShip("player", 100, 100)}>创建玩家船</button>
-										<button className="action-btn" onClick={() => createTestShip("owner", -100, 100)}>创建敌方船</button>
-										<button className="action-btn action-btn--primary" onClick={nextPhase}>推进阶段</button>
-									</div>
-								</div>
-							)}
-
-							<div className="sidebar-section">
-								<div className="section-title">视图</div>
-								<button className="action-btn" onClick={resetView}>重置视角</button>
-							</div>
-						</div>
-					)}
-				</aside>
 			</main>
 
-			<footer className="game-footer">
-				{selectedShip ? (
-					<div className="command-bar">
-						<div className="command-bar__unit">
-							<span className="unit-icon">{selectedShip.faction === Faction.PLAYER ? "🔵" : "🔴"}</span>
-							<span className="unit-name">{selectedShip.id.slice(-6)}</span>
-							<span className="unit-phase">{selectedShip.movement?.currentPhase || "NONE"}</span>
-						</div>
-						<div className="command-bar__actions">
-							<button className="cmd-btn" onClick={handleToggleShield} disabled={!canControlSelectedShip}><Shield size={16} /></button>
-							<button className="cmd-btn" onClick={handleVent} disabled={!canControlSelectedShip}><Zap size={16} /></button>
-							<button className="cmd-btn cmd-btn--primary" disabled={!canControlSelectedShip}><Navigation2 size={16} /></button>
-						</div>
-						<div className="command-bar__status">
-							{selectedShip.overloaded && <span className="status-alert">过载</span>}
-							{selectedShip.venting && <span className="status-info">辐散中</span>}
-						</div>
-					</div>
-				) : (
-					<div className="command-bar command-bar--empty"><span className="hint">点击舰船选择</span></div>
-				)}
-
-				{currentPlayer?.role !== PlayerRole.OWNER && (
-					<button className={`ready-toggle ${currentPlayer?.isReady ? "ready-toggle--ready" : ""}`} onClick={toggleReady}>
-						{currentPlayer?.isReady ? <CheckCircle size={16} /> : <XCircle size={16} />}
-						<span>{currentPlayer?.isReady ? "已准备" : "准备"}</span>
-					</button>
-				)}
-			</footer>
+			{/* 底部战斗面板 */}
+			<BattlePanel
+				tabs={[
+					{
+						id: "ship-info",
+						label: "舰船信息",
+						icon: <Info size={14} />,
+						component: (
+							<ShipInfoPanel
+								ship={selectedShip}
+								canControl={canControlSelectedShip}
+								onToggleShield={handleToggleShield}
+								onVent={handleVent}
+							/>
+						),
+						enabled: true,
+					},
+					{
+						id: "reality-edit",
+						label: "现实修改",
+						icon: <Edit size={14} />,
+						component: (
+							<RealityEditPanel
+								ship={selectedShip}
+								onSubmit={(shipId, data) => {
+									console.log("提交舰船数据修改:", shipId, data);
+									// TODO: 实现实际的数据提交逻辑
+									notify.success("舰船数据已提交修改");
+								}}
+							/>
+						),
+						enabled: true,
+					},
+					{
+						id: "hangar",
+						label: "机库",
+						icon: <Ship size={14} />,
+						component: (
+							<HangarPanel
+								cursorPosition={cameraPosition}
+								ships={hangarShips}
+								isLoading={hangarLoading}
+								onDeployShip={(shipProfile, position) => {
+									console.log("部署舰船:", shipProfile, position);
+									// TODO: 实现实际的舰船部署逻辑
+									notify.success(`已部署 ${shipProfile.name} 到 (${position.x}, ${position.y})`);
+								}}
+							/>
+						),
+						enabled: true,
+					},
+					{
+						id: "view-control",
+						label: "视图控制",
+						icon: <Eye size={14} />,
+						component: (
+							<ViewControlPanel
+								onResetView={resetView}
+							/>
+						),
+						enabled: true,
+					},
+				]}
+				defaultActiveTab="ship-info"
+			/>
 
 			{showPlayerRoster && (
 				<div className="modal-overlay" onClick={() => setShowPlayerRoster(false)}>

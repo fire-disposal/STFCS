@@ -6,6 +6,8 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { Badge, Box, Button, Card, Flex, Heading, Separator, Text, TextField } from '@radix-ui/themes';
+import { LockKeyhole, User } from 'lucide-react';
 
 interface AuthPageProps {
   onAuthenticated: (username: string) => void;
@@ -54,72 +56,71 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const isValid = username.trim().length > 0;
 
   return (
-    <div className="auth-container">
-      <div className="auth-grid-bg" />
+    <div className="radix-auth-shell">
+      <div className="radix-grid-bg" />
+      <Card className="radix-surface-card" size="4">
+        <Flex gap="6" direction={{ initial: 'column', md: 'row' }}>
+          <Flex direction="column" justify="between" className="radix-auth-side">
+            <Box>
+              <Text className="radix-auth-logo">◈</Text>
+              <Heading size="8" mb="2">STFCS</Heading>
+              <Text color="gray" size="3">战术指挥系统</Text>
+              <Separator my="4" size="4" />
+              <Flex direction="column" gap="2">
+                <Flex justify="between" align="center">
+                  <Text size="2" color="gray">系统状态</Text>
+                  <Badge color={serverStatus.online ? 'green' : 'red'} variant="soft">
+                    {serverStatus.online ? '在线' : '离线'}
+                  </Badge>
+                </Flex>
+                <Flex justify="between" align="center">
+                  <Text size="2" color="gray">服务端口</Text>
+                  <Badge variant="soft">{serverStatus.port}</Badge>
+                </Flex>
+                <Flex justify="between" align="center">
+                  <Text size="2" color="gray">连接加密</Text>
+                  <Badge color={serverStatus.secure ? 'green' : 'amber'} variant="soft">
+                    {serverStatus.secure ? '是' : '否'}
+                  </Badge>
+                </Flex>
+              </Flex>
+            </Box>
+            <Text size="1" color="gray">STFCS v2.0 · 2026</Text>
+          </Flex>
 
-      <div className="auth-dual-panel">
-        <div className="auth-left-panel">
-          <div>
-            <div className="auth-logo">◈</div>
-            <h1 className="auth-title">STFCS</h1>
-            <p className="auth-subtitle">战术指挥系统</p>
-
-            <div className="auth-status-block">
-              <div className="auth-status-line">
-                <span className="auth-status-label">系统状态</span>
-                <span className={serverStatus.online ? 'auth-status-value' : 'auth-status-value--error'}>
-                  [ {serverStatus.online ? '在线' : '离线'} ]
-                </span>
-              </div>
-              <div className="auth-status-line">
-                <span className="auth-status-label">服务端口</span>
-                <span className="auth-status-value">{serverStatus.port}</span>
-              </div>
-              <div className="auth-status-line">
-                <span className="auth-status-label">连接加密</span>
-                <span className={serverStatus.secure ? 'auth-status-value' : 'auth-status-value--warning'}>
-                  [ {serverStatus.secure ? '是' : '否'} ]
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="auth-version">
-            <div>STFCS v2.0</div>
-            <div>2026</div>
-          </div>
-        </div>
-
-        <div className="auth-right-panel">
-          {error && <div className="auth-error">{error}</div>}
-
-          <div className="auth-form-group">
-            <label className="auth-label">指挥官代号</label>
-            <input
+          <Flex direction="column" gap="4" className="radix-auth-form-wrap">
+            <Heading size="5">登录指挥终端</Heading>
+            {error && <Text className="radix-inline-error">{error}</Text>}
+            <Box>
+              <Text as="label" size="2" color="gray" mb="2" className="radix-label">指挥官代号</Text>
+              <TextField.Root
+                size="3"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="输入你的代号"
+                maxLength={32}
+                disabled={isLoading}
+                autoFocus
+              >
+                <TextField.Slot>
+                  <User size={14} />
+                </TextField.Slot>
+              </TextField.Root>
+            </Box>
+            <Button
+              size="3"
+              onClick={handleSubmit}
+              disabled={isLoading || !isValid}
               data-magnetic
-              className="auth-input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="输入你的代号"
-              maxLength={32}
-              disabled={isLoading}
-              autoFocus
-            />
-          </div>
-
-          <button
-            data-magnetic
-            className="auth-btn"
-            onClick={handleSubmit}
-            disabled={isLoading || !isValid}
-          >
-            {isLoading ? '连接中...' : '进  入'}
-          </button>
-
-          {isLoading && <div className="auth-progress">正在连接...</div>}
-        </div>
-      </div>
+            >
+              <LockKeyhole size={16} />
+              {isLoading ? '连接中...' : '进入系统'}
+            </Button>
+            {isLoading && <Text size="1" color="gray">正在连接服务器...</Text>}
+          </Flex>
+        </Flex>
+      </Card>
     </div>
   );
 };

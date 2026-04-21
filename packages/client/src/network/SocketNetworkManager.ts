@@ -9,7 +9,7 @@
  */
 
 import { io, Socket } from "socket.io-client";
-import type { SocketIOActionEvent } from "@vt/data";
+import type { ShipJSON, SocketIOActionEvent, WeaponJSON } from "@vt/data";
 
 const logger = {
 	info: (...args: any[]) => console.log("[network]", ...args),
@@ -49,6 +49,15 @@ export interface RoomCreateOptions {
 export interface RoomJoinResult {
 	success: boolean;
 	roomId?: string;
+	error?: string;
+}
+
+export interface PlayerLoadoutResult {
+	success: boolean;
+	loadout?: {
+		ships: ShipJSON[];
+		weapons: WeaponJSON[];
+	};
 	error?: string;
 }
 
@@ -157,6 +166,18 @@ export class SocketNetworkManager {
 
 		return new Promise((resolve) => {
 			this.socket!.emit("profile:update", profile, (result: any) => {
+				resolve(result);
+			});
+		});
+	}
+
+	async getLoadout(): Promise<PlayerLoadoutResult> {
+		if (!this.socket?.connected) {
+			return { success: false, error: "Not connected" };
+		}
+
+		return new Promise((resolve) => {
+			this.socket!.emit("profile:loadout:get", (result: PlayerLoadoutResult) => {
 				resolve(result);
 			});
 		});
@@ -320,6 +341,11 @@ export class SocketNetworkManager {
 				this.applyDelta(data.events);
 			}
 			this.emit("state:delta", data);
+		});
+
+		this.socket.on("state:full", (state: SocketGameState) => {
+			this.gameState = state;
+			this.emit("state:full", state);
 		});
 
 		this.socket.on("player:joined", (data: { playerId: string; playerName: string; totalPlayers: number }) => {

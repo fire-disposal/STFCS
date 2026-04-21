@@ -5,6 +5,7 @@
 @import './styles/design-system.css';
 @import './styles/ui-components.css';
 @import './styles/components.css';
+@import './styles/radix-pages.css';
 @import './styles/fonts.css';
 @import './styles/game-panels.css';
 @import './styles/game-layout.css';
@@ -14,6 +15,13 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* 全局无圆角（包含历史样式与第三方组件） */
+*,
+*::before,
+*::after {
+    border-radius: 0 !important;
 }
 
 html,
@@ -36,7 +44,8 @@ html[lang="zh-CN"] #root {
 }
 
 /* 代码相关元素使用 Fira Code */
-code, pre {
+code,
+pre {
     font-family: var(--font-mono-en) !important;
     font-feature-settings: "calt" 1;
 }
@@ -378,8 +387,10 @@ code, pre {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding-top: 48px; /* 为fixed顶栏留出空间 */
-    padding-bottom: 64px; /* 为fixed底部面板留出空间 */
+    padding-top: 48px;
+    /* 为fixed顶栏留出空间 */
+    padding-bottom: 64px;
+    /* 为fixed底部面板留出空间 */
 }
 
 .game-content {
@@ -942,10 +953,13 @@ code, pre {
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
         transform: scale(1);
     }
+
     50% {
         opacity: 0.5;
         transform: scale(1.2);
@@ -1035,11 +1049,9 @@ code, pre {
 
 .turn-indicator__progress-bar {
     height: 100%;
-    background: linear-gradient(
-        90deg,
-        #4a9eff,
-        #6ab3ff
-    );
+    background: linear-gradient(90deg,
+            #4a9eff,
+            #6ab3ff);
     transition: width 0.3s ease;
 }
 
@@ -1357,7 +1369,8 @@ code, pre {
 /* ====== 弹出菜单 ====== */
 .menu-overlay {
     position: fixed;
-    top: 48px; /* 顶栏下方 */
+    top: 48px;
+    /* 顶栏下方 */
     left: 0;
     right: 0;
     bottom: 0;

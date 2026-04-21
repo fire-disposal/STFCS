@@ -8,6 +8,21 @@
 import type { RoomInfo } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Avatar } from "@/ui/shared/Avatar";
+import {
+	Badge,
+	Box,
+	Button,
+	Card,
+	Dialog,
+	Flex,
+	Heading,
+	ScrollArea,
+	Separator,
+	Tabs,
+	Text,
+	TextField,
+} from "@radix-ui/themes";
+import { DoorOpen, LogOut, Plus, RefreshCw, Save, Upload, UserCircle } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 
 interface LobbyPageProps {
@@ -38,6 +53,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	onUpdateProfile,
 }) => {
 	const [showProfile, setShowProfile] = useState(false);
+	const [roomTab, setRoomTab] = useState("all");
 	const [nickname, setNickname] = useState(profile.nickname);
 	// 内部预览状态：如果是 Base64，则直接作为预览，如果是 "👤" 或 null，则为 null
 	const [previewAvatar, setPreviewAvatar] = useState<string | null>(
@@ -68,6 +84,16 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 		(room: RoomInfo) => currentShortId !== null && room.metadata.ownerShortId === currentShortId,
 		[currentShortId]
 	);
+
+	const visibleRooms = useMemo(() => {
+		if (roomTab === "joinable") {
+			return rooms.filter((room) => room.clients < room.maxClients);
+		}
+		if (roomTab === "owned") {
+			return rooms.filter((room) => isOwnRoom(room));
+		}
+		return rooms;
+	}, [roomTab, rooms, isOwnRoom]);
 
 	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
@@ -127,151 +153,134 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	};
 
 	return (
-		<div className="lobby-container">
-			<div className="lobby-grid" />
-			<header className="lobby-header">
-				<h2 className="lobby-title">🏠 游戏大厅</h2>
-				<div className="lobby-user-bar">
-					<span className="lobby-user-name">
-						<Avatar src={profile.avatar} size="medium" /> {profile.nickname || playerName}
-					</span>
-					<button
-						className="lobby-btn lobby-btn--secondary"
-						data-magnetic
-						onClick={() => setShowProfile(true)}
-					>
-						玩家档案
-					</button>
-					<button className="lobby-btn lobby-btn--danger" data-magnetic onClick={onLogout}>
-						退出登录
-					</button>
+		<div className="radix-lobby-shell">
+			<div className="radix-grid-bg" />
+			<Flex direction="column" gap="4" className="radix-lobby-content">
+				<Card className="radix-surface-card" size="3">
+					<Flex justify="between" align="center" wrap="wrap" gap="3">
+						<Flex align="center" gap="3">
+							<Avatar src={profile.avatar} size="medium" />
+							<Box>
+								<Heading size="5">🏠 游戏大厅</Heading>
+								<Text color="gray" size="2">欢迎，{profile.nickname || playerName}</Text>
+							</Box>
+						</Flex>
+						<Flex gap="2" align="center" wrap="wrap">
+							<Button variant="soft" onClick={() => setShowProfile(true)} data-magnetic>
+								<UserCircle size={16} /> 玩家档案
+							</Button>
+							<Button color="red" variant="soft" onClick={onLogout} data-magnetic>
+								<LogOut size={16} /> 退出
+							</Button>
+						</Flex>
+					</Flex>
+				</Card>
+
+				<div className="radix-lobby-grid">
+					<Card className="radix-surface-card" size="3">
+						<Flex justify="between" align="center" mb="3">
+							<Heading size="4">房间列表</Heading>
+							<Button variant="soft" onClick={onRefresh} data-magnetic>
+								<RefreshCw size={14} /> 刷新
+							</Button>
+						</Flex>
+						<Tabs.Root value={roomTab} onValueChange={setRoomTab}>
+							<Tabs.List>
+								<Tabs.Trigger value="all">全部</Tabs.Trigger>
+								<Tabs.Trigger value="joinable">可加入</Tabs.Trigger>
+								<Tabs.Trigger value="owned">我的房间</Tabs.Trigger>
+							</Tabs.List>
+						</Tabs.Root>
+						<Separator my="3" size="4" />
+						{isLoading ? (
+							<Text color="gray">正在加载房间列表...</Text>
+						) : visibleRooms.length === 0 ? (
+							<Box className="radix-empty-state">
+								<Text size="4">暂无可用房间</Text>
+								<Text color="gray" size="2">点击右侧“创建新房间”开始游戏</Text>
+							</Box>
+						) : (
+							<ScrollArea type="always" scrollbars="vertical" className="radix-room-scroll">
+								<Flex direction="column" gap="3" pr="2">
+									{visibleRooms.map((room) => (
+										<Card key={room.roomId} variant="surface">
+											<Flex justify="between" align="start" gap="3" wrap="wrap">
+												<Box>
+													<Flex align="center" gap="2" mb="2" wrap="wrap">
+														<Heading size="3">{room.name}</Heading>
+														{room.metadata.isPrivate && <Badge color="amber" variant="soft">私密</Badge>}
+														{isOwnRoom(room) && <Badge color="blue" variant="soft">你的房间</Badge>}
+													</Flex>
+													<Flex gap="2" wrap="wrap">
+														<Badge variant="soft">{room.clients}/{room.maxClients} 玩家</Badge>
+														<Badge variant="soft">阶段：{room.metadata.phase}</Badge>
+														{room.metadata.turnCount !== undefined && room.metadata.turnCount > 0 && (
+															<Badge variant="soft">回合：{room.metadata.turnCount}</Badge>
+														)}
+														{room.metadata.ownerShortId != null ? (
+															<Badge variant="soft">房主：#{room.metadata.ownerShortId}</Badge>
+														) : (
+															<Badge color="amber" variant="soft">等待房主</Badge>
+														)}
+													</Flex>
+												</Box>
+												<Flex gap="2" wrap="wrap">
+													<Button onClick={() => onJoinRoom(room.roomId)} data-magnetic>
+														<DoorOpen size={14} /> 进入
+													</Button>
+													{isOwnRoom(room) && (
+														<Button color="red" variant="soft" onClick={() => onDeleteRoom(room.roomId)} data-magnetic>
+															删除
+														</Button>
+													)}
+												</Flex>
+											</Flex>
+										</Card>
+									))}
+								</Flex>
+							</ScrollArea>
+						)}
+					</Card>
+
+					<Flex direction="column" gap="3">
+						<Card className="radix-surface-card" size="3">
+							<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>
+								<Plus size={16} /> 创建新房间
+							</Button>
+						</Card>
+
+						<Card className="radix-surface-card" size="3">
+							<Heading size="3" mb="3">📊 实时统计</Heading>
+							<Flex direction="column" gap="2">
+								<Flex justify="between"><Text color="gray">活跃房间</Text><Badge color="blue">{stats.totalRooms}</Badge></Flex>
+								<Flex justify="between"><Text color="gray">在线玩家</Text><Badge color="green">{stats.totalPlayers}</Badge></Flex>
+								<Flex justify="between"><Text color="gray">已满房间</Text><Badge color="red">{stats.fullRooms}</Badge></Flex>
+							</Flex>
+						</Card>
+
+						<Card className="radix-surface-card" size="3">
+							<Heading size="3" mb="3">📖 快速指南</Heading>
+							<Flex direction="column" gap="2">
+								<Text size="2" color="gray">1. 创建或加入房间</Text>
+								<Text size="2" color="gray">2. 首个玩家自动成为 DM</Text>
+								<Text size="2" color="gray">3. 等待其他玩家加入</Text>
+								<Text size="2" color="gray">4. DM 开始游戏</Text>
+							</Flex>
+						</Card>
+					</Flex>
 				</div>
-			</header>
+			</Flex>
 
-			<div className="lobby-main">
-				<section className="lobby-room-panel">
-					<div className="lobby-room-list-header">
-						<h3 className="lobby-section-title">📋 可用房间</h3>
-						<button
-							className="lobby-btn lobby-btn--refresh"
-							data-magnetic
-							onClick={onRefresh}
-						>
-							🔄 刷新
-						</button>
-					</div>
-					{isLoading ? (
-						<div className="lobby-empty">正在加载房间列表...</div>
-					) : rooms.length === 0 ? (
-						<div className="lobby-empty">
-							<p>暂无可用房间</p>
-							<p className="lobby-empty-hint">点击右侧“创建新房间”开始游戏</p>
-						</div>
-					) : (
-						<div className="lobby-room-list">
-							{rooms.map((room) => (
-								<div
-									key={room.roomId}
-									className="lobby-room-card"
-								>
-									<div className="lobby-room-name">
-										{room.name}
-										{room.metadata.isPrivate && " 🔒"}
-										{isOwnRoom(room) && " 👑"}
-									</div>
-									<div className="lobby-room-meta">
-										<span className="lobby-room-status">
-											<span className="lobby-status-dot" />
-											{room.clients}/{room.maxClients} 玩家
-										</span>
-										<span>阶段：{room.metadata.phase}</span>
-										{room.metadata.turnCount !== undefined && room.metadata.turnCount > 0 && (
-											<span>回合：{room.metadata.turnCount}</span>
-										)}
-										{room.metadata.ownerShortId != null ? (
-											<span>房主：#{room.metadata.ownerShortId}</span>
-										) : (
-											<span className="lobby-room-badge lobby-room-badge--warning">等待房主</span>
-										)}
-										{isOwnRoom(room) && (
-											<span className="lobby-room-badge lobby-room-badge--success">你的房间</span>
-										)}
-									</div>
-									<div className="lobby-room-actions">
-										<button
-											className="lobby-btn lobby-btn--join"
-											data-magnetic
-											onClick={() => onJoinRoom(room.roomId)}
-										>
-											进入房间
-										</button>
-										{isOwnRoom(room) && (
-											<button
-												className="lobby-btn lobby-btn--small lobby-btn--danger"
-												data-magnetic
-												onClick={() => onDeleteRoom(room.roomId)}
-											>
-												删除房间
-											</button>
-										)}
-									</div>
-								</div>
-							))}
-						</div>
-					)}
-				</section>
-
-				<aside className="lobby-sidebar">
-					<div className="lobby-section">
-						<button
-							className="lobby-btn lobby-btn--primary lobby-btn--block"
-							data-magnetic
-							onClick={onCreateRoom}
-						>
-							➕ 创建新房间
-						</button>
-					</div>
-					<div className="lobby-section">
-						<div className="lobby-section-title">📊 实时统计</div>
-						<div className="lobby-stat">
-							<span>活跃房间</span>
-							<span className="lobby-stat-value lobby-stat-value--primary">{stats.totalRooms}</span>
-						</div>
-						<div className="lobby-stat">
-							<span>在线玩家</span>
-							<span className="lobby-stat-value lobby-stat-value--success">
-								{stats.totalPlayers}
-							</span>
-						</div>
-						<div className="lobby-stat">
-							<span>已满房间</span>
-							<span className="lobby-stat-value lobby-stat-value--danger">{stats.fullRooms}</span>
-						</div>
-					</div>
-					<div className="lobby-section">
-						<div className="lobby-section-title">📖 快速指南</div>
-						<div className="lobby-guide">
-							<div>1. 创建或加入房间</div>
-							<div>2. 首个玩家自动成为 DM</div>
-							<div>3. 等待其他玩家加入</div>
-							<div>4. DM 开始游戏</div>
-						</div>
-					</div>
-				</aside>
-			</div>
-
-			{showProfile && (
-				<div className="modal-overlay" onClick={() => setShowProfile(false)}>
-					<div className="modal-content lobby-modal" onClick={(e) => e.stopPropagation()}>
-						<h3 className="modal-title">玩家档案</h3>
-						<div className="lobby-avatar-preview">
+			<Dialog.Root open={showProfile} onOpenChange={setShowProfile}>
+				<Dialog.Content maxWidth="420px">
+					<Dialog.Title>玩家档案</Dialog.Title>
+					<Dialog.Description size="2" mb="3">调整昵称与头像，保存后立即生效。</Dialog.Description>
+					<Flex direction="column" gap="3">
+						<Flex align="center" gap="3">
 							<Avatar src={previewAvatar} size="large" />
-							<button
-								className="lobby-btn lobby-btn--small lobby-btn--secondary"
-								onClick={() => fileInputRef.current?.click()}
-							>
-								📤 上传图片
-							</button>
+							<Button variant="soft" onClick={() => fileInputRef.current?.click()}>
+								<Upload size={14} /> 上传图片
+							</Button>
 							<input
 								type="file"
 								ref={fileInputRef}
@@ -279,35 +288,33 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 								accept="image/*"
 								onChange={handleFileChange}
 							/>
-						</div>
-						<div className="modal-label">修改昵称</div>
-						<input
-							className="modal-input"
-							value={nickname}
-							onChange={(e) => setNickname(e.target.value)}
-							placeholder="昵称（可选）"
-							maxLength={24}
-						/>
-						<div className="modal-actions">
-							<button className="modal-btn" onClick={() => setShowProfile(false)}>
-								取消
-							</button>
-							<button
-								className="modal-btn modal-btn--primary"
-								onClick={() => {
-									onUpdateProfile({
-										nickname,
-										avatar: previewAvatar || "", 
-									});
-									setShowProfile(false);
-								}}
-							>
-								保存
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+						</Flex>
+						<Box>
+							<Text as="label" size="2" color="gray" mb="2" className="radix-label">昵称</Text>
+							<TextField.Root
+								value={nickname}
+								onChange={(e) => setNickname(e.target.value)}
+								placeholder="昵称（可选）"
+								maxLength={24}
+							/>
+						</Box>
+					</Flex>
+					<Flex justify="end" gap="2" mt="4">
+						<Button variant="soft" color="gray" onClick={() => setShowProfile(false)}>取消</Button>
+						<Button
+							onClick={() => {
+								onUpdateProfile({
+									nickname,
+									avatar: previewAvatar || "",
+								});
+								setShowProfile(false);
+							}}
+						>
+							<Save size={14} /> 保存
+						</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
 		</div>
 	);
 };
