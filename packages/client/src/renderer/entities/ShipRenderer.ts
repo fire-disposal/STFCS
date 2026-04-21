@@ -1,7 +1,23 @@
 /**
- * 舰船战术渲染模块
+ * 舰船战术标记渲染 Hook
  *
- * 适配 ShipRuntime 数据结构
+ * 职责：
+ * 1. 渲染舰船在世界坐标系中的战术标记
+ * 2. 处理舰船点击选择交互
+ * 3. 实时更新舰船位置/朝向/状态可视化
+ *
+ * 渲染层：world.shipSprites / world.tacticalTokens
+ *
+ * 渲染内容：
+ * ├── 舰船本体：根据 faction 显示不同颜色
+ * ├── 朝向箭头：指向 heading 方向
+ * ├── 武器挂载点：显示武器类型图标
+ * ├── 状态指示：destroyed 标记
+ * └── 命中区域：hitArea 圆形
+ *
+ * 交互：
+ * - pointerdown: 选择舰船（调用 uiStore.selectShip）
+ * - hitArea: 点击检测区域
  */
 
 import { screenToWorld } from "@/utils/coordinateSystem";

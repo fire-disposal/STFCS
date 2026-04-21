@@ -1,33 +1,20 @@
-/**
- * 游戏视图组件
- *
- * 现代 RTS 风格布局：
- * - 顶栏：阶段信息 + 快捷操作
- * - 中央：战术地图
- * - 底部：新的战斗面板（类文件夹设计）
- */
-
-import type { RoomPlayerState } from "@vt/data";
-import type { ShipJSON } from "@vt/data";
 import { GamePhase, PlayerRole } from "@vt/data";
 import type { ShipViewModel } from "@/renderer";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
 import { useSocketRoom, useShips } from "@/sync";
-import { ClientCommand } from "@/sync/types";
 import { notify } from "@/ui/shared/Notification";
-import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import type { SocketNetworkManager } from "@/network";
 import "@/styles/game-layout.css";
 
-// 导入新的底部战斗面板组件
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
 import RealityEditPanel from "@/ui/panels/RealityEditPanel";
 import HangarPanel from "@/ui/panels/HangarPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
+import { useGameInteraction } from "./GamePage/useGameInteraction";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -39,123 +26,34 @@ const PHASE_NAMES: Record<string, string> = {
 interface GamePageProps {
 	networkManager: SocketNetworkManager;
 	onLeaveRoom: () => void;
-	playerName?: string;
 }
 
 export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom }) => {
 	const room = useSocketRoom(networkManager, onLeaveRoom);
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
-	const [hangarShips, setHangarShips] = useState<ShipJSON[]>([]);
-	const [hangarLoading, setHangarLoading] = useState(false);
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
-	const selectShip = useUIStore((state) => state.selectShip);
-	const { zoom, cameraPosition, setCameraPosition, viewRotation, setViewRotation, showGrid, showBackground, showWeaponArcs, showMovementRange } = useUIStore();
-
-	const cameraPositionRef = useRef(cameraPosition);
-	cameraPositionRef.current = cameraPosition;
-	const viewRotationRef = useRef(viewRotation);
-	viewRotationRef.current = viewRotation;
-
-	const players = useMemo(() => {
-		if (!room?.state?.players) return [];
-		const result: RoomPlayerState[] = [];
-		room.state.players.forEach((player: RoomPlayerState) => {
-			if (player.connected) result.push(player);
-		});
-		return result;
-	}, [room?.state?.players]);
-
-	const currentPlayer = useMemo(() => {
-		if (!room?.state?.players || !room.sessionId) return null;
-		return room.state.players.get(room.sessionId) || null;
-	}, [room?.state?.players, room?.sessionId]);
+	const mapCursor = useUIStore((state) => state.mapCursor);
 
 	const ships = useShips(room) as ShipViewModel[];
+	const selectedShip = ships.find((s) => s.id === selectedShipId) ?? null;
 
-	const selectedShip = useMemo(() => ships.find((s) => s.id === selectedShipId) || null, [ships, selectedShipId]);
+	const { handleToggleShield, handleVent } = useGameInteraction(room, selectedShip);
 
-	const isPlayerTurn = room?.state?.currentPhase === GamePhase.PLAYER_ACTION;
-	const isOwner = currentPlayer?.role === PlayerRole.OWNER;
+	const currentPlayer = room?.state?.players?.get(room.sessionId ?? "") ?? null;
+	const isHost = currentPlayer?.role === PlayerRole.HOST;
 
-	const canControlSelectedShip = useMemo(() => {
-		if (!selectedShip || !currentPlayer) return false;
-		if (currentPlayer.role === PlayerRole.OWNER) return true;
-		return currentPlayer.role === PlayerRole.PLAYER && isPlayerTurn && selectedShip.ownerId === currentPlayer.sessionId && !selectedShip.destroyed;
-	}, [selectedShip, currentPlayer, isPlayerTurn]);
-
-	const handleMapPan = useCallback((deltaX: number, deltaY: number) => {
-		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
-		setCameraPosition(cameraPositionRef.current.x - worldDelta.x, cameraPositionRef.current.y - worldDelta.y);
-	}, [setCameraPosition, zoom]);
-
-	const handleMapRotate = useCallback((delta: number) => {
-		setViewRotation(normalizeRotation(viewRotationRef.current + delta));
-	}, [setViewRotation]);
-
-	const sendCommand = useCallback(async (command: string, payload: unknown) => {
-		if (!room) return;
-		try { await room.send(command, payload); }
-		catch (error) { console.error("[GameView] Send command error:", error); notify.error("命令发送失败"); }
-	}, [room]);
-
-	const invitePlayer = useCallback(async () => {
-		if (!room) return;
-		const link = networkManager.buildInviteLink(room.roomId);
-		await navigator.clipboard.writeText(link);
-		notify.success("邀请链接已复制");
-	}, [networkManager, room]);
-
-	const handleToggleShield = useCallback(() => {
-		if (!selectedShip) return;
-		sendCommand(ClientCommand.CMD_TOGGLE_SHIELD, { shipId: selectedShip.id, active: !selectedShip.shield?.active });
-	}, [selectedShip, sendCommand]);
-
-	const handleVent = useCallback(() => {
-		if (!selectedShip) return;
-		sendCommand(ClientCommand.CMD_VENT_FLUX, { shipId: selectedShip.id });
-	}, [selectedShip, sendCommand]);
-
-	const resetView = useCallback(() => {
-		setCameraPosition(0, 0);
-		setViewRotation(0);
-		useUIStore.getState().setZoom(1);
-	}, [setCameraPosition, setViewRotation]);
-
-	useEffect(() => {
-		let disposed = false;
-
-		const loadHangar = async () => {
-			setHangarLoading(true);
-			const result = await networkManager.getLoadout();
-			if (disposed) return;
-
-			if (!result.success || !result.loadout) {
-				notify.error(result.error || "机库数据加载失败");
-				setHangarShips([]);
-				setHangarLoading(false);
-				return;
-			}
-
-			setHangarShips(result.loadout.ships || []);
-			setHangarLoading(false);
-		};
-
-		void loadHangar();
-
-		return () => {
-			disposed = true;
-		};
-	}, [networkManager]);
+	const cursorPosition = mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 };
 
 	if (!room || !room.state) {
 		return <div className="game-loading"><span>连接中...</span></div>;
 	}
 
+	const players = Array.from(room.state.players.values()).filter((p) => p.connected);
 	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "#4a9eff"
 		: room.state.currentPhase === GamePhase.DM_ACTION ? "#ff6f8f"
-			: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
+		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
 
 	return (
 		<div className="game-view">
@@ -163,15 +61,15 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				<div className="game-header__left">
 					<span className="game-phase" style={{ borderColor: phaseColor }}>
 						{room.state.currentPhase === GamePhase.DM_ACTION && <Crown size={14} style={{ color: phaseColor }} />}
-						<span>{PHASE_NAMES[room.state.currentPhase] || room.state.currentPhase}</span>
+						<span>{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}</span>
 					</span>
 					<span className="game-turn">回合 {room.state.turnCount}</span>
 				</div>
 
 				<div className="game-header__center">
 					{players.slice(0, 6).map((p) => (
-						<span key={p.sessionId} className={`player-chip ${p.role === PlayerRole.OWNER ? "player-chip--dm" : ""}`}>
-							{p.role === PlayerRole.OWNER && <Crown size={12} />}
+						<span key={p.sessionId} className={`player-chip ${p.role === PlayerRole.HOST ? "player-chip--dm" : ""}`}>
+							{p.role === PlayerRole.HOST && <Crown size={12} />}
 							<span className="player-chip__name">{p.nickname}</span>
 							{p.isReady ? <CheckCircle size={12} className="player-chip__ready" /> : <XCircle size={12} />}
 						</span>
@@ -187,57 +85,25 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<main className="game-main">
 				<section className="game-map">
-					<PixiCanvas
-						ships={ships}
-						zoom={zoom}
-						cameraX={cameraPosition.x}
-						cameraY={cameraPosition.y}
-						viewRotation={viewRotation}
-						showGrid={showGrid}
-						showBackground={showBackground}
-						showWeaponArcs={showWeaponArcs}
-						showMovementRange={showMovementRange}
-						selectedShipId={selectedShipId}
-						movementPreview={undefined}
-						onSelectShip={(id) => selectShip(id)}
-						onPanDelta={handleMapPan}
-						onRotateDelta={handleMapRotate}
-					/>
+					<PixiCanvas ships={ships} />
 				</section>
 			</main>
 
-			{/* 底部战斗面板 */}
 			<BattlePanel
 				tabs={[
 					{
 						id: "ship-info",
 						label: "舰船信息",
 						icon: <Info size={14} />,
-						component: (
-							<ShipInfoPanel
-								ship={selectedShip}
-								canControl={canControlSelectedShip}
-								onToggleShield={handleToggleShield}
-								onVent={handleVent}
-							/>
-						),
+						component: <ShipInfoPanel ship={selectedShip} canControl={true} onToggleShield={handleToggleShield} onVent={handleVent} />,
 						enabled: true,
 					},
 					{
 						id: "reality-edit",
 						label: "现实修改",
 						icon: <Edit size={14} />,
-						component: (
-							<RealityEditPanel
-								ship={selectedShip}
-								onSubmit={(shipId, data) => {
-									console.log("提交舰船数据修改:", shipId, data);
-									// TODO: 实现实际的数据提交逻辑
-									notify.success("舰船数据已提交修改");
-								}}
-							/>
-						),
-						enabled: true,
+						component: <RealityEditPanel ship={selectedShip} onSubmit={() => { notify.success("舰船数据已提交修改"); }} />,
+						enabled: isHost,
 					},
 					{
 						id: "hangar",
@@ -245,27 +111,19 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						icon: <Ship size={14} />,
 						component: (
 							<HangarPanel
-								cursorPosition={cameraPosition}
-								ships={hangarShips}
-								isLoading={hangarLoading}
-								onDeployShip={(shipProfile, position) => {
-									console.log("部署舰船:", shipProfile, position);
-									// TODO: 实现实际的舰船部署逻辑
-									notify.success(`已部署 ${shipProfile.name} 到 (${position.x}, ${position.y})`);
-								}}
+								cursorPosition={cursorPosition}
+								networkManager={networkManager}
+								room={room ?? undefined}
+								isHost={isHost}
 							/>
 						),
-						enabled: true,
+						enabled: isHost,
 					},
 					{
 						id: "view-control",
 						label: "视图控制",
 						icon: <Eye size={14} />,
-						component: (
-							<ViewControlPanel
-								onResetView={resetView}
-							/>
-						),
+						component: <ViewControlPanel />,
 						enabled: true,
 					},
 				]}
@@ -282,14 +140,14 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						<div className="modal-body">
 							{players.map((p) => (
 								<div key={p.sessionId} className={`player-row ${p.sessionId === room.sessionId ? "player-row--current" : ""}`}>
-									{p.role === PlayerRole.OWNER && <Crown size={14} className="player-row__icon" />}
+									{p.role === PlayerRole.HOST && <Crown size={14} className="player-row__icon" />}
 									<span className="player-row__name">{p.nickname}</span>
 									{p.isReady ? <CheckCircle size={12} className="player-row__ready" /> : <XCircle size={12} />}
 								</div>
 							))}
 						</div>
 						<div className="modal-footer">
-							{isOwner && <button className="action-btn" onClick={invitePlayer}>邀请链接</button>}
+							{isHost && <button className="action-btn" onClick={() => { navigator.clipboard.writeText(networkManager.buildInviteLink(room.roomId)); notify.success("邀请链接已复制"); }}>邀请链接</button>}
 							<button className="action-btn action-btn--danger" onClick={onLeaveRoom}>离开房间</button>
 						</div>
 					</div>
@@ -306,19 +164,19 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						<div className="modal-body">
 							<div className="setting-row">
 								<span>显示网格</span>
-								<button className={`toggle ${showGrid ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleGrid()} />
+								<button className={`toggle ${useUIStore.getState().showGrid ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleGrid()} />
 							</div>
 							<div className="setting-row">
 								<span>显示背景</span>
-								<button className={`toggle ${showBackground ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleBackground()} />
+								<button className={`toggle ${useUIStore.getState().showBackground ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleBackground()} />
 							</div>
 							<div className="setting-row">
 								<span>显示武器弧</span>
-								<button className={`toggle ${showWeaponArcs ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleWeaponArcs()} />
+								<button className={`toggle ${useUIStore.getState().showWeaponArcs ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleWeaponArcs()} />
 							</div>
 							<div className="setting-row">
 								<span>显示移动范围</span>
-								<button className={`toggle ${showMovementRange ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleMovementRange()} />
+								<button className={`toggle ${useUIStore.getState().showMovementRange ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleMovementRange()} />
 							</div>
 						</div>
 					</div>

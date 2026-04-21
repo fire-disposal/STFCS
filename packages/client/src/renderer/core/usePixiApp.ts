@@ -1,3 +1,27 @@
+/**
+ * PixiJS 应用核心 Hook
+ *
+ * 职责：
+ * 1. 初始化 Pixi Application
+ * 2. 注册渲染层（调用 setLayers）
+ * 3. 处理所有交互事件（鼠标/键盘）
+ * 4. 管理 ticker 渲染循环
+ *
+ * 交互事件处理：
+ * - pointerdown: 开始拖拽/点击 -> 设置游标位置
+ * - pointermove: 拖拽平移/旋转
+ * - pointerup: 结束拖拽
+ * - wheel: 缩放控制
+ * - keydown/keyup: 空格键切换拖拽模式
+ *
+ * 与其他模块协作：
+ * - useLayerSystem: 提供层注册
+ * - useInteraction: 拖拽状态管理
+ * - useZoomInteraction: 缩放动画
+ * - useCamera: 相机动画
+ * - uiStore: 游标位置、舰船选择
+ */
+
 import { screenToWorld } from "@/utils/coordinateSystem";
 import { Container, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";

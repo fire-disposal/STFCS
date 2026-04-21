@@ -1,8 +1,33 @@
+/**
+ * PixiCanvas - 战术地图主组件
+ *
+ * 职责：
+ * 1. 组合所有渲染 hooks，构建完整渲染管线
+ * 2. 直接订阅 uiStore，管理相机/选中舰船状态
+ * 3. 封装交互逻辑（平移/旋转/缩放），不依赖父组件传递
+ *
+ * 渲染管线：
+ * ├── useCanvasResize    - 容器尺寸监听
+ * ├── useLayerSystem     - 层级系统初始化
+ * ├── useCamera          - 相机动画控制
+ * ├── useInteraction     - 拖拽交互状态
+ * ├── useZoomInteraction - 缩放交互
+ * ├── usePixiApp         - Pixi 应用 + 事件绑定
+ * ├── useStarfield       - 星空背景生成
+ * └── useXxxRendering    - 各实体渲染
+ *
+ * Props 最小化原则：
+ * - ships: 舰船数据列表
+ * - onClick: 可选点击回调
+ * - movementPreview: 移动预览状态
+ * - 所有其他状态从 uiStore 内部订阅
+ */
+
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
 import { Application } from "@pixi/react";
 import type { ShipViewModel, MovementPreviewState } from "../types";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
 import { useCursorRendering } from "../systems/CursorRenderer";
@@ -16,68 +41,78 @@ import { useStarfieldRendering } from "../systems/StarfieldRenderer";
 import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
 import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
+import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 
 interface GameCanvasProps {
 	ships: ShipViewModel[];
-	zoom: number;
-	cameraX: number;
-	cameraY: number;
-	showGrid: boolean;
-	selectedShipId?: string | null;
-	onSelectShip?: (shipId: string) => void;
-	onPanDelta?: (deltaX: number, deltaY: number) => void;
-	onRotateDelta?: (delta: number) => void;
-	showWeaponArcs?: boolean;
-	showMovementRange?: boolean;
-	showBackground?: boolean;
 	onClick?: (x: number, y: number) => void;
-	viewRotation?: number;
-	/** 移动预览状态（从 BattleCommandPanel 同步） */
 	movementPreview?: MovementPreviewState;
 }
 
 const useStarfield = () => {
-	return useMemo(
-		() =>
-			new StarfieldGenerator({
-				deepStars: 1000,
-				midStars: 300,
-				nearStars: 80,
-				range: 10000,
-				parallaxStrength: 0.6,
-				enableNebula: true,
-				nebulaCount: 4,
-				nebulaOpacity: 0.12,
-			}),
-		[]
-	);
+	return new StarfieldGenerator({
+		deepStars: 1000,
+		midStars: 300,
+		nearStars: 80,
+		range: 10000,
+		parallaxStrength: 0.6,
+		enableNebula: true,
+		nebulaCount: 4,
+		nebulaOpacity: 0.12,
+	});
 };
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	ships,
-	zoom,
-	cameraX,
-	cameraY,
-	showGrid,
-	selectedShipId,
-	onSelectShip,
-	onPanDelta,
-	onRotateDelta,
-	showWeaponArcs: _showWeaponArcs = false,
-	showMovementRange = false,
-	showBackground = true,
 	onClick,
-	viewRotation = 0,
 	movementPreview,
 }) => {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
-	const selectShipAction = useUIStore((state) => state.selectShip);
-	const { setZoom, setCameraPosition, setMapCursor, mapCursor, showLabels, showEffects, showShipIcons } = useUIStore();
+
+	const {
+		zoom,
+		cameraPosition,
+		setCameraPosition,
+		viewRotation,
+		setViewRotation,
+		showGrid,
+		showBackground,
+		showMovementRange,
+		showLabels,
+		showEffects,
+		showShipIcons,
+		selectedShipId,
+		setZoom,
+		setMapCursor,
+		mapCursor,
+		selectShip,
+	} = useUIStore();
+
+	const cameraPositionRef = useRef(cameraPosition);
+	cameraPositionRef.current = cameraPosition;
+	const viewRotationRef = useRef(viewRotation);
+	viewRotationRef.current = viewRotation;
+
+	const shipsWithSelected = useMemo(() => {
+		return ships.map((ship) => ({
+			...ship,
+			selected: ship.id === selectedShipId,
+		}));
+	}, [ships, selectedShipId]);
+
+	const handlePanDelta = useCallback((deltaX: number, deltaY: number) => {
+		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
+		setCameraPosition(cameraPositionRef.current.x - worldDelta.x, cameraPositionRef.current.y - worldDelta.y);
+	}, [setCameraPosition, zoom]);
+
+	const handleRotateDelta = useCallback((delta: number) => {
+		setViewRotation(normalizeRotation(viewRotationRef.current + delta));
+	}, [setViewRotation]);
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
-	const interaction = useInteraction(onPanDelta, onRotateDelta);
+	const interaction = useInteraction(handlePanDelta, handleRotateDelta);
 	const layerSystem = useLayerSystem();
 	const zoomInteraction = useZoomInteraction(camera, canvasSize);
 
@@ -97,67 +132,61 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useCursorRendering(layerSystem.layers, mapCursor);
 	useStarfieldRendering(layerSystem.layers, starfield);
 
-	// 舰船战术标记渲染（在 world 层）
 	useShipRendering(
 		layerSystem.layers,
-		ships,
+		shipsWithSelected,
 		selectedShipId,
 		{
 			zoom,
-			x: cameraX,
-			y: cameraY,
+			x: cameraPosition.x,
+			y: cameraPosition.y,
 			canvasWidth: canvasSize.width,
 			canvasHeight: canvasSize.height,
 			viewRotation,
 		},
-		{ onSelectShip, storeSelectShip: selectShipAction }
+		{ onSelectShip: selectShip, storeSelectShip: selectShip }
 	);
 
-	// 舰船 HUD 渲染（血条/标签，在 HUD 层，固定像素大小）
 	useShipHUDRendering(
 		layerSystem.layers,
-		ships,
-		{ x: cameraX, y: cameraY, zoom, viewRotation },
+		shipsWithSelected,
+		{ x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation },
 		canvasSize,
 		{ showHpBars: showLabels, showLabels: showLabels }
 	);
 
-	useArmorHexagonRendering(layerSystem.layers, ships);
-	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview, {
+	useArmorHexagonRendering(layerSystem.layers, shipsWithSelected);
+	useMovementVisualRendering(layerSystem.layers, shipsWithSelected, selectedShipId ?? null, movementPreview, {
 		show: showMovementRange,
 	});
 	useGridRendering(layerSystem.layers, showGrid);
 
-	// 更新可见性
 	useEffect(() => {
 		if (!layerSystem.layers) return;
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
 	}, [layerSystem.layers, showEffects, showShipIcons]);
 
-	// ⚠️ 使用 ref 存储 layerSystem 函数，避免对象引用作为依赖
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;
 	const updateHitAreasRef = useRef(layerSystem.updateHitAreas);
 	updateHitAreasRef.current = layerSystem.updateHitAreas;
 
-	// ⚠️ 提取 canvasSize 的基本值作为依赖
 	const canvasWidth = canvasSize.width;
 	const canvasHeight = canvasSize.height;
 
-	// 更新世界层和 HUD 层变换
 	useEffect(() => {
-		camera.cameraRef.current = { x: cameraX, y: cameraY, zoom, viewRotation };
+		camera.cameraRef.current = { x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation };
 		updateWorldTransformsRef.current(
 			zoom,
-			cameraX,
-			cameraY,
+			cameraPosition.x,
+			cameraPosition.y,
 			canvasSize,
 			viewRotation,
 			showBackground
 		);
 		updateHitAreasRef.current(canvasSize);
-	}, [camera, cameraX, cameraY, zoom, viewRotation, canvasWidth, canvasHeight, showBackground]); // ⚠️ 使用 canvasWidth/canvasHeight 替代 canvasSize
+	}, [camera, cameraPosition.x, cameraPosition.y, zoom, viewRotation, canvasWidth, canvasHeight, showBackground]);
 
 	return (
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container">

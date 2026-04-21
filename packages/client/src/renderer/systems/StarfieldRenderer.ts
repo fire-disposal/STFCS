@@ -1,3 +1,25 @@
+/**
+ * 星空背景渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染多层视差星空背景
+ * 2. 实现视差滚动效果（不同层不同速度）
+ * 3. 渲染星云辉光效果
+ *
+ * 渲染层：
+ * - world.background (zIndex 0)
+ * - world.starfieldNebula (zIndex 0)
+ * - world.starfieldDeep (zIndex 1)
+ * - world.starfieldMid (zIndex 2)
+ * - world.starfieldNear (zIndex 3)
+ *
+ * 视差效果：
+ * - Deep 层：视差强度弱，移动慢
+ * - Mid 层：视差强度中
+ * - Near 层：视差强度强，移动快
+ * - Nebula：独立视差计算
+ */
+
 import type { StarfieldGenerator } from "./StarfieldBackground";
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";

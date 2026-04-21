@@ -1,3 +1,22 @@
+/**
+ * 相机控制 Hook
+ *
+ * 职责：
+ * 1. 管理相机状态引用（位置/缩放/旋转）
+ * 2. 提供坐标转换函数（屏幕 -> 世界）
+ * 3. 实现缩放动画（平滑过渡）
+ * 4. 限制缩放范围 [0.5, 3.0]
+ *
+ * 与 uiStore 协作：
+ * - setZoom: 更新缩放值
+ * - setCameraPosition: 更新相机位置
+ *
+ * 与 useZoomInteraction 协作：
+ * - queueZoomToTarget: 触发缩放动画
+ * - tickZoomAnimation: 推进动画帧
+ * - cancelZoomAnimation: 取消动画
+ */
+
 import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/coordinateSystem";
 import { useCallback, useRef } from "react";
 import type { CameraState } from "@/sync/types";

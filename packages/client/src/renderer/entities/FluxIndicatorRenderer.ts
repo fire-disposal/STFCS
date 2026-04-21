@@ -1,5 +1,19 @@
 /**
- * 辐能/过载状态指示器渲染器
+ * 辐能/过载状态指示器渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染舰船辐能状态环形指示器
+ * 2. 显示过载状态标记
+ * 3. 显示排气状态标记
+ *
+ * 渲染层：world.fluxIndicators (zIndex 14)
+ *
+ * 状态颜色编码：
+ * - NORMAL: 蓝色 (#4fc3ff) - 辐能正常
+ * - WARNING: 黄色 (#ffce66) - 辐能警告 (>70%)
+ * - CRITICAL: 红色 (#ff5d7e) - 辐能临界 (>90%)
+ * - OVERLOADED: 深红 (#ff2d4a) - 过载状态
+ * - VENTING: 绿色 (#57e38d) - 排气状态
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";

@@ -1,5 +1,24 @@
 /**
- * 移动可视化渲染器
+ * 移动可视化渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染舰船移动预览箭头
+ * 2. 显示移动范围（phase A/C forward/strafe）
+ * 3. 显示转向范围和锁定标记
+ *
+ * 渲染层：world.movementVisuals (zIndex 10)
+ *
+ * 移动阶段可视化：
+ * - Phase A: 前进/横移预览（绿色/红色）
+ * - Phase C: 前进/横移预览（橙色/粉色）
+ * - Turn: 转向范围扇形（蓝色）
+ *
+ * 颜色编码：
+ * - forwardLine: 前进方向（绿色）
+ * - backwardLine: 后退方向（红色）
+ * - rightLine: 右横移（橙色）
+ * - leftLine: 左横移（粉色）
+ * - turnRange: 转向范围（蓝色）
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";

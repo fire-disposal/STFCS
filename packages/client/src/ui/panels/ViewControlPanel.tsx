@@ -23,12 +23,10 @@ import {
 
 interface ViewControlPanelProps {
 	cameraAnimation?: UseCameraAnimationResult;
-	onResetView: () => void;
 }
 
 export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 	cameraAnimation,
-	onResetView,
 }) => {
 	const {
 		zoom,
@@ -70,6 +68,12 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		setCameraPosition(0, 0);
 		setViewRotation(0);
 		setZoom(1);
+	};
+
+	const handleResetView = () => {
+		setCameraPosition(0, 0);
+		setZoom(1);
+		setViewRotation(0);
 	};
 
 	const viewPresets = [
@@ -343,7 +347,7 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 						<RotateCcw className="game-icon--sm" />
 						<span>重置视图</span>
 					</button>
-					<button data-magnetic className="view-action-btn" onClick={onResetView}>
+					<button data-magnetic className="view-action-btn" onClick={handleResetView}>
 						<Home className="game-icon--sm" />
 						<span>返回原点</span>
 					</button>

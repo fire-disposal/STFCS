@@ -1,3 +1,23 @@
+/**
+ * 缩放交互 Hook
+ *
+ * 职责：
+ * 1. 处理鼠标滚轮缩放
+ * 2. 以鼠标位置为中心点缩放（世界坐标系保持稳定）
+ * 3. 触发缩放动画（通过 useCamera.queueZoomToTarget）
+ *
+ * 缩放算法：
+ * - wheel deltaY -> zoomFactor = exp(-deltaY * strength)
+ * - 计算鼠标位置的世界坐标
+ * - 计算缩放后的新世界坐标
+ * - 调整相机位置使世界点保持稳定
+ *
+ * 与 useCamera 协作：
+ * - clampZoom: 限制缩放范围 [0.5, 3.0]
+ * - screenToWorldPoint: 屏幕坐标转世界坐标
+ * - queueZoomToTarget: 触发缩放动画
+ */
+
 import { screenToWorld } from "@/utils/coordinateSystem";
 import { useCallback } from "react";
 import type { UseCameraResult } from "../systems/useCamera";

@@ -1,16 +1,38 @@
 /**
- * ShipHUDRenderer - 舰船 HUD 渲染器（血条/标签）
+ * 舰船 HUD 渲染 Hook（血条/标签）
+ *
+ * 职责：
+ * 1. 渲染舰船血条（文本样式，|符号组成）
+ * 2. 渲染舰船名称标签
+ * 3. 实时更新 HUD 元素位置（世界坐标 -> 屏幕坐标）
+ *
+ * 渲染层：hud.shipBars / hud.shipNames
+ *
+ * 血条设计：
+ * - 格式：|||||[050/300]|||||（对称）
+ * - 每20 HP 一个|（配置项 hpPerBar）
+ * - 外侧|为白色半透明（空血），内侧|为有血颜色
+ * - 中间数字 [current/max] 补位显示，随血量变色
+ *
+ * 颜色规则：
+ * - 高血量 (>=60%): 绿色
+ * - 中血量 (>=30%): 黄色
+ * - 低血量 (<30%): 红色
+ *
+ * 选中状态：
+ * - selected=true: 完全可见（alpha=1.0）
+ * - selected=false: 半透明（alpha=0.85）
  */
 
 import type { ShipViewModel } from "../types";
-import { Graphics, Text, TextStyle, Container } from "pixi.js";
+import { Text, TextStyle, Container } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 
-const HP_BAR_WIDTH = 62;
-const HP_BAR_HEIGHT = 8;
 const HP_BAR_OFFSET_Y = -40;
 const LABEL_OFFSET_Y = -25;
 const DEFAULT_HULL_MAX = 100;
+const DEFAULT_HP_PER_BAR = 20;
+const MAX_BARS_PER_SIDE = 15;
 
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
@@ -26,15 +48,28 @@ const labelStyle = new TextStyle({
 	},
 });
 
+const getHpColor = (hpPercent: number): number => {
+	if (hpPercent >= 0.6) return 0x57e38d;
+	if (hpPercent >= 0.3) return 0xffce66;
+	return 0xff5d7e;
+};
+
+interface HpBarConfig {
+	hpPerBar: number;
+	maxBarsPerSide: number;
+}
+
 interface ShipHUDCache {
-	hpBar: Graphics;
+	hpBarContainer: Container;
 	label: Text;
 	lastUpdate: {
 		worldX: number;
 		worldY: number;
 		hpPercent: number;
-		hpCurrent: number;
+		currentHp: number;
+		maxHp: number;
 		name: string;
+		selected: boolean;
 	};
 }
 
@@ -50,10 +85,18 @@ export class ShipHUDManager {
 	private hpBarLayer: Container;
 	private labelLayer: Container;
 	private lastCamera: CameraSnapshot | null = null;
+	private hpBarConfig: HpBarConfig;
 
-	constructor(hudLayers: { shipBars: Container; shipNames: Container }) {
+	constructor(
+		hudLayers: { shipBars: Container; shipNames: Container },
+		hpBarConfig?: Partial<HpBarConfig>
+	) {
 		this.hpBarLayer = hudLayers.shipBars;
 		this.labelLayer = hudLayers.shipNames;
+		this.hpBarConfig = {
+			hpPerBar: hpBarConfig?.hpPerBar ?? DEFAULT_HP_PER_BAR,
+			maxBarsPerSide: hpBarConfig?.maxBarsPerSide ?? MAX_BARS_PER_SIDE,
+		};
 	}
 
 	update(
@@ -66,9 +109,9 @@ export class ShipHUDManager {
 
 		for (const [id, cached] of this.cache) {
 			if (!currentIds.has(id)) {
-				this.hpBarLayer.removeChild(cached.hpBar);
+				this.hpBarLayer.removeChild(cached.hpBarContainer);
 				this.labelLayer.removeChild(cached.label);
-				cached.hpBar.destroy();
+				cached.hpBarContainer.destroy();
 				cached.label.destroy();
 				this.cache.delete(id);
 			}
@@ -105,30 +148,32 @@ export class ShipHUDManager {
 
 		const hullMax = ship.hullMax ?? defaultHullMax;
 		const hpPercent = ship.hull / hullMax;
+		const isSelected = ship.selected ?? false;
 
-		const hpBar = new Graphics();
-		this.drawHpBar(hpBar, hpPercent);
-		hpBar.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
+		const hpBarContainer = this.createHpBarContainer(ship.hull, hullMax, hpPercent, isSelected);
+		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 
 		const label = new Text({
-			text: this.formatLabel(ship, hullMax),
+			text: this.formatLabel(ship),
 			style: labelStyle,
 		});
 		label.anchor.set(0.5, 1);
 		label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 
-		this.hpBarLayer.addChild(hpBar);
+		this.hpBarLayer.addChild(hpBarContainer);
 		this.labelLayer.addChild(label);
 
 		this.cache.set(ship.id, {
-			hpBar,
+			hpBarContainer,
 			label,
 			lastUpdate: {
 				worldX: ship.position.x,
 				worldY: ship.position.y,
 				hpPercent,
-				hpCurrent: ship.hull,
+				currentHp: ship.hull,
+				maxHp: hullMax,
 				name: ship.name || ship.id,
+				selected: isSelected,
 			},
 		});
 	}
@@ -162,68 +207,139 @@ export class ShipHUDManager {
 				camera,
 				canvasSize
 			);
-			cached.hpBar.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
+			cached.hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 			cached.label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 		}
 
 		const hpPercent = ship.hull / hullMax;
-		if (hpPercent !== last.hpPercent) {
-			this.drawHpBar(cached.hpBar, hpPercent);
+		const isSelected = ship.selected ?? false;
+		const hpChanged = ship.hull !== last.currentHp || hullMax !== last.maxHp;
+		const selectedChanged = isSelected !== last.selected;
+
+		if (hpChanged || selectedChanged) {
+			this.updateHpBarContainer(cached.hpBarContainer, ship.hull, hullMax, hpPercent, isSelected);
 		}
 
 		const newName = ship.name || ship.id;
-		const hpChanged = ship.hull !== last.hpCurrent;
 		const nameChanged = newName !== last.name;
 
-		if (nameChanged || hpChanged) {
-			cached.label.text = this.formatLabel(ship, hullMax);
+		if (nameChanged) {
+			cached.label.text = this.formatLabel(ship);
 		}
 
 		cached.lastUpdate = {
 			worldX: ship.position.x,
 			worldY: ship.position.y,
 			hpPercent,
-			hpCurrent: ship.hull,
+			currentHp: ship.hull,
+			maxHp: hullMax,
 			name: newName,
+			selected: isSelected,
 		};
 	}
 
-	private formatLabel(ship: ShipViewModel, hullMax: number): string {
-		return `${ship.name || ship.id.slice(-6)}  HP:${Math.round(ship.hull)}/${Math.round(hullMax)}`;
+	private formatLabel(ship: ShipViewModel): string {
+		return ship.name || ship.id.slice(-6);
 	}
 
-	private drawHpBar(graphics: Graphics, hpPercent: number): void {
-		graphics.clear();
+	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): Container {
+		const container = new Container();
+		this.updateHpBarContainer(container, currentHp, maxHp, hpPercent, isSelected);
+		return container;
+	}
 
-		const width = HP_BAR_WIDTH;
-		const height = HP_BAR_HEIGHT;
-		const fill = Math.max(0, Math.min(1, hpPercent)) * width;
+	private updateHpBarContainer(container: Container, currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): void {
+		container.removeChildren().forEach((child) => child.destroy());
 
-		const color = hpPercent <= 0.3 ? 0xff5d7e : hpPercent <= 0.6 ? 0xffce66 : 0x57e38d;
+		const { hpPerBar, maxBarsPerSide } = this.hpBarConfig;
+		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar / 2), maxBarsPerSide);
+		const filledBars = Math.ceil(hpPercent * totalBars);
+		const emptyBars = totalBars - filledBars;
 
-		graphics
-			.roundRect(-width / 2, -height / 2, width, height, 3)
-			.fill({ color: 0x050c17, alpha: 0.95 });
+		const hpColor = getHpColor(hpPercent);
+		const barWidth = 8;
+		const baseAlpha = isSelected ? 1.0 : 0.85;
 
-		graphics.roundRect(-width / 2, -height / 2, fill, height, 3).fill({ color, alpha: 0.95 });
-
-		graphics.rect(-width / 2, -height / 2, fill, Math.max(2, height * 0.28)).fill({
-			color: 0xffffff,
-			alpha: 0.2,
+		const filledStyle = new TextStyle({
+			fill: hpColor,
+			fontSize: 12,
+			fontFamily: "monospace",
+			fontWeight: "700",
 		});
 
-		graphics.roundRect(-width / 2, -height / 2, width, height, 3).stroke({
-			color: 0xb9dbff,
-			alpha: 0.8,
-			width: 1,
+		const emptyStyle = new TextStyle({
+			fill: 0xffffff,
+			fontSize: 12,
+			fontFamily: "monospace",
+			fontWeight: "700",
 		});
+
+		const centerStyle = new TextStyle({
+			fill: hpColor,
+			fontSize: 10,
+			fontFamily: "monospace",
+			fontWeight: "600",
+		});
+
+		const centerText = new Text({
+			text: `[${this.formatHpNumber(Math.round(currentHp), Math.round(maxHp))}/${Math.round(maxHp)}]`,
+			style: centerStyle,
+		});
+		centerText.anchor.set(0.5, 0.5);
+		centerText.alpha = baseAlpha;
+		container.addChild(centerText);
+
+		const centerWidth = centerText.width + 4;
+
+		let x = -centerWidth / 2;
+		for (let i = 0; i < filledBars; i++) {
+			const bar = new Text({ text: "|", style: filledStyle });
+			bar.anchor.set(1, 0.5);
+			bar.x = x;
+			bar.alpha = baseAlpha;
+			container.addChild(bar);
+			x -= barWidth;
+		}
+
+		for (let i = 0; i < emptyBars; i++) {
+			const bar = new Text({ text: "|", style: emptyStyle });
+			bar.anchor.set(1, 0.5);
+			bar.x = x;
+			bar.alpha = isSelected ? 0.5 : 0.35;
+			container.addChild(bar);
+			x -= barWidth;
+		}
+
+		x = centerWidth / 2;
+		for (let i = 0; i < filledBars; i++) {
+			const bar = new Text({ text: "|", style: filledStyle });
+			bar.anchor.set(0, 0.5);
+			bar.x = x;
+			bar.alpha = baseAlpha;
+			container.addChild(bar);
+			x += barWidth;
+		}
+
+		for (let i = 0; i < emptyBars; i++) {
+			const bar = new Text({ text: "|", style: emptyStyle });
+			bar.anchor.set(0, 0.5);
+			bar.x = x;
+			bar.alpha = isSelected ? 0.5 : 0.35;
+			container.addChild(bar);
+			x += barWidth;
+		}
+	}
+
+	private formatHpNumber(current: number, max: number): string {
+		const maxDigits = max.toString().length;
+		return current.toString().padStart(maxDigits, "0");
 	}
 
 	clear(): void {
 		for (const cached of this.cache.values()) {
-			this.hpBarLayer.removeChild(cached.hpBar);
+			this.hpBarLayer.removeChild(cached.hpBarContainer);
 			this.labelLayer.removeChild(cached.label);
-			cached.hpBar.destroy();
+			cached.hpBarContainer.destroy();
 			cached.label.destroy();
 		}
 		this.cache.clear();

@@ -1,3 +1,22 @@
+/**
+ * 交互状态管理 Hook
+ *
+ * 职责：
+ * 1. 管理拖拽状态（平移/旋转/点击模式）
+ * 2. 管理空格键按下状态（切换拖拽模式）
+ * 3. 累积拖拽 delta，通过 flushDragDelta 批量提交
+ *
+ * 拖拽模式：
+ * - pan: 平移地图（默认右键拖拽，空格+左键拖拽）
+ * - rotate: 旋转地图（Ctrl+右键拖拽，Shift+拖拽）
+ * - click: 单击选择舰船/设置游标
+ *
+ * 与 usePixiApp 协作：
+ * - usePixiApp 监听 pointer 事件，更新 dragStateRef
+ * - ticker 循环中调用 flushDragDelta 提交累积 delta
+ * - onPanDelta/onRotateDelta 回调更新 uiStore 相机状态
+ */
+
 import { useRef } from "react";
 
 export interface DragState {

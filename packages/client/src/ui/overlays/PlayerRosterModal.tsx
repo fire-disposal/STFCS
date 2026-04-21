@@ -48,7 +48,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 		const connectedPlayers = players.filter((p) => p.connected);
 		const total = connectedPlayers.length;
 		const ready = connectedPlayers.filter((p) => p.isReady).length;
-		const dmCount = connectedPlayers.filter((p) => p.role === PlayerRole.OWNER).length;
+		const dmCount = connectedPlayers.filter((p) => p.role === PlayerRole.HOST).length;
 		return { total, ready, dmCount };
 	}, [players]);
 
@@ -74,7 +74,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 						<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 							{players.filter((p) => p.connected).map((player) => {
 								const isCurrent = player.sessionId === currentSessionId;
-								const isDM = player.role === PlayerRole.OWNER;
+								const isDM = player.role === PlayerRole.HOST;
 								const shipCount = playerShipCounts[player.sessionId] || 0;
 
 								return (
@@ -135,7 +135,7 @@ export const PlayerRosterModal: React.FC<PlayerRosterModalProps> = ({
 					<div className="game-section__divider" />
 
 					<div className="game-btn-group">
-						{currentPlayer && currentPlayer.role !== PlayerRole.OWNER && (
+						{currentPlayer && currentPlayer.role !== PlayerRole.HOST && (
 							<button
 								className={`game-btn ${currentPlayer.isReady ? "game-btn--success" : "game-btn--primary"}`}
 								onClick={() => onToggleReady(!currentPlayer.isReady)}

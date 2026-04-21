@@ -19,7 +19,7 @@ const App: React.FC = () => {
 	const [networkManager, setNetworkManager] = useState<SocketNetworkManager | null>(null);
 	const networkManagerRef = useRef<SocketNetworkManager | null>(null);
 	const [userName, setUserName] = useState<string>("");
-	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string }>({ nickname: "", avatar: "" });
+	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string; avatarAssetId?: string }>({ nickname: "", avatar: "" });
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const { rooms, isLoading: roomsLoading } = useRoomList(
@@ -37,6 +37,7 @@ const App: React.FC = () => {
 			}
 			setNetworkManager(manager);
 			networkManagerRef.current = manager;
+			window.__STFCS_SOCKET__ = manager.getSocket();
 
 			const restoredName = userService.restoreUsername();
 			if (restoredName) {
@@ -53,6 +54,7 @@ const App: React.FC = () => {
 		});
 
 		return () => {
+			window.__STFCS_SOCKET__ = undefined;
 			manager.disconnect();
 		};
 	}, []);
@@ -126,7 +128,7 @@ const App: React.FC = () => {
 	}, []);
 
 	const handleUpdateProfile = useCallback(
-		async (profile: { nickname?: string; avatar?: string }) => {
+		async (profile: { nickname?: string; avatar?: string; avatarAssetId?: string }) => {
 			if (!networkManagerRef.current) return;
 			const result = await networkManagerRef.current.updateProfile(profile);
 			if (!result.success || !result.profile) {
@@ -172,7 +174,6 @@ const App: React.FC = () => {
 				<GamePage
 					networkManager={networkManager}
 					onLeaveRoom={handleBackToLobby}
-					playerName={userName}
 				/>
 			)}
 		</div>

@@ -1,3 +1,21 @@
+/**
+ * Canvas 尺寸监听 Hook
+ *
+ * 职责：
+ * 1. 监听容器尺寸变化
+ * 2. 使用 ResizeObserver 实现响应式
+ * 3. 返回当前画布尺寸 { width, height }
+ *
+ * 使用方式：
+ * const hostRef = useRef<HTMLDivElement>(null);
+ * const canvasSize = useCanvasResize(hostRef);
+ *
+ * 返回值：
+ * - width: 容器宽度（像素）
+ * - height: 容器高度（像素）
+ * - 默认值: { width: 980, height: 620 }
+ */
+
 import { useEffect, useState } from "react";
 
 export interface CanvasSize {

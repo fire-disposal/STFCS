@@ -1,3 +1,19 @@
+/**
+ * 世界坐标系游标渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染世界坐标系中的十字准星
+ * 2. 指示当前点击/操作位置
+ * 3. 显示旋转方向（r 参数）
+ *
+ * 渲染层：world.cursor (zIndex 5)
+ *
+ * 游标样式：
+ * - 十字准星：水平/垂直线
+ * - 方向指示：旋转角度标记
+ * - 隐藏：当 cursor 为 null
+ */
+
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";

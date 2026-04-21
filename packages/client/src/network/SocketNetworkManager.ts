@@ -77,6 +77,7 @@ export class SocketNetworkManager {
 	private currentRoomId: string | null = null;
 	private gameState: SocketGameState | null = null;
 	private listeners: Map<string, Set<(data: any) => void>> = new Map();
+	private pendingRequests: Map<string, { resolve: Function; reject: Function; timeout: ReturnType<typeof setTimeout> }> = new Map();
 
 	constructor(serverUrl: string) {
 		this.serverUrl = serverUrl;
@@ -114,61 +115,58 @@ export class SocketNetworkManager {
 			return { success: false, error: "Not connected" };
 		}
 
-		return new Promise((resolve) => {
-			this.socket!.emit("auth", { playerName });
-			this.socket!.once("auth:success", (data: {
+		try {
+			const data = await this.sendRequest<{
 				playerId: string;
 				playerName: string;
-				profile?: { nickname: string; avatar: string };
-			}) => {
-				this.playerId = data.playerId;
-				this.playerName = data.playerName;
-				logger.info("Authenticated", { playerId: data.playerId });
-				resolve({ success: true, ...data });
-			});
-			this.socket!.once("error", (err: { code: string; message: string }) => {
-				if (err.code === "AUTH_FAILED") {
-					resolve({ success: false, error: err.message });
-				}
-			});
-		});
+				isHost: boolean;
+				role: string;
+				profile?: { nickname: string; avatar: string; avatarAssetId?: string };
+			}>("auth:login", { playerName });
+
+			this.playerId = data.playerId;
+			this.playerName = data.playerName;
+			logger.info("Authenticated", { playerId: data.playerId });
+
+			return { success: true, ...data, profile: data.profile };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Auth failed" };
+		}
 	}
 
 	async getRoomList(): Promise<RoomInfo[]> {
-		return new Promise((resolve) => {
-			this.socket?.emit("room:list");
-			this.socket?.once("room:list:result", (data: { rooms: RoomInfo[] }) => {
-				resolve(data.rooms || []);
-			});
-			setTimeout(() => resolve([]), 5000);
-		});
+		try {
+			const data = await this.sendRequest<{ rooms: RoomInfo[] }>("room:list", {});
+			return data.rooms || [];
+		} catch {
+			return [];
+		}
 	}
 
-	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string }; error?: string }> {
+	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string; avatarAssetId?: string }; error?: string }> {
 		if (!this.socket?.connected) {
 			return { success: false, error: "Not connected" };
 		}
 
-		return new Promise((resolve) => {
-			this.socket!.emit("profile:get", (result: any) => {
-				resolve(result);
-			});
-		});
+		try {
+			const data = await this.sendRequest<{ profile: { nickname: string; avatar: string; avatarAssetId?: string } }>("profile:get", {});
+			return { success: true, profile: data.profile };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Profile fetch failed" };
+		}
 	}
 
-	async updateProfile(profile: {
-		nickname?: string;
-		avatar?: string;
-	}): Promise<{ success: boolean; profile?: { nickname: string; avatar: string }; error?: string }> {
+	async updateProfile(profile: { nickname?: string; avatar?: string; avatarAssetId?: string }): Promise<{ success: boolean; profile?: { nickname: string; avatar: string; avatarAssetId?: string }; error?: string }> {
 		if (!this.socket?.connected) {
 			return { success: false, error: "Not connected" };
 		}
 
-		return new Promise((resolve) => {
-			this.socket!.emit("profile:update", profile, (result: any) => {
-				resolve(result);
-			});
-		});
+		try {
+			const data = await this.sendRequest<{ profile: { nickname: string; avatar: string; avatarAssetId?: string } }>("profile:update", profile);
+			return { success: true, profile: data.profile };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Profile update failed" };
+		}
 	}
 
 	async getLoadout(): Promise<PlayerLoadoutResult> {
@@ -176,11 +174,12 @@ export class SocketNetworkManager {
 			return { success: false, error: "Not connected" };
 		}
 
-		return new Promise((resolve) => {
-			this.socket!.emit("profile:loadout:get", (result: PlayerLoadoutResult) => {
-				resolve(result);
-			});
-		});
+		try {
+			const data = await this.sendRequest<{ loadout: { ships: ShipJSON[]; weapons: WeaponJSON[] } }>("profile:loadout:get", {});
+			return { success: true, loadout: data.loadout };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Loadout fetch failed" };
+		}
 	}
 
 	async createRoom(options: RoomCreateOptions): Promise<RoomJoinResult> {
@@ -188,38 +187,18 @@ export class SocketNetworkManager {
 			return { success: false, error: "Not authenticated" };
 		}
 
-		return new Promise((resolve) => {
-			const timeoutId = setTimeout(() => {
-				resolve({ success: false, error: "Room creation timeout" });
-			}, 10000); // 10秒超时
-
-			const cleanup = () => {
-				clearTimeout(timeoutId);
-				this.socket!.off("room:created", onRoomCreated);
-				this.socket!.off("error", onError);
-			};
-
-			const onRoomCreated = (data: { roomId: string; roomName: string }) => {
-				cleanup();
-				this.currentRoomId = data.roomId;
-				logger.info("Room created and joined", { roomId: data.roomId });
-				resolve({ success: true, roomId: data.roomId });
-			};
-
-			const onError = (err: { code: string; message: string }) => {
-				if (err.code === "ROOM_CREATE_FAILED") {
-					cleanup();
-					resolve({ success: false, error: err.message });
-				}
-			};
-
-			this.socket!.emit("room:create", {
-				roomName: options.roomName,
+		try {
+			const data = await this.sendRequest<{ roomId: string; roomName: string; isHost: boolean }>("room:create", {
+				name: options.roomName,
 				maxPlayers: options.maxPlayers ?? 4,
-			});
-			this.socket!.once("room:created", onRoomCreated);
-			this.socket!.once("error", onError);
-		});
+			}, 10000);
+
+			this.currentRoomId = data.roomId;
+			logger.info("Room created and joined", { roomId: data.roomId });
+			return { success: true, roomId: data.roomId };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Room creation failed" };
+		}
 	}
 
 	async joinRoom(roomId: string): Promise<RoomJoinResult> {
@@ -227,50 +206,40 @@ export class SocketNetworkManager {
 			return { success: false, error: "Not authenticated" };
 		}
 
-		return new Promise((resolve) => {
-			this.socket!.emit("room:join", { roomId });
-			this.socket!.once("state:full", (state: SocketGameState) => {
-				this.currentRoomId = roomId;
-				this.gameState = state;
-				this.emit("state:full", state);
-				resolve({ success: true, roomId });
-			});
-			this.socket!.once("error", (err: { code: string; message: string }) => {
-				resolve({ success: false, error: err.message });
-			});
-		});
+		try {
+			const data = await this.sendRequest<{ roomId: string; roomName: string; isHost: boolean; role: string }>("room:join", { roomId });
+
+			this.currentRoomId = roomId;
+			return { success: true, roomId: data.roomId };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Join failed" };
+		}
 	}
 
 	leaveRoom(): void {
 		if (this.currentRoomId) {
-			this.socket?.emit("room:leave");
+			this.socket?.emit("request", { event: "room:leave", requestId: crypto.randomUUID(), payload: {} });
 			this.currentRoomId = null;
 			this.gameState = null;
 		}
 	}
 
 	setReady(_isReady: boolean): void {
-		this.socket?.emit("room:ready");
+		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "ready" } });
 	}
 
 	startGame(): void {
-		this.socket?.emit("room:start");
+		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "start" } });
 	}
 
 	sendAction(event: SocketIOActionEvent, payload: unknown): Promise<{ success: boolean; error?: string }> {
-		return new Promise((resolve) => {
-			this.socket?.emit(event, payload, (result: any) => {
-				resolve(result);
-			});
-		});
+		const action = event.replace("game:", "");
+		const finalPayload = typeof payload === "object" && payload !== null ? { action, ...payload } : { action };
+		return this.sendRequest("game:action", finalPayload);
 	}
 
 	send(event: string, payload: unknown): Promise<any> {
-		return new Promise((resolve) => {
-			this.socket?.emit(event, payload, (result: any) => {
-				resolve(result);
-			});
-		});
+		return this.sendRequest(event, payload);
 	}
 
 	getPlayerId(): string | null {
@@ -291,6 +260,10 @@ export class SocketNetworkManager {
 
 	isConnected(): boolean {
 		return this.socket?.connected ?? false;
+	}
+
+	getSocket(): Socket | null {
+		return this.socket;
 	}
 
 	on(event: string, handler: (data: any) => void): void {
@@ -336,16 +309,20 @@ export class SocketNetworkManager {
 			this.emit("reconnect", { attemptNumber });
 		});
 
-		this.socket.on("state:delta", (data: { events: any[]; timestamp: number }) => {
-			if (this.gameState) {
-				this.applyDelta(data.events);
-			}
-			this.emit("state:delta", data);
+		this.socket.on("response", (data: { requestId: string; success: boolean; data?: any; error?: { code: string; message: string } }) => {
+			this.handleResponse(data);
 		});
 
-		this.socket.on("state:full", (state: SocketGameState) => {
+		this.socket.on("sync:full", (state: SocketGameState) => {
 			this.gameState = state;
-			this.emit("state:full", state);
+			this.emit("sync:full", state);
+		});
+
+		this.socket.on("sync:delta", (data: { timestamp: number; changes: any[] }) => {
+			if (this.gameState) {
+				this.applyDelta(data.changes);
+			}
+			this.emit("sync:delta", data);
 		});
 
 		this.socket.on("player:joined", (data: { playerId: string; playerName: string; totalPlayers: number }) => {
@@ -356,13 +333,41 @@ export class SocketNetworkManager {
 			this.emit("player:left", data);
 		});
 
-		this.socket.on("event", (data: any) => {
-			this.emit("event", data);
-		});
-
 		this.socket.on("error", (data: { code: string; message: string }) => {
 			logger.error("Server error", data);
 			this.emit("error", data);
+		});
+	}
+
+	private handleResponse(data: { requestId: string; success: boolean; data?: any; error?: { code: string; message: string } }): void {
+		const pending = this.pendingRequests.get(data.requestId);
+		if (!pending) return;
+
+		clearTimeout(pending.timeout);
+		this.pendingRequests.delete(data.requestId);
+
+		if (data.success) {
+			pending.resolve(data.data);
+		} else {
+			pending.reject(new Error(data.error?.message ?? "Unknown error"));
+		}
+	}
+
+	private sendRequest<T>(event: string, payload: unknown, timeoutMs = 10000): Promise<T> {
+		if (!this.socket?.connected) {
+			return Promise.reject(new Error("Not connected"));
+		}
+
+		const requestId = crypto.randomUUID();
+
+		return new Promise<T>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.pendingRequests.delete(requestId);
+				reject(new Error(`Request timeout: ${event}`));
+			}, timeoutMs);
+
+			this.pendingRequests.set(requestId, { resolve, reject, timeout });
+			this.socket!.emit("request", { event, requestId, payload });
 		});
 	}
 
@@ -390,6 +395,12 @@ export class SocketNetworkManager {
 
 	disconnect(): void {
 		if (this.socket) {
+			for (const pending of this.pendingRequests.values()) {
+				clearTimeout(pending.timeout);
+				pending.reject(new Error("Disconnected"));
+			}
+			this.pendingRequests.clear();
+
 			this.socket.disconnect();
 			this.socket = null;
 			this.playerId = null;

@@ -1,3 +1,20 @@
+/**
+ * 世界坐标系网格渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染世界坐标系网格线
+ * 2. 高亮轴线（x=0, y=0）
+ * 3. 根据显示设置控制可见性
+ *
+ * 渲染层：world.grid (zIndex 4)
+ *
+ * 网格参数：
+ * - gridSize: 100 单位间隔
+ * - range: [-3000, 3000] 覆盖范围
+ * - 轴线颜色: #4a9eff (蓝色)
+ * - 普通线颜色: #2a3d55 (暗蓝)
+ */
+
 import { Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";

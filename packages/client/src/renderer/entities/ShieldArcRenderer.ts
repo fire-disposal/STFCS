@@ -1,5 +1,21 @@
 /**
- * 护盾辉光弧线渲染器
+ * 护盾辉光弧线渲染 Hook
+ *
+ * 职责：
+ * 1. 渲染舰船护盾弧线可视化
+ * 2. 显示护盾覆盖范围（arc 角度）
+ * 3. 根据护盾值调整透明度
+ *
+ * 渲染层：world.shieldArcs (zIndex 12)
+ *
+ * 护盾样式：
+ * - 弧线：表示护盾覆盖范围
+ * - 辉光：多层叠加效果
+ * - 颜色：根据 faction 区分（玩家蓝色，敌人粉色）
+ *
+ * 护盾状态：
+ * - active: 显示辉光弧线
+ * - inactive: 隐藏护盾可视化
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
