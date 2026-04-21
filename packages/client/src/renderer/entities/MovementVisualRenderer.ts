@@ -23,8 +23,7 @@
 
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { ShipViewModel, MovementPreviewState, MoveMode } from "../types";
-import type { MovementState } from "@vt/data";
-import type { MovePhaseUIValue } from "@/types";
+import type { MovementState, MovementPhase } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -65,7 +64,7 @@ interface MovementGraphicsCache {
 		x: number;
 		y: number;
 		heading: number;
-		phase: MovePhaseUIValue;
+		phase: MovementPhase | undefined;
 		mode: MoveMode;
 		value: number;
 		turn: number;
@@ -215,7 +214,7 @@ function buildStateSnapshot(
 		x: ship.position?.x ?? 0,
 		y: ship.position?.y ?? 0,
 		heading: ship.heading ?? 0,
-		phase: preview?.phase ?? getMovePhaseFromMovement(ship.movement) ?? "NONE",
+		phase: preview?.phase ?? getMovePhaseFromMovement(ship.movement),
 		mode: preview?.mode ?? "forward",
 		value: preview?.value ?? 0,
 		turn: preview?.turn ?? 0,
@@ -226,14 +225,14 @@ function buildStateSnapshot(
 	};
 }
 
-function getMovePhaseFromMovement(movement?: MovementState): MovePhaseUIValue {
-	if (!movement?.currentPhase) return "NONE";
+function getMovePhaseFromMovement(movement?: MovementState): MovementPhase | undefined {
+	if (!movement?.currentPhase) return undefined;
 	switch (movement.currentPhase) {
 		case "A": return "A";
 		case "B": return "B";
 		case "C": return "C";
 		case "DONE": return "DONE";
-		default: return "NONE";
+		default: return undefined;
 	}
 }
 

@@ -44,16 +44,16 @@ export interface StarfieldConfig {
   deepStars: number;
   midStars: number;
   nearStars: number;
-  
+
   // 星空范围
   range: number;
-  
+
   // 视差强度 (0-1)
   parallaxStrength: number;
-  
+
   // 是否启用银河效果
   enableNebula: boolean;
-  
+
   // 银河配置
   nebulaCount: number;
   nebulaOpacity: number;
@@ -101,11 +101,11 @@ const NEBULA_COLORS = [
 function generateStar(z: number, range: number): Star {
   const angle = Math.random() * Math.PI * 2;
   const radius = Math.random() * range;
-  
+
   // 深度越近，恒星越大越亮
   const sizeBase = 0.5 + z * 1.5;
   const alphaBase = 0.3 + z * 0.5;
-  
+
   return {
     x: Math.cos(angle) * radius,
     y: Math.sin(angle) * radius,
@@ -124,7 +124,7 @@ function generateStar(z: number, range: number): Star {
 function generateNebula(range: number): Nebula {
   const angle = Math.random() * Math.PI * 2;
   const radius = 500 + Math.random() * 1500;
-  
+
   return {
     x: Math.cos(angle) * radius * 0.5,
     y: Math.sin(angle) * radius * 0.5,
@@ -145,44 +145,44 @@ export class StarfieldGenerator {
   private nearStars: Star[] = [];
   private nebulas: Nebula[] = [];
   private time: number = 0;
-  
+
   constructor(config: Partial<StarfieldConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.generate();
   }
-  
+
   /**
    * 生成所有星空元素
    */
   generate(): void {
     const { deepStars, midStars, nearStars, range, nebulaCount } = this.config;
-    
+
     // 生成各层恒星
-    this.deepStars = Array.from({ length: deepStars }, () => 
+    this.deepStars = Array.from({ length: deepStars }, () =>
       generateStar(0.1 + Math.random() * 0.2, range)
     );
-    
-    this.midStars = Array.from({ length: midStars }, () => 
+
+    this.midStars = Array.from({ length: midStars }, () =>
       generateStar(0.3 + Math.random() * 0.3, range)
     );
-    
-    this.nearStars = Array.from({ length: nearStars }, () => 
+
+    this.nearStars = Array.from({ length: nearStars }, () =>
       generateStar(0.6 + Math.random() * 0.3, range)
     );
-    
+
     // 生成星云
-    this.nebulas = Array.from({ length: nebulaCount }, () => 
+    this.nebulas = Array.from({ length: nebulaCount }, () =>
       generateNebula(range)
     );
   }
-  
+
   /**
    * 更新闪烁动画
    */
   update(deltaTime: number = 0.016): void {
     this.time += deltaTime;
   }
-  
+
   /**
    * 计算视差偏移
    */
@@ -194,95 +194,82 @@ export class StarfieldGenerator {
       y: cameraY * factor,
     };
   }
-  
+
   /**
    * 绘制深层星空
+   * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
   drawDeepStars(graphics: Graphics, cameraX: number, cameraY: number): void {
-    const offset = this.getParallaxOffset(cameraX, cameraY, 0);
-    
     for (const star of this.deepStars) {
-      const x = star.x - offset.x;
-      const y = star.y - offset.y;
-      
       // 闪烁效果
-      const twinkle = star.twinkleSpeed 
+      const twinkle = star.twinkleSpeed
         ? Math.sin(this.time * star.twinkleSpeed! + star.twinkleOffset!) * 0.2 + 0.8
         : 1;
-      
-      graphics.circle(x, y, star.size);
+
+      graphics.circle(star.x, star.y, star.size);
       graphics.fill({ color: star.color, alpha: star.alpha * twinkle });
     }
   }
-  
+
   /**
    * 绘制中层星空
+   * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
   drawMidStars(graphics: Graphics, cameraX: number, cameraY: number): void {
-    const offset = this.getParallaxOffset(cameraX, cameraY, 0.5);
-    
     for (const star of this.midStars) {
-      const x = star.x - offset.x;
-      const y = star.y - offset.y;
-      
-      const twinkle = star.twinkleSpeed 
+      const twinkle = star.twinkleSpeed
         ? Math.sin(this.time * star.twinkleSpeed! + star.twinkleOffset!) * 0.3 + 0.7
         : 1;
-      
-      graphics.circle(x, y, star.size);
+
+      graphics.circle(star.x, star.y, star.size);
       graphics.fill({ color: star.color, alpha: star.alpha * twinkle });
     }
   }
-  
+
   /**
    * 绘制浅层星空
+   * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
   drawNearStars(graphics: Graphics, cameraX: number, cameraY: number): void {
-    const offset = this.getParallaxOffset(cameraX, cameraY, 1);
-    
     for (const star of this.nearStars) {
-      const x = star.x - offset.x;
-      const y = star.y - offset.y;
-      
-      const twinkle = star.twinkleSpeed 
+      const twinkle = star.twinkleSpeed
         ? Math.sin(this.time * star.twinkleSpeed! * 2 + star.twinkleOffset!) * 0.4 + 0.6
         : 1;
-      
-      graphics.circle(x, y, star.size * 1.2);
+
+      graphics.circle(star.x, star.y, star.size * 1.2);
       graphics.fill({ color: star.color, alpha: star.alpha * twinkle });
     }
   }
-  
+
   /**
    * 绘制银河星云
+   * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
   drawNebula(graphics: Graphics, cameraX: number, cameraY: number): void {
     if (!this.config.enableNebula) return;
-    
+
     const time = this.time * 0.1; // 缓慢移动
-    
+
     for (const nebula of this.nebulas) {
-      const offset = this.getParallaxOffset(cameraX, cameraY, nebula.z);
-      
-      // 星云缓慢漂移
-      const x = nebula.x - offset.x + Math.sin(time + nebula.radius) * 50;
-      const y = nebula.y - offset.y + Math.cos(time + nebula.radius) * 50;
-      
+      // 星云缓慢漂移（保留自然漂移效果，但移除视差偏移）
+      const x = nebula.x + Math.sin(time + nebula.radius) * 50;
+      const y = nebula.y + Math.cos(time + nebula.radius) * 50;
+
       // 绘制多层渐变星云效果
       const layers = 5;
       for (let i = 0; i < layers; i++) {
         const layerRadius = nebula.radius * (1 - i / layers);
         const layerAlpha = nebula.alpha * this.config.nebulaOpacity * (1 - i / layers);
-        
+
         graphics.circle(x, y, layerRadius);
-        graphics.fill({ 
-          color: nebula.color, 
-          alpha: layerAlpha 
+        graphics.fill({
+          color: nebula.color,
+          alpha: layerAlpha
         });
       }
     }
   }
-  
+
   /**
    * 绘制完整星空背景
    */
@@ -293,20 +280,20 @@ export class StarfieldGenerator {
     layers: ('deep' | 'mid' | 'near' | 'nebula')[] = ['deep', 'mid', 'near', 'nebula']
   ): void {
     graphics.clear();
-    
+
     // 按深度顺序绘制：星云 -> 深层 -> 中层 -> 浅层
     if (layers.includes('nebula')) {
       this.drawNebula(graphics, cameraX, cameraY);
     }
-    
+
     if (layers.includes('deep')) {
       this.drawDeepStars(graphics, cameraX, cameraY);
     }
-    
+
     if (layers.includes('mid')) {
       this.drawMidStars(graphics, cameraX, cameraY);
     }
-    
+
     if (layers.includes('near')) {
       this.drawNearStars(graphics, cameraX, cameraY);
     }
@@ -326,7 +313,7 @@ export function createOptimizedStarfield(
   nebulaGraphics: Graphics;
 } {
   const generator = new StarfieldGenerator(config);
-  
+
   return {
     generator,
     deepGraphics: new Graphics(),

@@ -1,0 +1,958 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    Badge,
+    Box,
+    Button,
+    Card,
+    Dialog,
+    Flex,
+    Grid,
+    Select,
+    Separator,
+    Tabs,
+    Text,
+    TextArea,
+    TextField,
+} from "@radix-ui/themes";
+import {
+    DamageType,
+    HullSize,
+    ShipClass,
+    ShieldType,
+    TokenJSONSchema,
+    WeaponJSONSchema,
+    WeaponSlotSize,
+    WeaponTag,
+    isWeaponSizeCompatible,
+    type TokenJSON,
+    type WeaponJSON,
+    type AssetType,
+} from "@vt/data";
+import { Plus, Save, Upload, WandSparkles, Wrench, Copy, ShieldCheck, AlertCircle } from "lucide-react";
+import type { SocketNetworkManager } from "@/network";
+import { notify } from "@/ui/shared/Notification";
+import { useAssetSocket } from "@/hooks/useAssetSocket";
+import MiniShipPreview from "./MiniShipPreview";
+import "./ship-customization-modal.css";
+import "./weapon-customization-modal.css";
+
+interface LoadoutCustomizerDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    networkManager: SocketNetworkManager;
+}
+
+interface ShipBuildRecord {
+    id: string;
+    shipJson: unknown;
+    ownerId?: string;
+    isPreset?: boolean;
+}
+
+interface WeaponBuildRecord {
+    id: string;
+    weaponJson: unknown;
+    ownerId?: string;
+    isPreset?: boolean;
+}
+
+interface AssetWithData {
+    $id: string;
+    filename: string;
+    mimeType: string;
+    data?: string;
+}
+
+function clone<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function normalizeTokenJSON(input: unknown): TokenJSON | null {
+    const raw = (input as any)?.shipJson ?? input;
+    const direct = TokenJSONSchema.safeParse(raw);
+    if (direct.success) return direct.data;
+
+    if (raw && typeof raw === "object" && (raw as any).ship) {
+        const legacy = {
+            ...(raw as Record<string, unknown>),
+            $schema: "token-v2",
+            token: (raw as any).ship,
+        };
+        delete (legacy as any).ship;
+        const migrated = TokenJSONSchema.safeParse(legacy);
+        if (migrated.success) return migrated.data;
+    }
+
+    return null;
+}
+
+function normalizeWeaponJSON(input: unknown): WeaponJSON | null {
+    const raw = (input as any)?.weaponJson ?? input;
+    const parsed = WeaponJSONSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+function ensureShipDefaults(token: TokenJSON): TokenJSON {
+    const next = clone(token);
+    next.token.mounts = next.token.mounts ?? [];
+    next.metadata = next.metadata ?? { name: next.$id };
+    return next;
+}
+
+function ensureWeaponDefaults(weapon: WeaponJSON): WeaponJSON {
+    const next = clone(weapon);
+    next.metadata = next.metadata ?? { name: next.$id };
+    next.weapon.tags = next.weapon.tags ?? [];
+    return next;
+}
+
+function toDataUrl(mimeType: string, base64: string): string {
+    return `data:${mimeType};base64,${base64}`;
+}
+
+function idLabel(id: string): string {
+    if (id.startsWith("preset:")) return id;
+    return id.length > 20 ? `${id.slice(0, 10)}...${id.slice(-6)}` : id;
+}
+
+async function applyColorKey(sourceFile: File, colorHex: string, tolerance: number): Promise<File> {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("文件读取失败"));
+        reader.readAsDataURL(sourceFile);
+    });
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("图片解码失败"));
+        el.src = dataUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 不可用");
+
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const { data } = imageData;
+
+    const hex = colorHex.replace("#", "");
+    const targetR = Number.parseInt(hex.slice(0, 2), 16);
+    const targetG = Number.parseInt(hex.slice(2, 4), 16);
+    const targetB = Number.parseInt(hex.slice(4, 6), 16);
+
+    for (let i = 0; i < data.length; i += 4) {
+        const dr = Math.abs(data[i] - targetR);
+        const dg = Math.abs(data[i + 1] - targetG);
+        const db = Math.abs(data[i + 2] - targetB);
+        if (dr <= tolerance && dg <= tolerance && db <= tolerance) {
+            data[i + 3] = 0;
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+            if (!b) {
+                reject(new Error("无法导出图像"));
+                return;
+            }
+            resolve(b);
+        }, "image/png");
+    });
+
+    return new File([blob], sourceFile.name.replace(/\.[^.]+$/, "") + "-colorkey.png", { type: "image/png" });
+}
+
+export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = ({ open, onOpenChange, networkManager }) => {
+    const socket = networkManager.getSocket();
+    const assetSocket = useAssetSocket(socket);
+    const textureInputRef = useRef<HTMLInputElement>(null);
+
+    const [loading, setLoading] = useState(false);
+    const [activeTopTab, setActiveTopTab] = useState<"ship" | "weapon">("ship");
+
+    const [shipBuilds, setShipBuilds] = useState<ShipBuildRecord[]>([]);
+    const [weaponBuilds, setWeaponBuilds] = useState<WeaponBuildRecord[]>([]);
+    const [shipPresets, setShipPresets] = useState<TokenJSON[]>([]);
+    const [weaponPresets, setWeaponPresets] = useState<WeaponJSON[]>([]);
+
+    const [selectedShipBuildId, setSelectedShipBuildId] = useState<string | null>(null);
+    const [selectedWeaponBuildId, setSelectedWeaponBuildId] = useState<string | null>(null);
+    const [shipDraft, setShipDraft] = useState<TokenJSON | null>(null);
+    const [weaponDraft, setWeaponDraft] = useState<WeaponJSON | null>(null);
+    const [shipRawJson, setShipRawJson] = useState("");
+    const [weaponRawJson, setWeaponRawJson] = useState("");
+    const [editorTab, setEditorTab] = useState<"form" | "json">("form");
+
+    const [shipPreviewZoom, setShipPreviewZoom] = useState(1);
+    const [shipTextureAssets, setShipTextureAssets] = useState<AssetWithData[]>([]);
+    const [weaponTextureAssets, setWeaponTextureAssets] = useState<AssetWithData[]>([]);
+    const [texturePreviewDataUrl, setTexturePreviewDataUrl] = useState<string | null>(null);
+    const [keyColor, setKeyColor] = useState("#000000");
+    const [keyTolerance, setKeyTolerance] = useState(12);
+    const [mountSelection, setMountSelection] = useState<string>("");
+
+    useEffect(() => {
+        if (!socket) return;
+        socket.on("response", assetSocket.handleResponse);
+        return () => {
+            socket.off("response", assetSocket.handleResponse);
+        };
+    }, [socket, assetSocket.handleResponse]);
+
+    const reloadAssets = useCallback(async () => {
+        if (!socket?.connected) return;
+        try {
+            const [shipAssets, weaponAssets] = await Promise.all([
+                assetSocket.list("ship_texture"),
+                assetSocket.list("weapon_texture"),
+            ]);
+            setShipTextureAssets(shipAssets as AssetWithData[]);
+            setWeaponTextureAssets(weaponAssets as AssetWithData[]);
+        } catch (error) {
+            console.error(error);
+        }
+    }, [socket, assetSocket]);
+
+    const reloadData = useCallback(async () => {
+        if (!open) return;
+        setLoading(true);
+        try {
+            const [shipListRes, weaponListRes, shipPresetRes, weaponPresetRes] = await Promise.all([
+                networkManager.send("token:list", {}),
+                networkManager.send("weapon:list", {}),
+                networkManager.send("preset:list_tokens", {}),
+                networkManager.send("preset:list_weapons", {}),
+            ]);
+
+            const nextShipBuilds = (shipListRes?.ships ?? []) as ShipBuildRecord[];
+            const nextWeaponBuilds = (weaponListRes?.weapons ?? []) as WeaponBuildRecord[];
+            const nextShipPresets = (shipPresetRes?.presets ?? [])
+                .map((item: unknown) => normalizeTokenJSON(item))
+                .filter((item: TokenJSON | null): item is TokenJSON => Boolean(item));
+            const nextWeaponPresets = (weaponPresetRes?.presets ?? [])
+                .map((item: unknown) => normalizeWeaponJSON(item))
+                .filter((item: WeaponJSON | null): item is WeaponJSON => Boolean(item));
+
+            setShipBuilds(nextShipBuilds);
+            setWeaponBuilds(nextWeaponBuilds);
+            setShipPresets(nextShipPresets);
+            setWeaponPresets(nextWeaponPresets);
+
+            if (!selectedShipBuildId && nextShipBuilds.length > 0) {
+                setSelectedShipBuildId(nextShipBuilds[0].id);
+            }
+            if (!selectedWeaponBuildId && nextWeaponBuilds.length > 0) {
+                setSelectedWeaponBuildId(nextWeaponBuilds[0].id);
+            }
+
+            await reloadAssets();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "自定义数据加载失败");
+        } finally {
+            setLoading(false);
+        }
+    }, [networkManager, open, reloadAssets, selectedShipBuildId, selectedWeaponBuildId]);
+
+    useEffect(() => {
+        void reloadData();
+    }, [reloadData]);
+
+    useEffect(() => {
+        const selected = shipBuilds.find((item) => item.id === selectedShipBuildId);
+        if (!selected) {
+            setShipDraft(null);
+            setShipRawJson("");
+            return;
+        }
+
+        const parsed = normalizeTokenJSON(selected.shipJson);
+        if (!parsed) {
+            notify.error(`舰船 ${selected.id} 数据不符合 schema`);
+            return;
+        }
+
+        const normalized = ensureShipDefaults(parsed);
+        setShipDraft(normalized);
+        setShipRawJson(JSON.stringify(normalized, null, 2));
+        setMountSelection(normalized.token.mounts?.[0]?.id ?? "");
+    }, [shipBuilds, selectedShipBuildId]);
+
+    useEffect(() => {
+        const selected = weaponBuilds.find((item) => item.id === selectedWeaponBuildId);
+        if (!selected) {
+            setWeaponDraft(null);
+            setWeaponRawJson("");
+            return;
+        }
+
+        const parsed = normalizeWeaponJSON(selected.weaponJson);
+        if (!parsed) {
+            notify.error(`武器 ${selected.id} 数据不符合 schema`);
+            return;
+        }
+
+        const normalized = ensureWeaponDefaults(parsed);
+        setWeaponDraft(normalized);
+        setWeaponRawJson(JSON.stringify(normalized, null, 2));
+    }, [weaponBuilds, selectedWeaponBuildId]);
+
+    const selectedMount = useMemo(() => {
+        if (!shipDraft?.token.mounts?.length || !mountSelection) return null;
+        return shipDraft.token.mounts.find((item) => item.id === mountSelection) ?? null;
+    }, [shipDraft, mountSelection]);
+
+    const compatibleWeapons = useMemo(() => {
+        if (!selectedMount) return [];
+        return weaponBuilds.filter((item) => {
+            const w = normalizeWeaponJSON(item.weaponJson);
+            if (!w) return false;
+            return isWeaponSizeCompatible(selectedMount.size, w.weapon.size);
+        });
+    }, [selectedMount, weaponBuilds]);
+
+    const updateShipDraft = useCallback((updater: (draft: TokenJSON) => void) => {
+        setShipDraft((prev) => {
+            if (!prev) return prev;
+            const next = clone(prev);
+            updater(next);
+            setShipRawJson(JSON.stringify(next, null, 2));
+            return next;
+        });
+    }, []);
+
+    const updateWeaponDraft = useCallback((updater: (draft: WeaponJSON) => void) => {
+        setWeaponDraft((prev) => {
+            if (!prev) return prev;
+            const next = clone(prev);
+            updater(next);
+            setWeaponRawJson(JSON.stringify(next, null, 2));
+            return next;
+        });
+    }, []);
+
+    const validateShipRaw = useCallback(() => {
+        try {
+            const parsed = JSON.parse(shipRawJson);
+            const result = TokenJSONSchema.safeParse(parsed);
+            if (!result.success) {
+                notify.error(result.error.issues[0]?.message ?? "舰船 JSON 校验失败");
+                return;
+            }
+            setShipDraft(result.data);
+            setShipRawJson(JSON.stringify(result.data, null, 2));
+            notify.success("舰船 JSON 通过 Zod 校验");
+        } catch {
+            notify.error("舰船 JSON 解析失败");
+        }
+    }, [shipRawJson]);
+
+    const validateWeaponRaw = useCallback(() => {
+        try {
+            const parsed = JSON.parse(weaponRawJson);
+            const result = WeaponJSONSchema.safeParse(parsed);
+            if (!result.success) {
+                notify.error(result.error.issues[0]?.message ?? "武器 JSON 校验失败");
+                return;
+            }
+            setWeaponDraft(result.data);
+            setWeaponRawJson(JSON.stringify(result.data, null, 2));
+            notify.success("武器 JSON 通过 Zod 校验");
+        } catch {
+            notify.error("武器 JSON 解析失败");
+        }
+    }, [weaponRawJson]);
+
+    const saveShip = useCallback(async () => {
+        if (!shipDraft || !selectedShipBuildId) return;
+        const valid = TokenJSONSchema.safeParse(shipDraft);
+        if (!valid.success) {
+            notify.error(valid.error.issues[0]?.message ?? "舰船数据不合法");
+            return;
+        }
+
+        try {
+            await networkManager.send("token:update", {
+                tokenId: selectedShipBuildId,
+                updates: { shipJson: valid.data },
+            });
+            notify.success("舰船已保存");
+            await reloadData();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "舰船保存失败");
+        }
+    }, [networkManager, reloadData, selectedShipBuildId, shipDraft]);
+
+    const saveWeapon = useCallback(async () => {
+        if (!weaponDraft || !selectedWeaponBuildId) return;
+        const valid = WeaponJSONSchema.safeParse(weaponDraft);
+        if (!valid.success) {
+            notify.error(valid.error.issues[0]?.message ?? "武器数据不合法");
+            return;
+        }
+
+        try {
+            await networkManager.send("weapon:update", {
+                weaponId: selectedWeaponBuildId,
+                updates: { weaponJson: valid.data },
+            });
+            notify.success("武器已保存");
+            await reloadData();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "武器保存失败");
+        }
+    }, [networkManager, reloadData, selectedWeaponBuildId, weaponDraft]);
+
+    const copyShipPreset = useCallback(async (presetId: string) => {
+        try {
+            const res = await networkManager.send("token:copy_preset", { presetId });
+            notify.success("已从预设复制舰船");
+            await reloadData();
+            if (res?.ship?.id) {
+                setSelectedShipBuildId(res.ship.id);
+            }
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "复制预设失败");
+        }
+    }, [networkManager, reloadData]);
+
+    const copyWeaponPreset = useCallback(async (presetId: string) => {
+        try {
+            const res = await networkManager.send("weapon:copy_preset", { presetId });
+            notify.success("已从预设复制武器");
+            await reloadData();
+            if (res?.weapon?.id) {
+                setSelectedWeaponBuildId(res.weapon.id);
+            }
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "复制预设失败");
+        }
+    }, [networkManager, reloadData]);
+
+    const setTextureAssetForShip = useCallback(async (assetId: string) => {
+        if (!shipDraft) return;
+
+        updateShipDraft((draft) => {
+            draft.token.texture = {
+                ...draft.token.texture,
+                assetId,
+            };
+        });
+
+        try {
+            const results = await assetSocket.batchGet([assetId], true);
+            const first = results[0];
+            if (first?.data && first?.info?.mimeType) {
+                setTexturePreviewDataUrl(toDataUrl(first.info.mimeType, first.data));
+            }
+        } catch {
+            setTexturePreviewDataUrl(null);
+        }
+    }, [assetSocket, shipDraft, updateShipDraft]);
+
+    const uploadTexture = useCallback(async (assetType: AssetType, file: File, useColorKey: boolean) => {
+        try {
+            const uploadFile = useColorKey ? await applyColorKey(file, keyColor, keyTolerance) : file;
+            const assetId = await assetSocket.upload(assetType, uploadFile);
+            notify.success("贴图上传成功");
+            if (assetType === "ship_texture") {
+                await setTextureAssetForShip(assetId);
+            }
+            if (assetType === "weapon_texture") {
+                updateWeaponDraft((draft) => {
+                    draft.weapon.texture = {
+                        ...draft.weapon.texture,
+                        assetId,
+                    };
+                });
+            }
+            await reloadAssets();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "贴图上传失败");
+        }
+    }, [assetSocket, keyColor, keyTolerance, reloadAssets, setTextureAssetForShip, updateWeaponDraft]);
+
+    return (
+        <Dialog.Root open={open} onOpenChange={onOpenChange}>
+            <Dialog.Content maxWidth="1200px">
+                <Dialog.Title>
+                    <Flex align="center" gap="2">
+                        <Wrench size={16} /> 舰船 / 武器工坊
+                        <Badge color="blue" variant="soft">权威 Zod Schema 校验</Badge>
+                    </Flex>
+                </Dialog.Title>
+                <Dialog.Description size="2">
+                    外部可进入的装备工坊。支持友好表单 + 原始 JSON + 贴图中心对齐 + 挂点武器挂载。
+                </Dialog.Description>
+
+                {loading ? (
+                    <Text color="gray">加载中...</Text>
+                ) : (
+                    <Tabs.Root value={activeTopTab} onValueChange={(v) => setActiveTopTab(v as "ship" | "weapon")}>
+                        <Tabs.List>
+                            <Tabs.Trigger value="ship">舰船模块</Tabs.Trigger>
+                            <Tabs.Trigger value="weapon">武器模块</Tabs.Trigger>
+                        </Tabs.List>
+
+                        <Box mt="3">
+                            {activeTopTab === "ship" ? (
+                                <Grid columns="2" gap="3">
+                                    <Flex direction="column" gap="3">
+                                        <Card>
+                                            <Flex justify="between" align="center" mb="2">
+                                                <Text size="2" weight="bold">舰船选择</Text>
+                                                <Select.Root value={selectedShipBuildId ?? ""} onValueChange={setSelectedShipBuildId}>
+                                                    <Select.Trigger style={{ width: 240 }} />
+                                                    <Select.Content>
+                                                        {shipBuilds.map((item) => {
+                                                            const parsed = normalizeTokenJSON(item.shipJson);
+                                                            return (
+                                                                <Select.Item key={item.id} value={item.id}>
+                                                                    {parsed?.metadata?.name ?? idLabel(item.id)}
+                                                                </Select.Item>
+                                                            );
+                                                        })}
+                                                    </Select.Content>
+                                                </Select.Root>
+                                            </Flex>
+
+                                            <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={texturePreviewDataUrl} />
+                                        </Card>
+
+                                        <Card>
+                                            <Flex justify="between" align="center" mb="2">
+                                                <Text size="2" weight="bold">贴图与中心对齐</Text>
+                                                <Button variant="soft" onClick={() => textureInputRef.current?.click()}><Upload size={14} /> 上传</Button>
+                                            </Flex>
+
+                                            <Flex direction="column" gap="2">
+                                                <Select.Root
+                                                    value={shipDraft?.token.texture?.assetId ?? ""}
+                                                    onValueChange={(id) => {
+                                                        if (!id) return;
+                                                        void setTextureAssetForShip(id);
+                                                    }}
+                                                >
+                                                    <Select.Trigger placeholder="选择已有舰船贴图" />
+                                                    <Select.Content>
+                                                        {shipTextureAssets.map((asset) => (
+                                                            <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
+                                                        ))}
+                                                    </Select.Content>
+                                                </Select.Root>
+
+                                                <Grid columns="3" gap="2">
+                                                    <Box>
+                                                        <Text size="1" color="gray">中心 X 偏移</Text>
+                                                        <input
+                                                            type="range"
+                                                            min={-200}
+                                                            max={200}
+                                                            value={shipDraft?.token.texture?.offsetX ?? 0}
+                                                            onChange={(e) => updateShipDraft((d) => {
+                                                                d.token.texture = {
+                                                                    ...d.token.texture,
+                                                                    offsetX: Number(e.target.value),
+                                                                };
+                                                            })}
+                                                        />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">中心 Y 偏移</Text>
+                                                        <input
+                                                            type="range"
+                                                            min={-200}
+                                                            max={200}
+                                                            value={shipDraft?.token.texture?.offsetY ?? 0}
+                                                            onChange={(e) => updateShipDraft((d) => {
+                                                                d.token.texture = {
+                                                                    ...d.token.texture,
+                                                                    offsetY: Number(e.target.value),
+                                                                };
+                                                            })}
+                                                        />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">缩放</Text>
+                                                        <input
+                                                            type="range"
+                                                            min={0.2}
+                                                            max={4}
+                                                            step={0.01}
+                                                            value={shipDraft?.token.texture?.scale ?? 1}
+                                                            onChange={(e) => updateShipDraft((d) => {
+                                                                d.token.texture = {
+                                                                    ...d.token.texture,
+                                                                    scale: Number(e.target.value),
+                                                                };
+                                                            })}
+                                                        />
+                                                    </Box>
+                                                </Grid>
+
+                                                <Flex align="center" gap="2" wrap="wrap">
+                                                    <Text size="1" color="gray">抠图取色</Text>
+                                                    <input type="color" value={keyColor} onChange={(e) => setKeyColor(e.target.value)} />
+                                                    <input type="range" min={0} max={80} value={keyTolerance} onChange={(e) => setKeyTolerance(Number(e.target.value))} />
+                                                    <Text size="1">容差: {keyTolerance}</Text>
+                                                </Flex>
+                                            </Flex>
+
+                                            <input
+                                                ref={textureInputRef}
+                                                type="file"
+                                                accept="image/png"
+                                                style={{ display: "none" }}
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    void uploadTexture("ship_texture", file, true);
+                                                    e.currentTarget.value = "";
+                                                }}
+                                            />
+                                        </Card>
+
+                                        <Card>
+                                            <Text size="2" weight="bold" mb="2">挂点武器挂载</Text>
+                                            {shipDraft?.token.mounts?.length ? (
+                                                <Flex direction="column" gap="2">
+                                                    <Select.Root value={mountSelection} onValueChange={setMountSelection}>
+                                                        <Select.Trigger />
+                                                        <Select.Content>
+                                                            {shipDraft.token.mounts.map((mount) => (
+                                                                <Select.Item key={mount.id} value={mount.id}>{mount.displayName ?? mount.id} ({mount.size})</Select.Item>
+                                                            ))}
+                                                        </Select.Content>
+                                                    </Select.Root>
+
+                                                    <Select.Root
+                                                        value={typeof selectedMount?.weapon === "string" ? selectedMount.weapon : (selectedMount?.weapon?.$id ?? "")}
+                                                        onValueChange={(weaponId) => {
+                                                            if (!selectedMount || !shipDraft) return;
+                                                            if (!weaponId) return;
+                                                            const matched = weaponBuilds.find((item) => item.id === weaponId);
+                                                            const parsed = normalizeWeaponJSON(matched?.weaponJson);
+                                                            if (!parsed) return;
+                                                            if (!isWeaponSizeCompatible(selectedMount.size, parsed.weapon.size)) {
+                                                                notify.error("武器尺寸与挂点不兼容");
+                                                                return;
+                                                            }
+                                                            void (async () => {
+                                                                try {
+                                                                    const tokenId = selectedShipBuildId ?? shipDraft?.$id;
+                                                                    if (!tokenId) {
+                                                                        notify.error("未找到舰船ID");
+                                                                        return;
+                                                                    }
+                                                                    await networkManager.send("token:mount", {
+                                                                        tokenId,
+                                                                        mountId: selectedMount.id,
+                                                                        weaponId,
+                                                                    });
+                                                                    notify.success("挂载成功");
+                                                                    await reloadData();
+                                                                } catch (error) {
+                                                                    notify.error(error instanceof Error ? error.message : "挂载失败");
+                                                                }
+                                                            })();
+                                                        }}
+                                                    >
+                                                        <Select.Trigger placeholder="选择可兼容武器" />
+                                                        <Select.Content>
+                                                            {compatibleWeapons.map((item) => {
+                                                                const parsed = normalizeWeaponJSON(item.weaponJson);
+                                                                if (!parsed) return null;
+                                                                return <Select.Item key={item.id} value={item.id}>{parsed.metadata?.name ?? item.id} ({parsed.weapon.size})</Select.Item>;
+                                                            })}
+                                                        </Select.Content>
+                                                    </Select.Root>
+
+                                                    <Button variant="soft" color="gray" onClick={() => {
+                                                        if (!selectedMount) return;
+                                                        void (async () => {
+                                                            try {
+                                                                const tokenId = selectedShipBuildId ?? shipDraft?.$id;
+                                                                if (!tokenId) {
+                                                                    notify.error("未找到舰船ID");
+                                                                    return;
+                                                                }
+                                                                await networkManager.send("token:mount", {
+                                                                    tokenId,
+                                                                    mountId: selectedMount.id,
+                                                                    weaponId: null,
+                                                                });
+                                                                notify.success("已卸载挂点武器");
+                                                                await reloadData();
+                                                            } catch (error) {
+                                                                notify.error(error instanceof Error ? error.message : "卸载失败");
+                                                            }
+                                                        })();
+                                                    }}>卸载当前挂点</Button>
+                                                </Flex>
+                                            ) : (
+                                                <Text color="gray">当前舰船没有挂点</Text>
+                                            )}
+                                        </Card>
+                                    </Flex>
+
+                                    <Flex direction="column" gap="3">
+                                        <Card>
+                                            <Flex justify="between" align="center" mb="2">
+                                                <Text size="2" weight="bold">编辑器</Text>
+                                                <Tabs.Root value={editorTab} onValueChange={(v) => setEditorTab(v as "form" | "json")}>
+                                                    <Tabs.List>
+                                                        <Tabs.Trigger value="form">表单</Tabs.Trigger>
+                                                        <Tabs.Trigger value="json">JSON</Tabs.Trigger>
+                                                    </Tabs.List>
+                                                </Tabs.Root>
+                                            </Flex>
+
+                                            {editorTab === "form" && shipDraft && (
+                                                <Flex direction="column" gap="3">
+                                                    <Grid columns="2" gap="2">
+                                                        <TextField.Root
+                                                            value={shipDraft.metadata?.name ?? ""}
+                                                            onChange={(e) => updateShipDraft((d) => {
+                                                                d.metadata = { ...d.metadata, name: e.target.value };
+                                                            })}
+                                                            placeholder="舰船名称"
+                                                        />
+                                                        <TextField.Root
+                                                            value={shipDraft.metadata?.description ?? ""}
+                                                            onChange={(e) => updateShipDraft((d) => {
+                                                                d.metadata = { ...d.metadata, description: e.target.value };
+                                                            })}
+                                                            placeholder="描述"
+                                                        />
+                                                    </Grid>
+
+                                                    <Grid columns="4" gap="2">
+                                                        <Select.Root value={shipDraft.token.size} onValueChange={(v) => updateShipDraft((d) => { d.token.size = v as any; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                        <Select.Root value={shipDraft.token.class} onValueChange={(v) => updateShipDraft((d) => { d.token.class = v as any; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                        <TextField.Root type="number" value={String(shipDraft.token.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.token.width = Number(e.target.value) || 40; })} placeholder="宽度" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.token.length = Number(e.target.value) || 60; })} placeholder="长度" />
+                                                    </Grid>
+
+                                                    <Grid columns="4" gap="2">
+                                                        <TextField.Root type="number" value={String(shipDraft.token.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.token.maxHitPoints = Number(e.target.value) || 0; })} placeholder="最大船体" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.armorMaxPerQuadrant)} onChange={(e) => updateShipDraft((d) => { d.token.armorMaxPerQuadrant = Number(e.target.value) || 0; })} placeholder="每象限护甲" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.token.fluxCapacity = Number(e.target.value) || 0; })} placeholder="辐能容量" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.token.fluxDissipation = Number(e.target.value) || 0; })} placeholder="辐能散耗" />
+                                                    </Grid>
+
+                                                    <Grid columns="3" gap="2">
+                                                        <TextField.Root type="number" value={String(shipDraft.token.maxSpeed)} onChange={(e) => updateShipDraft((d) => { d.token.maxSpeed = Number(e.target.value) || 0; })} placeholder="最大速度" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.maxTurnRate)} onChange={(e) => updateShipDraft((d) => { d.token.maxTurnRate = Number(e.target.value) || 0; })} placeholder="转向速率" />
+                                                        <TextField.Root type="number" value={String(shipDraft.token.rangeModifier)} onChange={(e) => updateShipDraft((d) => { d.token.rangeModifier = Number(e.target.value) || 1; })} placeholder="射程系数" />
+                                                    </Grid>
+
+                                                    <Separator size="4" />
+                                                    <Text size="2" weight="bold"><ShieldCheck size={14} /> 护盾</Text>
+                                                    <Flex gap="2" align="center" wrap="wrap">
+                                                        <Button
+                                                            variant="soft"
+                                                            onClick={() => updateShipDraft((d) => {
+                                                                d.token.shield = d.token.shield
+                                                                    ? undefined
+                                                                    : { type: ShieldType.OMNI, arc: 360, direction: 0, radius: 50, efficiency: 1, upkeep: 0 };
+                                                            })}
+                                                        >
+                                                            {shipDraft.token.shield ? "禁用护盾" : "启用护盾"}
+                                                        </Button>
+                                                        {!shipDraft.token.shield && <Badge color="gray">NONE</Badge>}
+                                                    </Flex>
+
+                                                    {shipDraft.token.shield && (
+                                                        <Grid columns="3" gap="2">
+                                                            <Select.Root value={shipDraft.token.shield.type} onValueChange={(v) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.type = v as any; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(ShieldType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.arc = Number(e.target.value) || 0; })} placeholder="护盾角度" />
+                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.radius = Number(e.target.value) || 0; })} placeholder="护盾半径" />
+                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.direction ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.direction = Number(e.target.value) || 0; })} placeholder="护盾方向" />
+                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.efficiency = Number(e.target.value) || 1; })} placeholder="效率" />
+                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.upkeep = Number(e.target.value) || 0; })} placeholder="维持" />
+                                                        </Grid>
+                                                    )}
+                                                </Flex>
+                                            )}
+
+                                            {editorTab === "json" && (
+                                                <Flex direction="column" gap="2">
+                                                    <TextArea rows={22} value={shipRawJson} onChange={(e) => setShipRawJson(e.target.value)} />
+                                                    <Flex gap="2" wrap="wrap">
+                                                        <Button variant="soft" onClick={validateShipRaw}><WandSparkles size={14} /> 校验并应用</Button>
+                                                        <Button variant="soft" color="gray" onClick={() => setShipRawJson(JSON.stringify(JSON.parse(shipRawJson), null, 2))}>格式化</Button>
+                                                        <Button variant="soft" color="gray" onClick={() => navigator.clipboard.writeText(shipRawJson)}><Copy size={14} /> 复制</Button>
+                                                    </Flex>
+                                                </Flex>
+                                            )}
+
+                                            <Flex justify="between" align="center" mt="2">
+                                                <Flex align="center" gap="2">
+                                                    <AlertCircle size={14} />
+                                                    <Text size="1" color="gray">原始 JSON 支持复制粘贴，提交前会使用 TokenJSONSchema 进行权威校验。</Text>
+                                                </Flex>
+                                                <Button onClick={() => void saveShip()}><Save size={14} /> 保存舰船</Button>
+                                            </Flex>
+                                        </Card>
+
+                                        <Card>
+                                            <Flex justify="between" align="center" mb="2">
+                                                <Text size="2" weight="bold">从预设创建</Text>
+                                            </Flex>
+                                            <Flex direction="column" gap="2">
+                                                {shipPresets.map((preset) => (
+                                                    <Flex key={preset.$id} justify="between" align="center" className="ship-customization-modal__ship-item">
+                                                        <Box>
+                                                            <Text size="2">{preset.metadata.name}</Text>
+                                                            <Text size="1" color="gray">{preset.token.size} / {preset.token.class}</Text>
+                                                        </Box>
+                                                        <Button size="1" variant="soft" onClick={() => void copyShipPreset(preset.$id)}><Plus size={12} /> 复制</Button>
+                                                    </Flex>
+                                                ))}
+                                            </Flex>
+                                        </Card>
+                                    </Flex>
+                                </Grid>
+                            ) : (
+                                <Grid columns="2" gap="3">
+                                    <Flex direction="column" gap="3">
+                                        <Card>
+                                            <Flex justify="between" align="center" mb="2">
+                                                <Text size="2" weight="bold">武器选择</Text>
+                                                <Select.Root value={selectedWeaponBuildId ?? ""} onValueChange={setSelectedWeaponBuildId}>
+                                                    <Select.Trigger style={{ width: 260 }} />
+                                                    <Select.Content>
+                                                        {weaponBuilds.map((item) => {
+                                                            const parsed = normalizeWeaponJSON(item.weaponJson);
+                                                            return <Select.Item key={item.id} value={item.id}>{parsed?.metadata?.name ?? idLabel(item.id)}</Select.Item>;
+                                                        })}
+                                                    </Select.Content>
+                                                </Select.Root>
+                                            </Flex>
+
+                                            {weaponDraft && (
+                                                <Flex direction="column" gap="2">
+                                                    <TextField.Root value={weaponDraft.metadata?.name ?? ""} onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...d.metadata, name: e.target.value }; })} placeholder="武器名称" />
+                                                    <TextField.Root value={weaponDraft.metadata?.description ?? ""} onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), name: d.metadata?.name ?? d.$id, description: e.target.value }; })} placeholder="武器描述" />
+                                                    <Grid columns="3" gap="2">
+                                                        <Select.Root value={weaponDraft.weapon.size} onValueChange={(v) => updateWeaponDraft((d) => { d.weapon.size = v as any; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                        <Select.Root value={weaponDraft.weapon.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.weapon.damageType = v as any; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.damage)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.damage = Number(e.target.value) || 0; })} placeholder="伤害" />
+                                                    </Grid>
+                                                    <Grid columns="4" gap="2">
+                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.range)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.range = Number(e.target.value) || 0; })} placeholder="射程" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.minRange = Number(e.target.value) || 0; })} placeholder="最小射程" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.cooldown = Number(e.target.value) || 0; })} placeholder="冷却" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.fluxCostPerShot = Number(e.target.value) || 0; })} placeholder="辐耗" />
+                                                    </Grid>
+
+                                                    <Text size="1" color="gray">标签（逗号分隔）</Text>
+                                                    <TextField.Root
+                                                        value={(weaponDraft.weapon.tags ?? []).join(",")}
+                                                        onChange={(e) => {
+                                                            const values = e.target.value
+                                                                .split(",")
+                                                                .map((x) => x.trim())
+                                                                .filter((x): x is keyof typeof WeaponTag => Boolean(x) && Object.values(WeaponTag).includes(x as any));
+                                                            updateWeaponDraft((d) => {
+                                                                d.weapon.tags = values as any;
+                                                            });
+                                                        }}
+                                                        placeholder="ANTI_SHIP,ENERGY"
+                                                    />
+                                                </Flex>
+                                            )}
+                                        </Card>
+
+                                        <Card>
+                                            <Text size="2" weight="bold" mb="2">武器贴图</Text>
+                                            <Flex direction="column" gap="2">
+                                                <Select.Root value={weaponDraft?.weapon.texture?.assetId ?? ""} onValueChange={(id) => updateWeaponDraft((d) => {
+                                                    d.weapon.texture = { ...d.weapon.texture, assetId: id };
+                                                })}>
+                                                    <Select.Trigger placeholder="选择已有武器贴图" />
+                                                    <Select.Content>
+                                                        {weaponTextureAssets.map((asset) => <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>)}
+                                                    </Select.Content>
+                                                </Select.Root>
+                                                <Button variant="soft" onClick={() => {
+                                                    const input = document.createElement("input");
+                                                    input.type = "file";
+                                                    input.accept = "image/png";
+                                                    input.onchange = () => {
+                                                        const file = input.files?.[0];
+                                                        if (!file) return;
+                                                        void uploadTexture("weapon_texture", file, true);
+                                                    };
+                                                    input.click();
+                                                }}><Upload size={14} /> 上传并抠图</Button>
+                                            </Flex>
+                                        </Card>
+                                    </Flex>
+
+                                    <Flex direction="column" gap="3">
+                                        <Card>
+                                            <Text size="2" weight="bold" mb="2">武器 JSON（支持粘贴）</Text>
+                                            <TextArea rows={26} value={weaponRawJson} onChange={(e) => setWeaponRawJson(e.target.value)} />
+                                            <Flex gap="2" mt="2" wrap="wrap">
+                                                <Button variant="soft" onClick={validateWeaponRaw}><WandSparkles size={14} /> 校验并应用</Button>
+                                                <Button variant="soft" color="gray" onClick={() => setWeaponRawJson(JSON.stringify(JSON.parse(weaponRawJson), null, 2))}>格式化</Button>
+                                                <Button variant="soft" color="gray" onClick={() => navigator.clipboard.writeText(weaponRawJson)}><Copy size={14} /> 复制</Button>
+                                            </Flex>
+                                            <Flex justify="end" mt="3">
+                                                <Button onClick={() => void saveWeapon()}><Save size={14} /> 保存武器</Button>
+                                            </Flex>
+                                        </Card>
+
+                                        <Card>
+                                            <Text size="2" weight="bold" mb="2">从预设创建武器</Text>
+                                            <Flex direction="column" gap="2">
+                                                {weaponPresets.map((preset) => (
+                                                    <Flex key={preset.$id} justify="between" align="center" className="ship-customization-modal__ship-item">
+                                                        <Box>
+                                                            <Text size="2">{preset.metadata?.name ?? preset.$id}</Text>
+                                                            <Text size="1" color="gray">{preset.weapon.size} / {preset.weapon.damageType}</Text>
+                                                        </Box>
+                                                        <Button size="1" variant="soft" onClick={() => void copyWeaponPreset(preset.$id)}><Plus size={12} /> 复制</Button>
+                                                    </Flex>
+                                                ))}
+                                            </Flex>
+                                        </Card>
+                                    </Flex>
+                                </Grid>
+                            )}
+                        </Box>
+                    </Tabs.Root>
+                )}
+
+                <Flex justify="between" mt="4">
+                    <Text size="1" color="gray">提示：挂点支持可视化挂载，也支持直接编辑完整 JSON（含挂点与内嵌武器）。</Text>
+                    <Button variant="soft" color="gray" onClick={() => onOpenChange(false)}>关闭</Button>
+                </Flex>
+            </Dialog.Content>
+        </Dialog.Root>
+    );
+};
+
+export default LoadoutCustomizerDialog;

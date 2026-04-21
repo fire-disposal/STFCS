@@ -1,11 +1,9 @@
 import { create } from "zustand";
-import { GamePhase, Faction, PlayerRole } from "@vt/data";
+import { GamePhase, Faction, PlayerRole, MovementPhase } from "@vt/data";
 import type { RoomPlayerState, ShipRuntime } from "@vt/data";
-import type { MovePhaseUIValue } from "@/types";
-import { MovePhaseUI } from "@/types";
 
-export { MovePhaseUI };
-export type MovementPhaseValue = MovePhaseUIValue;
+// 使用 @vt/data 中的 MovementPhase，undefined 表示没有移动阶段
+export type MovementPhaseValue = MovementPhase | undefined;
 
 export interface LocalChatMessage {
 	id: string;
@@ -99,7 +97,7 @@ const initialState: GameState = {
 	selectedWeaponId: null,
 	camera: { x: 0, y: 0, zoom: 1, viewRotation: 0 },
 	otherPlayersCameras: new Map(),
-	movementPhase: MovePhaseUI.NONE,
+	movementPhase: undefined,
 	mapWidth: 2000,
 	mapHeight: 2000,
 	showGrid: true,

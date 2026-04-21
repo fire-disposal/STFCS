@@ -8,8 +8,7 @@
  * - 各渲染选项类型
  */
 
-import type { ShipRuntime } from "@vt/data";
-import type { MovePhaseUIValue } from "@/types";
+import type { ShipRuntime, MovementPhase } from "@vt/data";
 
 export type ShipViewModel = ShipRuntime & {
 	id: string;
@@ -23,7 +22,7 @@ export type ShipViewModel = ShipRuntime & {
 	shieldArc?: number;
 	maxSpeed?: number;
 	maxTurnRate?: number;
-	movePhase?: MovePhaseUIValue;
+	movePhase?: MovementPhase | undefined;
 	movementUsed?: {
 		phaseAForward: number;
 		phaseAStrafe: number;
@@ -65,7 +64,7 @@ export interface FluxIndicatorOptions {
 export type MoveMode = "forward" | "strafe";
 
 export interface MovementPreviewState {
-	phase: MovePhaseUIValue;
+	phase: MovementPhase | undefined;
 	mode: MoveMode;
 	value: number;
 	turn: number;

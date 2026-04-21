@@ -20,4 +20,3 @@ export {
 	type UserRole,
 	type PermissionContext,
 } from "./permission.js";
-export { setupSocketIO } from "./handler.js";

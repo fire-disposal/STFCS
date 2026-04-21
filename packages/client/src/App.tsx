@@ -156,6 +156,7 @@ const App: React.FC = () => {
 
 			{appState === "lobby" && (
 				<LobbyPage
+					networkManager={networkManager}
 					playerName={userName}
 					profile={userProfile}
 					currentShortId={null}

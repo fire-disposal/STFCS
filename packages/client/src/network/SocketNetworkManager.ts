@@ -9,7 +9,7 @@
  */
 
 import { io, Socket } from "socket.io-client";
-import type { ShipJSON, SocketIOActionEvent, WeaponJSON } from "@vt/data";
+import type { ShipJSON, SocketIOActionEvent, WeaponJSON, RoomInfo } from "@vt/data";
 
 const logger = {
 	info: (...args: any[]) => console.log("[network]", ...args),
@@ -17,18 +17,6 @@ const logger = {
 	error: (...args: any[]) => console.error("[network]", ...args),
 };
 
-export interface RoomInfo {
-	roomId: string;
-	name: string;
-	clients: number;
-	maxClients: number;
-	metadata: {
-		phase: string;
-		turnCount?: number;
-		ownerShortId?: number;
-		isPrivate?: boolean;
-	};
-}
 
 export interface AuthResult {
 	success: boolean;
@@ -62,11 +50,14 @@ export interface PlayerLoadoutResult {
 }
 
 interface SocketGameState {
-	currentPhase: string;
-	turnCount: number;
-	activeFaction: string;
-	ships: Map<string, any>;
-	players: Map<string, any>;
+	phase?: string;
+	currentPhase?: string;
+	turn?: number;
+	turnCount?: number;
+	activeFaction?: string;
+	tokens?: Record<string, any>;
+	ships?: Record<string, any>;
+	players?: Record<string, any>;
 }
 
 export class SocketNetworkManager {
@@ -175,8 +166,20 @@ export class SocketNetworkManager {
 		}
 
 		try {
-			const data = await this.sendRequest<{ loadout: { ships: ShipJSON[]; weapons: WeaponJSON[] } }>("profile:loadout:get", {});
-			return { success: true, loadout: data.loadout };
+			const [tokenData, weaponData] = await Promise.all([
+				this.sendRequest<{ ships: Array<{ shipJson?: ShipJSON } | ShipJSON> }>("token:list", {}),
+				this.sendRequest<{ weapons: Array<{ weaponJson?: WeaponJSON } | WeaponJSON> }>("weapon:list", {}),
+			]);
+
+			const ships = (tokenData.ships || [])
+				.map((item) => ((item as any).shipJson ?? item) as ShipJSON)
+				.filter(Boolean);
+
+			const weapons = (weaponData.weapons || [])
+				.map((item) => ((item as any).weaponJson ?? item) as WeaponJSON)
+				.filter(Boolean);
+
+			return { success: true, loadout: { ships, weapons } };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Loadout fetch failed" };
 		}
@@ -316,6 +319,7 @@ export class SocketNetworkManager {
 		this.socket.on("sync:full", (state: SocketGameState) => {
 			this.gameState = state;
 			this.emit("sync:full", state);
+			this.emit("state:full", state);
 		});
 
 		this.socket.on("sync:delta", (data: { timestamp: number; changes: any[] }) => {
@@ -323,6 +327,7 @@ export class SocketNetworkManager {
 				this.applyDelta(data.changes);
 			}
 			this.emit("sync:delta", data);
+			this.emit("state:delta", data);
 		});
 
 		this.socket.on("player:joined", (data: { playerId: string; playerName: string; totalPlayers: number }) => {
@@ -372,21 +377,66 @@ export class SocketNetworkManager {
 	}
 
 	private applyDelta(events: any[]): void {
-		for (const event of events) {
-			switch (event.type) {
-				case "ship_update":
-					if (this.gameState?.ships && event.shipId && event.data) {
-						this.gameState.ships.set(event.shipId, event.data);
+		for (const change of events) {
+			switch (change.type) {
+				case "token_add":
+					if (this.gameState && change.id) {
+						this.gameState.tokens = this.gameState.tokens ?? {};
+						this.gameState.tokens[change.id] = change.value;
+					}
+					break;
+				case "token_update":
+					if (this.gameState && change.id) {
+						this.gameState.tokens = this.gameState.tokens ?? {};
+						if (change.field === "runtime" && this.gameState.tokens[change.id]?.tokenJson) {
+							this.gameState.tokens[change.id] = {
+								...this.gameState.tokens[change.id],
+								tokenJson: {
+									...this.gameState.tokens[change.id].tokenJson,
+									runtime: {
+										...this.gameState.tokens[change.id].tokenJson.runtime,
+										...change.value,
+									},
+								},
+							};
+						} else {
+							this.gameState.tokens[change.id] = change.value ?? this.gameState.tokens[change.id];
+						}
+					}
+					break;
+				case "token_remove":
+				case "token_destroyed":
+					if (this.gameState?.tokens && change.id) {
+						delete this.gameState.tokens[change.id];
+					}
+					break;
+				case "player_update":
+				case "player_join":
+					if (this.gameState && change.id) {
+						this.gameState.players = this.gameState.players ?? {};
+						this.gameState.players[change.id] = change.value;
+					}
+					break;
+				case "player_leave":
+					if (this.gameState?.players && change.id) {
+						delete this.gameState.players[change.id];
 					}
 					break;
 				case "phase_change":
-					if (this.gameState && event.phase) {
-						this.gameState.currentPhase = event.phase;
+					if (this.gameState && change.value) {
+						this.gameState.phase = change.value;
+						this.gameState.currentPhase = change.value;
 					}
 					break;
 				case "turn_change":
-					if (this.gameState && event.turn) {
-						this.gameState.turnCount = event.turn;
+					if (this.gameState && typeof change.value === "number") {
+						this.gameState.turn = change.value;
+						this.gameState.turnCount = change.value;
+					}
+					break;
+				case "faction_turn":
+					if (this.gameState && change.value) {
+						this.gameState.activeFaction = change.value;
 					}
 					break;
 			}

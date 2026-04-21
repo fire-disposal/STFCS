@@ -17,6 +17,16 @@ export interface SocketRoomState {
 	players: Map<string, any>;
 }
 
+function toMap(value: unknown): Map<string, any> {
+	if (value instanceof Map) {
+		return value;
+	}
+	if (value && typeof value === "object") {
+		return new Map(Object.entries(value as Record<string, any>));
+	}
+	return new Map();
+}
+
 export interface SocketRoom {
 	state: SocketRoomState;
 	sessionId: string | null;
@@ -41,35 +51,79 @@ export function useSocketRoom(
 				playerId: networkManager.getPlayerId(),
 				playerName: networkManager.getPlayerName(),
 				isConnected: true,
-				currentPhase: state.currentPhase || "DEPLOYMENT",
-				turnCount: state.turnCount || 1,
+				currentPhase: state.phase || state.currentPhase || "DEPLOYMENT",
+				turnCount: state.turn || state.turnCount || 1,
 				activeFaction: state.activeFaction || "PLAYER",
-				ships: new Map(Object.entries(state.ships || {})),
-				players: new Map(Object.entries(state.players || {})),
+				ships: toMap(state.tokens ?? state.ships),
+				players: toMap(state.players),
 			};
 			stateRef.current = newState;
 			setRoomState(newState);
 		};
 
-		const handleStateDelta = (data: { events: any[] }) => {
+		const handleStateDelta = (data: { changes: any[] }) => {
 			if (!stateRef.current) return;
 			const newState = { ...stateRef.current };
-			for (const event of data.events) {
-				switch (event.type) {
-					case "ship_update":
-						if (event.shipId && event.data) {
+			for (const change of data.changes ?? []) {
+				switch (change.type) {
+					case "token_add":
+					case "token_update":
+						if (change.id) {
 							newState.ships = new Map(newState.ships);
-							newState.ships.set(event.shipId, event.data);
+							if (change.field === "runtime") {
+								const current = newState.ships.get(change.id);
+								if (current?.tokenJson) {
+									newState.ships.set(change.id, {
+										...current,
+										tokenJson: {
+											...current.tokenJson,
+											runtime: {
+												...current.tokenJson.runtime,
+												...change.value,
+											},
+										},
+									});
+								} else if (change.value) {
+									newState.ships.set(change.id, change.value);
+								}
+							} else if (change.value) {
+								newState.ships.set(change.id, change.value);
+							}
+						}
+						break;
+					case "token_remove":
+					case "token_destroyed":
+						if (change.id) {
+							newState.ships = new Map(newState.ships);
+							newState.ships.delete(change.id);
 						}
 						break;
 					case "phase_change":
-						if (event.phase) {
-							newState.currentPhase = event.phase;
+						if (change.value) {
+							newState.currentPhase = change.value;
 						}
 						break;
 					case "turn_change":
-						if (event.turn) {
-							newState.turnCount = event.turn;
+						if (typeof change.value === "number") {
+							newState.turnCount = change.value;
+						}
+						break;
+					case "faction_turn":
+						if (change.value) {
+							newState.activeFaction = change.value;
+						}
+						break;
+					case "player_update":
+					case "player_join":
+						if (change.id) {
+							newState.players = new Map(newState.players);
+							newState.players.set(change.id, change.value);
+						}
+						break;
+					case "player_leave":
+						if (change.id) {
+							newState.players = new Map(newState.players);
+							newState.players.delete(change.id);
 						}
 						break;
 				}
@@ -84,8 +138,8 @@ export function useSocketRoom(
 			if (onLeaveRoom) onLeaveRoom();
 		};
 
-		networkManager.on("state:full", handleStateFull);
-		networkManager.on("state:delta", handleStateDelta);
+		networkManager.on("sync:full", handleStateFull);
+		networkManager.on("sync:delta", handleStateDelta);
 		networkManager.on("disconnect", handleDisconnect);
 
 		const existingState = networkManager?.getGameState();
@@ -95,8 +149,8 @@ export function useSocketRoom(
 
 		return () => {
 			if (networkManager) {
-				networkManager.off("state:full", handleStateFull);
-				networkManager.off("state:delta", handleStateDelta);
+				networkManager.off("sync:full", handleStateFull);
+				networkManager.off("sync:delta", handleStateDelta);
 				networkManager.off("disconnect", handleDisconnect);
 			}
 		};
@@ -141,8 +195,22 @@ export function useShips(room: SocketRoom | null): any[] {
 
 		const updateShips = () => {
 			const shipArray: any[] = [];
-			room.state.ships.forEach((ship: any) => {
-				shipArray.push(ship);
+			room.state.ships.forEach((token: any, tokenId: string) => {
+				if (token?.tokenJson?.runtime && token?.tokenJson?.token) {
+					shipArray.push({
+						id: token.id ?? tokenId,
+						name: token.tokenJson.metadata?.name,
+						...token.tokenJson.runtime,
+						width: token.tokenJson.token.width,
+						length: token.tokenJson.token.length,
+						hullMax: token.tokenJson.token.maxHitPoints,
+						fluxCapacity: token.tokenJson.token.fluxCapacity,
+						maxSpeed: token.tokenJson.token.maxSpeed,
+						maxTurnRate: token.tokenJson.token.maxTurnRate,
+					});
+				} else {
+					shipArray.push(token);
+				}
 			});
 			setShips(shipArray);
 		};

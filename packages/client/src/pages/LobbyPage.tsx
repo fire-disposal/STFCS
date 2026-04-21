@@ -6,8 +6,10 @@
  */
 
 import type { RoomInfo } from "@/network";
+import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Avatar } from "@/ui/shared/Avatar";
+import LoadoutCustomizerDialog from "@/ui/overlays/LoadoutCustomizerDialog";
 import {
 	Badge,
 	Box,
@@ -22,10 +24,11 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, Plus, RefreshCw, Save, Upload, UserCircle } from "lucide-react";
+import { DoorOpen, LogOut, Plus, RefreshCw, Save, Upload, UserCircle, Wrench } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 
 interface LobbyPageProps {
+	networkManager: SocketNetworkManager;
 	playerName: string;
 	profile: { nickname: string; avatar: string };
 	currentShortId: number | null;
@@ -40,6 +43,7 @@ interface LobbyPageProps {
 }
 
 export const LobbyPage: React.FC<LobbyPageProps> = ({
+	networkManager,
 	playerName,
 	profile,
 	currentShortId,
@@ -52,6 +56,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	onLogout,
 	onUpdateProfile,
 }) => {
+	const [showCustomizer, setShowCustomizer] = useState(false);
 	const [showProfile, setShowProfile] = useState(false);
 	const [roomTab, setRoomTab] = useState("all");
 	const [nickname, setNickname] = useState(profile.nickname);
@@ -74,20 +79,20 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	const stats = useMemo(
 		() => ({
 			totalRooms: rooms.length,
-			totalPlayers: rooms.reduce((sum, room) => sum + room.clients, 0),
-			fullRooms: rooms.filter((room) => room.clients >= room.maxClients).length,
+			totalPlayers: rooms.reduce((sum, room) => sum + room.playerCount, 0),
+			fullRooms: rooms.filter((room) => room.playerCount >= room.maxPlayers).length,
 		}),
 		[rooms]
 	);
 
 	const isOwnRoom = useCallback(
-		(room: RoomInfo) => currentShortId !== null && room.metadata.ownerShortId === currentShortId,
+		(room: RoomInfo) => currentShortId !== null && room.ownerId === currentShortId,
 		[currentShortId]
 	);
 
 	const visibleRooms = useMemo(() => {
 		if (roomTab === "joinable") {
-			return rooms.filter((room) => room.clients < room.maxClients);
+			return rooms.filter((room) => room.playerCount < room.maxPlayers);
 		}
 		if (roomTab === "owned") {
 			return rooms.filter((room) => isOwnRoom(room));
@@ -166,6 +171,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							</Box>
 						</Flex>
 						<Flex gap="2" align="center" wrap="wrap">
+							<Button variant="soft" onClick={() => setShowCustomizer(true)} data-magnetic>
+								<Wrench size={16} /> 舰船/武器工坊
+							</Button>
 							<Button variant="soft" onClick={() => setShowProfile(true)} data-magnetic>
 								<UserCircle size={16} /> 玩家档案
 							</Button>
@@ -208,17 +216,17 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 												<Box>
 													<Flex align="center" gap="2" mb="2" wrap="wrap">
 														<Heading size="3">{room.name}</Heading>
-														{room.metadata.isPrivate && <Badge color="amber" variant="soft">私密</Badge>}
+														{/* 后端没有 isPrivate 属性，暂时移除私密标记 */}
 														{isOwnRoom(room) && <Badge color="blue" variant="soft">你的房间</Badge>}
 													</Flex>
 													<Flex gap="2" wrap="wrap">
-														<Badge variant="soft">{room.clients}/{room.maxClients} 玩家</Badge>
-														<Badge variant="soft">阶段：{room.metadata.phase}</Badge>
-														{room.metadata.turnCount !== undefined && room.metadata.turnCount > 0 && (
-															<Badge variant="soft">回合：{room.metadata.turnCount}</Badge>
+														<Badge variant="soft">{room.playerCount}/{room.maxPlayers} 玩家</Badge>
+														<Badge variant="soft">阶段：{room.phase}</Badge>
+														{room.turnCount !== undefined && room.turnCount > 0 && (
+															<Badge variant="soft">回合：{room.turnCount}</Badge>
 														)}
-														{room.metadata.ownerShortId != null ? (
-															<Badge variant="soft">房主：#{room.metadata.ownerShortId}</Badge>
+														{room.ownerId != null ? (
+															<Badge variant="soft">房主：#{room.ownerId}</Badge>
 														) : (
 															<Badge color="amber" variant="soft">等待房主</Badge>
 														)}
@@ -315,6 +323,12 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>
+
+			<LoadoutCustomizerDialog
+				open={showCustomizer}
+				onOpenChange={setShowCustomizer}
+				networkManager={networkManager}
+			/>
 		</div>
 	);
 };

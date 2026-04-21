@@ -8,7 +8,7 @@ import { resolve } from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
-import { setupSocketIO } from "./server/socketio/handler.js";
+import { setupUnifiedSocketIO } from "./server/socketio/unifiedHandler.js";
 
 const logger = createLogger("server");
 
@@ -42,7 +42,7 @@ export class STFCServer {
 				maxHttpBufferSize: 10 * 1024 * 1024, // 10MB
 			});
 
-			setupSocketIO(this.io, this.roomManager);
+			setupUnifiedSocketIO(this.io, this.roomManager);
 
 			this.httpServer.listen(this.config.port, () => {
 				logger.info("STFCS Socket.IO server started", {
@@ -152,4 +152,4 @@ export {
 } from "./persistence/index.js";
 
 export { actionHandler, ActionHandler } from "./server/handlers/index.js";
-export { setupSocketIO, setupUnifiedSocketIO } from "./server/socketio/index.js";
+export { setupUnifiedSocketIO } from "./server/socketio/index.js";

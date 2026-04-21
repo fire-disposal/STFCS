@@ -33,6 +33,7 @@ import {
 	deltaHostChange,
 	deltaModifierAdd,
 	deltaTurnChange,
+	isWeaponSizeCompatible,
 } from "@vt/data";
 import type {
 	WsEventName,
@@ -896,6 +897,14 @@ async function handleTokenMount(socket: Socket, requestId: string, userId: strin
 			const weapon = await playerProfileService.getPlayerWeapon(userId, payload.weaponId);
 			if (!weapon) {
 				sendResponse(socket, requestId, false, undefined, { code: "WEAPON_NOT_FOUND", message: "Weapon not found or not owned by user" });
+				return;
+			}
+			const mount = shipJson.token.mounts[mountIndex];
+			if (!isWeaponSizeCompatible(mount.size, weapon.weaponJson.weapon.size)) {
+				sendResponse(socket, requestId, false, undefined, {
+					code: "WEAPON_SIZE_INCOMPATIBLE",
+					message: `Weapon size ${weapon.weaponJson.weapon.size} incompatible with mount size ${mount.size}`,
+				});
 				return;
 			}
 			shipJson.token.mounts[mountIndex].weapon = weapon.weaponJson;
