@@ -69,16 +69,16 @@ export function useStarfieldRendering(
 		}
 
 		nebulaGraphics.clear();
-		starfield.drawNebula(nebulaGraphics, 0, 0);
+		starfield.drawNebula(nebulaGraphics);
 
 		deepGraphics.clear();
-		starfield.drawDeepStars(deepGraphics, 0, 0);
+		starfield.drawDeepStars(deepGraphics);
 
 		midGraphics.clear();
-		starfield.drawMidStars(midGraphics, 0, 0);
+		starfield.drawMidStars(midGraphics);
 
 		nearGraphics.clear();
-		starfield.drawNearStars(nearGraphics, 0, 0);
+		starfield.drawNearStars(nearGraphics);
 	}, [layers, starfield]);
 
 	useEffect(() => {
@@ -99,17 +99,17 @@ export function useStarfieldRendering(
 
 			if (deepGraphics && frameCountRef.current % 3 === 0) {
 				deepGraphics.clear();
-				starfield.drawDeepStars(deepGraphics, 0, 0);
+				starfield.drawDeepStars(deepGraphics);
 			}
 
 			if (midGraphics && frameCountRef.current % 2 === 0) {
 				midGraphics.clear();
-				starfield.drawMidStars(midGraphics, 0, 0);
+				starfield.drawMidStars(midGraphics);
 			}
 
 			if (nearGraphics) {
 				nearGraphics.clear();
-				starfield.drawNearStars(nearGraphics, 0, 0);
+				starfield.drawNearStars(nearGraphics);
 			}
 		};
 

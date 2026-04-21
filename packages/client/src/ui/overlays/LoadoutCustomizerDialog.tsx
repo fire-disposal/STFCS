@@ -7,6 +7,7 @@ import {
     Dialog,
     Flex,
     Grid,
+    Progress,
     Select,
     Separator,
     Tabs,
@@ -28,7 +29,7 @@ import {
     type WeaponJSON,
     type AssetType,
 } from "@vt/data";
-import { Plus, Save, Upload, WandSparkles, Wrench, Copy, ShieldCheck, AlertCircle } from "lucide-react";
+import { Plus, Save, Upload, WandSparkles, Wrench, Copy, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -197,6 +198,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [keyColor, setKeyColor] = useState("#000000");
     const [keyTolerance, setKeyTolerance] = useState(12);
     const [mountSelection, setMountSelection] = useState<string>("");
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!socket) return;
@@ -222,14 +224,33 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const reloadData = useCallback(async () => {
         if (!open) return;
+
         setLoading(true);
+        setLoadError(null);
+
         try {
-            const [shipListRes, weaponListRes, shipPresetRes, weaponPresetRes] = await Promise.all([
+            // 检查socket连接状态
+            const socket = networkManager.getSocket();
+            if (!socket?.connected) {
+                throw new Error("网络未连接，请检查服务器状态");
+            }
+
+            // 设置超时保护
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("数据加载超时，请检查网络连接")), 15000);
+            });
+
+            const dataPromise = Promise.all([
                 networkManager.send("token:list", {}),
                 networkManager.send("weapon:list", {}),
                 networkManager.send("preset:list_tokens", {}),
                 networkManager.send("preset:list_weapons", {}),
             ]);
+
+            const [shipListRes, weaponListRes, shipPresetRes, weaponPresetRes] = await Promise.race([
+                dataPromise,
+                timeoutPromise
+            ]) as any[];
 
             const nextShipBuilds = (shipListRes?.ships ?? []) as ShipBuildRecord[];
             const nextWeaponBuilds = (weaponListRes?.weapons ?? []) as WeaponBuildRecord[];
@@ -254,7 +275,16 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
             await reloadAssets();
         } catch (error) {
-            notify.error(error instanceof Error ? error.message : "自定义数据加载失败");
+            const errorMessage = error instanceof Error ? error.message : "自定义数据加载失败";
+            console.error("LoadoutCustomizerDialog reloadData error:", error);
+            notify.error(errorMessage);
+            setLoadError(errorMessage);
+
+            // 设置空状态，让用户至少可以看到界面
+            setShipBuilds([]);
+            setWeaponBuilds([]);
+            setShipPresets([]);
+            setWeaponPresets([]);
         } finally {
             setLoading(false);
         }
@@ -492,7 +522,23 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                 </Dialog.Description>
 
                 {loading ? (
-                    <Text color="gray">加载中...</Text>
+                    <Flex direction="column" align="center" gap="3" py="4">
+                        <Text color="gray">加载中...</Text>
+                        <Progress value={undefined} style={{ width: "100%" }} />
+                    </Flex>
+                ) : loadError ? (
+                    <Flex direction="column" align="center" gap="3" py="4">
+                        <Text color="red" weight="bold">加载失败</Text>
+                        <Text color="gray" size="2">{loadError}</Text>
+                        <Flex gap="2">
+                            <Button variant="soft" onClick={() => void reloadData()}>
+                                <RefreshCw size={14} /> 重试
+                            </Button>
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                                关闭
+                            </Button>
+                        </Flex>
+                    </Flex>
                 ) : (
                     <Tabs.Root value={activeTopTab} onValueChange={(v) => setActiveTopTab(v as "ship" | "weapon")}>
                         <Tabs.List>

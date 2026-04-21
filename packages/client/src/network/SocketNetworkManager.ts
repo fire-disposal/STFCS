@@ -9,7 +9,7 @@
  */
 
 import { io, Socket } from "socket.io-client";
-import type { ShipJSON, SocketIOActionEvent, WeaponJSON, RoomInfo } from "@vt/data";
+import type { SocketIOActionEvent, WeaponJSON, RoomInfo } from "@vt/data";
 
 const logger = {
 	info: (...args: any[]) => console.log("[network]", ...args),
@@ -462,4 +462,4 @@ export class SocketNetworkManager {
 	}
 }
 
-export type { SocketIOActionEvent };
+export type { SocketIOActionEvent, RoomInfo };

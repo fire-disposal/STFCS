@@ -214,14 +214,15 @@ async function handleAuthLogin(socket: Socket, requestId: string, payload: AuthL
 	socket.data.playerId = playerId;
 	socket.data.playerName = playerName;
 
-	const profile = await playerAvatarStorage.getClientProfile(playerName);
+	// 获取用户资料（用于内部使用，不包含在 AuthLoginResponse 中）
+	await playerAvatarStorage.getClientProfile(playerName);
 
+	// 返回符合 AuthLoginResponse 类型的数据
 	sendResponse(socket, requestId, true, {
 		playerId,
 		playerName,
 		isHost: false,
 		role: "PLAYER",
-		profile,
 	});
 }
 

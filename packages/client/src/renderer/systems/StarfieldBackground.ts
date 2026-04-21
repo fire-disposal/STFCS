@@ -199,7 +199,7 @@ export class StarfieldGenerator {
    * 绘制深层星空
    * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
-  drawDeepStars(graphics: Graphics, cameraX: number, cameraY: number): void {
+  drawDeepStars(graphics: Graphics): void {
     for (const star of this.deepStars) {
       // 闪烁效果
       const twinkle = star.twinkleSpeed
@@ -215,7 +215,7 @@ export class StarfieldGenerator {
    * 绘制中层星空
    * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
-  drawMidStars(graphics: Graphics, cameraX: number, cameraY: number): void {
+  drawMidStars(graphics: Graphics): void {
     for (const star of this.midStars) {
       const twinkle = star.twinkleSpeed
         ? Math.sin(this.time * star.twinkleSpeed! + star.twinkleOffset!) * 0.3 + 0.7
@@ -230,7 +230,7 @@ export class StarfieldGenerator {
    * 绘制浅层星空
    * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
-  drawNearStars(graphics: Graphics, cameraX: number, cameraY: number): void {
+  drawNearStars(graphics: Graphics): void {
     for (const star of this.nearStars) {
       const twinkle = star.twinkleSpeed
         ? Math.sin(this.time * star.twinkleSpeed! * 2 + star.twinkleOffset!) * 0.4 + 0.6
@@ -245,7 +245,7 @@ export class StarfieldGenerator {
    * 绘制银河星云
    * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
    */
-  drawNebula(graphics: Graphics, cameraX: number, cameraY: number): void {
+  drawNebula(graphics: Graphics): void {
     if (!this.config.enableNebula) return;
 
     const time = this.time * 0.1; // 缓慢移动
@@ -283,19 +283,19 @@ export class StarfieldGenerator {
 
     // 按深度顺序绘制：星云 -> 深层 -> 中层 -> 浅层
     if (layers.includes('nebula')) {
-      this.drawNebula(graphics, cameraX, cameraY);
+      this.drawNebula(graphics);
     }
 
     if (layers.includes('deep')) {
-      this.drawDeepStars(graphics, cameraX, cameraY);
+      this.drawDeepStars(graphics);
     }
 
     if (layers.includes('mid')) {
-      this.drawMidStars(graphics, cameraX, cameraY);
+      this.drawMidStars(graphics);
     }
 
     if (layers.includes('near')) {
-      this.drawNearStars(graphics, cameraX, cameraY);
+      this.drawNearStars(graphics);
     }
   }
 }

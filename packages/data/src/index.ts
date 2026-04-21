@@ -65,6 +65,7 @@ export type {
 	DeltaChange,
 	SyncDeltaPayload,
 	AuthLoginPayload,
+	AuthLoginResponse,
 	RoomCreatePayload,
 	RoomJoinPayload,
 	RoomActionPayload,

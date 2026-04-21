@@ -86,7 +86,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	);
 
 	const isOwnRoom = useCallback(
-		(room: RoomInfo) => currentShortId !== null && room.ownerId === currentShortId,
+		(room: RoomInfo) => currentShortId !== null && room.ownerId === String(currentShortId),
 		[currentShortId]
 	);
 

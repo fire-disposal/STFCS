@@ -98,7 +98,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="输入你的代号"
+                placeholder="输入用户名"
                 maxLength={32}
                 disabled={isLoading}
                 autoFocus
