@@ -9,7 +9,7 @@
  * 5. 护盾维持消耗
  */
 
-import type { ShipTokenState } from "../../state/Token.js";
+import type { CombatToken } from "../../state/Token.js";
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createShieldToggleEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
@@ -61,12 +61,11 @@ export function applyShield(context: EngineContext): { newState: any; events: an
  */
 function processShieldToggle(ship: any, payload: any) {
 	const runtime = { ...ship.runtime };
-	const spec = ship.shipJson.ship;
+	const spec = ship.tokenJson.token;
 	
 	const previousActive = runtime.shield?.active || false;
 	const newActive = payload.active !== undefined ? payload.active : !previousActive;
 
-	// 初始化护盾状态
 	if (!runtime.shield) {
 		runtime.shield = {
 			active: false,
@@ -75,10 +74,8 @@ function processShieldToggle(ship: any, payload: any) {
 		};
 	}
 
-	// 更新护盾状态
 	runtime.shield.active = newActive;
 
-	// 如果开启护盾，检查是否会产生辐能
 	if (newActive && !previousActive) {
 		const shieldUpkeep = spec.shield?.upkeep || 0;
 		if (shieldUpkeep > 0) {
@@ -94,11 +91,6 @@ function processShieldToggle(ship: any, payload: any) {
 
 /**
  * 判断护盾是否覆盖指定角度
- *
- * @param shipHeading - 舰船朝向
- * @param shieldDirection - 护盾中心方向（相对于舰船）
- * @param shieldArc - 护盾覆盖角度
- * @param targetAngle - 目标相对于舰船的角度
  */
 export function isAngleInShieldArc(
 	shipHeading: number,
@@ -106,48 +98,41 @@ export function isAngleInShieldArc(
 	shieldArc: number,
 	targetAngle: number
 ): boolean {
-	// 计算目标相对于护盾中心的角度差
 	const relativeAngle = ((targetAngle - shipHeading - shieldDirection + 540) % 360) - 180;
 	return Math.abs(relativeAngle) <= shieldArc / 2;
 }
 
 /**
  * 判断攻击是否命中护盾
- *
- * @param ship - 目标舰船
- * @param attackerPosition - 攻击者位置
  */
 export function isShieldHit(
-	ship: ShipTokenState,
+	ship: CombatToken,
 	attackerPosition: { x: number; y: number }
 ): { hit: boolean; shieldAngle?: number } {
-	const runtime = ship.runtime;
-	const shield = runtime.shield;
+	const runtime = ship.tokenJson.runtime;
+	const shield = runtime?.shield;
 
-	// 没有护盾或护盾未开启
 	if (!shield || !shield.active || shield.value <= 0) {
 		return { hit: false };
 	}
 
-	// 计算攻击者相对于舰船的角度
-	const dx = attackerPosition.x - runtime.position.x;
-	const dy = attackerPosition.y - runtime.position.y;
+	const position = runtime?.position ?? { x: 0, y: 0 };
+	const dx = attackerPosition.x - position.x;
+	const dy = attackerPosition.y - position.y;
 	const attackAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
 
-	const shieldSpec = ship.shipJson.ship.shield;
+	const shieldSpec = ship.tokenJson.token.shield;
 	if (!shieldSpec) return { hit: false };
 
-	// 全向盾总是覆盖
 	if (shieldSpec.type === "OMNI") {
 		return { hit: true, shieldAngle: attackAngle };
 	}
 
-	// 前盾：中心方向为0（正前方）
-	const shieldDirection = shield.direction || 0;
-	const shieldArc = shield.arc || shieldSpec.arc || 120;
+	const shieldDirection = shieldSpec.direction || 0;
+	const shieldArc = shieldSpec.arc || 120;
 
 	const inArc = isAngleInShieldArc(
-		runtime.heading,
+		runtime?.heading ?? 0,
 		shieldDirection,
 		shieldArc,
 		attackAngle
@@ -158,9 +143,6 @@ export function isShieldHit(
 
 /**
  * 计算护盾防御产生的硬辐能
- *
- * @param damage - 对护盾伤害
- * @param efficiency - 护盾效率
  */
 export function calculateShieldFlux(damage: number, efficiency: number): number {
 	return damage * efficiency;
@@ -168,12 +150,10 @@ export function calculateShieldFlux(damage: number, efficiency: number): number 
 
 /**
  * 计算护盾维持消耗
- *
- * @param ship - 舰船
  */
-export function calculateShieldUpkeep(ship: ShipTokenState): number {
-	const shield = ship.runtime.shield;
-	const shieldSpec = ship.shipJson.ship.shield;
+export function calculateShieldUpkeep(ship: CombatToken): number {
+	const shield = ship.tokenJson.runtime?.shield;
+	const shieldSpec = ship.tokenJson.token.shield;
 
 	if (!shield || !shield.active || !shieldSpec) {
 		return 0;
@@ -184,16 +164,12 @@ export function calculateShieldUpkeep(ship: ShipTokenState): number {
 
 /**
  * 应用护盾伤害
- *
- * @param ship - 舰船
- * @param damage - 伤害值
- * @returns 实际护盾伤害和穿透伤害
  */
 export function applyShieldDamage(
-	ship: ShipTokenState,
+	ship: CombatToken,
 	damage: number
 ): { shieldDamage: number; overflow: number } {
-	const shield = ship.runtime.shield;
+	const shield = ship.tokenJson.runtime?.shield;
 
 	if (!shield || !shield.active || shield.value <= 0) {
 		return { shieldDamage: 0, overflow: damage };
@@ -201,11 +177,9 @@ export function applyShieldDamage(
 
 	const remaining = shield.value;
 	if (damage >= remaining) {
-		// 护盾被击破
 		shield.value = 0;
 		return { shieldDamage: remaining, overflow: damage - remaining };
 	} else {
-		// 护盾吸收部分伤害
 		shield.value -= damage;
 		return { shieldDamage: damage, overflow: 0 };
 	}
@@ -213,28 +187,23 @@ export function applyShieldDamage(
 
 /**
  * 切换护盾状态
- *
- * @param ship - 舰船
- * @param active - 目标状态
  */
 export function toggleShield(
-	ship: ShipTokenState,
+	ship: CombatToken,
 	active: boolean
 ): ShieldToggleResult {
-	const shield = ship.runtime.shield;
-	const shieldSpec = ship.shipJson.ship.shield;
+	const shield = ship.tokenJson.runtime?.shield;
+	const shieldSpec = ship.tokenJson.token.shield;
 
 	if (!shieldSpec || !shield) {
 		return { success: false, newActive: false, reason: "Ship has no shield" };
 	}
 
-	// 过载时不能操作护盾
-	if (ship.runtime.overloaded) {
+	if (ship.tokenJson.runtime?.overloaded) {
 		return { success: false, newActive: shield.active, reason: "Ship is overloaded" };
 	}
 
-	// 主动排散时不能开启护盾
-	if (active && ship.runtime.venting) {
+	if (active && ship.tokenJson.runtime?.venting) {
 		return { success: false, newActive: false, reason: "Cannot activate shield while venting" };
 	}
 
@@ -250,7 +219,7 @@ export function toggleShield(
 /**
  * 获取护盾状态摘要
  */
-export function getShieldStatus(ship: ShipTokenState): {
+export function getShieldStatus(ship: CombatToken): {
 	hasShield: boolean;
 	active: boolean;
 	value: number;
@@ -260,8 +229,8 @@ export function getShieldStatus(ship: ShipTokenState): {
 	upkeep: number;
 	canToggle: boolean;
 } {
-	const shield = ship.runtime.shield;
-	const shieldSpec = ship.shipJson.ship.shield;
+	const shield = ship.tokenJson.runtime?.shield;
+	const shieldSpec = ship.tokenJson.token.shield;
 
 	if (!shieldSpec || !shield) {
 		return {
@@ -276,8 +245,8 @@ export function getShieldStatus(ship: ShipTokenState): {
 		};
 	}
 
-	const maxShield = shield.maxShield || shieldSpec.radius || 100;
-	const canToggle = !ship.runtime.overloaded && !ship.runtime.destroyed;
+	const maxShield = shieldSpec.radius || 100;
+	const canToggle = !ship.tokenJson.runtime?.overloaded && !ship.tokenJson.runtime?.destroyed;
 
 	return {
 		hasShield: true,
@@ -300,13 +269,11 @@ export function calculateShieldAbsorption(
 	shieldSpec: any,
 	runtime?: any
 ): { absorbedDamage: number; fluxGenerated: number } {
-	// 应用 shieldEfficiency modifier
 	const baseEfficiency = shieldSpec.efficiency || 1.0;
 	const efficiency = runtime
 		? calculateModifiedValue(baseEfficiency, runtime, "shieldEfficiency")
 		: baseEfficiency;
 
-	// 根据伤害类型计算护盾伤害倍率（从 game-rules.json 获取）
 	let shieldMultiplier = 1.0;
 	switch (damageType) {
 		case "KINETIC":
@@ -340,31 +307,25 @@ export function checkShieldHit(
 	attackAngle: number,
 	_hitPosition: { x: number; y: number }
 ): { hit: boolean; angleDiff: number } {
-	const spec = ship.shipJson.ship;
-	const runtime = ship.runtime;
+	const spec = ship.tokenJson.token;
+	const runtime = ship.tokenJson.runtime;
 
-	// 检查护盾是否开启
-	if (!runtime.shield?.active || !spec.shield) {
+	if (!runtime?.shield?.active || !spec.shield) {
 		return { hit: false, angleDiff: 0 };
 	}
 
-	// 全向盾总是覆盖
 	if (spec.shield.type === "OMNI") {
 		return { hit: true, angleDiff: 0 };
 	}
 
-	// 计算攻击相对于舰船的角度
 	const shipAngle = runtime.heading || 0;
 	const relativeAttackAngle = ((attackAngle - shipAngle + 360) % 360);
 
-	// 计算护盾方向
 	const shieldDirection = spec.shield.direction || 0;
 	const shieldArc = spec.shield.arc || 360;
 
-	// 计算角度差
 	const angleDiff = Math.abs(((relativeAttackAngle - shieldDirection + 180) % 360) - 180);
 
-	// 检查是否在护盾覆盖范围内
 	const hit = angleDiff <= shieldArc / 2;
 
 	return { hit, angleDiff };
@@ -374,14 +335,14 @@ export function checkShieldHit(
  * 检查护盾切换合法性
  */
 export function validateShieldToggle(ship: any, newActive: boolean): { valid: boolean; error?: string } {
-	const runtime = ship.runtime;
-	const spec = ship.shipJson.ship;
+	const runtime = ship.tokenJson.runtime;
+	const spec = ship.tokenJson.token;
 
-	if (runtime.destroyed) {
+	if (runtime?.destroyed) {
 		return { valid: false, error: "Ship is destroyed" };
 	}
 
-	if (runtime.overloaded) {
+	if (runtime?.overloaded) {
 		return { valid: false, error: "Ship is overloaded" };
 	}
 
@@ -389,13 +350,12 @@ export function validateShieldToggle(ship: any, newActive: boolean): { valid: bo
 		return { valid: false, error: "Ship has no shield" };
 	}
 
-	const currentActive = runtime.shield?.active || false;
+	const currentActive = runtime?.shield?.active || false;
 	if (currentActive === newActive) {
 		return { valid: false, error: `Shield is already ${newActive ? "active" : "inactive"}` };
 	}
 
-	// 主动排散时不能开启护盾
-	if (newActive && runtime.venting) {
+	if (newActive && runtime?.venting) {
 		return { valid: false, error: "Cannot activate shield while venting" };
 	}
 

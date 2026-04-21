@@ -152,4 +152,4 @@ export {
 } from "./persistence/index.js";
 
 export { actionHandler, ActionHandler } from "./server/handlers/index.js";
-export { broadcaster } from "./server/broadcast/index.js";
+export { setupSocketIO, setupUnifiedSocketIO } from "./server/socketio/index.js";

@@ -80,7 +80,7 @@ export const FactionSchema = z.enum(["PLAYER", "ENEMY", "NEUTRAL"]);
 export const Faction = FactionSchema.enum;
 export type Faction = z.infer<typeof FactionSchema>;
 
-export const PlayerRoleSchema = z.enum(["OWNER", "PLAYER", "OBSERVER"]);
+export const PlayerRoleSchema = z.enum(["HOST", "PLAYER"]);
 export const PlayerRole = PlayerRoleSchema.enum;
 export type PlayerRole = z.infer<typeof PlayerRoleSchema>;
 
@@ -100,15 +100,10 @@ export type MovementPhase = z.infer<typeof MovementPhaseSchema>;
 // 通用类型
 // ============================================================
 
-export const TextureSourceTypeSchema = z.enum(["url", "uploaded", "preset", "none"]);
-export const TextureSourceType = TextureSourceTypeSchema.enum;
-export type TextureSourceType = z.infer<typeof TextureSourceTypeSchema>;
+
 
 export const TextureSchema = z.object({
-	sourceType: TextureSourceTypeSchema,
-	source: z.string().optional(),
-	transparentColor: z.string().optional(),
-	transparencyTolerance: z.number().optional(),
+	assetId: z.string().optional(),
 	offsetX: z.number().optional(),
 	offsetY: z.number().optional(),
 	scale: z.number().optional(),
@@ -163,6 +158,7 @@ export const WeaponRuntimeSchema = z.object({
 	mountId: z.string(),
 	state: WeaponStateSchema,
 	cooldownRemaining: z.number().optional(),
+	currentHeading: z.number().optional(),  // 当前指向角度（渲染用，开火时更新）
 	statusEffects: z.array(StatusEffectSchema).optional(),
 	weapon: WeaponSpecSchema.optional(),
 });
@@ -212,7 +208,7 @@ export const PluginSlotSchema = z.object({
 });
 export type PluginSlot = z.infer<typeof PluginSlotSchema>;
 
-export const ShipSpecSchema = z.object({
+export const TokenSpecSchema = z.object({
 	size: HullSizeSchema,
 	class: ShipClassSchema,
 	width: z.number().min(10).optional(),
@@ -231,7 +227,9 @@ export const ShipSpecSchema = z.object({
 	rangeModifier: z.number().default(1.0),
 	texture: TextureSchema.optional(),
 });
-export type ShipSpec = z.infer<typeof ShipSpecSchema>;
+export type TokenSpec = z.infer<typeof TokenSpecSchema>;
+/** @deprecated 使用 TokenSpec */
+export type ShipSpec = TokenSpec;
 
 export const TranslationLockSchema = z.enum(["FORWARD_BACKWARD", "LEFT_RIGHT"]).nullable();
 export type TranslationLock = z.infer<typeof TranslationLockSchema>;
@@ -247,8 +245,8 @@ export const MovementStateSchema = z.object({
 });
 export type MovementState = z.infer<typeof MovementStateSchema>;
 
-// 舰船修正（BUFF/倍率）
-export const ShipModifierSchema = z.object({
+// Token修正（BUFF/倍率）
+export const TokenModifierSchema = z.object({
 	id: z.string(),
 	source: z.string(), // 来源标识
 	stat: z.enum([
@@ -270,14 +268,16 @@ export const ShipModifierSchema = z.object({
 	duration: z.number().default(999),
 	metadata: z.record(z.string(), z.any()).optional(),
 });
-export type ShipModifier = z.infer<typeof ShipModifierSchema>;
+export type TokenModifier = z.infer<typeof TokenModifierSchema>;
+/** @deprecated 使用 TokenModifier */
+export type ShipModifier = TokenModifier;
 
 // ============================================================
 // 预定义修正模板（工厂函数）
 // ============================================================
 
 /** 创建增伤修正（造成伤害倍率） */
-export function createDamageBoostModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createDamageBoostModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `damageBoost_${Date.now()}`,
 		source,
@@ -291,7 +291,7 @@ export function createDamageBoostModifier(value: number, duration = 999, source 
 }
 
 /** 创建减伤修正（受到伤害倍率） */
-export function createDamageReductionModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createDamageReductionModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `damageReduction_${Date.now()}`,
 		source,
@@ -305,7 +305,7 @@ export function createDamageReductionModifier(value: number, duration = 999, sou
 }
 
 /** 创建易伤修正（受到伤害增加） */
-export function createVulnerabilityModifier(percent: number, duration: number, source = "system"): ShipModifier {
+export function createVulnerabilityModifier(percent: number, duration: number, source = "system"): TokenModifier {
 	return {
 		id: `vulnerability_${Date.now()}`,
 		source,
@@ -319,7 +319,7 @@ export function createVulnerabilityModifier(percent: number, duration: number, s
 }
 
 /** 创建航速修正 */
-export function createSpeedModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createSpeedModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `speed_${Date.now()}`,
 		source,
@@ -333,7 +333,7 @@ export function createSpeedModifier(value: number, duration = 999, source = "sys
 }
 
 /** 创建转向速度修正 */
-export function createTurnRateModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createTurnRateModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `turnRate_${Date.now()}`,
 		source,
@@ -347,7 +347,7 @@ export function createTurnRateModifier(value: number, duration = 999, source = "
 }
 
 /** 创建护盾效率修正 */
-export function createShieldEfficiencyModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createShieldEfficiencyModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `shieldEfficiency_${Date.now()}`,
 		source,
@@ -361,7 +361,7 @@ export function createShieldEfficiencyModifier(value: number, duration = 999, so
 }
 
 /** 创建辐散修正 */
-export function createFluxDissipationModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createFluxDissipationModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `fluxDissipation_${Date.now()}`,
 		source,
@@ -375,7 +375,7 @@ export function createFluxDissipationModifier(value: number, duration = 999, sou
 }
 
 /** 创建射程修正 */
-export function createRangeModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createRangeModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `range_${Date.now()}`,
 		source,
@@ -389,7 +389,7 @@ export function createRangeModifier(value: number, duration = 999, source = "sys
 }
 
 /** 创建命中率修正（加法） */
-export function createAccuracyModifier(value: number, duration = 999, source = "system"): ShipModifier {
+export function createAccuracyModifier(value: number, duration = 999, source = "system"): TokenModifier {
 	return {
 		id: `accuracy_${Date.now()}`,
 		source,
@@ -416,7 +416,7 @@ export const MODIFIER_TEMPLATES = {
 	ACCURACY_BOOST_20: () => createAccuracyModifier(0.2),
 } as const;
 
-export const ShipRuntimeSchema = z.object({
+export const TokenRuntimeSchema = z.object({
 	position: PointSchema,
 	heading: z.number(),
 	hull: z.number().min(0),
@@ -431,22 +431,35 @@ export const ShipRuntimeSchema = z.object({
 	hasFired: z.boolean().optional(),
 	weapons: z.array(WeaponRuntimeSchema).optional(),
 	/** 当前激活的修正（BUFF/倍率） */
-	modifiers: z.array(ShipModifierSchema).optional(),
+	modifiers: z.array(TokenModifierSchema).optional(),
 	faction: FactionSchema.optional(),
 	ownerId: z.string().optional(),
 	venting: z.boolean().optional(),
 });
-export type ShipRuntime = z.infer<typeof ShipRuntimeSchema>;
+export type TokenRuntime = z.infer<typeof TokenRuntimeSchema>;
+/** @deprecated 使用 TokenRuntime */
+export type ShipRuntime = TokenRuntime;
 
-export const ShipJSONSchema = z.object({
-	$schema: z.literal("ship-v2"),
+export const TokenJSONSchema = z.object({
+	$schema: z.literal("token-v2"),
 	$id: z.string(),
 	$presetRef: z.string().optional(),
-	ship: ShipSpecSchema,
-	runtime: ShipRuntimeSchema.optional(),
+	token: TokenSpecSchema,
+	runtime: TokenRuntimeSchema.optional(),
 	metadata: MetadataSchema,
 });
-export type ShipJSON = z.infer<typeof ShipJSONSchema>;
+export type TokenJSON = z.infer<typeof TokenJSONSchema>;
+/** @deprecated 使用 TokenJSON */
+export type ShipJSON = TokenJSON;
+
+/** @deprecated 使用 TokenSpecSchema */
+export const ShipSpecSchema = TokenSpecSchema;
+/** @deprecated 使用 TokenRuntimeSchema */
+export const ShipRuntimeSchema = TokenRuntimeSchema;
+/** @deprecated 使用 TokenJSONSchema */
+export const ShipJSONSchema = TokenJSONSchema;
+/** @deprecated 使用 TokenModifierSchema */
+export const ShipModifierSchema = TokenModifierSchema;
 
 // ============================================================
 // 地图类型
@@ -490,7 +503,7 @@ export const RoomPlayerStateSchema = z.object({
 	faction: FactionSchema.optional(),
 	isReady: z.boolean().default(false),
 	connected: z.boolean().default(true),
-	shipIds: z.array(z.string()).optional(),
+	tokenIds: z.array(z.string()).optional(),
 });
 export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 
@@ -502,7 +515,7 @@ export const GameRoomStateSchema = z.object({
 	turnCount: z.number().default(0),
 	activeFaction: FactionSchema.optional(),
 	players: z.record(z.string(), RoomPlayerStateSchema),
-	ships: z.record(z.string(), ShipJSONSchema),
+	tokens: z.record(z.string(), TokenJSONSchema),
 	map: GameMapSchema.optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
 	createdAt: z.number(),
@@ -530,7 +543,7 @@ export const GameSaveSchema = z.object({
 	$id: z.string(),
 	metadata: SaveMetadataSchema,
 	room: GameRoomStateSchema.optional(),
-	ships: z.array(ShipJSONSchema),
+	tokens: z.array(TokenJSONSchema),
 	createdAt: z.number(),
 	updatedAt: z.number().optional(),
 });
@@ -546,7 +559,7 @@ export const PlayerProfileSchema = z.object({
 	username: z.string(),
 	displayName: z.string(),
 	avatarAssetId: z.string().optional(),
-	ships: z.array(ShipJSONSchema),
+	tokens: z.array(TokenJSONSchema),
 	weapons: z.array(WeaponJSONSchema),
 	saveIds: z.array(z.string()).optional(),
 	stats: z.object({
@@ -561,18 +574,11 @@ export const PlayerProfileSchema = z.object({
 export type PlayerProfile = z.infer<typeof PlayerProfileSchema>;
 
 // ============================================================
-// 资产类型
+// 资产类型（简化：所有资产公开）
 // ============================================================
 
-export const AssetTypeSchema = z.enum([
-	"avatar",
-	"ship_texture",
-	"weapon_texture",
-	"obstacle_texture",
-	"map_texture",
-	"ui_texture",
-	"custom_texture",
-]);
+export const AssetTypeSchema = z.enum(["avatar", "ship_texture", "weapon_texture"]);
+export const AssetType = AssetTypeSchema.enum;
 export type AssetType = z.infer<typeof AssetTypeSchema>;
 
 export const AssetSchema = z.object({
@@ -588,33 +594,22 @@ export const AssetSchema = z.object({
 		tags: z.array(z.string()).optional(),
 		width: z.number().optional(),
 		height: z.number().optional(),
-		format: z.string().optional(),
-		author: z.string().optional(),
-		license: z.string().optional(),
 	}).optional(),
 	ownerId: z.string(),
 	uploadedAt: z.number(),
 	updatedAt: z.number().optional(),
-	visibility: z.enum(["private", "public", "shared"]),
-	sharedWith: z.array(z.string()).optional(),
-	data: z.custom<Uint8Array>(
-		(val): val is Uint8Array => val instanceof Uint8Array,
-		{ message: "Expected Uint8Array or Buffer" }
-	).optional(),
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
 export const AssetUploadRequestSchema = z.object({
 	type: AssetTypeSchema,
 	filename: z.string(),
-	mimeType: z.string(),
+	mimeType: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]),
 	buffer: z.custom<Uint8Array>(
 		(val): val is Uint8Array => val instanceof Uint8Array,
 		{ message: "Expected Uint8Array or Buffer" }
 	),
 	metadata: AssetSchema.shape.metadata.optional(),
-	visibility: z.enum(["private", "public", "shared"]).optional(),
-	sharedWith: z.array(z.string()).optional(),
 });
 export type AssetUploadRequest = z.infer<typeof AssetUploadRequestSchema>;
 
@@ -628,14 +623,12 @@ export const AssetListItemSchema = z.object({
 	ownerId: z.string(),
 	uploadedAt: z.number(),
 	updatedAt: z.number().optional(),
-	visibility: z.enum(["private", "public", "shared"]),
 });
 export type AssetListItem = z.infer<typeof AssetListItemSchema>;
 
 export const AssetFilterSchema = z.object({
 	type: z.union([AssetTypeSchema, z.array(AssetTypeSchema)]).optional(),
 	ownerId: z.string().optional(),
-	visibility: z.enum(["private", "public", "shared"]).optional(),
 	tags: z.array(z.string()).optional(),
 	search: z.string().optional(),
 	sharedWith: z.string().optional(),
@@ -660,14 +653,14 @@ export type AssetStats = z.infer<typeof AssetStatsSchema>;
 
 export const ExportJSONSchema = z.object({
 	$schema: z.string(),
-	$type: z.enum(["SHIP", "WEAPON", "FLEET"]),
+	$type: z.enum(["TOKEN", "WEAPON", "FLEET"]),
 	$exportedAt: z.string(),
-	ship: ShipJSONSchema.optional(),
+	token: TokenJSONSchema.optional(),
 	weapon: WeaponJSONSchema.optional(),
 	fleet: z.object({
 		name: z.string(),
 		description: z.string().optional(),
-		ships: z.array(ShipJSONSchema),
+		tokens: z.array(TokenJSONSchema),
 	}).optional(),
 });
 export type ExportJSON = z.infer<typeof ExportJSONSchema>;
@@ -690,12 +683,17 @@ function createTypeGuard<T>(schema: z.ZodTypeAny): (data: unknown) => data is T 
 // 验证函数导出（由工厂生成）
 // ============================================================
 
-export const validateShipJSON = createValidator<ShipJSON>(ShipJSONSchema);
+export const validateTokenJSON = createValidator<TokenJSON>(TokenJSONSchema);
 export const validateWeaponJSON = createValidator<WeaponJSON>(WeaponJSONSchema);
 export const validatePlayerProfile = createValidator<PlayerProfile>(PlayerProfileSchema);
 export const validateGameSave = createValidator<GameSave>(GameSaveSchema);
 export const validateGameMap = createValidator<GameMap>(GameMapSchema);
 export const validateGameRoomState = createValidator<GameRoomState>(GameRoomStateSchema);
 
-export const isValidShipJSON = createTypeGuard<ShipJSON>(ShipJSONSchema);
+export const isValidTokenJSON = createTypeGuard<TokenJSON>(TokenJSONSchema);
 export const isValidWeaponJSON = createTypeGuard<WeaponJSON>(WeaponJSONSchema);
+
+/** @deprecated 使用 validateTokenJSON */
+export const validateShipJSON = validateTokenJSON;
+/** @deprecated 使用 isValidTokenJSON */
+export const isValidShipJSON = isValidTokenJSON;

@@ -91,7 +91,7 @@ export class PlayerAvatarStorageService {
             $id: `player:${username}`,
             username,
             displayName: playerName,
-            ships: [],
+            tokens: [],
             weapons: [],
             saveIds: [],
             stats: {

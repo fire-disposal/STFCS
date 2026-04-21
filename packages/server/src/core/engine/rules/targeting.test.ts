@@ -4,7 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import { calculateShipWeaponTargets } from "./targeting.js";
-import type { ShipTokenState } from "../../state/Token.js";
+import type { CombatToken } from "../../state/Token.js";
+import type { TokenJSON, WeaponSpec, MountSpec } from "@vt/data";
 
 function createTestShip(
 	id: string,
@@ -13,56 +14,36 @@ function createTestShip(
 	weapons: Array<{
 		mountId: string;
 		state: string;
-		weapon: {
-			category: string;
-			damageType: string;
-			size: string;
-			damage: number;
-			range: number;
-			fluxCostPerShot: number;
-			allowsMultipleTargets?: boolean;
-			burstCount?: number;
-			projectilesPerShot?: number;
-		};
+		weapon: WeaponSpec;
 	}>,
 	mounts: Array<{
 		id: string;
-		mountType: string;
 		facing?: number;
-		position: { x: number; y: number };
+		arc?: number;
 	}> = []
-): ShipTokenState {
-	const now = Date.now();
-	return {
-		id,
-		type: "SHIP",
-		position,
-		heading: 0,
-		scale: 1,
-		visible: true,
-		selected: false,
-		locked: false,
-		dataRef: `ship:${id}`,
-		shipJson: {
-			$schema: "ship-v2",
-			$id: `ship:${id}`,
-			ship: {
-				size: "FRIGATE",
-				class: "STRIKE",
-				maxHitPoints: 100,
-				armorMaxPerQuadrant: 50,
-				maxSpeed: 100,
-				maxTurnRate: 60,
-				mounts: mounts.map((m) => ({
-					id: m.id,
-					mountType: m.mountType as "TURRET" | "HARDPOINT",
-					position: m.position,
-					facing: m.facing,
-					size: "SMALL",
-				})),
-			},
-			metadata: { name },
+): CombatToken {
+	const tokenJson: TokenJSON = {
+		$schema: "token-v2",
+		$id: `ship:${id}`,
+		token: {
+			size: "FRIGATE",
+			class: "STRIKE",
+			maxHitPoints: 100,
+			armorMaxPerQuadrant: 50,
+			armorMinReduction: 0.1,
+			armorMaxReduction: 0.85,
+			maxSpeed: 100,
+			maxTurnRate: 60,
+			rangeModifier: 1.0,
+			mounts: mounts.map((m) => ({
+				id: m.id,
+				position: { x: 0, y: 0 },
+				facing: m.facing ?? 0,
+				arc: m.arc ?? 360,
+				size: "SMALL",
+			})),
 		},
+		metadata: { name },
 		runtime: {
 			position,
 			heading: 0,
@@ -71,8 +52,10 @@ function createTestShip(
 			fluxSoft: 0,
 			fluxHard: 0,
 			overloaded: false,
+			overloadTime: 0,
 			destroyed: false,
 			movement: {
+				currentPhase: "A",
 				hasMoved: false,
 				phaseAUsed: 0,
 				turnAngleUsed: 0,
@@ -81,62 +64,16 @@ function createTestShip(
 			hasFired: false,
 			weapons: weapons.map((w) => ({
 				mountId: w.mountId,
-				state: w.state as "READY" | "COOLDOWN" | "DISABLED",
-				weapon: w.weapon as import("@vt/data").WeaponSpec,
-				cooldownRemaining: 0,
+				state: w.state as "READY" | "COOLDOWN" | "DISABLED" | "FIRED",
+				weapon: w.weapon,
 			})),
 		},
-		combatState: {
-			hull: 100,
-			maxHull: 100,
-			hullPercentage: 100,
-			armor: [50, 50, 50, 50, 50, 50],
-			maxArmor: 50,
-			armorPercentages: [100, 100, 100, 100, 100, 100],
-			fluxSoft: 0,
-			fluxHard: 0,
-			totalFlux: 0,
-			fluxCapacity: 100,
-			fluxPercentage: 0,
-			fluxState: "NORMAL",
-			shieldActive: false,
-			shieldValue: 0,
-			maxShield: 0,
-			shieldPercentage: 0,
-			overloaded: false,
-			overloadTime: 0,
-			destroyed: false,
-			hasFired: false,
-			weaponsReady: weapons.filter((w) => w.state === "READY").length,
-			weaponsTotal: weapons.length,
-			weaponsPercentage:
-				weapons.length > 0
-					? (weapons.filter((w) => w.state === "READY").length / weapons.length) * 100
-					: 0,
-		},
-		movementState: {
-			hasMoved: false,
-			phaseAUsed: 0,
-			turnAngleUsed: 0,
-			phaseCUsed: 0,
-			maxSpeed: 100,
-			maxTurnRate: 60,
-			phaseAAvailable: 100,
-			phaseCAvailable: 100,
-			turnAngleAvailable: 60,
-			movePercentage: 0,
-			turnPercentage: 0,
-		},
-		metadata: {
-			name,
-			description: undefined,
-			faction: "PLAYER",
-			ownerId: undefined,
-			createdAt: now,
-			updatedAt: now,
-			tags: [],
-			customData: undefined,
-		},
+	};
+
+	return {
+		id,
+		type: "SHIP",
+		tokenJson,
 	};
 }
 
@@ -150,27 +87,19 @@ describe("Weapon Targeting", () => {
 				{
 					mountId: "mount1",
 					state: "READY",
-						weapon: {
-							category: "BALLISTIC" as const,
-							damageType: "KINETIC" as const,
-							size: "SMALL" as const,
-							damage: 10,
-							range: 500,
-							fluxCostPerShot: 5,
-							allowsMultipleTargets: false,
-							burstCount: 1,
-						},
+					weapon: {
+						damageType: "KINETIC",
+						size: "SMALL",
+						damage: 10,
+						range: 500,
+						fluxCostPerShot: 5,
+					},
 				},
 			],
-			[{ id: "mount1", mountType: "TURRET", position: { x: 0, y: 0 } }]
+			[{ id: "mount1" }]
 		);
 
-		const target = createTestShip(
-			"ship2",
-			"Target",
-			{ x: 100, y: 0 },
-			[]
-		);
+		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
 
 		const result = calculateShipWeaponTargets(attacker, [target]);
 
@@ -192,7 +121,6 @@ describe("Weapon Targeting", () => {
 					mountId: "mount1",
 					state: "READY",
 					weapon: {
-						category: "BALLISTIC",
 						damageType: "KINETIC",
 						size: "SMALL",
 						damage: 10,
@@ -201,15 +129,10 @@ describe("Weapon Targeting", () => {
 					},
 				},
 			],
-			[{ id: "mount1", mountType: "TURRET", position: { x: 0, y: 0 } }]
+			[{ id: "mount1" }]
 		);
 
-		const target = createTestShip(
-			"ship2",
-			"Target",
-			{ x: 100, y: 0 },
-			[]
-		);
+		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
 
 		const result = calculateShipWeaponTargets(attacker, [target]);
 
@@ -226,7 +149,6 @@ describe("Weapon Targeting", () => {
 					mountId: "mount1",
 					state: "READY",
 					weapon: {
-						category: "BALLISTIC",
 						damageType: "KINETIC",
 						size: "SMALL",
 						damage: 10,
@@ -236,7 +158,7 @@ describe("Weapon Targeting", () => {
 				},
 			]
 		);
-		attacker.runtime.hasFired = true;
+		attacker.tokenJson.runtime!.hasFired = true;
 
 		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
 		const result = calculateShipWeaponTargets(attacker, [target]);
@@ -255,20 +177,19 @@ describe("Weapon Targeting", () => {
 					mountId: "mount1",
 					state: "READY",
 					weapon: {
-						category: "BALLISTIC" as const,
-						damageType: "KINETIC" as const,
-						size: "SMALL" as const,
+						damageType: "KINETIC",
+						size: "SMALL",
 						damage: 10,
 						range: 500,
 						fluxCostPerShot: 5,
 					},
 				},
 			],
-			[{ id: "mount1", mountType: "TURRET", position: { x: 0, y: 0 } }]
+			[{ id: "mount1" }]
 		);
 
 		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
-		target.runtime.destroyed = true;
+		target.tokenJson.runtime!.destroyed = true;
 
 		const result = calculateShipWeaponTargets(attacker, [target]);
 

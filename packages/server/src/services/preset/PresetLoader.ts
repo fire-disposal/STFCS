@@ -8,9 +8,9 @@
 import {
 	presetShips,
 	presetWeapons,
-	ShipJSONSchema,
+	TokenJSONSchema,
 	WeaponJSONSchema,
-	type ShipJSON,
+	type TokenJSON,
 	type WeaponJSON,
 } from "@vt/data";
 import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
@@ -33,7 +33,7 @@ export class PresetLoader {
 
 		for (const rawShip of presetShips) {
 			try {
-				const shipJson = ShipJSONSchema.parse(rawShip) as ShipJSON;
+				const shipJson = TokenJSONSchema.parse(rawShip) as TokenJSON;
 
 				const existing = await this.persistence.ships.findById(shipJson.$id);
 				if (existing) {
@@ -48,7 +48,7 @@ export class PresetLoader {
 					customizations: {},
 					isPreset: true,
 					isPublic: true,
-					tags: ["preset", shipJson.ship.class, shipJson.ship.size],
+					tags: ["preset", shipJson.token.class, shipJson.token.size],
 					usageCount: 0,
 					createdAt: shipJson.metadata.createdAt ?? Date.now(),
 					updatedAt: Date.now(),

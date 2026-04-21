@@ -5,8 +5,8 @@
  */
 
 import {
-	ShipJSONSchema,
-	type ShipJSON,
+	TokenJSONSchema,
+	type TokenJSON,
 	type Point,
 	type Faction,
 } from "@vt/data";
@@ -33,7 +33,7 @@ export class ShipBuildService {
 		shipJson: unknown,
 		customizations: ShipBuild["customizations"] = {}
 	): Promise<ShipBuild> {
-		const validated = ShipJSONSchema.parse(shipJson) as ShipJSON;
+		const validated = TokenJSONSchema.parse(shipJson) as TokenJSON;
 
 		const buildId = validated.$id.startsWith("preset:")
 			? generateId("ship")
@@ -70,7 +70,7 @@ export class ShipBuildService {
 			throw new Error(`Preset ship not found: ${presetId}`);
 		}
 
-		const shipJson = JSON.parse(JSON.stringify(preset)) as ShipJSON;
+		const shipJson = JSON.parse(JSON.stringify(preset)) as TokenJSON;
 		shipJson.$id = generateId("ship");
 		shipJson.$presetRef = preset.$id;
 		shipJson.metadata = {
@@ -80,16 +80,16 @@ export class ShipBuildService {
 		};
 
 		if (options.position || options.heading || options.faction) {
-			shipJson.runtime = this.buildRuntime(shipJson.ship, options);
+			shipJson.runtime = this.buildRuntime(shipJson.token, options);
 		}
 
 		return await this.createShipBuild(ownerId, shipJson);
 	}
 
 	private buildRuntime(
-		spec: ShipJSON["ship"],
+		spec: TokenJSON["token"],
 		options: { position?: Point; heading?: number; faction?: Faction }
-	): ShipJSON["runtime"] {
+	): TokenJSON["runtime"] {
 		const armorMax = spec.armorMaxPerQuadrant;
 
 		return {
@@ -133,7 +133,7 @@ export class ShipBuildService {
 		}
 
 		if (updates.shipJson) {
-			updates.shipJson = ShipJSONSchema.parse(updates.shipJson) as ShipJSON;
+			updates.shipJson = TokenJSONSchema.parse(updates.shipJson) as TokenJSON;
 		}
 
 		return await this.persistence.ships.update(id, updates);

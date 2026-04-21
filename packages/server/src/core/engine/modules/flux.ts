@@ -11,7 +11,7 @@
 
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createFluxChangeEvent } from "../context.js";
-import type { ShipTokenState } from "../../state/Token.js";
+import type { CombatToken } from "../../state/Token.js";
 import { calculateModifiedValue } from "./modifier.js";
 
 /**
@@ -38,33 +38,38 @@ export type FluxSource =
 
 // ==================== 基础查询函数 ====================
 
-export function getFluxCapacity(ship: ShipTokenState): number {
-	return ship.shipJson.ship.fluxCapacity || 100;
+export function getFluxCapacity(ship: CombatToken): number {
+	return ship.tokenJson.token.fluxCapacity || 100;
 }
 
-export function getFluxDissipation(ship: ShipTokenState): number {
-	// 应用 fluxDissipation modifier
-	const baseDissipation = ship.shipJson.ship.fluxDissipation || 0;
-	return calculateModifiedValue(baseDissipation, ship.runtime, "fluxDissipation");
+export function getFluxDissipation(ship: CombatToken): number {
+	const baseDissipation = ship.tokenJson.token.fluxDissipation || 0;
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) return baseDissipation;
+	return calculateModifiedValue(baseDissipation, runtime, "fluxDissipation");
 }
 
-export function getTotalFlux(ship: ShipTokenState): number {
-	const runtime = ship.runtime;
-	return (runtime.fluxSoft || 0) + (runtime.fluxHard || 0);
+export function getTotalFlux(ship: CombatToken): number {
+	const runtime = ship.tokenJson.runtime;
+	return (runtime?.fluxSoft || 0) + (runtime?.fluxHard || 0);
 }
 
-export function isOverloaded(ship: ShipTokenState): boolean {
-	return ship.runtime.overloaded || false;
+export function isOverloaded(ship: CombatToken): boolean {
+	return ship.tokenJson.runtime?.overloaded || false;
 }
 
 // ==================== 辐能添加 ====================
 
 export function addSoftFlux(
-	ship: ShipTokenState,
+	ship: CombatToken,
 	amount: number
 ): { success: boolean; actualAdded: number; newFluxSoft: number } {
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return { success: false, actualAdded: 0, newFluxSoft: 0 };
+	}
 	if (amount <= 0) {
-		return { success: true, actualAdded: 0, newFluxSoft: ship.runtime.fluxSoft || 0 };
+		return { success: true, actualAdded: 0, newFluxSoft: runtime.fluxSoft || 0 };
 	}
 
 	const capacity = getFluxCapacity(ship);
@@ -75,14 +80,13 @@ export function addSoftFlux(
 		return {
 			success: false,
 			actualAdded: 0,
-			newFluxSoft: ship.runtime.fluxSoft || 0,
+			newFluxSoft: runtime.fluxSoft || 0,
 		};
 	}
 
 	const actualAdded = Math.min(amount, available);
-	ship.runtime.fluxSoft = (ship.runtime.fluxSoft || 0) + actualAdded;
+	runtime.fluxSoft = (runtime.fluxSoft || 0) + actualAdded;
 
-	// 检查是否触发过载
 	if (getTotalFlux(ship) >= capacity) {
 		triggerOverload(ship);
 	}
@@ -90,16 +94,20 @@ export function addSoftFlux(
 	return {
 		success: actualAdded > 0,
 		actualAdded,
-		newFluxSoft: ship.runtime.fluxSoft,
+		newFluxSoft: runtime.fluxSoft,
 	};
 }
 
 export function addHardFlux(
-	ship: ShipTokenState,
+	ship: CombatToken,
 	amount: number
 ): { success: boolean; actualAdded: number; newFluxHard: number } {
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return { success: false, actualAdded: 0, newFluxHard: 0 };
+	}
 	if (amount <= 0) {
-		return { success: true, actualAdded: 0, newFluxHard: ship.runtime.fluxHard || 0 };
+		return { success: true, actualAdded: 0, newFluxHard: runtime.fluxHard || 0 };
 	}
 
 	const capacity = getFluxCapacity(ship);
@@ -110,12 +118,12 @@ export function addHardFlux(
 		return {
 			success: false,
 			actualAdded: 0,
-			newFluxHard: ship.runtime.fluxHard || 0,
+			newFluxHard: runtime.fluxHard || 0,
 		};
 	}
 
 	const actualAdded = Math.min(amount, available);
-	ship.runtime.fluxHard = (ship.runtime.fluxHard || 0) + actualAdded;
+	runtime.fluxHard = (runtime.fluxHard || 0) + actualAdded;
 
 	if (getTotalFlux(ship) >= capacity) {
 		triggerOverload(ship);
@@ -124,26 +132,25 @@ export function addHardFlux(
 	return {
 		success: actualAdded > 0,
 		actualAdded,
-		newFluxHard: ship.runtime.fluxHard,
+		newFluxHard: runtime.fluxHard,
 	};
 }
 
 // ==================== 过载管理 ====================
 
-export function triggerOverload(ship: ShipTokenState): void {
-	if (ship.runtime.overloaded) return;
+export function triggerOverload(ship: CombatToken): void {
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime || runtime.overloaded) return;
 
-	ship.runtime.overloaded = true;
-	ship.runtime.overloadTime = 1;
+	runtime.overloaded = true;
+	runtime.overloadTime = 1;
 
-	// 关闭护盾
-	if (ship.runtime.shield) {
-		ship.runtime.shield.active = false;
+	if (runtime.shield) {
+		runtime.shield.active = false;
 	}
 
-	// 禁用武器
-	if (ship.runtime.weapons) {
-		ship.runtime.weapons.forEach((w: any) => {
+	if (runtime.weapons) {
+		runtime.weapons.forEach((w: any) => {
 			if (w.state === "READY" || w.state === "COOLDOWN") {
 				w.state = "DISABLED";
 			}
@@ -151,33 +158,31 @@ export function triggerOverload(ship: ShipTokenState): void {
 	}
 }
 
-export function endOverload(ship: ShipTokenState): void {
-	if (!ship.runtime.overloaded) return;
+export function endOverload(ship: CombatToken): void {
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime || !runtime.overloaded) return;
 
-	ship.runtime.overloaded = false;
-	ship.runtime.overloadTime = 0;
+	runtime.overloaded = false;
+	runtime.overloadTime = 0;
 
-	// 过载结束时辐能降到最大值的一半
 	const capacity = getFluxCapacity(ship);
 	const targetFlux = capacity / 2;
 	const currentTotal = getTotalFlux(ship);
 
 	if (currentTotal > targetFlux) {
 		const excess = currentTotal - targetFlux;
-		// 优先减少软辐能
-		const currentSoft = ship.runtime.fluxSoft || 0;
+		const currentSoft = runtime.fluxSoft || 0;
 		if (currentSoft >= excess) {
-			ship.runtime.fluxSoft = currentSoft - excess;
+			runtime.fluxSoft = currentSoft - excess;
 		} else {
 			const remaining = excess - currentSoft;
-			ship.runtime.fluxSoft = 0;
-			ship.runtime.fluxHard = Math.max(0, (ship.runtime.fluxHard || 0) - remaining);
+			runtime.fluxSoft = 0;
+			runtime.fluxHard = Math.max(0, (runtime.fluxHard || 0) - remaining);
 		}
 	}
 
-	// 恢复武器状态（从 DISABLED 恢复）
-	if (ship.runtime.weapons) {
-		ship.runtime.weapons.forEach((w: any) => {
+	if (runtime.weapons) {
+		runtime.weapons.forEach((w: any) => {
 			if (w.state === "DISABLED") {
 				w.state = "READY";
 			}
@@ -187,15 +192,17 @@ export function endOverload(ship: ShipTokenState): void {
 
 // ==================== 辐散 ====================
 
-/**
- * 辐散处理
- *
- * 规则：
- * - 软辐能：每回合下降 fluxDissipation 点
- * - 硬辐能：护盾开启时不可消散，护盾关闭时可消散
- */
-export function dissipateFlux(ship: ShipTokenState): FluxCalculationResult {
-	const runtime = ship.runtime;
+export function dissipateFlux(ship: CombatToken): FluxCalculationResult {
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return {
+			newFluxSoft: 0,
+			newFluxHard: 0,
+			totalFlux: 0,
+			overloaded: false,
+			overloadChanged: false,
+		};
+	}
 	const dissipation = getFluxDissipation(ship);
 	const shieldActive = runtime.shield?.active ?? false;
 
@@ -203,18 +210,14 @@ export function dissipateFlux(ship: ShipTokenState): FluxCalculationResult {
 	let newFluxHard = runtime.fluxHard || 0;
 	let overloadChanged = false;
 
-	// 软辐能散逸（始终可消散）
 	if (dissipation > 0 && newFluxSoft > 0) {
 		newFluxSoft = Math.max(0, newFluxSoft - dissipation);
 	}
 
-	// 硬辐能散逸（仅护盾关闭时）
-	// 远行星号规则：护盾开启时硬辐能不可通过辐散降低
 	if (!shieldActive && dissipation > 0 && newFluxHard > 0) {
 		newFluxHard = Math.max(0, newFluxHard - dissipation);
 	}
 
-	// 检查过载是否结束
 	let overloaded = runtime.overloaded || false;
 	if (overloaded) {
 		const overloadTime = runtime.overloadTime || 0;
@@ -235,27 +238,31 @@ export function dissipateFlux(ship: ShipTokenState): FluxCalculationResult {
 
 // ==================== 回合结束处理 ====================
 
-export function processTurnEndFlux(ship: ShipTokenState): {
+export function processTurnEndFlux(ship: CombatToken): {
 	fluxDissipated: boolean;
 	overloadEnded: boolean;
 	newFluxSoft: number;
 	newFluxHard: number;
 } {
-	const runtime = ship.runtime;
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return {
+			fluxDissipated: false,
+			overloadEnded: false,
+			newFluxSoft: 0,
+			newFluxHard: 0,
+		};
+	}
 
-	// 减少过载时间
 	if (runtime.overloaded && (runtime.overloadTime || 0) > 0) {
 		runtime.overloadTime = (runtime.overloadTime || 0) - 1;
 	}
 
-	// 辐散
 	const result = dissipateFlux(ship);
 
-	// 更新状态
 	runtime.fluxSoft = result.newFluxSoft;
 	runtime.fluxHard = result.newFluxHard;
 
-	// 检查过载是否结束
 	if (result.overloadChanged) {
 		endOverload(ship);
 	} else {
@@ -272,12 +279,15 @@ export function processTurnEndFlux(ship: ShipTokenState): {
 
 // ==================== 主动排散 ====================
 
-export function ventFlux(ship: ShipTokenState): {
+export function ventFlux(ship: CombatToken): {
 	success: boolean;
 	reason?: string;
 	fluxCleared: number;
 } {
-	const runtime = ship.runtime;
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return { success: false, reason: "No runtime state", fluxCleared: 0 };
+	}
 
 	if (runtime.venting) {
 		return { success: false, reason: "Already venting this turn", fluxCleared: 0 };
@@ -287,22 +297,18 @@ export function ventFlux(ship: ShipTokenState): {
 		return { success: false, reason: "Cannot vent after firing weapons", fluxCleared: 0 };
 	}
 
-	// 关闭护盾
 	if (runtime.shield) {
 		runtime.shield.active = false;
 	}
 
-	// 清空辐能
 	const fluxCleared = getTotalFlux(ship);
 	runtime.fluxSoft = 0;
 	runtime.fluxHard = 0;
 
-	// 如果过载中，结束过载
 	if (runtime.overloaded) {
 		endOverload(ship);
 	}
 
-	// 标记主动排散
 	runtime.venting = true;
 
 	return {
@@ -311,11 +317,14 @@ export function ventFlux(ship: ShipTokenState): {
 	};
 }
 
-export function canVent(ship: ShipTokenState): {
+export function canVent(ship: CombatToken): {
 	canVent: boolean;
 	reason?: string;
 } {
-	const runtime = ship.runtime;
+	const runtime = ship.tokenJson.runtime;
+	if (!runtime) {
+		return { canVent: false, reason: "No runtime state" };
+	}
 
 	if (runtime.destroyed) {
 		return { canVent: false, reason: "Ship is destroyed" };
@@ -334,7 +343,7 @@ export function canVent(ship: ShipTokenState): {
 
 // ==================== 状态查询 ====================
 
-export function getFluxStatus(ship: ShipTokenState): {
+export function getFluxStatus(ship: CombatToken): {
 	fluxSoft: number;
 	fluxHard: number;
 	totalFlux: number;
@@ -344,27 +353,24 @@ export function getFluxStatus(ship: ShipTokenState): {
 	overloaded: boolean;
 	venting: boolean;
 } {
-	const runtime = ship.runtime;
+	const runtime = ship.tokenJson.runtime;
 	const capacity = getFluxCapacity(ship);
 	const total = getTotalFlux(ship);
 
 	return {
-		fluxSoft: runtime.fluxSoft || 0,
-		fluxHard: runtime.fluxHard || 0,
+		fluxSoft: runtime?.fluxSoft || 0,
+		fluxHard: runtime?.fluxHard || 0,
 		totalFlux: total,
 		fluxCapacity: capacity,
 		fluxDissipation: getFluxDissipation(ship),
 		percentage: capacity > 0 ? (total / capacity) * 100 : 0,
-		overloaded: runtime.overloaded || false,
-		venting: runtime.venting || false,
+		overloaded: runtime?.overloaded || false,
+		venting: runtime?.venting || false,
 	};
 }
 
 // ==================== 兼容性接口（保留现有功能）====================
 
-/**
- * 应用辐能Action
- */
 export function applyFlux(context: EngineContext): { newState: any; events: any[] } {
 	const { state, action, ship } = context;
 	
@@ -380,30 +386,27 @@ export function applyFlux(context: EngineContext): { newState: any; events: any[
 		
 		if (ventResult.success) {
 			updates.set(`ship:${ship.id}`, {
-				runtime: {
-					...ship.runtime,
+				tokenJson: {
+					...ship.tokenJson,
+					runtime: ship.tokenJson.runtime,
 				},
 			});
 
 			events.push(createFluxChangeEvent(
 				ship.id,
-				ship.runtime.fluxSoft || 0,
-				ship.runtime.fluxHard || 0,
+				ship.tokenJson.runtime?.fluxSoft || 0,
+				ship.tokenJson.runtime?.fluxHard || 0,
 				getTotalFlux(ship),
 				"VENTED"
 			));
 		}
 	} else if (action.type === "END_TURN") {
-		// 回合结束时的辐能处理在 GameStateManager 中统一处理
 	}
 
 	const newState = applyStateUpdates(state, updates);
 	return { newState, events };
 }
 
-/**
- * 检查排散辐能合法性
- */
 export function validateFluxVent(ship: any): { valid: boolean; error?: string } {
 	const result = canVent(ship);
 	if (result.canVent) {
@@ -414,9 +417,6 @@ export function validateFluxVent(ship: any): { valid: boolean; error?: string } 
 		: { valid: false };
 }
 
-/**
- * 计算辐能状态
- */
 export function calculateFluxState(
 	fluxSoft: number,
 	fluxHard: number,
@@ -434,9 +434,6 @@ export function calculateFluxState(
 	}
 }
 
-/**
- * 处理辐能消散（回合结束时，兼容旧版）
- */
 export function processFluxDissipation(state: any): {
 	shipUpdates: Map<string, any>;
 	fluxChanges: Map<string, any>;
@@ -445,23 +442,22 @@ export function processFluxDissipation(state: any): {
 	const fluxChanges = new Map<string, any>();
 
 	for (const [shipId, ship] of state.tokens.entries()) {
-		if (ship.runtime.destroyed) continue;
+		if (ship.tokenJson.runtime?.destroyed) continue;
 
 		const oldTotalFlux = getTotalFlux(ship);
-		const oldOverloaded = ship.runtime.overloaded;
+		const oldOverloaded = ship.tokenJson.runtime?.overloaded;
 
-		// 使用新的辐能系统处理
 		processTurnEndFlux(ship);
 
 		const newTotalFlux = getTotalFlux(ship);
-		const newOverloaded = ship.runtime.overloaded;
+		const newOverloaded = ship.tokenJson.runtime?.overloaded;
 
-		shipUpdates.set(shipId, { runtime: ship.runtime });
+		shipUpdates.set(shipId, { tokenJson: { ...ship.tokenJson, runtime: ship.tokenJson.runtime } });
 
 		if (oldTotalFlux !== newTotalFlux || oldOverloaded !== newOverloaded) {
 			fluxChanges.set(shipId, {
-				newFluxSoft: ship.runtime.fluxSoft,
-				newFluxHard: ship.runtime.fluxHard,
+				newFluxSoft: ship.tokenJson.runtime?.fluxSoft,
+				newFluxHard: ship.tokenJson.runtime?.fluxHard,
 				newTotalFlux: newTotalFlux,
 				isOverloaded: newOverloaded,
 			});

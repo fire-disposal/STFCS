@@ -6,29 +6,34 @@
  */
 
 import {
-	ShipJSONSchema,
+	TokenJSONSchema,
 	WeaponJSONSchema,
 	PlayerProfileSchema,
 	GameSaveSchema,
 	GameMapSchema,
+	ShipJSONSchema,
 } from "../core/GameSchemas.js";
 
 /** Schema 对象映射（运行时验证用） */
 export const SCHEMAS = {
-	ship: ShipJSONSchema,
+	token: TokenJSONSchema,
 	weapon: WeaponJSONSchema,
 	player: PlayerProfileSchema,
 	save: GameSaveSchema,
 	map: GameMapSchema,
+	/** @deprecated 使用 token */
+	ship: ShipJSONSchema,
 } as const;
 
 /** Schema 版本 */
 export const SCHEMA_VERSIONS = {
-	ship: "2.0.0",
+	token: "2.0.0",
 	weapon: "2.0.0",
 	player: "1.0.0",
 	save: "1.0.0",
 	map: "1.0.0",
+	/** @deprecated 使用 token */
+	ship: "2.0.0",
 } as const;
 
 /**

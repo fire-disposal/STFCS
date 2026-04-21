@@ -4,7 +4,7 @@
 
 import type { ShipJSON, ShipRuntime, Faction, GamePhase, PlayerRoleValue } from "@vt/data";
 
-import type { TokenState, TokenType } from "../state/Token.js";
+import type { Token, TokenType } from "../state/Token.js";
 import type { ComponentState } from "../state/Component.js";
 
 // 本地定义这些类型（@vt/data 中不存在）
@@ -21,8 +21,9 @@ export interface GameState {
   turn: number;
   activeFaction: Faction;
   players: Map<string, PlayerState>;
-  tokens: Map<string, TokenState>; // 所有Token（舰船、站台、小行星等）
-  components: Map<string, ComponentState>; // 所有组件（武器、引擎等）
+  tokens: Map<string, Token>;
+  components: Map<string, ComponentState>;
+  globalModifiers?: Map<string, number>;
   metadata: GameMetadata;
   turnPhase?: TurnPhase;
   factionTurnPhase?: FactionTurnPhase;

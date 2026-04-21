@@ -4,7 +4,7 @@
 
 import type { Faction, GamePhase } from "@vt/data";
 import type { GameState, PlayerState } from "../types/common.js";
-import type { TokenState, ShipTokenState } from "./Token.js";
+import type { Token, ShipToken } from "./Token.js";
 
 /** 游戏状态管理器 */
 export class GameStateManager {
@@ -54,7 +54,7 @@ export class GameStateManager {
 
   // ==================== Token管理 ====================
 
-  addToken(token: TokenState): void {
+  addToken(token: Token): void {
     this.state.tokens.set(token.id, token);
   }
 
@@ -62,11 +62,11 @@ export class GameStateManager {
     return this.state.tokens.delete(tokenId);
   }
 
-  getToken(tokenId: string): TokenState | undefined {
+  getToken(tokenId: string): Token | undefined {
     return this.state.tokens.get(tokenId);
   }
 
-  updateToken(tokenId: string, updates: Partial<TokenState>): boolean {
+  updateToken(tokenId: string, updates: Partial<Token>): boolean {
     const token = this.state.tokens.get(tokenId);
     if (!token) return false;
 
@@ -94,14 +94,14 @@ export class GameStateManager {
     return Array.from(this.state.players.values());
   }
 
-  getAllTokens(): TokenState[] {
+  getAllTokens(): Token[] {
     return Array.from(this.state.tokens.values());
   }
 
-  getPlayerShips(playerId: string): ShipTokenState[] {
+  getPlayerShips(playerId: string): ShipToken[] {
     return this.getAllTokens()
-      .filter((token): token is ShipTokenState => token.type === "SHIP")
-      .filter(ship => ship.runtime.ownerId === playerId);
+      .filter((token): token is ShipToken => token.type === "SHIP")
+      .filter(ship => ship.tokenJson.runtime?.ownerId === playerId);
   }
 
   // ==================== 状态快照 ====================

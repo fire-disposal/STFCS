@@ -109,10 +109,10 @@ export class ComponentService {
 
 		const req = component.requirements;
 
-		if (req.shipSize && !req.shipSize.includes(shipJson.ship.size)) return false;
-		if (req.shipClass && !req.shipClass.includes(shipJson.ship.class)) return false;
+		if (req.shipSize && !req.shipSize.includes(shipJson.token.size)) return false;
+		if (req.shipClass && !req.shipClass.includes(shipJson.token.class)) return false;
 		if (req.power) {
-			const availablePower = shipJson.ship.fluxCapacity ?? 100;
+			const availablePower = shipJson.token.fluxCapacity ?? 100;
 			if (req.power > availablePower * 0.3) return false;
 		}
 

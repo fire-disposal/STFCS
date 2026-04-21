@@ -131,7 +131,7 @@ export class PlayerProfileService {
 		 $schema: "save-v1",
 		 $id: generateId("save", userId),
 		 metadata: { name, createdAt: Date.now(), updatedAt: Date.now() },
-		 ships,
+		 tokens: ships,
 		 createdAt: Date.now(),
 	 };
 

@@ -400,6 +400,7 @@ export class Room {
 
 	get name(): string { return this.options.roomName; }
 	get creatorId(): string { return this.options.creatorSessionId; }
+	set creatorId(value: string) { this.options.creatorSessionId = value; }
 	get maxPlayers(): number { return this.options.maxPlayers; }
 	get isPrivate(): boolean { return false; }
 	get password(): string | undefined { return undefined; }
@@ -411,8 +412,10 @@ export class Room {
 		const token = this.stateManager.getShipToken(shipId);
 		if (!token) return false;
 		this.stateManager.updateShipToken(shipId, {
-			...token,
-			runtime: { ...token.runtime, ...runtimeUpdates },
+			shipJson: {
+				...token.tokenJson,
+				runtime: { ...token.tokenJson.runtime, ...runtimeUpdates },
+			},
 		});
 		return true;
 	}

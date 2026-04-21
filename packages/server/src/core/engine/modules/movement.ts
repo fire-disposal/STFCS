@@ -289,7 +289,7 @@ export function validateMovement(
 	strafeDistance: number
 ): { valid: boolean; error?: string } {
 	// 应用 speed modifier
-	const baseMaxSpeed = ship.shipJson.ship.maxSpeed || 0;
+	const baseMaxSpeed = ship.tokenJson.token.maxSpeed || 0;
 	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
 	const movement = getMovementState(ship);
 
@@ -355,7 +355,7 @@ export function validateRotation(
 	angle: number
 ): { valid: boolean; error?: string } {
 	// 应用 turnRate modifier
-	const baseMaxTurn = ship.shipJson.ship.maxTurnRate || 0;
+	const baseMaxTurn = ship.tokenJson.token.maxTurnRate || 0;
 	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
 	const movement = getMovementState(ship);
 
@@ -413,8 +413,8 @@ export function getMovementStatus(ship: any): {
 	canMove: boolean;
 } {
 	// 应用 speed 和 turnRate modifier
-	const baseMaxSpeed = ship.shipJson?.ship?.maxSpeed || 0;
-	const baseMaxTurn = ship.shipJson?.ship?.maxTurnRate || 0;
+	const baseMaxSpeed = ship.tokenJson?.token?.maxSpeed || 0;
+	const baseMaxTurn = ship.tokenJson?.token?.maxTurnRate || 0;
 	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
 	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
 	const movement = getMovementState(ship);
