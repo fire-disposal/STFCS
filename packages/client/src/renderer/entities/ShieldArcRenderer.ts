@@ -32,6 +32,7 @@ const DEFAULT_SHIELD_ARC = 120;
 
 const FACTION_SHIELD_COLORS: Record<string, number> = {
 	[Faction.PLAYER]: 0x4fc3ff,
+	[Faction.ENEMY]: 0xff5d7e,
 	[Faction.NEUTRAL]: 0xff7f9f,
 };
 

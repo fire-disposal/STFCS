@@ -11,14 +11,14 @@ import { Application } from "@pixi/react";
 import { Graphics } from "pixi.js";
 import React, { useRef, useCallback } from "react";
 import type { InventoryToken } from "@vt/data";
-import { DamageType, WeaponTag, WeaponSlotSize } from "@vt/data";
+import { WeaponTag, WeaponSlotSize } from "@vt/data";
 
-const DAMAGE_TYPE_COLORS: Record<string, number> = {
-	[DamageType.KINETIC]: 0xffd700,
-	[DamageType.HIGH_EXPLOSIVE]: 0xff6b35,
-	[DamageType.ENERGY]: 0x7b68ee,
-	[DamageType.FRAGMENTATION]: 0x32cd32,
-};
+const DAMAGE_TYPE_COLORS = {
+	KINETIC: 0xffd700,
+	HIGH_EXPLOSIVE: 0xff6b35,
+	ENERGY: 0x7b68ee,
+	FRAGMENTATION: 0x32cd32,
+} as const;
 
 const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
 	SMALL: 5,

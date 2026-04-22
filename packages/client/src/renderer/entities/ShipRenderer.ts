@@ -24,7 +24,7 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipViewModel, ShipRenderOptions } from "../types";
 import type { WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
-import { Faction, DamageType, WeaponTag } from "@vt/data";
+import { Faction, WeaponTag } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -35,15 +35,16 @@ const FLUX_THRESHOLD = 0.5;
 
 const FACTION_COLORS: Record<string, number> = {
 	[Faction.PLAYER]: 0x4fc3ff,
+	[Faction.ENEMY]: 0xff5d7e,
 	[Faction.NEUTRAL]: 0xff7f9f,
 };
 
-const DAMAGE_TYPE_COLORS: Record<string, number> = {
-	[DamageType.KINETIC]: 0xffd700,
-	[DamageType.HIGH_EXPLOSIVE]: 0xff6b35,
-	[DamageType.ENERGY]: 0x7b68ee,
-	[DamageType.FRAGMENTATION]: 0x32cd32,
-};
+const DAMAGE_TYPE_COLORS = {
+	KINETIC: 0xffd700,
+	HIGH_EXPLOSIVE: 0xff6b35,
+	ENERGY: 0x7b68ee,
+	FRAGMENTATION: 0x32cd32,
+} as const;
 
 const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
 	SMALL: 6,
@@ -444,7 +445,7 @@ function drawSingleWeaponMarker(
 	const offsetY = mount.position?.y ?? 0;
 	const facingRad = (mount.facing ?? 0) * Math.PI / 180;
 
-	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType] ?? 0x7b68ee;
+	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? 0x7b68ee;
 	const iconSize = MOUNT_SLOT_SIZE[spec.size];
 	const alpha = isSelected ? 0.95 : 0.75;
 	const outlineAlpha = isSelected ? 1 : 0.8;
