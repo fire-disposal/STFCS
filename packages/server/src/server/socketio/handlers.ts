@@ -72,18 +72,28 @@ rpc.namespace("room", {
   create: async (payload: unknown, ctx) => {
     ctx.requireAuth();
     const p = payload as WsPayload<"room:create">;
+    
+    const existingRooms = ctx.roomManager.getAllRooms().filter(r => r.creatorId === ctx.playerId);
+    if (existingRooms.length > 0) {
+      throw err("你已拥有一个房间，请先删除现有房间", "ALREADY_HAS_ROOM");
+    }
+    
     const room = ctx.roomManager.createRoom({
       roomName: p.name,
       maxPlayers: p.maxPlayers ?? 4,
       mapWidth: p.mapWidth ?? 2000,
       mapHeight: p.mapHeight ?? 2000,
       creatorSessionId: ctx.playerId,
+      creatorName: ctx.playerName,
     });
     if (!room) throw err("创建房间失败", "ROOM_CREATE_FAILED");
     ctx.socket.join(room.id);
     ctx.socket.data.roomId = room.id;
     ctx.socket.data.role = "HOST";
     ctx.state.addPlayer(ctx.playerId, { sessionId: ctx.socket.id, nickname: ctx.playerName, role: "HOST", isReady: false, connected: true });
+    
+    ctx.io.emit("room:list_updated", { action: "created", room: { roomId: room.id, name: room.name, playerCount: 1, maxPlayers: room.maxPlayers, phase: "WAITING", ownerName: ctx.playerName } });
+    
     return { roomId: room.id, roomName: room.name, isHost: true };
   },
   list: async (_, ctx) => {
@@ -94,7 +104,7 @@ rpc.namespace("room", {
       maxPlayers: r.maxPlayers,
       phase: r.phase,
       turnCount: r.gameState?.turnCount ?? 0,
-      ownerId: r.creatorId,
+      ownerName: r.creatorName ?? "未知",
       createdAt: r.createdAt,
     }));
     return { rooms };
@@ -111,15 +121,29 @@ rpc.namespace("room", {
     ctx.socket.data.role = role;
     ctx.state.addPlayer(ctx.playerId, { sessionId: ctx.socket.id, nickname: ctx.playerName, role, isReady: false, connected: true });
     ctx.state.broadcastFull();
+    
+    ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: p.roomId, name: room.name, playerCount: room.getPlayerCount(), maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+    
     return { roomId: p.roomId, roomName: room.name, isHost: role === "HOST", role };
   },
   leave: async (_, ctx) => {
     ctx.requireRoom();
+    const room = ctx.roomManager.getRoom(ctx.roomId);
     ctx.state.removePlayer(ctx.playerId);
     ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
     ctx.socket.leave(ctx.roomId);
     ctx.socket.data.roomId = undefined;
     ctx.socket.data.role = undefined;
+    
+    if (room) {
+      const playerCountAfter = room.getPlayerCount();
+      if (playerCountAfter === 0) {
+        ctx.roomManager.removeRoom(ctx.roomId);
+        ctx.io.emit("room:list_updated", { action: "removed", roomId: ctx.roomId });
+      } else {
+        ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+      }
+    }
   },
   action: async (payload: unknown, ctx) => {
     ctx.requireRoom();

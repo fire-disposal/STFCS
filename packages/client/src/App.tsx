@@ -28,9 +28,9 @@ const App: React.FC = () => {
 	);
 
 	const myRoom = useMemo(() => {
-		if (!playerId || !rooms.length) return null;
-		return rooms.find((r) => r.ownerId === playerId) ?? null;
-	}, [playerId, rooms]);
+		if (!rooms.length) return null;
+		return rooms.find((r) => r.ownerName === userProfile.nickname) ?? null;
+	}, [userProfile.nickname, rooms]);
 
 	useEffect(() => {
 		const manager = new SocketNetworkManager(DEFAULT_WS_URL);

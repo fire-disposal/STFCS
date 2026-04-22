@@ -90,8 +90,8 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	);
 
 	const isOwnRoom = useCallback(
-		(room: RoomInfo) => playerId !== null && room.ownerId === playerId,
-		[playerId]
+		(room: RoomInfo) => playerId !== null && room.ownerName === profile.nickname,
+		[playerId, profile.nickname]
 	);
 
 	const visibleRooms = useMemo(() => {
@@ -229,8 +229,8 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 														{room.turnCount !== undefined && room.turnCount > 0 && (
 															<Badge variant="soft">回合：{room.turnCount}</Badge>
 														)}
-														{room.ownerId != null ? (
-															<Badge variant="soft">房主：#{room.ownerId}</Badge>
+														{room.ownerName ? (
+															<Badge variant="soft">房主：{room.ownerName}</Badge>
 														) : (
 															<Badge color="amber" variant="soft">等待房主</Badge>
 														)}

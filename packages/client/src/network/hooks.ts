@@ -50,6 +50,28 @@ export function useRoomList(
 		fetchRooms();
 	}, [fetchRooms, refreshKey]);
 
+	useEffect(() => {
+		if (!networkManager?.isConnected()) return;
+
+		const handleRoomUpdate = (data: unknown) => {
+			const update = data as { action: string; room?: RoomInfo; roomId?: string };
+			if (update.action === "created" && update.room) {
+				setRooms((prev) => [...prev, update.room!]);
+			} else if (update.action === "removed" && update.roomId) {
+				setRooms((prev) => prev.filter((r) => r.roomId !== update.roomId));
+			} else if (update.action === "updated" && update.room) {
+				setRooms((prev) => prev.map((r) => r.roomId === update.room!.roomId ? update.room! : r));
+			} else {
+				fetchRooms();
+			}
+		};
+
+		networkManager.on("room:list_updated", handleRoomUpdate);
+		return () => {
+			networkManager.off("room:list_updated", handleRoomUpdate);
+		};
+	}, [networkManager, fetchRooms]);
+
 	return { rooms, isLoading, refresh: fetchRooms };
 }
 

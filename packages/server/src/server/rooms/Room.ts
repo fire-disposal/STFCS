@@ -15,6 +15,7 @@ export interface RoomOptions {
 	mapWidth?: number;
 	mapHeight?: number;
 	creatorSessionId?: string;
+	creatorName?: string;
 }
 
 export interface RoomTransportCallbacks {
@@ -51,6 +52,7 @@ export class Room {
 			mapWidth: 2000,
 			mapHeight: 2000,
 			creatorSessionId: "",
+			creatorName: "未知",
 			...options,
 		};
 
@@ -273,6 +275,7 @@ export class Room {
 		this.options.creatorSessionId = value;
 		this.stateManager.changeHost(value);
 	}
+	get creatorName(): string { return this.options.creatorName; }
 	get maxPlayers(): number { return this.options.maxPlayers; }
 	get phase(): GamePhase { return this.stateManager.getState().phase; }
 

@@ -47,6 +47,7 @@ export class RoomManager {
 		mapWidth?: number;
 		mapHeight?: number;
 		creatorSessionId?: string;
+		creatorName?: string;
 	}): Room | null {
 		if (this.rooms.size >= this.options.maxRooms) {
 			this.logger.warn("Maximum rooms limit reached", { maxRooms: this.options.maxRooms });
@@ -124,6 +125,7 @@ export class RoomManager {
 		id: string;
 		name: string;
 		creatorId: string;
+		creatorName: string;
 		playerCount: number;
 		maxPlayers: number;
 		gameState: GameRoomState;
@@ -134,6 +136,7 @@ export class RoomManager {
 			id: room.id,
 			name: room.name,
 			creatorId: room.creatorId,
+			creatorName: room.creatorName,
 			playerCount: room.getPlayerCount(),
 			maxPlayers: room.maxPlayers,
 			gameState: room.gameState,

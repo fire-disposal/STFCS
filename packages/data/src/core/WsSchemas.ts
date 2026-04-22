@@ -108,7 +108,7 @@ const RoomInfoSchema = z.object({
   maxPlayers: z.number(),
   phase: z.string(),
   turnCount: z.number(),
-  ownerId: z.string(),
+  ownerName: z.string(),
   createdAt: z.number(),
 })
 export type RoomInfo = z.infer<typeof RoomInfoSchema>
