@@ -19,7 +19,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipRuntime } from "@vt/data";
+import type { ShipViewModel } from "../types";
 import { Faction } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -104,15 +104,9 @@ export interface ShieldArcOptions {
 	shieldMax?: number;
 }
 
-export type ShipForShield = ShipRuntime & {
-	id: string;
-	shieldRadius?: number;
-	shieldArc?: number;
-};
-
 export function useShieldArcRendering(
 	layers: LayerRegistry | null,
-	ships: ShipForShield[],
+	ships: ShipViewModel[],
 	options: ShieldArcOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ShieldArcCacheItem>>(new Map());
@@ -136,7 +130,7 @@ export function useShieldArcRendering(
 		}
 
 		for (const ship of ships) {
-			if (ship.overloaded || !ship.shield?.active) {
+			if (ship.runtime?.overloaded || !ship.runtime?.shield?.active) {
 				const cached = cache.get(ship.id);
 				if (cached) {
 					cached.graphics.clear();
@@ -167,22 +161,22 @@ export function useShieldArcRendering(
 
 function shouldUpdateShield(
 	cached: ShieldArcCacheItem,
-	ship: ShipForShield,
+	ship: ShipViewModel,
 	_defaultRadius: number,
 	_defaultMax: number
 ): boolean {
-	if (!cached.lastState || !ship.position) return true;
+	if (!cached.lastState || !ship.runtime?.position) return true;
 
 	const last = cached.lastState;
-	const dx = Math.abs(ship.position.x - last.x);
-	const dy = Math.abs(ship.position.y - last.y);
-	const dHeading = Math.abs(ship.heading - last.heading);
+	const dx = Math.abs(ship.runtime.position.x - last.x);
+	const dy = Math.abs(ship.runtime.position.y - last.y);
+	const dHeading = Math.abs(ship.runtime.heading - last.heading);
 
-	const shieldValue = ship.shield?.value ?? 0;
+	const shieldValue = ship.runtime.shield?.value ?? 0;
 	const shieldChanged =
-		(ship.shield?.active ?? false) !== last.shieldActive ||
+		(ship.runtime.shield?.active ?? false) !== last.shieldActive ||
 		shieldValue !== last.shieldValue ||
-		(ship.overloaded ?? false) !== last.isOverloaded;
+		(ship.runtime.overloaded ?? false) !== last.isOverloaded;
 
 	return dx > 0.5 || dy > 0.5 || dHeading > 1 || shieldChanged;
 }
@@ -190,16 +184,16 @@ function shouldUpdateShield(
 function createShieldArc(
 	layers: LayerRegistry,
 	cache: Map<string, ShieldArcCacheItem>,
-	ship: ShipForShield,
+	ship: ShipViewModel,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
 	const root = new Container();
-	root.position.set(ship.position.x, ship.position.y);
-	root.rotation = (ship.heading * Math.PI) / 180;
+	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	const graphics = new Graphics();
 	drawShieldArcForShip(graphics, ship, defaultRadius, defaultArc, defaultMax);
@@ -211,57 +205,57 @@ function createShieldArc(
 		root,
 		graphics,
 		lastState: {
-			x: ship.position.x,
-			y: ship.position.y,
-			heading: ship.heading,
-			shieldActive: ship.shield?.active ?? false,
-			shieldValue: ship.shield?.value ?? 0,
-			isOverloaded: ship.overloaded ?? false,
+			x: ship.runtime.position.x,
+			y: ship.runtime.position.y,
+			heading: ship.runtime.heading,
+			shieldActive: ship.runtime.shield?.active ?? false,
+			shieldValue: ship.runtime.shield?.value ?? 0,
+			isOverloaded: ship.runtime.overloaded ?? false,
 		},
 	});
 }
 
 function updateShieldArc(
 	cached: ShieldArcCacheItem,
-	ship: ShipForShield,
+	ship: ShipViewModel,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
-	cached.root.position.set(ship.position.x, ship.position.y);
-	cached.root.rotation = (ship.heading * Math.PI) / 180;
+	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	drawShieldArcForShip(cached.graphics, ship, defaultRadius, defaultArc, defaultMax);
 
 	cached.lastState = {
-		x: ship.position.x,
-		y: ship.position.y,
-		heading: ship.heading,
-		shieldActive: ship.shield?.active ?? false,
-		shieldValue: ship.shield?.value ?? 0,
-		isOverloaded: ship.overloaded ?? false,
+		x: ship.runtime.position.x,
+		y: ship.runtime.position.y,
+		heading: ship.runtime.heading,
+		shieldActive: ship.runtime.shield?.active ?? false,
+		shieldValue: ship.runtime.shield?.value ?? 0,
+		isOverloaded: ship.runtime.overloaded ?? false,
 	};
 }
 
 function drawShieldArcForShip(
 	graphics: Graphics,
-	ship: ShipForShield,
+	ship: ShipViewModel,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number
 ): void {
-	if (!ship.shield?.active || ship.overloaded) {
+	if (!ship.runtime?.shield?.active || ship.runtime.overloaded) {
 		graphics.clear();
 		return;
 	}
 
-	const radius = ship.shieldRadius ?? defaultRadius;
-	const arc = ship.shieldArc ?? defaultArc;
-	const orientation = ship.heading;
-	const color = getShieldColor(ship.faction);
-	const alpha = getShieldAlpha(ship.shield.value, defaultMax);
+	const radius = ship.spec.shield?.radius ?? defaultRadius;
+	const arc = ship.spec.shield?.arc ?? defaultArc;
+	const orientation = ship.runtime.heading;
+	const color = getShieldColor(ship.runtime.faction);
+	const alpha = getShieldAlpha(ship.runtime.shield?.value ?? 0, defaultMax);
 
 	drawShieldArc(graphics, radius + SHIELD_ARC_RADIUS_OFFSET, arc, orientation, color, alpha);
 }

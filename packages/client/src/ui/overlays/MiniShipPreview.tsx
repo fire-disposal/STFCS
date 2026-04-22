@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Rectangle } from "pixi.js";
-import { Faction, WeaponState } from "@vt/data";
-import type { TokenJSON, WeaponRuntime } from "@vt/data";
+import { Faction } from "@vt/data";
+import type { TokenJSON } from "@vt/data";
 import type { LayerRegistry, ShipViewModel } from "@/renderer";
 import { useLayerSystem, useShipRendering } from "@/renderer";
 import { useCanvasResize } from "@/renderer/core/useCanvasResize";
@@ -95,44 +95,34 @@ function createLayers(app: any): LayerRegistry {
 }
 
 function toPreviewShip(token: TokenJSON): ShipViewModel {
-    const weapons: WeaponRuntime[] = (token.token.mounts ?? [])
-        .map((mount) => {
-            if (!mount.weapon || typeof mount.weapon === "string") return null;
-            return {
-                mountId: mount.id,
-                state: WeaponState.READY,
-                weapon: mount.weapon.weapon,
-            } as WeaponRuntime;
-        })
-        .filter((item): item is WeaponRuntime => Boolean(item));
-
-    return {
-        id: token.$id,
-        name: token.metadata?.name,
+    const spec = token.token ?? token.spec;
+    const runtime = token.runtime ?? {
         position: { x: 0, y: 0 },
         heading: 0,
-        hull: token.runtime?.hull ?? token.token.maxHitPoints,
-        armor: token.runtime?.armor ?? [
-            token.token.armorMaxPerQuadrant,
-            token.token.armorMaxPerQuadrant,
-            token.token.armorMaxPerQuadrant,
-            token.token.armorMaxPerQuadrant,
-            token.token.armorMaxPerQuadrant,
-            token.token.armorMaxPerQuadrant,
+        hull: spec.maxHitPoints,
+        armor: [
+            spec.armorMaxPerQuadrant,
+            spec.armorMaxPerQuadrant,
+            spec.armorMaxPerQuadrant,
+            spec.armorMaxPerQuadrant,
+            spec.armorMaxPerQuadrant,
+            spec.armorMaxPerQuadrant,
         ],
-        fluxSoft: token.runtime?.fluxSoft ?? 0,
-        fluxHard: token.runtime?.fluxHard ?? 0,
-        faction: token.runtime?.faction ?? Faction.PLAYER,
-        ownerId: token.runtime?.ownerId,
-        destroyed: token.runtime?.destroyed ?? false,
-        overloaded: token.runtime?.overloaded ?? false,
-        overloadTime: token.runtime?.overloadTime ?? 1,
-        width: token.token.width ?? 42,
-        length: token.token.length ?? 70,
-        hullMax: token.token.maxHitPoints,
-        maxSpeed: token.token.maxSpeed,
-        maxTurnRate: token.token.maxTurnRate,
-        weapons,
+        fluxSoft: 0,
+        fluxHard: 0,
+        overloaded: false,
+        overloadTime: 1,
+        destroyed: false,
+        faction: Faction.PLAYER,
+    };
+
+    return {
+        $id: token.$id,
+        $presetRef: token.$presetRef,
+        spec,
+        runtime,
+        metadata: token.metadata,
+        id: token.$id,
     };
 }
 

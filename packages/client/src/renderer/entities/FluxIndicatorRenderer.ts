@@ -17,7 +17,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipRuntime } from "@vt/data";
+import type { ShipViewModel } from "../types";
 import { FluxState } from "@vt/data";
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -108,15 +108,15 @@ function drawOverloadWarning(graphics: Graphics, size: number): void {
 	graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.5 });
 }
 
-function computeFluxState(ship: ShipRuntime & { id: string; fluxCapacity?: number }): { percent: number; state: string } {
-	const fluxSoft = ship.fluxSoft ?? 0;
-	const fluxHard = ship.fluxHard ?? 0;
-	const capacity = ship.fluxCapacity ?? 100;
+function computeFluxState(ship: ShipViewModel): { percent: number; state: string } {
+	const fluxSoft = ship.runtime?.fluxSoft ?? 0;
+	const fluxHard = ship.runtime?.fluxHard ?? 0;
+	const capacity = ship.spec.fluxCapacity ?? 100;
 	const total = fluxSoft + fluxHard;
 	const percent = total / capacity;
 
-	if (ship.overloaded) return { percent: 1, state: FluxState.OVERLOADED };
-	if (ship.venting) return { percent, state: FluxState.VENTING };
+	if (ship.runtime?.overloaded) return { percent: 1, state: FluxState.OVERLOADED };
+	if (ship.runtime?.venting) return { percent, state: FluxState.VENTING };
 	if (percent >= FLUX_CRITICAL_THRESHOLD) return { percent, state: FluxState.HIGH };
 	if (percent >= FLUX_WARNING_THRESHOLD) return { percent, state: FluxState.HIGH };
 	return { percent, state: FluxState.NORMAL };
@@ -145,7 +145,7 @@ export interface FluxIndicatorOptions {
 
 export function useFluxIndicatorRendering(
 	layers: LayerRegistry | null,
-	ships: (ShipRuntime & { id: string; fluxCapacity?: number })[],
+	ships: ShipViewModel[],
 	options: FluxIndicatorOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, FluxIndicatorCacheItem>>(new Map());
@@ -190,22 +190,22 @@ export function useFluxIndicatorRendering(
 
 function shouldUpdateFlux(
 	cached: FluxIndicatorCacheItem,
-	ship: ShipRuntime & { id: string; fluxCapacity?: number },
-	defaultCapacity: number
+	ship: ShipViewModel,
+	_defaultCapacity: number
 ): boolean {
-	if (!cached.lastState || !ship.position) return true;
+	if (!cached.lastState || !ship.runtime?.position) return true;
 
 	const last = cached.lastState;
-	const dx = Math.abs(ship.position.x - last.x);
-	const dy = Math.abs(ship.position.y - last.y);
-	const dHeading = Math.abs(ship.heading - last.heading);
+	const dx = Math.abs(ship.runtime.position.x - last.x);
+	const dy = Math.abs(ship.runtime.position.y - last.y);
+	const dHeading = Math.abs(ship.runtime.heading - last.heading);
 
-	const flux = computeFluxState({ ...ship, fluxCapacity: ship.fluxCapacity ?? defaultCapacity });
+	const flux = computeFluxState(ship);
 	const fluxChanged =
 		flux.percent !== last.fluxPercent ||
 		flux.state !== last.fluxState ||
-		ship.overloaded !== last.isOverloaded ||
-		ship.overloadTime !== last.overloadTime;
+		ship.runtime.overloaded !== last.isOverloaded ||
+		ship.runtime.overloadTime !== last.overloadTime;
 
 	return dx > 0.5 || dy > 0.5 || dHeading > 1 || fluxChanged;
 }
@@ -213,16 +213,15 @@ function shouldUpdateFlux(
 function createFluxIndicator(
 	layers: LayerRegistry,
 	cache: Map<string, FluxIndicatorCacheItem>,
-	ship: ShipRuntime & { id: string; fluxCapacity?: number },
-	defaultCapacity: number
+	ship: ShipViewModel,
+	_defaultCapacity: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
 	const root = new Container();
-	root.position.set(ship.position.x, ship.position.y);
+	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 
-	const capacity = ship.fluxCapacity ?? defaultCapacity;
-	const flux = computeFluxState({ ...ship, fluxCapacity: capacity });
+	const flux = computeFluxState(ship);
 	const radius = FLUX_RING_RADIUS;
 
 	const fluxRing = new Graphics();
@@ -230,20 +229,20 @@ function createFluxIndicator(
 	root.addChild(fluxRing);
 
 	const overloadIcon = new Graphics();
-	if (ship.overloaded) {
+	if (ship.runtime.overloaded) {
 		drawOverloadWarning(overloadIcon, OVERLOAD_ICON_SIZE);
 	}
 	overloadIcon.position.set(0, -radius - OVERLOAD_ICON_SIZE / 2);
-	overloadIcon.visible = ship.overloaded ?? false;
+	overloadIcon.visible = ship.runtime.overloaded ?? false;
 	root.addChild(overloadIcon);
 
 	const overloadText = new Text({
-		text: formatOverloadTime(ship.overloadTime ?? 0),
+		text: formatOverloadTime(ship.runtime.overloadTime ?? 0),
 		style: overloadTextStyle,
 	});
 	overloadText.anchor.set(0.5, 0.5);
 	overloadText.position.set(0, -radius - OVERLOAD_TEXT_OFFSET_Y);
-	overloadText.visible = (ship.overloaded ?? false) && (ship.overloadTime ?? 0) > 0;
+	overloadText.visible = (ship.runtime.overloaded ?? false) && (ship.runtime.overloadTime ?? 0) > 0;
 	root.addChild(overloadText);
 
 	layers.fluxIndicators.addChild(root);
@@ -254,50 +253,49 @@ function createFluxIndicator(
 		overloadIcon,
 		overloadText,
 		lastState: {
-			x: ship.position.x,
-			y: ship.position.y,
-			heading: ship.heading,
+			x: ship.runtime.position.x,
+			y: ship.runtime.position.y,
+			heading: ship.runtime.heading,
 			fluxPercent: flux.percent,
 			fluxState: flux.state,
-			isOverloaded: ship.overloaded ?? false,
-			overloadTime: ship.overloadTime ?? 0,
+			isOverloaded: ship.runtime.overloaded ?? false,
+			overloadTime: ship.runtime.overloadTime ?? 0,
 		},
 	});
 }
 
 function updateFluxIndicator(
 	cached: FluxIndicatorCacheItem,
-	ship: ShipRuntime & { id: string; fluxCapacity?: number },
-	defaultCapacity: number
+	ship: ShipViewModel,
+	_defaultCapacity: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
-	cached.root.position.set(ship.position.x, ship.position.y);
+	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 
-	const capacity = ship.fluxCapacity ?? defaultCapacity;
-	const flux = computeFluxState({ ...ship, fluxCapacity: capacity });
+	const flux = computeFluxState(ship);
 	const radius = FLUX_RING_RADIUS;
 
 	drawFluxRing(cached.fluxRing, radius, flux.percent, flux.state);
 
-	cached.overloadIcon.visible = ship.overloaded ?? false;
-	if (ship.overloaded) {
+	cached.overloadIcon.visible = ship.runtime.overloaded ?? false;
+	if (ship.runtime.overloaded) {
 		drawOverloadWarning(cached.overloadIcon, OVERLOAD_ICON_SIZE);
 	}
 
-	cached.overloadText.visible = (ship.overloaded ?? false) && (ship.overloadTime ?? 0) > 0;
-	if (ship.overloaded && ship.overloadTime) {
-		cached.overloadText.text = formatOverloadTime(ship.overloadTime);
+	cached.overloadText.visible = (ship.runtime.overloaded ?? false) && (ship.runtime.overloadTime ?? 0) > 0;
+	if (ship.runtime.overloaded && ship.runtime.overloadTime) {
+		cached.overloadText.text = formatOverloadTime(ship.runtime.overloadTime);
 	}
 
 	cached.lastState = {
-		x: ship.position.x,
-		y: ship.position.y,
-		heading: ship.heading,
+		x: ship.runtime.position.x,
+		y: ship.runtime.position.y,
+		heading: ship.runtime.heading,
 		fluxPercent: flux.percent,
 		fluxState: flux.state,
-		isOverloaded: ship.overloaded ?? false,
-		overloadTime: ship.overloadTime ?? 0,
+		isOverloaded: ship.runtime.overloaded ?? false,
+		overloadTime: ship.runtime.overloadTime ?? 0,
 	};
 }
 

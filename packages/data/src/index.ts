@@ -73,6 +73,7 @@ export type {
   SaveBuild,
   InventoryToken,
   CombatToken,
+  TokenJSON,
   TokenSpec,
   TokenRuntime,
   CustomizeTokenPayload,
@@ -92,3 +93,13 @@ export type {
   BattleLogPayload,
   EditLogContext,
 } from "./core/index.js"
+
+export {
+  CombatTokenSchema,
+  InventoryTokenSchema,
+  TokenJSONSchema,
+  WeaponJSONSchema,
+  PlayerProfileSchema,
+  GameSaveSchema,
+  GameMapSchema,
+} from "./core/GameSchemas.js"

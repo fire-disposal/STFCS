@@ -107,7 +107,7 @@ export function useMovementVisualRendering(
 			}
 		}
 
-		if (selectedShip && selectedShip.position) {
+		if (selectedShip && selectedShip.runtime?.position) {
 			const cached = cache.get(selectedShip.id);
 			if (!cached) {
 				createMovementGraphics(
@@ -147,11 +147,11 @@ function createMovementGraphics(
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
 	const root = new Container();
-	root.position.set(ship.position.x, ship.position.y);
-	root.rotation = (ship.heading * Math.PI) / 180;
+	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	const directionGraphics = new Graphics();
 	const targetGraphics = new Graphics();
@@ -183,14 +183,14 @@ function updateMovementGraphics(
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
 	const newState = buildStateSnapshot(ship, preview, maxSpeed, maxTurnRate);
 	const shouldUpdate = !cached.lastState || needsRedraw(cached.lastState, newState);
 
 	if (shouldUpdate) {
-		cached.root.position.set(ship.position.x, ship.position.y);
-		cached.root.rotation = (ship.heading * Math.PI) / 180;
+		cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+		cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 		drawMovementIndicators(
 			cached.directionGraphics,
@@ -211,10 +211,10 @@ function buildStateSnapshot(
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
 ): MovementGraphicsCache["lastState"] {
 	return {
-		x: ship.position?.x ?? 0,
-		y: ship.position?.y ?? 0,
-		heading: ship.heading ?? 0,
-		phase: preview?.phase ?? getMovePhaseFromMovement(ship.movement),
+		x: ship.runtime?.position?.x ?? 0,
+		y: ship.runtime?.position?.y ?? 0,
+		heading: ship.runtime?.heading ?? 0,
+		phase: preview?.phase ?? getMovePhaseFromMovement(ship.runtime?.movement),
 		mode: preview?.mode ?? "forward",
 		value: preview?.value ?? 0,
 		turn: preview?.turn ?? 0,
@@ -267,7 +267,7 @@ function drawMovementIndicators(
 	directionGraphics.clear();
 	targetGraphics.clear();
 
-	const phase = preview?.phase ?? getMovePhaseFromMovement(ship.movement);
+	const phase = preview?.phase ?? getMovePhaseFromMovement(ship.runtime?.movement);
 	const remainingForward = preview?.remaining.forward ?? maxSpeed * 2;
 	const remainingStrafe = preview?.remaining.strafe ?? maxSpeed;
 	const remainingTurn = preview?.remaining.turn ?? maxTurnRate;

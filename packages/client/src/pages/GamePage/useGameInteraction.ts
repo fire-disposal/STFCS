@@ -29,7 +29,7 @@ export function useGameInteraction(
 			await sendCommand("game:action", {
 				action: "shield",
 				tokenId: selectedShip.id,
-				active: !selectedShip.shield?.active,
+				active: !selectedShip.runtime?.shield?.active,
 			});
 		} catch (error) {
 			notify.error("护盾切换失败");

@@ -22,7 +22,7 @@
 
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipViewModel, ShipRenderOptions } from "../types";
-import type { WeaponRuntime } from "@vt/data";
+import type { WeaponRuntime, MountSpec } from "@vt/data";
 import { Faction, DamageType, WeaponTag } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -106,7 +106,7 @@ export function useShipRendering(
 		}
 
 		for (const ship of ships) {
-			if (!ship.position) continue;
+			if (!ship.runtime?.position) continue;
 
 			const isSelected = ship.id === selectedId;
 			const cached = cache.get(ship.id);
@@ -135,15 +135,15 @@ function shouldUpdate(
 	ship: ShipViewModel,
 	isSelected: boolean
 ): boolean {
-	if (!cached.lastState || !ship.position) return true;
+	if (!cached.lastState || !ship.runtime?.position) return true;
 
-	const dx = Math.abs(ship.position.x - cached.lastState.x);
-	const dy = Math.abs(ship.position.y - cached.lastState.y);
-	const dHeading = Math.abs(ship.heading - cached.lastState.heading);
-	const fluxTotal = (ship.fluxSoft ?? 0) + (ship.fluxHard ?? 0);
+	const dx = Math.abs(ship.runtime.position.x - cached.lastState.x);
+	const dy = Math.abs(ship.runtime.position.y - cached.lastState.y);
+	const dHeading = Math.abs(ship.runtime.heading - cached.lastState.heading);
+	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
 	const dFlux = Math.abs(fluxTotal - cached.lastState.flux);
 	const selectedChanged = cached.isSelected !== isSelected;
-	const weaponCount = ship.weapons?.length ?? 0;
+	const weaponCount = ship.runtime.weapons?.length ?? 0;
 	const weaponCountChanged = cached.lastState.weaponCount !== weaponCount;
 
 	return (
@@ -161,14 +161,14 @@ function updateShipToken(
 	ship: ShipViewModel,
 	isSelected: boolean
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
-	const color = FACTION_COLORS[ship.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
-	const halfWidth = (ship.width ?? DEFAULT_WIDTH) / 2;
-	const halfLength = (ship.length ?? DEFAULT_LENGTH) / 2;
+	const color = FACTION_COLORS[ship.runtime.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
+	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
+	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 
-	cached.root.position.set(ship.position.x, ship.position.y);
-	cached.root.rotation = (ship.heading * Math.PI) / 180;
+	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	if (cached.isSelected !== isSelected) {
 		cached.isSelected = isSelected;
@@ -178,13 +178,13 @@ function updateShipToken(
 
 	drawWeaponMarkers(cached.weaponMarkers, ship, isSelected);
 
-	const fluxTotal = (ship.fluxSoft ?? 0) + (ship.fluxHard ?? 0);
+	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
 	cached.lastState = {
-		x: ship.position.x,
-		y: ship.position.y,
-		heading: ship.heading,
+		x: ship.runtime.position.x,
+		y: ship.runtime.position.y,
+		heading: ship.runtime.heading,
 		flux: fluxTotal,
-		weaponCount: ship.weapons?.length ?? 0,
+		weaponCount: ship.runtime.weapons?.length ?? 0,
 	};
 }
 
@@ -196,16 +196,16 @@ function createShipToken(
 	optionsRef: React.MutableRefObject<ShipRenderOptions>,
 	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
-	const color = FACTION_COLORS[ship.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
-	const halfWidth = (ship.width ?? DEFAULT_WIDTH) / 2;
-	const halfLength = (ship.length ?? DEFAULT_LENGTH) / 2;
+	const color = FACTION_COLORS[ship.runtime.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
+	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
+	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 	const hitRadius = Math.max(halfWidth, halfLength) + 10;
 
 	const root = new Container();
-	root.position.set(ship.position.x, ship.position.y);
-	root.rotation = (ship.heading * Math.PI) / 180;
+	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 	root.eventMode = "static";
 	root.cursor = "pointer";
 	root.hitArea = new Circle(0, 0, hitRadius);
@@ -253,7 +253,7 @@ function createShipToken(
 
 	layers.tacticalTokens.addChild(root);
 
-	const fluxTotal = (ship.fluxSoft ?? 0) + (ship.fluxHard ?? 0);
+	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
 	cache.set(ship.id, {
 		root,
 		tacticalToken,
@@ -261,11 +261,11 @@ function createShipToken(
 		weaponMarkers,
 		isSelected,
 		lastState: {
-			x: ship.position.x,
-			y: ship.position.y,
-			heading: ship.heading,
+			x: ship.runtime.position.x,
+			y: ship.runtime.position.y,
+			heading: ship.runtime.heading,
 			flux: fluxTotal,
-			weaponCount: ship.weapons?.length ?? 0,
+			weaponCount: ship.runtime.weapons?.length ?? 0,
 		},
 	});
 }
@@ -337,24 +337,26 @@ function drawWeaponMarkers(
 ): void {
 	target.clear();
 
-	if (!ship.weapons) return;
+	if (!ship.runtime?.weapons) return;
 
-	for (const weapon of ship.weapons) {
-		drawSingleWeaponMarker(target, weapon, isSelected);
+	for (const weapon of ship.runtime.weapons) {
+		drawSingleWeaponMarker(target, weapon, ship.spec.mounts, isSelected);
 	}
 }
 
 function drawSingleWeaponMarker(
 	target: Graphics,
 	weapon: WeaponRuntime,
+	mounts: MountSpec[] | undefined,
 	isSelected: boolean
 ): void {
-	const spec = weapon.weapon;
+	const mount = mounts?.find((m) => m.id === weapon.mountId);
+	const spec = mount?.weapon?.spec;
 	if (!spec) return;
 
-	const offsetX = 0;
-	const offsetY = 0;
-	const facingRad = 0;
+	const offsetX = mount?.position?.x ?? 0;
+	const offsetY = mount?.position?.y ?? 0;
+	const facingRad = (mount?.facing ?? 0) * Math.PI / 180;
 
 	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType] ?? 0x7b68ee;
 	const iconSize = WEAPON_SIZE_SCALE[spec.size] ?? 8;

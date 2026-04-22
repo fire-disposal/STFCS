@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Target, Filter, Search, Rocket } from "lucide-react";
 import { Badge, Box, Button, Card, Flex, Grid, Text, TextField, Select } from "@radix-ui/themes";
-import type { TokenJSON } from "@vt/data";
+import type { CombatToken } from "@vt/data";
 import type { SocketNetworkManager, SocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 
@@ -21,7 +21,7 @@ interface UserShipProfile {
 	weapons: string[];
 	faction: "player" | "neutral" | "enemy";
 	description?: string;
-	sourceShip?: TokenJSON;
+	sourceShip?: CombatToken;
 }
 
 export interface HangarPanelProps {
@@ -39,7 +39,7 @@ export const HangarPanel: React.FC<HangarPanelProps> = ({
 }) => {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterFaction, setFilterFaction] = useState<string>("all");
-	const [hangarShips, setHangarShips] = useState<TokenJSON[]>([]);
+	const [hangarShips, setHangarShips] = useState<CombatToken[]>([]);
 	const [hangarLoading, setHangarLoading] = useState(false);
 
 	useEffect(() => {
@@ -75,22 +75,22 @@ export const HangarPanel: React.FC<HangarPanelProps> = ({
 					? "neutral"
 					: "enemy";
 
-			const weaponNames = (ship.token.mounts || [])
+			const weaponNames = (ship.spec.mounts || [])
 				.map((mount: any) => {
 					if (!mount.weapon) return undefined;
 					if (typeof mount.weapon === "string") return mount.weapon;
-					return mount.weapon?.weapon?.metadata?.name || mount.weapon?.weapon?.$id || mount.weapon.$id;
+					return mount.weapon?.spec?.metadata?.name || mount.weapon?.spec?.$id || mount.weapon.$id;
 				})
 				.filter((w: any): w is string => Boolean(w));
 
 			return {
 				id: ship.$id,
 				name: ship.metadata?.name || ship.$id,
-				type: sizeNameMap[ship.token.size] || ship.token.size,
-				hull: ship.runtime?.hull ?? ship.token.maxHitPoints,
-				hullMax: ship.token.maxHitPoints,
+				type: sizeNameMap[ship.spec.size] || ship.spec.size,
+				hull: ship.runtime?.hull ?? ship.spec.maxHitPoints,
+				hullMax: ship.spec.maxHitPoints,
 				shield: ship.runtime?.shield?.value ?? 0,
-				fluxCapacity: ship.token.fluxCapacity ?? 0,
+				fluxCapacity: ship.spec.fluxCapacity ?? 0,
 				weapons: weaponNames,
 				faction,
 				description: ship.metadata?.description,

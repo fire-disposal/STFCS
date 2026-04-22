@@ -11,10 +11,11 @@ import type {
 	WsResponseData,
 	WsResponse,
 	RoomInfo,
-	TokenJSON,
+	CombatToken,
 	WeaponJSON,
 	GameRoomState,
-	DeltaChange,
+	StatePatch,
+	StatePatchPayload,
 } from "@vt/data";
 
 const logger = {
@@ -44,15 +45,15 @@ export interface RoomJoinResult {
 
 export interface PlayerLoadoutResult {
 	success: boolean;
-	loadout?: { ships: TokenJSON[]; weapons: WeaponJSON[] };
+	loadout?: { ships: CombatToken[]; weapons: WeaponJSON[] };
 	error?: string;
 }
 
 interface InternalGameState {
 	phase?: string;
-	turn?: number;
+	turnCount?: number;
 	activeFaction?: string;
-	tokens?: Record<string, TokenJSON>;
+	tokens?: Record<string, CombatToken>;
 	players?: Record<string, unknown>;
 }
 
@@ -94,9 +95,6 @@ export class SocketNetworkManager {
 		});
 	}
 
-	/**
-	 * 泛型请求方法 - 自动推导类型
-	 */
 	async request<E extends WsEventName>(
 		event: E,
 		payload: WsPayload<E>,
@@ -173,13 +171,13 @@ export class SocketNetworkManager {
 		if (!this.socket?.connected) return { success: false, error: "Not connected" };
 
 		try {
-			const [tokenData, weaponData] = await Promise.all([
-				this.request("token:list", {}),
-				this.request("weapon:list", {}),
+			const [tokenRes, weaponRes] = await Promise.all([
+				this.request("customize:token", { action: "list" }),
+				this.request("customize:weapon", { action: "list" }),
 			]);
 
-			const ships = (tokenData.ships ?? []).filter((s) => s !== null).map((s) => s.shipJson as TokenJSON).filter(Boolean);
-			const weapons = (weaponData.weapons ?? []).filter((w) => w !== null).map((w) => w.weaponJson as WeaponJSON).filter(Boolean);
+			const ships = (tokenRes as { ships?: Array<{ data: CombatToken }> }).ships?.map((s) => s.data) ?? [];
+			const weapons = (weaponRes as { weapons?: Array<{ data: WeaponJSON }> }).weapons?.map((w) => w.data) ?? [];
 
 			return { success: true, loadout: { ships, weapons } };
 		} catch (error) {
@@ -307,7 +305,7 @@ export class SocketNetworkManager {
 		this.socket.on("sync:full", (state: GameRoomState) => {
 			this.gameState = {
 				phase: state.phase,
-				turn: state.turnCount,
+				turnCount: state.turnCount,
 				activeFaction: state.activeFaction,
 				tokens: state.tokens,
 				players: state.players,
@@ -316,18 +314,13 @@ export class SocketNetworkManager {
 			this.emit("state:full", state);
 		});
 
-		this.socket.on("sync:delta", (data: { timestamp: number; changes: DeltaChange[] }) => {
-			if (this.gameState) this.applyDelta(data.changes);
-			this.emit("sync:delta", data);
-			this.emit("state:delta", data);
+		this.socket.on("state:patch", (data: StatePatchPayload) => {
+			if (this.gameState) this.applyPatches(data.patches);
+			this.emit("state:patch", data);
 		});
 
-		this.socket.on("player:joined", (data: { playerId: string; playerName: string; totalPlayers: number }) => {
-			this.emit("player:joined", data);
-		});
-
-		this.socket.on("player:left", (data: { playerId: string; totalPlayers: number }) => {
-			this.emit("player:left", data);
+		this.socket.on("battle:log", (data: { log: unknown }) => {
+			this.emit("battle:log", data);
 		});
 
 		this.socket.on("error", (data: { code: string; message: string }) => {
@@ -350,49 +343,75 @@ export class SocketNetworkManager {
 		}
 	}
 
-	private applyDelta(events: DeltaChange[]): void {
-		for (const change of events) {
+	private applyPatches(patches: StatePatch[]): void {
+		for (const patch of patches) {
 			if (!this.gameState) continue;
 
-			switch (change.type) {
-				case "token_add":
-					if (change.id) {
+			const path = patch.path;
+			if (path.length === 0) continue;
+
+			const [rootKey, ...restPath] = path;
+
+			if (rootKey === "tokens") {
+				if (restPath.length === 0) {
+					if (patch.op === "add" && patch.value) {
 						this.gameState.tokens ??= {};
-						this.gameState.tokens[change.id] = change.value as TokenJSON;
+						this.gameState.tokens[patch.value.$id as string] = patch.value as CombatToken;
 					}
-					break;
-				case "token_update":
-					if (change.id && this.gameState.tokens?.[change.id]) {
-						this.gameState.tokens[change.id] = { ...this.gameState.tokens[change.id], ...(change.value as Partial<TokenJSON>) };
+				} else {
+					const tokenId = String(restPath[0]);
+					if (patch.op === "remove") {
+						if (this.gameState.tokens) delete this.gameState.tokens[tokenId];
+					} else if (patch.op === "add" || patch.op === "replace") {
+						this.gameState.tokens ??= {};
+						if (!this.gameState.tokens[tokenId] && patch.op === "add") {
+							this.gameState.tokens[tokenId] = patch.value as CombatToken;
+						} else if (this.gameState.tokens[tokenId]) {
+							this.applyPatchToObject(this.gameState.tokens[tokenId], restPath.slice(1), patch);
+						}
 					}
-					break;
-				case "token_remove":
-				case "token_destroyed":
-					if (change.id && this.gameState.tokens) {
-						delete this.gameState.tokens[change.id];
-					}
-					break;
-				case "player_join":
-					if (change.id) {
+				}
+			} else if (rootKey === "players") {
+				if (restPath.length === 0) {
+					if (patch.op === "add" && patch.value) {
 						this.gameState.players ??= {};
-						this.gameState.players[change.id] = change.value;
+						const player = patch.value as { sessionId: string };
+						this.gameState.players[player.sessionId] = patch.value;
 					}
-					break;
-				case "player_leave":
-					if (change.id && this.gameState.players) {
-						delete this.gameState.players[change.id];
+				} else {
+					const playerId = String(restPath[0]);
+					if (patch.op === "remove") {
+						if (this.gameState.players) delete this.gameState.players[playerId];
+					} else if (this.gameState.players?.[playerId]) {
+						this.applyPatchToObject(this.gameState.players[playerId], restPath.slice(1), patch);
 					}
-					break;
-				case "phase_change":
-					this.gameState.phase = change.value as string;
-					break;
-				case "turn_change":
-					this.gameState.turn = change.value as number;
-					break;
-				case "faction_turn":
-					this.gameState.activeFaction = change.value as string;
-					break;
+				}
+			} else if (rootKey === "phase" && patch.op === "replace") {
+				this.gameState.phase = patch.value as string;
+			} else if (rootKey === "turnCount" && patch.op === "replace") {
+				this.gameState.turnCount = patch.value as number;
+			} else if (rootKey === "activeFaction" && patch.op === "replace") {
+				this.gameState.activeFaction = patch.value as string;
 			}
+		}
+	}
+
+	private applyPatchToObject(obj: unknown, path: (string | number)[], patch: StatePatch): void {
+		if (path.length === 0) return;
+		if (!obj || typeof obj !== "object") return;
+
+		const target = obj as Record<string | number, unknown>;
+		const [key, ...rest] = path;
+
+		if (rest.length === 0) {
+			if (patch.op === "remove") {
+				delete target[key];
+			} else {
+				target[key] = patch.value;
+			}
+		} else {
+			if (!target[key]) target[key] = typeof rest[0] === "number" ? [] : {};
+			this.applyPatchToObject(target[key], rest, patch);
 		}
 	}
 

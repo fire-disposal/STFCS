@@ -1,8 +1,8 @@
-import { GamePhase, PlayerRole } from "@vt/data";
+import { GamePhase } from "@vt/data";
 import type { ShipViewModel } from "@/renderer";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useSocketRoom, useShips } from "@/network";
+import { useSocketRoom, useTokens } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
 import React, { useState } from "react";
@@ -36,16 +36,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
 
-	const ships = useShips(room) as unknown as ShipViewModel[];
-	const selectedShip = ships.find((s) => s.id === selectedShipId) ?? null;
+	const tokens = useTokens(room) as unknown as ShipViewModel[];
+	const selectedShip = tokens.find((t) => t.id === selectedShipId) ?? null;
 
 	const { handleToggleShield, handleVent } = useGameInteraction(room, selectedShip);
 
 	const handleRealityEdit = async (shipId: string, runtimeData: Record<string, unknown>) => {
 		if (!room) return;
 		try {
-			for (const [field, value] of Object.entries(runtimeData)) {
-				await room.send("dm:modify", { tokenId: shipId, field, value });
+			for (const [path, value] of Object.entries(runtimeData)) {
+				await room.send("edit:token", { action: "modify", tokenId: shipId, path: `runtime/${path}`, value });
 			}
 			notify.success("舰船数据已提交修改");
 		} catch (error) {
@@ -53,8 +53,13 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		}
 	};
 
-	const currentPlayer = room?.state?.players?.get(room.sessionId ?? "") ?? null;
-	const isHost = currentPlayer?.role === PlayerRole.HOST;
+	const playerKeys = room?.state?.players ? Object.keys(room.state.players) : [];
+	const currentPlayerKey = playerKeys.find((k) => {
+		const p = room?.state?.players[k];
+		return p?.sessionId === room?.sessionId;
+	});
+	const currentPlayer = currentPlayerKey ? room?.state?.players[currentPlayerKey] : undefined;
+	const isHost = currentPlayer?.role === "HOST";
 
 	const cursorPosition = mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 };
 
@@ -62,7 +67,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		return <div className="game-loading"><span>连接中...</span></div>;
 	}
 
-	const players = Array.from(room.state.players.values()).filter((p) => p.connected);
+	const players = Object.values(room.state.players).filter((p) => p.connected);
 	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "#4a9eff"
 		: room.state.currentPhase === GamePhase.DM_ACTION ? "#ff6f8f"
 		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
@@ -80,8 +85,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 				<div className="game-header__center">
 					{players.slice(0, 6).map((p) => (
-						<span key={p.sessionId} className={`player-chip ${p.role === PlayerRole.HOST ? "player-chip--dm" : ""}`}>
-							{p.role === PlayerRole.HOST && <Crown size={12} />}
+						<span key={p.sessionId} className={`player-chip ${p.role === "HOST" ? "player-chip--dm" : ""}`}>
+							{p.role === "HOST" && <Crown size={12} />}
 							<span className="player-chip__name">{p.nickname}</span>
 							{p.isReady ? <CheckCircle size={12} className="player-chip__ready" /> : <XCircle size={12} />}
 						</span>
@@ -97,7 +102,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<main className="game-main">
 				<section className="game-map">
-					<PixiCanvas ships={ships} />
+					<PixiCanvas ships={tokens} />
 				</section>
 			</main>
 
@@ -115,7 +120,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						label: "现实修改",
 						icon: <Edit size={14} />,
 						component: <RealityEditPanel ship={selectedShip} onSubmit={handleRealityEdit} />,
-						enabled: isHost,
+						enabled: Boolean(isHost),
 					},
 					{
 						id: "hangar",
@@ -126,10 +131,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 								cursorPosition={cursorPosition}
 								networkManager={networkManager}
 								room={room ?? undefined}
-								isHost={isHost}
+								isHost={Boolean(isHost)}
 							/>
 						),
-						enabled: isHost,
+						enabled: Boolean(isHost),
 					},
 					{
 						id: "view-control",
@@ -152,7 +157,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						<div className="modal-body">
 							{players.map((p) => (
 								<div key={p.sessionId} className={`player-row ${p.sessionId === room.sessionId ? "player-row--current" : ""}`}>
-									{p.role === PlayerRole.HOST && <Crown size={14} className="player-row__icon" />}
+									{p.role === "HOST" && <Crown size={14} className="player-row__icon" />}
 									<span className="player-row__name">{p.nickname}</span>
 									{p.isReady ? <CheckCircle size={12} className="player-row__ready" /> : <XCircle size={12} />}
 								</div>

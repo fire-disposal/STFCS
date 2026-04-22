@@ -118,7 +118,7 @@ export class ShipHUDManager {
 		}
 
 		for (const ship of ships) {
-			if (!ship.position) continue;
+			if (!ship.runtime?.position) continue;
 
 			const cached = this.cache.get(ship.id);
 			if (!cached) {
@@ -137,20 +137,20 @@ export class ShipHUDManager {
 		canvasSize: { width: number; height: number },
 		defaultHullMax: number
 	): void {
-		if (!ship.position) return;
+		if (!ship.runtime?.position) return;
 
 		const { screenX, screenY } = worldToScreen(
-			ship.position.x,
-			ship.position.y,
+			ship.runtime.position.x,
+			ship.runtime.position.y,
 			camera,
 			canvasSize
 		);
 
-		const hullMax = ship.hullMax ?? defaultHullMax;
-		const hpPercent = ship.hull / hullMax;
+		const hullMax = ship.spec.maxHitPoints ?? defaultHullMax;
+		const hpPercent = ship.runtime.hull / hullMax;
 		const isSelected = ship.selected ?? false;
 
-		const hpBarContainer = this.createHpBarContainer(ship.hull, hullMax, hpPercent, isSelected);
+		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected);
 		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 
 		const label = new Text({
@@ -167,12 +167,12 @@ export class ShipHUDManager {
 			hpBarContainer,
 			label,
 			lastUpdate: {
-				worldX: ship.position.x,
-				worldY: ship.position.y,
+				worldX: ship.runtime.position.x,
+				worldY: ship.runtime.position.y,
 				hpPercent,
-				currentHp: ship.hull,
+				currentHp: ship.runtime.hull,
 				maxHp: hullMax,
-				name: ship.name || ship.id,
+				name: ship.metadata?.name || ship.id,
 				selected: isSelected,
 			},
 		});
@@ -185,10 +185,10 @@ export class ShipHUDManager {
 		canvasSize: { width: number; height: number },
 		defaultHullMax: number
 	): void {
-		if (!ship.position) return;
+		if (!ship.runtime?.position) return;
 
 		const last = cached.lastUpdate;
-		const hullMax = ship.hullMax ?? defaultHullMax;
+		const hullMax = ship.spec.maxHitPoints ?? defaultHullMax;
 
 		const cameraChanged = !this.lastCamera ||
 			camera.zoom !== this.lastCamera.zoom ||
@@ -197,13 +197,13 @@ export class ShipHUDManager {
 			camera.y !== this.lastCamera.y;
 
 		const positionChanged =
-			ship.position.x !== last.worldX ||
-			ship.position.y !== last.worldY;
+			ship.runtime.position.x !== last.worldX ||
+			ship.runtime.position.y !== last.worldY;
 
 		if (cameraChanged || positionChanged) {
 			const { screenX, screenY } = worldToScreen(
-				ship.position.x,
-				ship.position.y,
+				ship.runtime.position.x,
+				ship.runtime.position.y,
 				camera,
 				canvasSize
 			);
@@ -211,16 +211,16 @@ export class ShipHUDManager {
 			cached.label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 		}
 
-		const hpPercent = ship.hull / hullMax;
+		const hpPercent = ship.runtime.hull / hullMax;
 		const isSelected = ship.selected ?? false;
-		const hpChanged = ship.hull !== last.currentHp || hullMax !== last.maxHp;
+		const hpChanged = ship.runtime.hull !== last.currentHp || hullMax !== last.maxHp;
 		const selectedChanged = isSelected !== last.selected;
 
 		if (hpChanged || selectedChanged) {
-			this.updateHpBarContainer(cached.hpBarContainer, ship.hull, hullMax, hpPercent, isSelected);
+			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected);
 		}
 
-		const newName = ship.name || ship.id;
+		const newName = ship.metadata?.name || ship.id;
 		const nameChanged = newName !== last.name;
 
 		if (nameChanged) {
@@ -228,10 +228,10 @@ export class ShipHUDManager {
 		}
 
 		cached.lastUpdate = {
-			worldX: ship.position.x,
-			worldY: ship.position.y,
+			worldX: ship.runtime.position.x,
+			worldY: ship.runtime.position.y,
 			hpPercent,
-			currentHp: ship.hull,
+			currentHp: ship.runtime.hull,
 			maxHp: hullMax,
 			name: newName,
 			selected: isSelected,
@@ -239,7 +239,7 @@ export class ShipHUDManager {
 	}
 
 	private formatLabel(ship: ShipViewModel): string {
-		return ship.name || ship.id.slice(-6);
+		return ship.metadata?.name || ship.id.slice(-6);
 	}
 
 	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): Container {

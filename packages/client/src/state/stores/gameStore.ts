@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { GamePhase, Faction, PlayerRole, MovementPhase } from "@vt/data";
-import type { RoomPlayerState, ShipRuntime } from "@vt/data";
+import type { RoomPlayerState, TokenRuntime } from "@vt/data";
 
 // 使用 @vt/data 中的 MovementPhase，undefined 表示没有移动阶段
 export type MovementPhaseValue = MovementPhase | undefined;
@@ -35,7 +35,7 @@ interface GameState {
 	currentPhase: GamePhase;
 	turnCount: number;
 	activeFaction: Faction;
-	ships: Map<string, ShipRuntime & { id: string }>;
+	ships: Map<string, TokenRuntime & { id: string }>;
 	players: Map<string, RoomPlayerState>;
 	chatMessages: LocalChatMessage[];
 	selectedShipId: string | null;
@@ -60,7 +60,7 @@ interface GameActions {
 	setPhase: (phase: GamePhase) => void;
 	setTurnCount: (count: number) => void;
 	setActiveFaction: (faction: Faction) => void;
-	setShip: (ship: ShipRuntime & { id: string }) => void;
+	setShip: (ship: TokenRuntime & { id: string }) => void;
 	removeShip: (id: string) => void;
 	setPlayer: (player: RoomPlayerState) => void;
 	removePlayer: (id: string) => void;

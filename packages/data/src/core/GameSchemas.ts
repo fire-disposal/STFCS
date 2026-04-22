@@ -454,6 +454,13 @@ export const CombatTokenSchema = z.object({
 });
 export type CombatToken = z.infer<typeof CombatTokenSchema>;
 
+export type TokenJSON = CombatToken & {
+	token: TokenSpec;
+};
+export const TokenJSONSchema = CombatTokenSchema.extend({
+	token: TokenSpecSchema,
+});
+
 
 // ============================================================
 // 地图类型

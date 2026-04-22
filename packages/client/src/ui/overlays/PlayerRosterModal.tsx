@@ -1,4 +1,4 @@
-import type { RoomPlayerState, ShipRuntime } from "@vt/data";
+import type { RoomPlayerState, TokenRuntime } from "@vt/data";
 import { PlayerRole } from "@vt/data";
 import { Crown, User, CheckCircle, XCircle, Copy, LogOut, Users } from "lucide-react";
 import React, { useMemo } from "react";
@@ -7,7 +7,7 @@ interface PlayerRosterModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	players: RoomPlayerState[];
-	ships: (ShipRuntime & { id: string })[];
+	ships: (TokenRuntime & { id: string })[];
 	currentSessionId: string;
 	currentPhase: string;
 	onToggleReady: (isReady: boolean) => void;

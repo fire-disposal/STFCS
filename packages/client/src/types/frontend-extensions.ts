@@ -62,7 +62,7 @@ export interface RoomState {
 }
 
 export interface GameState {
-    ships: Map<string, import("@vt/data").ShipRuntime>;
+    ships: Map<string, import("@vt/data").TokenRuntime>;
     weapons: Map<string, any>;
     objects: Map<string, GameObject>;
     turn: number;

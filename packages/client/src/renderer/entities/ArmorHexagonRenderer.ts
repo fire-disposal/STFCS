@@ -21,7 +21,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipRuntime } from "@vt/data";
+import type { ShipViewModel } from "../types";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -85,7 +85,7 @@ export interface ArmorHexagonOptions {
 
 export function useArmorHexagonRendering(
 	layers: LayerRegistry | null,
-	ships: (ShipRuntime & { id: string })[],
+	ships: ShipViewModel[],
 	options: ArmorHexagonOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ArmorHexagonCacheItem>>(new Map());
@@ -128,16 +128,16 @@ export function useArmorHexagonRendering(
 	}, []);
 }
 
-function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: ShipRuntime & { id: string }): boolean {
-	if (!cached.lastState || !ship.position) return true;
+function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: ShipViewModel): boolean {
+	if (!cached.lastState || !ship.runtime?.position) return true;
 
-	const dx = Math.abs(ship.position.x - cached.lastState.x);
-	const dy = Math.abs(ship.position.y - cached.lastState.y);
-	const dHeading = Math.abs(ship.heading - cached.lastState.heading);
+	const dx = Math.abs(ship.runtime.position.x - cached.lastState.x);
+	const dy = Math.abs(ship.runtime.position.y - cached.lastState.y);
+	const dHeading = Math.abs(ship.runtime.heading - cached.lastState.heading);
 
-	if (!ship.armor) return dx > 0.5 || dy > 0.5 || dHeading > 1;
+	if (!ship.runtime.armor) return dx > 0.5 || dy > 0.5 || dHeading > 1;
 
-	const armorChanged = ship.armor.some(
+	const armorChanged = ship.runtime.armor.some(
 		(v: number, i: number) => v !== cached.lastState!.armor[i]
 	);
 
@@ -147,14 +147,14 @@ function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: ShipRuntime & { 
 function createArmorHexagon(
 	layers: LayerRegistry,
 	cache: Map<string, ArmorHexagonCacheItem>,
-	ship: ShipRuntime & { id: string },
+	ship: ShipViewModel,
 	armorMax: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
 	const root = new Container();
-	root.position.set(ship.position.x, ship.position.y);
-	root.rotation = (ship.heading * Math.PI) / 180;
+	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	const graphics = new Graphics();
 	drawArmorHexagon(graphics, ship, armorMax);
@@ -166,39 +166,39 @@ function createArmorHexagon(
 		root,
 		graphics,
 		lastState: {
-			x: ship.position.x,
-			y: ship.position.y,
-			heading: ship.heading,
-			armor: ship.armor ? Array.from(ship.armor) : [],
+			x: ship.runtime.position.x,
+			y: ship.runtime.position.y,
+			heading: ship.runtime.heading,
+			armor: ship.runtime.armor ? Array.from(ship.runtime.armor) : [],
 		},
 	});
 }
 
 function updateArmorHexagon(
 	cached: ArmorHexagonCacheItem,
-	ship: ShipRuntime & { id: string },
+	ship: ShipViewModel,
 	armorMax: number
 ): void {
-	if (!ship.position) return;
+	if (!ship.runtime?.position) return;
 
-	cached.root.position.set(ship.position.x, ship.position.y);
-	cached.root.rotation = (ship.heading * Math.PI) / 180;
+	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
+	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	drawArmorHexagon(cached.graphics, ship, armorMax);
 
 	cached.lastState = {
-		x: ship.position.x,
-		y: ship.position.y,
-		heading: ship.heading,
-		armor: ship.armor ? Array.from(ship.armor) : [],
+		x: ship.runtime.position.x,
+		y: ship.runtime.position.y,
+		heading: ship.runtime.heading,
+		armor: ship.runtime.armor ? Array.from(ship.runtime.armor) : [],
 	};
 }
 
-function drawArmorHexagon(graphics: Graphics, ship: ShipRuntime & { id: string }, armorMax: number): void {
+function drawArmorHexagon(graphics: Graphics, ship: ShipViewModel, armorMax: number): void {
 	graphics.clear();
 
 	const radius = ARMOR_HEX_RADIUS;
-	const armor = ship.armor || [];
+	const armor = ship.runtime?.armor || [];
 
 	const vertices: { x: number; y: number }[] = HEX_VERTEX_ANGLES.map((angleDeg) => {
 		const rad = (angleDeg - 90) * Math.PI / 180;

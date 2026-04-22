@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { RoomInfo, TokenJSON, DeltaChange, WsEventName, WsPayload, WsResponseData } from "@vt/data";
+import type { RoomInfo, CombatToken, StatePatch, WsEventName, WsPayload, WsResponseData } from "@vt/data";
 import { GamePhase, Faction } from "@vt/data";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
 
@@ -15,8 +15,8 @@ export interface RoomState {
 	currentPhase: string;
 	turnCount: number;
 	activeFaction: string;
-	tokens: Map<string, TokenJSON>;
-	players: Map<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
+	tokens: Record<string, CombatToken>;
+	players: Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
 }
 
 export interface SocketRoom {
@@ -75,60 +75,76 @@ export function useSocketRoom(
 				playerId: networkManager.getPlayerId(),
 				playerName: networkManager.getPlayerName(),
 				isConnected: true,
-				currentPhase: (s.phase as string) || (s.currentPhase as string) || GamePhase.DEPLOYMENT,
-				turnCount: (s.turn as number) || (s.turnCount as number) || 1,
+				currentPhase: (s.phase as string) || GamePhase.DEPLOYMENT,
+				turnCount: (s.turnCount as number) || 1,
 				activeFaction: (s.activeFaction as string) || Faction.PLAYER,
-				tokens: toMap(s.tokens ?? s.ships) as Map<string, TokenJSON>,
+				tokens: toMap(s.tokens) as Map<string, CombatToken>,
 				players: toMap(s.players) as Map<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>,
 			};
 			stateRef.current = newState;
 			setRoomState(newState);
 		};
 
-		const handleStateDelta = (data: unknown) => {
+		const handleStatePatch = (data: unknown) => {
 			if (!stateRef.current) return;
-			const delta = data as { changes: DeltaChange[] };
+			const patchData = data as { patches: StatePatch[]; timestamp: number };
 			const newState = { ...stateRef.current };
-			for (const change of delta.changes ?? []) {
-				switch (change.type) {
-					case "token_add":
-					case "token_update":
-						if (change.id) {
-							newState.tokens = new Map(newState.tokens);
-							if (change.value) newState.tokens.set(change.id, change.value as TokenJSON);
+			
+			for (const patch of patchData.patches) {
+				const path = patch.path;
+				if (path.length === 0) continue;
+
+				const [rootKey, ...restPath] = path;
+
+				if (rootKey === "tokens") {
+					newState.tokens = new Map(newState.tokens);
+					if (restPath.length === 0) {
+						if (patch.op === "add" && patch.value) {
+							const token = patch.value as CombatToken;
+							newState.tokens.set(token.$id, token);
 						}
-						break;
-					case "token_remove":
-					case "token_destroyed":
-						if (change.id) {
-							newState.tokens = new Map(newState.tokens);
-							newState.tokens.delete(change.id);
+					} else {
+						const tokenId = String(restPath[0]);
+						if (patch.op === "remove") {
+							newState.tokens.delete(tokenId);
+						} else {
+							const existing = newState.tokens.get(tokenId);
+							if (existing) {
+								const updated = applyPatchToToken(existing, restPath.slice(1), patch);
+								newState.tokens.set(tokenId, updated);
+							} else if (patch.op === "add" && patch.value) {
+								newState.tokens.set(tokenId, patch.value as CombatToken);
+							}
 						}
-						break;
-					case "phase_change":
-						if (change.value) newState.currentPhase = change.value as string;
-						break;
-					case "turn_change":
-						if (typeof change.value === "number") newState.turnCount = change.value;
-						break;
-					case "faction_turn":
-						if (change.value) newState.activeFaction = change.value as string;
-						break;
-					case "player_join":
-					case "player_update":
-						if (change.id && change.value) {
-							newState.players = new Map(newState.players);
-							newState.players.set(change.id, change.value as { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean });
+					}
+				} else if (rootKey === "players") {
+					newState.players = new Map(newState.players);
+					if (restPath.length === 0) {
+						if (patch.op === "add" && patch.value) {
+							const player = patch.value as { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean };
+							newState.players.set(player.sessionId, player);
 						}
-						break;
-					case "player_leave":
-						if (change.id) {
-							newState.players = new Map(newState.players);
-							newState.players.delete(change.id);
+					} else {
+						const playerId = String(restPath[0]);
+						if (patch.op === "remove") {
+							newState.players.delete(playerId);
+						} else {
+							const existing = newState.players.get(playerId);
+							if (existing) {
+								const updated = applyPatchToPlayer(existing, restPath.slice(1), patch);
+								newState.players.set(playerId, updated);
+							}
 						}
-						break;
+					}
+				} else if (rootKey === "phase" && patch.op === "replace") {
+					newState.currentPhase = patch.value as string;
+				} else if (rootKey === "turnCount" && patch.op === "replace") {
+					newState.turnCount = patch.value as number;
+				} else if (rootKey === "activeFaction" && patch.op === "replace") {
+					newState.activeFaction = patch.value as string;
 				}
 			}
+
 			stateRef.current = newState;
 			setRoomState(newState);
 		};
@@ -140,7 +156,7 @@ export function useSocketRoom(
 		};
 
 		networkManager.on("sync:full", handleStateFull);
-		networkManager.on("sync:delta", handleStateDelta);
+		networkManager.on("state:patch", handleStatePatch);
 		networkManager.on("disconnect", handleDisconnect);
 
 		const existing = networkManager.getGameState();
@@ -148,7 +164,7 @@ export function useSocketRoom(
 
 		return () => {
 			networkManager.off("sync:full", handleStateFull);
-			networkManager.off("sync:delta", handleStateDelta);
+			networkManager.off("state:patch", handleStatePatch);
 			networkManager.off("disconnect", handleDisconnect);
 		};
 	}, [networkManager, onLeaveRoom]);
@@ -171,21 +187,66 @@ export function useSocketRoom(
 	return { state: roomState, sessionId: roomState.playerId, roomId: roomState.roomId, send, leave };
 }
 
-export function useShips(room: SocketRoom | null): Array<TokenJSON & { id: string }> {
-	const [ships, setShips] = useState<Array<TokenJSON & { id: string }>>([]);
+function applyPatchToToken(token: CombatToken, path: (string | number)[], patch: StatePatch): CombatToken {
+	const result = { ...token };
+	let current: unknown = result;
+
+	for (let i = 0; i < path.length - 1; i++) {
+		const key = path[i];
+		if (current && typeof current === "object") {
+			const obj = current as Record<string | number, unknown>;
+			if (!obj[key]) obj[key] = typeof path[i + 1] === "number" ? [] : {};
+			current = obj[key];
+		}
+	}
+
+	if (current && typeof current === "object") {
+		const obj = current as Record<string | number, unknown>;
+		const finalKey = path[path.length - 1];
+		if (patch.op === "remove") {
+			delete obj[finalKey];
+		} else {
+			obj[finalKey] = patch.value;
+		}
+	}
+
+	return result;
+}
+
+function applyPatchToPlayer(
+	player: { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean },
+	path: (string | number)[],
+	patch: StatePatch
+): { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean } {
+	const result = { ...player };
+	const finalKey = path[path.length - 1] as string;
+
+	if (patch.op === "remove") {
+		delete (result as Record<string, unknown>)[finalKey];
+	} else if (finalKey in result) {
+		(result as Record<string, unknown>)[finalKey] = patch.value;
+	}
+
+	return result;
+}
+
+export function useTokens(room: SocketRoom | null): Array<CombatToken & { id: string }> {
+	const [tokens, setTokens] = useState<Array<CombatToken & { id: string }>>([]);
 
 	useEffect(() => {
 		if (!room?.state?.tokens) {
-			setShips([]);
+			setTokens([]);
 			return;
 		}
 
-		const shipArray: Array<TokenJSON & { id: string }> = [];
+		const tokenArray: Array<CombatToken & { id: string }> = [];
 		room.state.tokens.forEach((token, tokenId) => {
-			shipArray.push({ ...token, id: token.$id ?? tokenId });
+			tokenArray.push({ ...token, id: token.$id ?? tokenId });
 		});
-		setShips(shipArray);
+		setTokens(tokenArray);
 	}, [room?.state?.tokens]);
 
-	return ships;
+	return tokens;
 }
+
+export { useTokens as useShips };

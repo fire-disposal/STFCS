@@ -6,35 +6,35 @@ import React, { useEffect, useState } from "react";
 import { Edit, Eye, EyeOff, RotateCcw, Save } from "lucide-react";
 import { Badge, Box, Button, Flex, Grid, Switch, Tabs, Text, TextArea, TextField } from "@radix-ui/themes";
 import type { ShipViewModel } from "@/renderer";
-import type { ShipRuntime } from "@vt/data";
+import type { TokenRuntime } from "@vt/data";
 
 export interface RealityEditPanelProps {
     ship: ShipViewModel | null;
-    onSubmit: (shipId: string, runtimeData: Partial<ShipRuntime>) => void;
+    onSubmit: (shipId: string, runtimeData: Partial<TokenRuntime>) => void;
 }
 
 export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubmit }) => {
     const [editMode, setEditMode] = useState(false);
     const [editorMode, setEditorMode] = useState<"form" | "json">("form");
-    const [runtimeData, setRuntimeData] = useState<Partial<ShipRuntime>>({});
+    const [runtimeData, setRuntimeData] = useState<Partial<TokenRuntime>>({});
     const [rawJson, setRawJson] = useState("");
 
-    const snapshotFromShip = (s: ShipViewModel): Partial<ShipRuntime> => ({
-        position: s.position || { x: 0, y: 0 },
-        heading: s.heading || 0,
-        hull: s.hull || 0,
-        fluxSoft: s.fluxSoft || 0,
-        fluxHard: s.fluxHard || 0,
-        shield: s.shield
+    const snapshotFromShip = (s: ShipViewModel): Partial<TokenRuntime> => ({
+        position: s.runtime?.position || { x: 0, y: 0 },
+        heading: s.runtime?.heading || 0,
+        hull: s.runtime?.hull || 0,
+        fluxSoft: s.runtime?.fluxSoft || 0,
+        fluxHard: s.runtime?.fluxHard || 0,
+        shield: s.runtime?.shield
             ? {
-                active: s.shield.active,
-                value: s.shield.value,
+                active: s.runtime.shield.active,
+                value: s.runtime.shield.value,
             }
             : undefined,
-        overloaded: s.overloaded || false,
-        venting: s.venting || false,
-        faction: s.faction,
-        ownerId: s.ownerId,
+        overloaded: s.runtime?.overloaded || false,
+        venting: s.runtime?.venting || false,
+        faction: s.runtime?.faction,
+        ownerId: s.runtime?.ownerId,
     });
 
     useEffect(() => {
@@ -48,8 +48,8 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubm
         setRawJson(JSON.stringify(next, null, 2));
     }, [ship]);
 
-    const handleFieldChange = (field: keyof ShipRuntime, value: unknown) => {
-        setRuntimeData((prev) => {
+    const handleFieldChange = (field: keyof TokenRuntime, value: unknown) => {
+        setRuntimeData((prev: Partial<TokenRuntime>) => {
             const next = { ...prev, [field]: value };
             setRawJson(JSON.stringify(next, null, 2));
             return next;
