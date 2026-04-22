@@ -9,7 +9,7 @@ import {
 	CombatTokenSchema,
 	InventoryTokenSchema,
 	WeaponJSONSchema,
-	PlayerProfileSchema,
+	PlayerInfoSchema,
 	GameSaveSchema,
 	GameMapSchema,
 } from "../core/GameSchemas.js";
@@ -19,7 +19,7 @@ export const SCHEMAS = {
 	inventoryToken: InventoryTokenSchema,
 	combatToken: CombatTokenSchema,
 	weapon: WeaponJSONSchema,
-	player: PlayerProfileSchema,
+	player: PlayerInfoSchema,
 	save: GameSaveSchema,
 	map: GameMapSchema,
 } as const;

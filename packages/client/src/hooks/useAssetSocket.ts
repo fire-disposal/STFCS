@@ -57,7 +57,7 @@ export function useAssetSocket(socket: Socket | null) {
 	}, []);
 
 	const upload = useCallback(
-		async (type: "avatar" | "ship_texture" | "weapon_texture", file: File): Promise<string> => {
+		async (type: "ship_texture" | "weapon_texture", file: File): Promise<string> => {
 			const limits = ASSET_LIMITS[type];
 
 			if (!limits.allowedMimeTypes.includes(file.type as "image/png" | "image/jpeg" | "image/gif")) {
@@ -85,7 +85,7 @@ export function useAssetSocket(socket: Socket | null) {
 	);
 
 	const list = useCallback(
-		async (type?: "avatar" | "ship_texture" | "weapon_texture", ownerId?: string): Promise<AssetListItem[]> => {
+		async (type?: "ship_texture" | "weapon_texture", ownerId?: string): Promise<AssetListItem[]> => {
 			const payload: WsPayload<"asset:action"> = { action: "list", type, ownerId };
 			const result = await sendRequest<{ assets: AssetListItem[] }>("asset:action", payload);
 			return result.assets ?? [];
@@ -141,7 +141,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 	});
 }
 
-export const ASSET_LIMITS: Record<"avatar" | "ship_texture" | "weapon_texture", {
+export const ASSET_LIMITS: Record<"ship_texture" | "weapon_texture", {
 	allowedMimeTypes: string[];
 	maxFileSize: number;
 	minWidth: number;
@@ -149,14 +149,6 @@ export const ASSET_LIMITS: Record<"avatar" | "ship_texture" | "weapon_texture", 
 	minHeight: number;
 	maxHeight: number;
 }> = {
-	avatar: {
-		allowedMimeTypes: ["image/png", "image/jpeg", "image/gif"],
-		maxFileSize: 512 * 1024,
-		minWidth: 64,
-		maxWidth: 512,
-		minHeight: 64,
-		maxHeight: 512,
-	},
 	ship_texture: {
 		allowedMimeTypes: ["image/png"],
 		maxFileSize: 2 * 1024 * 1024,

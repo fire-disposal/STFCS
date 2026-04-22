@@ -3,7 +3,7 @@
  */
 
 import { createRpcRegistry } from "./RpcServer.js";
-import { PlayerAvatarStorageService } from "../../services/PlayerAvatarStorageService.js";
+import { PlayerInfoService } from "../../services/PlayerInfoService.js";
 import { PlayerProfileService } from "../../services/PlayerProfileService.js";
 import { ShipBuildService } from "../../services/ship/ShipBuildService.js";
 import { PresetService } from "../../services/preset/PresetService.js";
@@ -19,12 +19,13 @@ import { ventFlux, canVent } from "../../core/engine/modules/flux.js";
 import { Faction } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken, InventoryToken, WeaponJSON } from "@vt/data";
 import { createCombatToken } from "../../core/state/Token.js";
+import { generateShortId } from "../utils/shortId.js";
 
-const playerAvatarStorage = new PlayerAvatarStorageService();
-const assetService = new AssetService();
+const playerInfoService = new PlayerInfoService();
 const playerProfileService = new PlayerProfileService(persistence);
 const shipBuildService = new ShipBuildService(persistence);
 const presetService = new PresetService(persistence);
+const assetService = new AssetService();
 
 export const rpc = createRpcRegistry();
 
@@ -35,11 +36,21 @@ function err(message: string, code: string = "ERROR"): Error {
 rpc.namespace("auth", {
   login: async (payload: unknown, ctx) => {
     const p = payload as WsPayload<"auth:login">;
-    ctx.socket.data.playerId = `player_${ctx.socket.id}`;
+    let existingInfo = await playerInfoService.getPlayerInfoByUsername(p.playerName);
+    let playerId: string;
+    
+    if (existingInfo) {
+      playerId = existingInfo.playerId;
+      await playerInfoService.updateLastLogin(playerId);
+    } else {
+      playerId = generateShortId();
+      existingInfo = await playerInfoService.createPlayerInfo(p.playerName, playerId);
+    }
+    
+    ctx.socket.data.playerId = playerId;
     ctx.socket.data.playerName = p.playerName;
-    await playerAvatarStorage.getClientProfile(p.playerName);
-    await playerProfileService.createAccount(ctx.socket.data.playerId, p.playerName);
-    return { playerId: ctx.socket.data.playerId, playerName: p.playerName, isHost: false, role: "PLAYER" };
+    await playerProfileService.createAccount(playerId, p.playerName);
+    return { playerId, playerName: p.playerName, isHost: false, role: "PLAYER" };
   },
   logout: async (_, ctx) => {
     if (ctx.roomId) {
@@ -54,17 +65,19 @@ rpc.namespace("auth", {
 rpc.namespace("profile", {
   get: async (_, ctx) => {
     ctx.requireAuth();
-    const profile = await playerAvatarStorage.getClientProfile(ctx.playerName);
-    return { profile };
+    const info = await playerInfoService.getPlayerInfo(ctx.playerId);
+    if (!info) throw err("玩家信息不存在", "PROFILE_NOT_FOUND");
+    return { profile: { playerId: info.playerId, nickname: info.displayName, avatar: info.avatar } };
   },
   update: async (payload: unknown, ctx) => {
     ctx.requireAuth();
     const p = payload as WsPayload<"profile:update">;
-    const patch: { nickname?: string; avatar?: string } = {};
-    if (p.nickname !== undefined) patch.nickname = p.nickname;
+    const patch: Partial<{ displayName: string; avatar: string | null }> = {};
+    if (p.nickname !== undefined) patch.displayName = p.nickname;
     if (p.avatar !== undefined) patch.avatar = p.avatar;
-    const profile = await playerAvatarStorage.upsertProfile(ctx.playerName, patch);
-    return { profile };
+    const updated = await playerInfoService.updatePlayerInfo(ctx.playerName, ctx.playerId, patch);
+    if (!updated) throw err("更新失败", "UPDATE_FAILED");
+    return { profile: { playerId: updated.playerId, nickname: updated.displayName, avatar: updated.avatar } };
   },
 });
 
@@ -812,7 +825,7 @@ rpc.on("sync:request_full", async (_, ctx) => {
 });
 
 export function setupSocketIO(io: any, roomManager: any): void {
-  const services = { playerProfile: playerProfileService, shipBuild: shipBuildService, preset: presetService, asset: assetService, playerAvatar: playerAvatarStorage };
+  const services = { playerProfile: playerProfileService, playerInfo: playerInfoService, shipBuild: shipBuildService, preset: presetService, asset: assetService };
   const middleware = rpc.createMiddleware();
 
   roomManager.setOnRoomRemove(async (room: any, roomId: string) => {

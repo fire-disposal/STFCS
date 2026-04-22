@@ -9,7 +9,7 @@
  * - 地图（Map）
  * - 房间/玩家状态（Room / PlayerState）
  * - 存档（Save）
- * - 玩家档案（PlayerProfile）
+ * - 玩家信息（PlayerInfo）
  * - 资产（Asset）
  *
  * 设计原则：
@@ -434,8 +434,7 @@ export type TokenRuntime = z.infer<typeof TokenRuntimeSchema>;
 
 /**
  * 库存Token - 用户保存的舰船配置
- * 不含runtime，用于 PlayerProfile.tokens
- * 持久化到数据库时只保存这部分
+ * 不含runtime，持久化到数据库时只保存这部分
  */
 export const InventoryTokenSchema = z.object({
 	$id: z.string(),
@@ -549,14 +548,11 @@ export const GameSaveSchema = z.object({
 });
 export type GameSave = z.infer<typeof GameSaveSchema>;
 
-export const PlayerProfileSchema = z.object({
-	$id: z.string(),
+export const PlayerInfoSchema = z.object({
+	playerId: z.string(),
 	username: z.string(),
 	displayName: z.string(),
-	avatarAssetId: z.string().optional(),
-	tokens: z.array(InventoryTokenSchema),
-	weapons: z.array(WeaponJSONSchema),
-	saveIds: z.array(z.string()).optional(),
+	avatar: z.string().nullable(),
 	stats: z.object({
 		gamesPlayed: z.number(),
 		wins: z.number(),
@@ -566,13 +562,14 @@ export const PlayerProfileSchema = z.object({
 	updatedAt: z.number(),
 	lastLogin: z.number().optional(),
 });
-export type PlayerProfile = z.infer<typeof PlayerProfileSchema>;
+export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
+export const validatePlayerInfo = createValidator<PlayerInfo>(PlayerInfoSchema);
 
 // ============================================================
 // 资产类型（简化：所有资产公开）
 // ============================================================
 
-export const AssetTypeSchema = z.enum(["avatar", "ship_texture", "weapon_texture"]);
+export const AssetTypeSchema = z.enum(["ship_texture", "weapon_texture"]);
 export const AssetType = AssetTypeSchema.enum;
 export type AssetType = z.infer<typeof AssetTypeSchema>;
 
@@ -680,7 +677,6 @@ function createTypeGuard<T>(schema: z.ZodTypeAny): (data: unknown) => data is T 
 export const validateCombatToken = createValidator<CombatToken>(CombatTokenSchema);
 export const validateInventoryToken = createValidator<InventoryToken>(InventoryTokenSchema);
 export const validateWeaponJSON = createValidator<WeaponJSON>(WeaponJSONSchema);
-export const validatePlayerProfile = createValidator<PlayerProfile>(PlayerProfileSchema);
 export const validateGameSave = createValidator<GameSave>(GameSaveSchema);
 export const validateGameMap = createValidator<GameMap>(GameMapSchema);
 export const validateGameRoomState = createValidator<GameRoomState>(GameRoomStateSchema);

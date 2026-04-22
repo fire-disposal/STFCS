@@ -22,6 +22,6 @@ export {
 } from "./modifier/index.js";
 
 export { AssetService } from "./AssetService.js";
-export { PlayerAvatarStorageService } from "./PlayerAvatarStorageService.js";
+export { PlayerInfoService } from "./PlayerInfoService.js";
 export { PlayerProfileService } from "./PlayerProfileService.js";
 export { SimpleObjectCreationService } from "./SimpleObjectCreationService.js";

@@ -90,13 +90,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
-			{/* Ready Status Float - 部署阶段显示 */}
-			<ReadyStatusFloat
-				networkManager={networkManager}
-				players={room.state.players}
-				playerId={room.sessionId ?? networkManager.getPlayerId()}
-				phase={phase}
-			/>
 			{/* Header */}
 			<Card style={{ flexShrink: 0, height: "40px", borderRadius: 0, background: "rgba(10, 20, 35, 0.95)", borderBottom: "1px solid rgba(74, 158, 255, 0.2)" }}>
 				<Flex justify="between" align="center" height="100%" px="3">
@@ -135,6 +128,13 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			{/* Main */}
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+					{/* Ready Status Float - 部署阶段显示，在 Pixi 容器内 */}
+					<ReadyStatusFloat
+						networkManager={networkManager}
+						players={room.state.players}
+						playerId={room.sessionId ?? networkManager.getPlayerId()}
+						phase={phase}
+					/>
 					<PixiCanvas ships={tokens} />
 				</Box>
 			</Box>

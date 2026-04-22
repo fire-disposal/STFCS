@@ -47,6 +47,8 @@ export interface UserProfile extends BaseEntity {
 	name: string;
 	nickname?: string;
 	avatar?: string;
+	avatarAssetId?: string;
+	username: string;
 	role: PlayerRoleValue;
 	faction: Faction;
 	ready: boolean;

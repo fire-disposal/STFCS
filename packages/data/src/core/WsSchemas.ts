@@ -78,9 +78,9 @@ export const AuthLogoutDef = {
 // ============================================================
 
 const ClientProfileSchema = z.object({
+  playerId: z.string(),
   nickname: z.string(),
   avatar: z.string().nullable(),
-  avatarAssetId: z.string().optional(),
 })
 
 export const ProfileGetDef = {
@@ -263,7 +263,7 @@ export type SaveActionPayload = z.infer<typeof SaveActionDef.payload>
 
 export const AssetUploadDef = {
   payload: z.object({
-    type: z.enum(["avatar", "ship_texture", "weapon_texture"]),
+    type: z.enum(["ship_texture", "weapon_texture"]),
     filename: z.string().min(1).max(255),
     mimeType: z.string(),
     data: z.string(),
@@ -278,7 +278,7 @@ export const AssetActionDef = {
     action: z.enum(["list", "batch_get", "delete"]),
     assetIds: z.array(z.string()).optional(),
     assetId: z.string().optional(),
-    type: z.enum(["avatar", "ship_texture", "weapon_texture"]).optional(),
+    type: z.enum(["ship_texture", "weapon_texture"]).optional(),
     ownerId: z.string().optional(),
     includeData: z.boolean().optional(),
   }),

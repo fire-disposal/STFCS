@@ -47,10 +47,10 @@ export interface RpcContext {
 
 export interface RpcServices {
   playerProfile: unknown;
+  playerInfo: unknown;
   shipBuild: unknown;
   preset: unknown;
   asset: unknown;
-  playerAvatar: unknown;
 }
 
 type HandlerFn = (payload: WsPayload<WsEventName>, ctx: RpcContext) => WsResponseData<WsEventName> | void | Promise<WsResponseData<WsEventName> | void>;

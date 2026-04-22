@@ -4,18 +4,14 @@
  * 这些类型扩展了 @vt/data 中的权威类型，用于前端特有的需求
  */
 
-import { MovementPhase } from "@vt/data";
+import { MovementPhase, type PlayerInfo } from "@vt/data";
 
-// 直接使用 @vt/data 中的 MovementPhase，不需要 "NONE"
-// 使用 undefined 或 null 来表示没有移动阶段
 export type MovementPhaseValue = MovementPhase | undefined;
 
-// 工具函数：将 undefined/null 转换为安全的显示值
 export function getMovementPhaseDisplay(phase: MovementPhaseValue): string {
     return phase ?? "未开始";
 }
 
-// 前端应用状态类型
 export interface AppState {
     connection: ConnectionState;
     player: FrontendPlayerState;
@@ -37,16 +33,10 @@ export interface FrontendPlayerState {
     sessionId: string | null;
     name: string | null;
     role: import("@vt/data").PlayerRoleValue | null;
-    profile: PlayerProfile | null;
+    profile: PlayerInfo | null;
     ready: boolean;
     connected: boolean;
     connectionQuality: string;
-}
-
-export interface PlayerProfile {
-    nickname?: string;
-    avatar?: string;
-    preferences?: Record<string, unknown>;
 }
 
 export interface RoomState {

@@ -99,7 +99,9 @@ export {
   InventoryTokenSchema,
   TokenJSONSchema,
   WeaponJSONSchema,
-  PlayerProfileSchema,
+  PlayerInfoSchema,
   GameSaveSchema,
   GameMapSchema,
 } from "./core/GameSchemas.js"
+export type { PlayerInfo } from "./core/GameSchemas.js"
+export { validatePlayerInfo } from "./core/GameSchemas.js"

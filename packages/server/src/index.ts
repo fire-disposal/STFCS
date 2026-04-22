@@ -11,6 +11,7 @@ import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handlers.js";
 import { PresetLoader } from "./services/preset/PresetLoader.js";
 import { persistence } from "./persistence/PersistenceManager.js";
+import { assetService } from "./services/AssetService.js";
 
 const logger = createLogger("server");
 
@@ -44,6 +45,8 @@ async start(): Promise<void> {
 
 			const presetLoader = new PresetLoader(persistence);
 			await presetLoader.loadAllPresets();
+
+			await assetService.initialize();
 
 			this.httpServer = createServer();
 			this.io = new IOServer(this.httpServer, {
@@ -135,7 +138,7 @@ export {
 	ModifierService,
 	modifierService,
 	AssetService,
-	PlayerAvatarStorageService,
+	PlayerInfoService,
 	PlayerProfileService,
 	SimpleObjectCreationService,
 } from "./services/index.js";

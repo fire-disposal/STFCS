@@ -32,6 +32,7 @@ import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
 import MiniShipPreview from "./MiniShipPreview";
+import MiniWeaponPreview from "./MiniWeaponPreview";
 import "./ship-customization-modal.css";
 
 interface LoadoutCustomizerDialogProps {
@@ -175,12 +176,18 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [shipTextureAssets, setShipTextureAssets] = useState<AssetInfo[]>([]);
     const [weaponTextureAssets, setWeaponTextureAssets] = useState<AssetInfo[]>([]);
     const [texturePreviewUrl, setTexturePreviewUrl] = useState<string | null>(null);
+    const [weaponTexturePreviewUrl, setWeaponTexturePreviewUrl] = useState<string | null>(null);
 
     const [keyColor, setKeyColor] = useState("#000000");
     const [keyTolerance, setKeyTolerance] = useState(12);
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
+    const shipBuildsRef = useRef<ShipBuild[]>([]);
+    const weaponBuildsRef = useRef<WeaponBuild[]>([]);
+    
+    shipBuildsRef.current = shipBuilds;
+    weaponBuildsRef.current = weaponBuilds;
 
     useEffect(() => {
         if (!socket) return;
@@ -244,7 +251,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     }, [reloadData]);
 
     useEffect(() => {
-        const selected = shipBuilds.find((item) => item.id === selectedShipBuildId);
+        const builds = shipBuildsRef.current;
+        const selected = builds.find((item) => item.id === selectedShipBuildId);
         if (!selected) {
             setShipDraft(null);
             setShipRawJson("");
@@ -262,7 +270,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } else {
             setTexturePreviewUrl(null);
         }
-    }, [shipBuilds, selectedShipBuildId]);
+    }, [selectedShipBuildId]);
 
     const loadTexturePreview = useCallback(async (assetId: string) => {
         try {
@@ -276,8 +284,21 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [assetSocket]);
 
+    const loadWeaponTexturePreview = useCallback(async (assetId: string) => {
+        try {
+            const results = await assetSocket.batchGet([assetId], true);
+            const first = results[0];
+            if (first?.data && first?.info?.mimeType) {
+                setWeaponTexturePreviewUrl(toDataUrl(first.info.mimeType, first.data));
+            }
+        } catch {
+            setWeaponTexturePreviewUrl(null);
+        }
+    }, [assetSocket]);
+
     useEffect(() => {
-        const selected = weaponBuilds.find((item) => item.id === selectedWeaponBuildId);
+        const builds = weaponBuildsRef.current;
+        const selected = builds.find((item) => item.id === selectedWeaponBuildId);
         if (!selected) {
             setWeaponDraft(null);
             setWeaponRawJson("");
@@ -287,7 +308,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         const normalized = ensureWeaponDefaults(selected.data);
         setWeaponDraft(normalized);
         setWeaponRawJson(JSON.stringify(normalized, null, 2));
-    }, [weaponBuilds, selectedWeaponBuildId]);
+    }, [selectedWeaponBuildId]);
 
     const selectedMount = useMemo(() => {
         if (!shipDraft?.spec.mounts?.length || !mountSelection) return null;
@@ -462,11 +483,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             const assetId = await assetSocket.upload("weapon_texture", uploadFile);
             notify.success("上传成功");
             updateWeaponTexture({ assetId });
+            await loadWeaponTexturePreview(assetId);
             await reloadAssets();
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, updateWeaponTexture, reloadAssets]);
+    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview, reloadAssets]);
 
     if (loadError) {
         return (
@@ -528,104 +550,121 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     </Flex>
                                 </Card>
 
-                                <Card>
-                                    <Flex justify="between" align="center" mb="2">
-                                        <Text weight="bold">贴图</Text>
-                                        <Button size="1" variant="soft" onClick={() => shipTextureInputRef.current?.click()}>
-                                            <Upload size={12} /> 上传
-                                        </Button>
-                                    </Flex>
-
-                                    <Flex direction="column" gap="2">
-                                        <Select.Root
-                                            value={shipDraft?.spec.texture?.assetId ?? ""}
-                                            onValueChange={(v) => {
-                                                if (!v) return;
-                                                updateShipTexture({ assetId: v });
-                                                loadTexturePreview(v);
-                                            }}
-                                        >
-                                            <Select.Trigger placeholder="选择贴图..." />
-                                            <Select.Content>
-                                                {shipTextureAssets.map((asset) => (
-                                                    <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
-                                                ))}
-                                            </Select.Content>
-                                        </Select.Root>
-
-                                        <Separator size="2" />
-
-                                        <Grid columns="3" gap="3">
-                                            <Box>
-                                                <Text size="1" color="gray">X 偏移</Text>
-                                                <Flex align="center" gap="1">
-                                                    <input
-                                                        type="range"
-                                                        min={-100}
-                                                        max={100}
-                                                        value={shipDraft?.spec.texture?.offsetX ?? 0}
-                                                        onChange={(e) => updateShipTexture({ offsetX: Number(e.target.value) })}
-                                                        style={{ width: 80 }}
-                                                    />
-                                                    <Text size="1">{shipDraft?.spec.texture?.offsetX ?? 0}</Text>
-                                                </Flex>
-                                            </Box>
-                                            <Box>
-                                                <Text size="1" color="gray">Y 偏移</Text>
-                                                <Flex align="center" gap="1">
-                                                    <input
-                                                        type="range"
-                                                        min={-100}
-                                                        max={100}
-                                                        value={shipDraft?.spec.texture?.offsetY ?? 0}
-                                                        onChange={(e) => updateShipTexture({ offsetY: Number(e.target.value) })}
-                                                        style={{ width: 80 }}
-                                                    />
-                                                    <Text size="1">{shipDraft?.spec.texture?.offsetY ?? 0}</Text>
-                                                </Flex>
-                                            </Box>
-                                            <Box>
-                                                <Text size="1" color="gray">缩放</Text>
-                                                <Flex align="center" gap="1">
-                                                    <input
-                                                        type="range"
-                                                        min={0.5}
-                                                        max={3}
-                                                        step={0.1}
-                                                        value={shipDraft?.spec.texture?.scale ?? 1}
-                                                        onChange={(e) => updateShipTexture({ scale: Number(e.target.value) })}
-                                                        style={{ width: 80 }}
-                                                    />
-                                                    <Text size="1">{(shipDraft?.spec.texture?.scale ?? 1).toFixed(1)}</Text>
-                                                </Flex>
-                                            </Box>
-                                        </Grid>
-
-                                        <Separator size="2" />
-
-                                        <Flex align="center" gap="2">
-                                            <Text size="1" color="gray">抠图取色:</Text>
-                                            <input type="color" value={keyColor} onChange={(e) => setKeyColor(e.target.value)} style={{ width: 24, height: 24 }} />
-                                            <Text size="1">{keyColor}</Text>
-                                            <Text size="1" color="gray">容差:</Text>
-                                            <input type="range" min={0} max={50} value={keyTolerance} onChange={(e) => setKeyTolerance(Number(e.target.value))} style={{ width: 60 }} />
-                                            <Text size="1">{keyTolerance}</Text>
+<Card>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">贴图</Text>
+                                            <Flex gap="2">
+                                                <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()}>
+                                                    <Upload size={12} /> 上传图片
+                                                </Button>
+                                            </Flex>
                                         </Flex>
-                                    </Flex>
 
-                                    <input
-                                        ref={shipTextureInputRef}
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/webp,image/gif"
-                                        style={{ display: "none" }}
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            void uploadShipTexture(file, keyColor !== "#000000" || keyTolerance > 0);
-                                            e.currentTarget.value = "";
-                                        }}
-                                    />
-                                </Card>
+                                        <Flex direction="column" gap="2">
+                                            {texturePreviewUrl && (
+                                                <Box style={{ width: 120, height: 120, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden" }}>
+                                                    <img src={texturePreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                                                </Box>
+                                            )}
+
+                                            <Select.Root
+                                                value={shipDraft?.spec.texture?.assetId ?? ""}
+                                                onValueChange={(v) => {
+                                                    if (!v || !shipDraft) return;
+                                                    updateShipTexture({ assetId: v });
+                                                    void loadTexturePreview(v);
+                                                }}
+                                            >
+                                                <Select.Trigger placeholder="选择已有贴图..." style={{ width: "100%" }} />
+                                                <Select.Content>
+                                                    {shipTextureAssets.length === 0 && (
+                                                        <Select.Item value="_empty" disabled>暂无贴图，请上传</Select.Item>
+                                                    )}
+                                                    {shipTextureAssets.map((asset) => (
+                                                        <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
+                                                    ))}
+                                                </Select.Content>
+                                            </Select.Root>
+
+                                            <Separator size="2" />
+
+                                            <Flex direction="column" gap="2">
+                                                <Text size="1" weight="bold">贴图位置调整</Text>
+                                                <Grid columns="3" gap="3">
+                                                    <Box>
+                                                        <Text size="1" color="gray">X 偏移</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={-100}
+                                                                max={100}
+                                                                value={shipDraft?.spec.texture?.offsetX ?? 0}
+                                                                onChange={(e) => updateShipTexture({ offsetX: Number(e.target.value) })}
+                                                                style={{ width: 80 }}
+                                                            />
+                                                            <Text size="1">{shipDraft?.spec.texture?.offsetX ?? 0}</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">Y 偏移</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={-100}
+                                                                max={100}
+                                                                value={shipDraft?.spec.texture?.offsetY ?? 0}
+                                                                onChange={(e) => updateShipTexture({ offsetY: Number(e.target.value) })}
+                                                                style={{ width: 80 }}
+                                                            />
+                                                            <Text size="1">{shipDraft?.spec.texture?.offsetY ?? 0}</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">缩放比例</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={0.5}
+                                                                max={3}
+                                                                step={0.1}
+                                                                value={shipDraft?.spec.texture?.scale ?? 1}
+                                                                onChange={(e) => updateShipTexture({ scale: Number(e.target.value) })}
+                                                                style={{ width: 80 }}
+                                                            />
+                                                            <Text size="1">{(shipDraft?.spec.texture?.scale ?? 1).toFixed(1)}x</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                </Grid>
+                                            </Flex>
+
+                                            <Separator size="2" />
+
+                                            <Flex direction="column" gap="2">
+                                                <Text size="1" weight="bold">抠图取色（透明化指定颜色）</Text>
+                                                <Flex align="center" gap="2">
+                                                    <Text size="1" color="gray">目标色:</Text>
+                                                    <input type="color" value={keyColor} onChange={(e) => setKeyColor(e.target.value)} style={{ width: 32, height: 24, cursor: "pointer" }} />
+                                                    <Text size="1">{keyColor}</Text>
+                                                    <Text size="1" color="gray">容差:</Text>
+                                                    <input type="range" min={0} max={50} value={keyTolerance} onChange={(e) => setKeyTolerance(Number(e.target.value))} style={{ width: 60 }} />
+                                                    <Text size="1">{keyTolerance}</Text>
+                                                </Flex>
+                                            </Flex>
+                                        </Flex>
+
+                                        <input
+                                            ref={shipTextureInputRef}
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp,image/gif"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                void uploadShipTexture(file, keyColor !== "#000000" || keyTolerance > 0);
+                                                e.currentTarget.value = "";
+                                            }}
+                                        />
+                                    </Card>
 
                                 <Card>
                                     <Text weight="bold" mb="2">挂点武器</Text>
@@ -701,65 +740,126 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     </Flex>
 
                                     {editorTab === "form" && shipDraft && (
-                                        <Flex direction="column" gap="2">
-                                            <Grid columns="2" gap="2">
-                                                <TextField.Root
-                                                    value={shipDraft.metadata?.name ?? ""}
-                                                    onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, name: e.target.value }; })}
-                                                    placeholder="名称"
-                                                />
-                                                <TextField.Root
-                                                    value={shipDraft.metadata?.description ?? ""}
-                                                    onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, description: e.target.value }; })}
-                                                    placeholder="描述"
-                                                />
-                                            </Grid>
+                                        <Flex direction="column" gap="3">
+                                            <Box>
+                                                <Text size="1" weight="bold" mb="1">基本信息</Text>
+                                                <Grid columns="2" gap="2">
+                                                    <Box>
+                                                        <Text size="1" color="gray">名称</Text>
+                                                        <TextField.Root
+                                                            value={shipDraft.metadata?.name ?? ""}
+                                                            onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, name: e.target.value }; })}
+                                                        />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">描述</Text>
+                                                        <TextField.Root
+                                                            value={shipDraft.metadata?.description ?? ""}
+                                                            onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, description: e.target.value }; })}
+                                                        />
+                                                    </Box>
+                                                </Grid>
+                                            </Box>
 
-                                            <Grid columns="4" gap="2">
-                                                <Select.Root value={shipDraft.spec.size} onValueChange={(v) => updateShipDraft((d) => { d.spec.size = v as HullSize; })}>
-                                                    <Select.Trigger />
-                                                    <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                </Select.Root>
-                                                <Select.Root value={shipDraft.spec.class} onValueChange={(v) => updateShipDraft((d) => { d.spec.class = v as ShipClass; })}>
-                                                    <Select.Trigger />
-                                                    <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                </Select.Root>
-                                                <TextField.Root type="number" value={String(shipDraft.spec.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.spec.width = Number(e.target.value) || 40; })} placeholder="宽度" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.spec.length = Number(e.target.value) || 60; })} placeholder="长度" />
-                                            </Grid>
+                                            <Box>
+                                                <Text size="1" weight="bold" mb="1">舰船规格</Text>
+                                                <Grid columns="4" gap="2">
+                                                    <Box>
+                                                        <Text size="1" color="gray">船体大小</Text>
+                                                        <Select.Root value={shipDraft.spec.size} onValueChange={(v) => updateShipDraft((d) => { d.spec.size = v as HullSize; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">舰船类型</Text>
+                                                        <Select.Root value={shipDraft.spec.class} onValueChange={(v) => updateShipDraft((d) => { d.spec.class = v as ShipClass; })}>
+                                                            <Select.Trigger />
+                                                            <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">宽度 (像素)</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.spec.width = Number(e.target.value) || 40; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">长度 (像素)</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.spec.length = Number(e.target.value) || 60; })} />
+                                                    </Box>
+                                                </Grid>
+                                            </Box>
 
-                                            <Grid columns="4" gap="2">
-                                                <TextField.Root type="number" value={String(shipDraft.spec.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.spec.maxHitPoints = Number(e.target.value) || 0; })} placeholder="船体" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.armorMaxPerQuadrant ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.armorMaxPerQuadrant = Number(e.target.value) || 0; })} placeholder="护甲" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxCapacity = Number(e.target.value) || 0; })} placeholder="辐能容量" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxDissipation = Number(e.target.value) || 0; })} placeholder="散耗" />
-                                            </Grid>
+                                            <Box>
+                                                <Text size="1" weight="bold" mb="1">防御属性</Text>
+                                                <Grid columns="4" gap="2">
+                                                    <Box>
+                                                        <Text size="1" color="gray">船体耐久</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.spec.maxHitPoints = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">护甲/象限</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.armorMaxPerQuadrant ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.armorMaxPerQuadrant = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">辐能容量</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxCapacity = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">辐能散耗</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxDissipation = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                </Grid>
+                                            </Box>
 
-                                            <Grid columns="3" gap="2">
-                                                <TextField.Root type="number" value={String(shipDraft.spec.maxSpeed ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxSpeed = Number(e.target.value) || 0; })} placeholder="速度" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.maxTurnRate ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxTurnRate = Number(e.target.value) || 0; })} placeholder="转向" />
-                                                <TextField.Root type="number" value={String(shipDraft.spec.rangeModifier ?? 1)} onChange={(e) => updateShipDraft((d) => { d.spec.rangeModifier = Number(e.target.value) || 1; })} placeholder="射程系数" />
-                                            </Grid>
+                                            <Box>
+                                                <Text size="1" weight="bold" mb="1">机动属性</Text>
+                                                <Grid columns="3" gap="2">
+                                                    <Box>
+                                                        <Text size="1" color="gray">最大速度</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxSpeed ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxSpeed = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">转向速度</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxTurnRate ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxTurnRate = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">射程系数</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.rangeModifier ?? 1)} onChange={(e) => updateShipDraft((d) => { d.spec.rangeModifier = Number(e.target.value) || 1; })} />
+                                                    </Box>
+                                                </Grid>
+                                            </Box>
 
                                             <Separator size="2" />
 
                                             <Flex gap="2" align="center">
                                                 <ShieldCheck size={14} />
-                                                <Text size="1">护盾</Text>
+                                                <Text size="1" weight="bold">护盾系统</Text>
                                                 <Button size="1" variant="soft" onClick={() => updateShipDraft((d) => {
                                                     d.spec.shield = d.spec.shield ? undefined : { arc: 360, radius: 50, efficiency: 1, upkeep: 0 };
                                                 })}>
-                                                    {shipDraft.spec.shield ? "禁用" : "启用"}
+                                                    {shipDraft.spec.shield ? "禁用护盾" : "启用护盾"}
                                                 </Button>
                                                 {shipDraft.spec.shield && <Badge size="1">{shipDraft.spec.shield.arc >= 360 ? "全向" : "定向"}</Badge>}
                                             </Flex>
 
                                             {shipDraft.spec.shield && (
                                                 <Grid columns="4" gap="2">
-                                                    <TextField.Root type="number" value={String(shipDraft.spec.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.arc = Number(e.target.value) || 0; })} placeholder="角度" />
-                                                    <TextField.Root type="number" value={String(shipDraft.spec.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.radius = Number(e.target.value) || 0; })} placeholder="半径" />
-                                                    <TextField.Root type="number" value={String(shipDraft.spec.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.efficiency = Number(e.target.value) || 1; })} placeholder="效率" />
-                                                    <TextField.Root type="number" value={String(shipDraft.spec.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.upkeep = Number(e.target.value) || 0; })} placeholder="维持" />
+                                                    <Box>
+                                                        <Text size="1" color="gray">覆盖角度</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.arc = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">护盾半径</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.radius = Number(e.target.value) || 0; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">伤害效率</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.efficiency = Number(e.target.value) || 1; })} />
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">维持消耗</Text>
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.upkeep = Number(e.target.value) || 0; })} />
+                                                    </Box>
                                                 </Grid>
                                             )}
                                         </Flex>
@@ -869,39 +969,53 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     )}
                                 </Card>
 
-                                <Card>
-                                    <Flex justify="between" align="center" mb="2">
-                                        <Text weight="bold">贴图</Text>
-                                        <Button size="1" variant="soft" onClick={() => weaponTextureInputRef.current?.click()}>
-                                            <Upload size={12} /> 上传
-                                        </Button>
-                                    </Flex>
+<Card>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">贴图</Text>
+                                            <Flex gap="2">
+                                                <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
+                                                    <Upload size={12} /> 上传图片
+                                                </Button>
+                                            </Flex>
+                                        </Flex>
 
-                                    <Select.Root
-                                        value={weaponDraft?.spec.texture?.assetId ?? ""}
-                                        onValueChange={(v) => {
-                                            if (!v) return;
-                                            updateWeaponTexture({ assetId: v });
-                                        }}
-                                    >
-                                        <Select.Trigger placeholder="选择贴图..." />
-                                        <Select.Content>
-                                            {weaponTextureAssets.map((asset) => (
-                                                <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
-                                            ))}
-                                        </Select.Content>
-                                    </Select.Root>
+                                        <Flex direction="column" gap="2">
+                                            {weaponTexturePreviewUrl && (
+                                                <Box style={{ width: 100, height: 100, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden", background: "rgba(0,0,0,0.3)" }}>
+                                                    <MiniWeaponPreview weapon={weaponDraft} texturePreviewUrl={weaponTexturePreviewUrl} />
+                                                </Box>
+                                            )}
 
-                                    <input
-                                        ref={weaponTextureInputRef}
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/webp"
-                                        style={{ display: "none" }}
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            void uploadWeaponTexture(file);
-                                            e.currentTarget.value = "";
+                                            <Select.Root
+                                                value={weaponDraft?.spec.texture?.assetId ?? ""}
+                                                onValueChange={(v) => {
+                                                    if (!v || !weaponDraft) return;
+                                                    updateWeaponTexture({ assetId: v });
+                                                    void loadWeaponTexturePreview(v);
+                                                }}
+                                            >
+                                                <Select.Trigger placeholder="选择已有贴图..." style={{ width: "100%" }} />
+                                                <Select.Content>
+                                                    {weaponTextureAssets.length === 0 && (
+                                                        <Select.Item value="_empty" disabled>暂无贴图，请上传</Select.Item>
+                                                    )}
+                                                    {weaponTextureAssets.map((asset) => (
+                                                        <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
+                                                    ))}
+                                                </Select.Content>
+                                            </Select.Root>
+                                        </Flex>
+
+                                        <input
+                                            ref={weaponTextureInputRef}
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                void uploadWeaponTexture(file);
+                                                e.currentTarget.value = "";
                                         }}
                                     />
                                 </Card>

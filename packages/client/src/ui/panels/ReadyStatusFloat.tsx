@@ -1,11 +1,11 @@
 /**
  * ReadyStatusFloat - 准备状态浮窗
- * 用户独立切换自己的准备状态
+ * 位于 Pixi 容器左上角，大尺寸切换按钮
  */
 
 import React, { useMemo } from "react";
 import { CheckCircle, Circle } from "lucide-react";
-import { Flex, Button, Box, Text } from "@radix-ui/themes";
+import { Flex, Button, Text } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
 
 interface ReadyStatusFloatProps {
@@ -36,36 +36,39 @@ export const ReadyStatusFloat: React.FC<ReadyStatusFloatProps> = ({
 	};
 
 	return (
-		<Box
+		<div
 			style={{
-				position: "fixed",
-				top: 16,
-				right: 16,
+				position: "absolute",
+				top: 20,
+				left: 20,
 				zIndex: 100,
 			}}
 		>
 			<Flex
+				direction="column"
 				align="center"
-				gap="2"
+				gap="3"
 				style={{
 					background: "rgba(26, 39, 56, 0.95)",
-					borderRadius: 8,
-					padding: "8px 12px",
-					border: "1px solid rgba(43, 66, 97, 0.6)",
+					borderRadius: 12,
+					padding: "16px 20px",
+					border: isReady ? "2px solid rgba(46, 204, 113, 0.6)" : "1px solid rgba(43, 66, 97, 0.6)",
+					minWidth: 120,
 				}}
 			>
-				<Text size="2" color="gray">准备状态</Text>
+				<Text size="3" weight="bold" color="gray">准备状态</Text>
 				<Button
-					size="1"
-					variant={isReady ? "solid" : "soft"}
+					size="3"
+					variant={isReady ? "solid" : "outline"}
 					color={isReady ? "green" : "gray"}
 					onClick={handleToggleReady}
+					style={{ minWidth: 100 }}
 				>
-					{isReady ? <CheckCircle size={14} /> : <Circle size={14} />}
+					{isReady ? <CheckCircle size={18} /> : <Circle size={18} />}
 					{isReady ? "已准备" : "未准备"}
 				</Button>
 			</Flex>
-		</Box>
+		</div>
 	);
 };
 

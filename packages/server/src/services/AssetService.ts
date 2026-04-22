@@ -3,10 +3,6 @@
  *
  * 存储结构：
  * data/assets/
- * ├── avatars/
- * │   ├── index.json          # 索引文件
- * │   ├── {assetId}.json      # 元数据
- * │   └── {assetId}.png       # 二进制数据
  * ├── ships/
  * │   ├── index.json
  * │   └── {assetId}.png       # 仅PNG格式
@@ -26,7 +22,6 @@ const logger = createLogger("asset-service");
 
 // 资产类型到子文件夹的映射
 const ASSET_TYPE_DIR: Record<AssetType, string> = {
-	avatar: "avatars",
 	ship_texture: "ships",
 	weapon_texture: "weapons",
 };
@@ -285,14 +280,6 @@ export class AssetService {
 	}
 
 	/**
-	 * 上传头像
-	 */
-	async uploadAvatar(userId: string, data: Buffer, filename: string, mimeType: string): Promise<string> {
-		const asset = await this.uploadAsset(userId, "avatar", filename, mimeType, data);
-		return asset.$id;
-	}
-
-	/**
 	 * 上传舰船贴图（仅PNG）
 	 */
 	async uploadShipTexture(
@@ -475,14 +462,6 @@ export class AssetService {
 		logger.info("Asset deleted", { assetId, type });
 
 		return true;
-	}
-
-	/**
-	 * 获取用户头像
-	 */
-	async getUserAvatar(userId: string): Promise<AssetListItem | null> {
-		const assets = await this.listAssets("avatar", userId);
-		return assets[0] ?? null;
 	}
 
 	/**

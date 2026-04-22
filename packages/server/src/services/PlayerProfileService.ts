@@ -166,10 +166,6 @@ export class PlayerProfileService {
 		return archives.map((a) => a.saveJson);
 	}
 
-	async uploadAvatar(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
-		return this.assetService.uploadAvatar(userId, buffer, filename, mimeType);
-	}
-
 	async uploadShipTexture(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
 		return this.assetService.uploadShipTexture(userId, buffer, filename, mimeType);
 	}
