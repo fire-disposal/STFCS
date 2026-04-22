@@ -176,8 +176,8 @@ export class SocketNetworkManager {
 				this.request("customize:weapon", { action: "list" }),
 			]);
 
-			const ships = (tokenRes as { ships?: Array<{ data: CombatToken }> }).ships?.map((s) => s.data) ?? [];
-			const weapons = (weaponRes as { weapons?: Array<{ data: WeaponJSON }> }).weapons?.map((w) => w.data) ?? [];
+			const ships = (tokenRes as { ships?: CombatToken[] }).ships ?? [];
+			const weapons = (weaponRes as { weapons?: WeaponJSON[] }).weapons ?? [];
 
 			return { success: true, loadout: { ships, weapons } };
 		} catch (error) {

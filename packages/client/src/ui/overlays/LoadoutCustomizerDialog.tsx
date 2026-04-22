@@ -25,7 +25,7 @@ import {
     type WeaponJSON,
     type Texture,
 } from "@vt/data";
-import { Plus, Save, Upload, Copy, ShieldCheck, Trash2 } from "lucide-react";
+import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -37,13 +37,6 @@ interface LoadoutCustomizerDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     networkManager: SocketNetworkManager;
-}
-
-interface AssetInfo {
-    $id: string;
-    filename: string;
-    mimeType: string;
-    data?: string;
 }
 
 function clone<T>(value: T): T {
@@ -171,8 +164,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [editorTab, setEditorTab] = useState<"form" | "json">("form");
 
     const [shipPreviewZoom, setShipPreviewZoom] = useState(1);
-    const [shipTextureAssets, setShipTextureAssets] = useState<AssetInfo[]>([]);
-    const [weaponTextureAssets, setWeaponTextureAssets] = useState<AssetInfo[]>([]);
     const [texturePreviewUrl, setTexturePreviewUrl] = useState<string | null>(null);
     const [weaponTexturePreviewUrl, setWeaponTexturePreviewUrl] = useState<string | null>(null);
 
@@ -194,20 +185,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             socket.off("response", assetSocket.handleResponse);
         };
     }, [socket, assetSocket.handleResponse]);
-
-    const reloadAssets = useCallback(async () => {
-        if (!socket?.connected) return;
-        try {
-            const [shipAssets, weaponAssets] = await Promise.all([
-                assetSocket.list("ship_texture"),
-                assetSocket.list("weapon_texture"),
-            ]);
-            setShipTextureAssets((shipAssets as AssetInfo[]).sort((a, b) => a.filename.localeCompare(b.filename)));
-            setWeaponTextureAssets((weaponAssets as AssetInfo[]).sort((a, b) => a.filename.localeCompare(b.filename)));
-        } catch (error) {
-            console.error("reloadAssets error:", error);
-        }
-    }, [socket, assetSocket]);
 
     const reloadData = useCallback(async () => {
         if (!open) return;
@@ -235,14 +212,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
             setSelectedShipBuildId((prev) => prev ?? (shipListRes.ships?.[0]?.$id ?? null));
             setSelectedWeaponBuildId((prev) => prev ?? (weaponListRes.weapons?.[0]?.$id ?? null));
-
-            await reloadAssets();
         } catch (error) {
             console.error("reloadData error:", error);
             notify.error(error instanceof Error ? error.message : "加载失败");
             setLoadError(error instanceof Error ? error.message : "加载失败");
         }
-    }, [networkManager, open, reloadAssets]);
+    }, [networkManager, open]);
 
     useEffect(() => {
         void reloadData();
@@ -469,11 +444,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             notify.success("上传成功");
             updateShipTexture({ assetId });
             await loadTexturePreview(assetId);
-            await reloadAssets();
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, keyColor, keyTolerance, updateShipTexture, loadTexturePreview, reloadAssets]);
+    }, [assetSocket, keyColor, keyTolerance, updateShipTexture, loadTexturePreview]);
 
     const uploadWeaponTexture = useCallback(async (file: File) => {
         try {
@@ -482,11 +456,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             notify.success("上传成功");
             updateWeaponTexture({ assetId });
             await loadWeaponTexturePreview(assetId);
-            await reloadAssets();
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview, reloadAssets]);
+    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview]);
 
     if (loadError) {
         return (
@@ -508,7 +481,14 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Content maxWidth="1200px">
-                <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
+                <Flex justify="between" align="center" mb="2">
+                    <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
+                    <Dialog.Close>
+                        <Button size="1" variant="ghost" color="gray">
+                            <X size={14} />
+                        </Button>
+                    </Dialog.Close>
+                </Flex>
 
                 <Tabs.Root value={activeTopTab} onValueChange={(v) => setActiveTopTab(v as "ship" | "weapon")}>
                     <Tabs.List mb="3">
@@ -551,11 +531,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">贴图</Text>
-                                            <Flex gap="2">
-                                                <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()}>
-                                                    <Upload size={12} /> 上传图片
-                                                </Button>
-                                            </Flex>
+                                            <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()}>
+                                                <Upload size={12} /> 上传图片
+                                            </Button>
                                         </Flex>
 
                                         <Flex direction="column" gap="2">
@@ -564,25 +542,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <img src={texturePreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                                                 </Box>
                                             )}
-
-                                            <Select.Root
-                                                value={shipDraft?.spec.texture?.assetId ?? ""}
-                                                onValueChange={(v) => {
-                                                    if (!v || !shipDraft) return;
-                                                    updateShipTexture({ assetId: v });
-                                                    void loadTexturePreview(v);
-                                                }}
-                                            >
-                                                <Select.Trigger placeholder="选择已有贴图..." style={{ width: "100%" }} />
-                                                <Select.Content>
-                                                    {shipTextureAssets.length === 0 && (
-                                                        <Select.Item value="_empty" disabled>暂无贴图，请上传</Select.Item>
-                                                    )}
-                                                    {shipTextureAssets.map((asset) => (
-                                                        <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
-                                                    ))}
-                                                </Select.Content>
-                                            </Select.Root>
 
                                             <Separator size="2" />
 
@@ -970,11 +929,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">贴图</Text>
-                                            <Flex gap="2">
-                                                <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
-                                                    <Upload size={12} /> 上传图片
-                                                </Button>
-                                            </Flex>
+                                            <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
+                                                <Upload size={12} /> 上传图片
+                                            </Button>
                                         </Flex>
 
                                         <Flex direction="column" gap="2">
@@ -983,25 +940,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <MiniWeaponPreview weapon={weaponDraft} texturePreviewUrl={weaponTexturePreviewUrl} />
                                                 </Box>
                                             )}
-
-                                            <Select.Root
-                                                value={weaponDraft?.spec.texture?.assetId ?? ""}
-                                                onValueChange={(v) => {
-                                                    if (!v || !weaponDraft) return;
-                                                    updateWeaponTexture({ assetId: v });
-                                                    void loadWeaponTexturePreview(v);
-                                                }}
-                                            >
-                                                <Select.Trigger placeholder="选择已有贴图..." style={{ width: "100%" }} />
-                                                <Select.Content>
-                                                    {weaponTextureAssets.length === 0 && (
-                                                        <Select.Item value="_empty" disabled>暂无贴图，请上传</Select.Item>
-                                                    )}
-                                                    {weaponTextureAssets.map((asset) => (
-                                                        <Select.Item key={asset.$id} value={asset.$id}>{asset.filename}</Select.Item>
-                                                    ))}
-                                                </Select.Content>
-                                            </Select.Root>
                                         </Flex>
 
                                         <input

@@ -344,9 +344,18 @@ function drawMountSlotShape(
 	y: number,
 	size: WeaponSlotSize,
 	slotRadius: number,
-	alpha: number
+	alpha: number,
+	facing: number = 0
 ): void {
 	const r = slotRadius;
+	const facingRad = facing * Math.PI / 180;
+	
+	target.poly([
+		x + Math.cos(facingRad) * r * 0.6, y + Math.sin(facingRad) * r * 0.6,
+		x, y,
+	]);
+	target.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
+	
 	switch (size) {
 		case "SMALL":
 			target.rect(x - r, y - r, r * 2, r * 2);
@@ -367,7 +376,17 @@ function drawMountSlotShape(
 			target.stroke({ color: 0x5a6a8a, width: 1, alpha });
 			break;
 		case "LARGE":
-			target.circle(x, y, r);
+			const ol = r * 0.35;
+			target.poly([
+				x - r + ol, y - r,
+				x + r - ol, y - r,
+				x + r, y - r + ol,
+				x + r, y + r - ol,
+				x + r - ol, y + r,
+				x - r + ol, y + r,
+				x - r, y + r - ol,
+				x - r, y - r + ol,
+			]);
 			target.stroke({ color: 0x5a6a8a, width: 1.2, alpha });
 			break;
 	}
@@ -389,8 +408,9 @@ function drawMountMarkers(
 		const offsetY = mount.position?.y ?? 0;
 		const mountSize = mount.size;
 		const slotRadius = MOUNT_SLOT_SIZE[mountSize];
+		const mountFacing = mount.facing ?? 0;
 
-		drawMountSlotShape(target, offsetX, offsetY, mountSize, slotRadius, alpha);
+		drawMountSlotShape(target, offsetX, offsetY, mountSize, slotRadius, alpha, mountFacing);
 	}
 }
 

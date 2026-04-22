@@ -42,9 +42,13 @@ function drawMountSlotShape(
 	y: number,
 	size: WeaponSlotSize,
 	slotRadius: number,
-	alpha: number
+	alpha: number,
+	facing: number = 0
 ): void {
 	const r = slotRadius;
+	const facingRad = facing * Math.PI / 180;
+	g.rotation = facingRad;
+	
 	switch (size) {
 		case "SMALL":
 			g.rect(x - r, y - r, r * 2, r * 2);
@@ -65,10 +69,27 @@ function drawMountSlotShape(
 			g.stroke({ color: 0x5a6a8a, width: 1, alpha });
 			break;
 		case "LARGE":
-			g.circle(x, y, r);
+			const ol = r * 0.35;
+			g.poly([
+				x - r + ol, y - r,
+				x + r - ol, y - r,
+				x + r, y - r + ol,
+				x + r, y + r - ol,
+				x + r - ol, y + r,
+				x - r + ol, y + r,
+				x - r, y + r - ol,
+				x - r, y - r + ol,
+			]);
 			g.stroke({ color: 0x5a6a8a, width: 1, alpha });
 			break;
 	}
+	
+	g.rotation = 0;
+	
+	const arrowLen = r * 0.6;
+	g.moveTo(x, y);
+	g.lineTo(x + Math.cos(facingRad) * arrowLen, y + Math.sin(facingRad) * arrowLen);
+	g.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
 }
 
 function drawWeaponMarker(
@@ -188,8 +209,9 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 			const offsetY = (mount.position?.y ?? 0) * scale;
 			const mountSize = mount.size;
 			const slotRadius = MOUNT_SLOT_SIZE[mountSize] * scale;
+			const mountFacing = mount.facing ?? 0;
 
-			drawMountSlotShape(g, offsetX, offsetY, mountSize, slotRadius, mountAlpha);
+			drawMountSlotShape(g, offsetX, offsetY, mountSize, slotRadius, mountAlpha, mountFacing);
 		}
 
 		for (const mount of mounts) {
