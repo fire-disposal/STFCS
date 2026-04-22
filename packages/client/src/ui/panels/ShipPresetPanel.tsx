@@ -33,14 +33,12 @@ export interface ShipPresetPanelProps {
 	room: SocketRoom | null;
 	networkManager: SocketNetworkManager;
 	cursorPosition: { x: number; y: number };
-	isHost: boolean;
 }
 
 export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 	room,
 	networkManager,
 	cursorPosition,
-	isHost,
 }) => {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -86,8 +84,8 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 	const selectedPreset = selectedId ? shipPresets.find((p) => p.id === selectedId) : null;
 
 	const handleDeploy = async () => {
-		if (!room || !selectedPreset || !isHost) {
-			notify.error("只有房主可以部署舰船");
+		if (!room || !selectedPreset) {
+			notify.error("请先选择舰船预设");
 			return;
 		}
 
@@ -238,12 +236,10 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 				variant="solid"
 				color="green"
 				onClick={handleDeploy}
-				disabled={!isHost || !selectedPreset}
+				disabled={!selectedPreset}
 			>
 				<Rocket size={12} /> 部署
 			</Button>
-
-			{!isHost && <Text size="1" color="amber">仅房主可部署</Text>}
 		</Flex>
 	);
 };

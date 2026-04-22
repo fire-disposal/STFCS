@@ -181,7 +181,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						id: "ship-preset",
 						label: "舰船预设",
 						icon: <Rocket size={14} />,
-						component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 }} isHost={Boolean(isHost)} />,
+						component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 }} />,
 						enabled: true,
 					},
 					{
