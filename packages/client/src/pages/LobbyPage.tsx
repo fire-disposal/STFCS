@@ -31,10 +31,10 @@ interface LobbyPageProps {
 	networkManager: SocketNetworkManager;
 	playerName: string;
 	profile: { nickname: string; avatar: string | null };
-	currentShortId: number | null;
 	rooms: RoomInfo[];
 	isLoading: boolean;
-	myRoomId: string | null;
+	myRoom: RoomInfo | null;
+	playerId: string | null;
 	onCreateRoom: () => void;
 	onEnterMyRoom: () => void;
 	onJoinRoom: (roomId: string) => void;
@@ -48,10 +48,10 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	networkManager,
 	playerName,
 	profile,
-	currentShortId,
 	rooms,
 	isLoading,
-	myRoomId,
+	myRoom,
+	playerId,
 	onCreateRoom,
 	onEnterMyRoom,
 	onJoinRoom,
@@ -90,8 +90,8 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	);
 
 	const isOwnRoom = useCallback(
-		(room: RoomInfo) => currentShortId !== null && room.ownerId === String(currentShortId),
-		[currentShortId]
+		(room: RoomInfo) => playerId !== null && room.ownerId === playerId,
+		[playerId]
 	);
 
 	const visibleRooms = useMemo(() => {
@@ -256,9 +256,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
 					<Flex direction="column" gap="3">
 						<Card className="radix-surface-card" size="3">
-							{myRoomId ? (
+							{myRoom ? (
 								<Button size="3" color="green" className="radix-full-btn" onClick={onEnterMyRoom} data-magnetic>
-									<Play size={16} /> 进入房间
+									<Play size={16} /> 进入我的房间
 								</Button>
 							) : (
 								<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>

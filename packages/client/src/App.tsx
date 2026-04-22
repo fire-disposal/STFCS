@@ -11,7 +11,7 @@ type AppState = "auth" | "lobby" | "game" | "loading";
 
 import { SocketNetworkManager, useRoomList } from "@/network";
 import { userService } from "@/services/UserService";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 
 const App: React.FC = () => {
 	const [appState, setAppState] = useState<AppState>("auth");
@@ -19,13 +19,18 @@ const App: React.FC = () => {
 	const networkManagerRef = useRef<SocketNetworkManager | null>(null);
 	const [userName, setUserName] = useState<string>("");
 	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string | null; avatarAssetId?: string }>({ nickname: "", avatar: null });
-	const [myRoomId, setMyRoomId] = useState<string | null>(null);
+	const [playerId, setPlayerId] = useState<string | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const { rooms, isLoading: roomsLoading } = useRoomList(
 		networkManager,
 		refreshKey
 	);
+
+	const myRoom = useMemo(() => {
+		if (!playerId || !rooms.length) return null;
+		return rooms.find((r) => r.ownerId === playerId) ?? null;
+	}, [playerId, rooms]);
 
 	useEffect(() => {
 		const manager = new SocketNetworkManager(DEFAULT_WS_URL);
@@ -42,13 +47,14 @@ const App: React.FC = () => {
 			const restoredName = userService.restoreUsername();
 			if (restoredName) {
 				manager.authenticate(restoredName).then((result) => {
-					if (result.success) {
-						setUserName(restoredName);
-						setUserProfile(result.profile ?? { nickname: restoredName, avatar: null });
-						setAppState("lobby");
-						notify.success(`欢迎回来，${restoredName}！`);
-						setRefreshKey(Date.now());
-					}
+if (result.success) {
+setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
+				setUserName(restoredName);
+				setUserProfile(result.profile ?? { nickname: restoredName, avatar: null });
+				setAppState("lobby");
+				notify.success(`欢迎回来，${restoredName}！`);
+				setRefreshKey(Date.now());
+			}
 				});
 			}
 		});
@@ -65,6 +71,7 @@ const App: React.FC = () => {
 		const result = await networkManagerRef.current.authenticate(username);
 		if (result.success) {
 			setUserName(username);
+			setPlayerId(networkManagerRef.current.getPlayerId());
 			setUserProfile(result.profile ?? { nickname: username, avatar: null });
 			userService.setUsername(username);
 			setAppState("lobby");
@@ -78,7 +85,7 @@ const App: React.FC = () => {
 	const handleLogout = useCallback(() => {
 		userService.logout();
 		setUserName("");
-		setMyRoomId(null);
+		setPlayerId(null);
 		setAppState("auth");
 		networkManagerRef.current?.leaveRoom();
 		notify.info("已退出");
@@ -94,7 +101,6 @@ const App: React.FC = () => {
 		});
 
 		if (result.success && result.roomId) {
-			setMyRoomId(result.roomId);
 			notify.success("房间创建成功，点击「进入房间」开始游戏");
 			setAppState("lobby");
 			setRefreshKey(Date.now());
@@ -105,10 +111,10 @@ const App: React.FC = () => {
 	}, [userName]);
 
 	const handleEnterMyRoom = useCallback(async () => {
-		if (!networkManagerRef.current || !myRoomId) return;
+		if (!networkManagerRef.current || !myRoom?.roomId) return;
 
 		setAppState("loading");
-		const result = await networkManagerRef.current.joinRoom(myRoomId);
+		const result = await networkManagerRef.current.joinRoom(myRoom.roomId);
 
 		if (result.success) {
 			notify.success("进入房间成功");
@@ -117,7 +123,7 @@ const App: React.FC = () => {
 			notify.error(result.error || "进入房间失败");
 			setAppState("lobby");
 		}
-	}, [myRoomId]);
+	}, [myRoom]);
 
 	const handleJoinRoom = useCallback(async (roomId: string) => {
 		if (!networkManagerRef.current) return;
@@ -138,7 +144,6 @@ const App: React.FC = () => {
 		setAppState("lobby");
 		networkManagerRef.current?.leaveRoom();
 		setRefreshKey(Date.now());
-		setMyRoomId(null);
 		notify.info("已返回大厅");
 	}, []);
 
@@ -178,10 +183,10 @@ const App: React.FC = () => {
 					networkManager={networkManager}
 					playerName={userName}
 					profile={userProfile}
-					currentShortId={null}
 					rooms={rooms}
 					isLoading={roomsLoading}
-					myRoomId={myRoomId}
+					myRoom={myRoom}
+					playerId={playerId}
 					onCreateRoom={handleCreateRoom}
 					onEnterMyRoom={handleEnterMyRoom}
 					onJoinRoom={handleJoinRoom}
