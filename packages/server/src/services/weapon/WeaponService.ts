@@ -1,32 +1,54 @@
-import type { WeaponJSON } from "@vt/data";
-import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
+import { WeaponJSONSchema, type WeaponJSON } from "@vt/data";
+import { PlayerInfoService } from "../PlayerInfoService.js";
+import { PresetService } from "../preset/PresetService.js";
+
+let idCounter = 0;
+
+function generateId(prefix: string): string {
+	idCounter++;
+	return `${prefix}:${Date.now().toString(36)}_${idCounter.toString(36)}`;
+}
 
 export class WeaponService {
-	constructor(private persistence: PersistenceManager) {}
+	private presetService: PresetService;
 
-	async getWeaponById(id: string): Promise<WeaponJSON | null> {
-		const build = await this.persistence.weapons.findById(id);
-		return build?.data ?? null;
+	constructor(private playerInfoService: PlayerInfoService) {
+		this.presetService = new PresetService();
 	}
 
-	async getAllWeapons(): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findAll();
-		return builds.items.map((b) => b.data);
+	async createWeaponBuild(ownerId: string, weaponJson: unknown): Promise<WeaponJSON> {
+		const validated = WeaponJSONSchema.parse(weaponJson) as WeaponJSON;
+		const weapon: WeaponJSON = validated.$id.startsWith("preset:") || validated.$id.startsWith("weapon:preset:")
+			? { ...validated, $id: generateId("weapon") }
+			: validated;
+		return await this.playerInfoService.addWeapon(ownerId, weapon);
 	}
 
-	async getWeaponsByOwner(ownerId: string): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findCustomByOwner(ownerId);
-		return builds.map((b) => b.data);
+	async createFromPreset(ownerId: string, presetId: string): Promise<WeaponJSON> {
+		const preset = await this.presetService.getWeaponPresetById(presetId);
+		if (!preset) throw new Error(`Preset weapon not found: ${presetId}`);
+		const weapon: WeaponJSON = {
+			...JSON.parse(JSON.stringify(preset)),
+			$id: generateId("weapon"),
+		};
+		return await this.playerInfoService.addWeapon(ownerId, weapon);
 	}
 
-	async getWeaponsBySize(size: string): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findBySize(size);
-		return builds.map((b) => b.data);
+	async getWeaponBuild(ownerId: string, weaponId: string): Promise<WeaponJSON | null> {
+		const weapons = await this.playerInfoService.getWeapons(ownerId);
+		return weapons.find((w) => w.$id === weaponId) ?? null;
 	}
 
-	async getWeaponsByDamageType(damageType: string): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findByDamageType(damageType);
-		return builds.map((b) => b.data);
+	async getWeaponBuildsByOwner(ownerId: string): Promise<WeaponJSON[]> {
+		return await this.playerInfoService.getWeapons(ownerId);
+	}
+
+	async updateWeaponBuild(ownerId: string, weaponId: string, updates: Partial<WeaponJSON>): Promise<WeaponJSON | null> {
+		return await this.playerInfoService.updateWeapon(ownerId, weaponId, updates);
+	}
+
+	async deleteWeaponBuild(ownerId: string, weaponId: string): Promise<boolean> {
+		return await this.playerInfoService.deleteWeapon(ownerId, weaponId);
 	}
 
 	checkWeaponCompatibility(_weaponId: string, mountSize: string): boolean {
@@ -35,29 +57,18 @@ export class WeaponService {
 			MEDIUM: ["SMALL", "MEDIUM"],
 			LARGE: ["SMALL", "MEDIUM", "LARGE"],
 		};
-
-		const compatibleSizes = sizeHierarchy[mountSize] ?? [];
-		return compatibleSizes.includes(mountSize);
+		return (sizeHierarchy[mountSize] ?? []).includes(mountSize);
 	}
 
-	calculateWeaponStats(weaponJson: WeaponJSON): {
-		dps: number;
-		fluxPerSecond: number;
-		effectiveRange: number;
-	} {
+	calculateWeaponStats(weaponJson: WeaponJSON): { dps: number; fluxPerSecond: number; effectiveRange: number } {
 		const spec = weaponJson.spec;
 		const cooldown = spec.cooldown ?? 1;
 		const burstCount = spec.burstCount ?? 1;
 		const projectiles = spec.projectilesPerShot ?? 1;
-
-		const dps = (spec.damage * projectiles * burstCount) / cooldown;
-		const fluxPerSecond = spec.fluxCostPerShot / cooldown;
-		const effectiveRange = spec.range;
-
-		return { dps, fluxPerSecond, effectiveRange };
-	}
-
-	async incrementUsage(id: string): Promise<void> {
-		await this.persistence.weapons.incrementUsage(id);
+		return {
+			dps: (spec.damage * projectiles * burstCount) / cooldown,
+			fluxPerSecond: spec.fluxCostPerShot / cooldown,
+			effectiveRange: spec.range,
+		};
 	}
 }

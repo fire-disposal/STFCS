@@ -684,3 +684,30 @@ export const validateGameRoomState = createValidator<GameRoomState>(GameRoomStat
 export const isValidCombatToken = createTypeGuard<CombatToken>(CombatTokenSchema);
 export const isValidInventoryToken = createTypeGuard<InventoryToken>(InventoryTokenSchema);
 export const isValidWeaponJSON = createTypeGuard<WeaponJSON>(WeaponJSONSchema);
+
+export const RoomArchiveMetadataSchema = z.object({
+	roomId: z.string(),
+	roomName: z.string(),
+	mapWidth: z.number(),
+	mapHeight: z.number(),
+	maxPlayers: z.number(),
+	playerCount: z.number(),
+	totalTurns: z.number(),
+	winnerFaction: FactionSchema.optional(),
+	gameDuration: z.number(),
+});
+export type RoomArchiveMetadata = z.infer<typeof RoomArchiveMetadataSchema>;
+
+export const RoomArchiveSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	description: z.string().optional(),
+	saveJson: GameSaveSchema,
+	metadata: RoomArchiveMetadataSchema,
+	playerIds: z.array(z.string()),
+	isAutoSave: z.boolean(),
+	tags: z.array(z.string()),
+	createdAt: z.number(),
+	updatedAt: z.number(),
+});
+export type RoomArchive = z.infer<typeof RoomArchiveSchema>;

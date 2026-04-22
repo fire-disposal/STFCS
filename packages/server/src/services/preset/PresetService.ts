@@ -1,60 +1,38 @@
-/**
- * PresetService - 预设数据查询服务
- *
- * 提供预设舰船和武器的查询接口
- */
-
+import { presetShips, presetWeapons } from "@vt/data";
 import type { InventoryToken, WeaponJSON } from "@vt/data";
-import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
 
 export class PresetService {
-	constructor(private persistence: PersistenceManager) {}
-
 	async getShipPresets(): Promise<InventoryToken[]> {
-		const builds = await this.persistence.ships.findPresets();
-		return builds.map((b) => b.data);
+		return presetShips as unknown as InventoryToken[];
 	}
 
 	async getWeaponPresets(): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findPresets();
-		return builds.map((b) => b.data);
+		return presetWeapons as unknown as WeaponJSON[];
 	}
 
 	async getShipPresetById(id: string): Promise<InventoryToken | null> {
-		const build = await this.persistence.ships.findById(id);
-		if (!build || !build.isPreset) return null;
-		return build.data;
+		const found = presetShips.find((p: any) => p.$id === id);
+		return found ? (found as unknown as InventoryToken) : null;
 	}
 
 	async getWeaponPresetById(id: string): Promise<WeaponJSON | null> {
-		const build = await this.persistence.weapons.findById(id);
-		if (!build || !build.isPreset) return null;
-		return build.data;
+		const found = presetWeapons.find((p: any) => p.$id === id);
+		return found ? (found as unknown as WeaponJSON) : null;
 	}
 
 	async getShipPresetsByClass(shipClass: string): Promise<InventoryToken[]> {
-		const builds = await this.persistence.ships.findPresets();
-		return builds
-			.filter((b) => b.data.spec.class === shipClass)
-			.map((b) => b.data);
+		return presetShips.filter((p: any) => p.spec.class === shipClass) as unknown as InventoryToken[];
 	}
 
 	async getShipPresetsBySize(size: string): Promise<InventoryToken[]> {
-		const builds = await this.persistence.ships.findPresets();
-		return builds
-			.filter((b) => b.data.spec.size === size)
-			.map((b) => b.data);
+		return presetShips.filter((p: any) => p.spec.size === size) as unknown as InventoryToken[];
 	}
 
 	async getWeaponPresetsBySize(size: string): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findPresets();
-		return builds
-			.filter((b) => b && b.data.spec.size === size)
-			.map((b) => b.data);
+		return presetWeapons.filter((p: any) => p.spec.size === size) as unknown as WeaponJSON[];
 	}
 
 	async getWeaponPresetsByDamageType(damageType: string): Promise<WeaponJSON[]> {
-		const builds = await this.persistence.weapons.findByDamageType(damageType);
-		return builds.filter((b) => b && b.isPreset).map((b) => b.data);
+		return presetWeapons.filter((p: any) => p.spec.damageType === damageType) as unknown as WeaponJSON[];
 	}
 }

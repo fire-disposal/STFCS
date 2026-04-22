@@ -1,16 +1,5 @@
-/**
- * ShipBuildService - 用户舰船构建服务
- *
- * 提供用户自定义舰船的 CRUD、验证和实例化功能
- * 使用 InventoryToken（无runtime）存储用户配置
- */
-
-import {
-	InventoryTokenSchema,
-	type InventoryToken,
-} from "@vt/data";
-import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
-import type { ShipBuild } from "../../persistence/index.js";
+import { InventoryTokenSchema, type InventoryToken } from "@vt/data";
+import { PlayerInfoService } from "../PlayerInfoService.js";
 import { PresetService } from "../preset/PresetService.js";
 
 let idCounter = 0;
@@ -23,98 +12,47 @@ function generateId(prefix: string): string {
 export class ShipBuildService {
 	private presetService: PresetService;
 
-	constructor(private persistence: PersistenceManager) {
-		this.presetService = new PresetService(persistence);
+	constructor(private playerInfoService: PlayerInfoService) {
+		this.presetService = new PresetService();
 	}
 
-	async createShipBuild(
-		ownerId: string,
-		shipJson: unknown,
-	): Promise<ShipBuild> {
+	async createShipBuild(ownerId: string, shipJson: unknown): Promise<InventoryToken> {
 		const validated = InventoryTokenSchema.parse(shipJson) as InventoryToken;
-
-		const buildId = validated.$id.startsWith("preset:")
-			? generateId("ship")
-			: validated.$id;
-
-		const build: ShipBuild = {
-			id: buildId,
-			data: validated,
-			ownerId,
-			isPreset: false,
-			tags: validated.metadata.tags ?? [],
-			usageCount: 0,
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
-		};
-
-		return await this.persistence.ships.create(build);
+		const ship: InventoryToken = validated.$id.startsWith("preset:")
+			? { ...validated, $id: generateId("ship") }
+			: validated;
+		return await this.playerInfoService.addShip(ownerId, ship);
 	}
 
-	async createFromPreset(
-		ownerId: string,
-		presetId: string,
-		options: {
-			name?: string;
-		} = {}
-	): Promise<ShipBuild> {
+	async createFromPreset(ownerId: string, presetId: string, options: { name?: string } = {}): Promise<InventoryToken> {
 		const preset = await this.presetService.getShipPresetById(presetId);
-		if (!preset) {
-			throw new Error(`Preset ship not found: ${presetId}`);
-		}
-
-		const shipJson: InventoryToken = {
+		if (!preset) throw new Error(`Preset ship not found: ${presetId}`);
+		const ship: InventoryToken = {
 			$id: generateId("ship"),
 			$presetRef: preset.$id,
 			spec: preset.spec,
 			metadata: {
 				...preset.metadata,
-				name: options.name ?? preset.metadata.name,
-				createdAt: Date.now(),
+				name: options.name ?? preset.metadata?.name,
 			},
 		};
-
-		return await this.createShipBuild(ownerId, shipJson);
+		return await this.playerInfoService.addShip(ownerId, ship);
 	}
 
-	async getShipBuild(id: string): Promise<ShipBuild | null> {
-		return await this.persistence.ships.findById(id);
+	async getShipBuild(ownerId: string, shipId: string): Promise<InventoryToken | null> {
+		const ships = await this.playerInfoService.getShips(ownerId);
+		return ships.find((s) => s.$id === shipId) ?? null;
 	}
 
-	async getShipBuildsByOwner(ownerId: string): Promise<ShipBuild[]> {
-		return await this.persistence.ships.findCustomByOwner(ownerId);
+	async getShipBuildsByOwner(ownerId: string): Promise<InventoryToken[]> {
+		return await this.playerInfoService.getShips(ownerId);
 	}
 
-	async updateShipBuild(
-		id: string,
-		updates: Partial<ShipBuild>
-	): Promise<ShipBuild | null> {
-		const existing = await this.persistence.ships.findById(id);
-		if (!existing || existing.isPreset) {
-			throw new Error(`Cannot update preset or non-existent ship: ${id}`);
-		}
-
-		if (updates.data) {
-			updates.data = InventoryTokenSchema.parse(updates.data) as InventoryToken;
-		}
-
-		return await this.persistence.ships.update(id, updates);
+	async updateShipBuild(ownerId: string, shipId: string, updates: Partial<InventoryToken>): Promise<InventoryToken | null> {
+		return await this.playerInfoService.updateShip(ownerId, shipId, updates);
 	}
 
-	async deleteShipBuild(id: string): Promise<boolean> {
-		const existing = await this.persistence.ships.findById(id);
-		if (!existing || existing.isPreset) {
-			return false;
-		}
-		return await this.persistence.ships.delete(id);
-	}
-
-	async incrementUsage(id: string): Promise<void> {
-		await this.persistence.ships.incrementUsage(id);
-	}
-
-	async getAllShipBuilds(): Promise<ShipBuild[]> {
-		const result = await this.persistence.ships.findAll();
-		return result.items;
+	async deleteShipBuild(ownerId: string, shipId: string): Promise<boolean> {
+		return await this.playerInfoService.deleteShip(ownerId, shipId);
 	}
 }

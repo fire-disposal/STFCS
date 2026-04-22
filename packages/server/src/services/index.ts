@@ -2,7 +2,7 @@
  * Services 层统一导出
  */
 
-export { PresetLoader, PresetService } from "./preset/index.js";
+export { PresetService } from "./preset/index.js";
 export { ShipBuildService } from "./ship/index.js";
 export { WeaponService } from "./weapon/index.js";
 export {

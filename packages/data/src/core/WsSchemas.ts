@@ -167,34 +167,6 @@ export const RoomGetAssetsDef = {
   }),
 } as const satisfies WsEventDef<any, any>
 
-// ============================================================
-// customize 命名空间（存档操作）
-// ============================================================
-
-const ShipBuildSchema = z.object({
-  id: z.string(),
-  data: InventoryTokenSchema,
-  ownerId: z.string(),
-  isPreset: z.boolean(),
-  tags: z.array(z.string()),
-  usageCount: z.number().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-})
-export type ShipBuild = z.infer<typeof ShipBuildSchema>
-
-const WeaponBuildSchema = z.object({
-  id: z.string(),
-  data: WeaponJSONSchema,
-  ownerId: z.string(),
-  isPreset: z.boolean(),
-  tags: z.array(z.string()),
-  usageCount: z.number().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-})
-export type WeaponBuild = z.infer<typeof WeaponBuildSchema>
-
 export const CustomizeTokenDef = {
   payload: z.object({
     action: z.enum(["list", "get", "upsert", "delete", "copy_preset"]),
@@ -203,8 +175,8 @@ export const CustomizeTokenDef = {
     presetId: z.string().optional(),
   }),
   response: z.union([
-    z.object({ ships: z.array(ShipBuildSchema) }),
-    z.object({ ship: ShipBuildSchema }),
+    z.object({ ships: z.array(InventoryTokenSchema) }),
+    z.object({ ship: InventoryTokenSchema }),
     VoidSchema,
   ]),
 } as const satisfies WsEventDef<any, any>
@@ -218,8 +190,8 @@ export const CustomizeWeaponDef = {
     presetId: z.string().optional(),
   }),
   response: z.union([
-    z.object({ weapons: z.array(WeaponBuildSchema) }),
-    z.object({ weapon: WeaponBuildSchema }),
+    z.object({ weapons: z.array(WeaponJSONSchema) }),
+    z.object({ weapon: WeaponJSONSchema }),
     VoidSchema,
   ]),
 } as const satisfies WsEventDef<any, any>

@@ -23,8 +23,6 @@ import {
     isWeaponSizeCompatible,
     type InventoryToken,
     type WeaponJSON,
-    type ShipBuild,
-    type WeaponBuild,
     type Texture,
 } from "@vt/data";
 import { Plus, Save, Upload, Copy, ShieldCheck, Trash2 } from "lucide-react";
@@ -136,11 +134,11 @@ async function convertToPng(sourceFile: File, applyKeyColor?: { color: string; t
 }
 
 interface CustomizeTokenListResponse {
-    ships: ShipBuild[];
+    ships: InventoryToken[];
 }
 
 interface CustomizeWeaponListResponse {
-    weapons: WeaponBuild[];
+    weapons: WeaponJSON[];
 }
 
 interface PresetListTokensResponse {
@@ -159,8 +157,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const [activeTopTab, setActiveTopTab] = useState<"ship" | "weapon">("ship");
 
-    const [shipBuilds, setShipBuilds] = useState<ShipBuild[]>([]);
-    const [weaponBuilds, setWeaponBuilds] = useState<WeaponBuild[]>([]);
+    const [shipBuilds, setShipBuilds] = useState<InventoryToken[]>([]);
+    const [weaponBuilds, setWeaponBuilds] = useState<WeaponJSON[]>([]);
     const [shipPresets, setShipPresets] = useState<InventoryToken[]>([]);
     const [weaponPresets, setWeaponPresets] = useState<WeaponJSON[]>([]);
 
@@ -183,8 +181,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
-    const shipBuildsRef = useRef<ShipBuild[]>([]);
-    const weaponBuildsRef = useRef<WeaponBuild[]>([]);
+    const shipBuildsRef = useRef<InventoryToken[]>([]);
+    const weaponBuildsRef = useRef<WeaponJSON[]>([]);
     
     shipBuildsRef.current = shipBuilds;
     weaponBuildsRef.current = weaponBuilds;
@@ -235,8 +233,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             setShipPresets(shipPresetRes.presets ?? []);
             setWeaponPresets(weaponPresetRes.presets ?? []);
 
-            setSelectedShipBuildId((prev) => prev ?? (shipListRes.ships?.[0]?.id ?? null));
-            setSelectedWeaponBuildId((prev) => prev ?? (weaponListRes.weapons?.[0]?.id ?? null));
+            setSelectedShipBuildId((prev) => prev ?? (shipListRes.ships?.[0]?.$id ?? null));
+            setSelectedWeaponBuildId((prev) => prev ?? (weaponListRes.weapons?.[0]?.$id ?? null));
 
             await reloadAssets();
         } catch (error) {
@@ -252,7 +250,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     useEffect(() => {
         const builds = shipBuildsRef.current;
-        const selected = builds.find((item) => item.id === selectedShipBuildId);
+        const selected = builds.find((item) => item.$id === selectedShipBuildId);
         if (!selected) {
             setShipDraft(null);
             setShipRawJson("");
@@ -260,7 +258,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             return;
         }
 
-        const normalized = ensureShipDefaults(selected.data);
+        const normalized = ensureShipDefaults(selected);
         setShipDraft(normalized);
         setShipRawJson(JSON.stringify(normalized, null, 2));
         setMountSelection(normalized.spec.mounts?.[0]?.id ?? "");
@@ -298,14 +296,14 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     useEffect(() => {
         const builds = weaponBuildsRef.current;
-        const selected = builds.find((item) => item.id === selectedWeaponBuildId);
+        const selected = builds.find((item) => item.$id === selectedWeaponBuildId);
         if (!selected) {
             setWeaponDraft(null);
             setWeaponRawJson("");
             return;
         }
 
-        const normalized = ensureWeaponDefaults(selected.data);
+        const normalized = ensureWeaponDefaults(selected);
         setWeaponDraft(normalized);
         setWeaponRawJson(JSON.stringify(normalized, null, 2));
     }, [selectedWeaponBuildId]);
@@ -318,7 +316,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const compatibleWeapons = useMemo(() => {
         if (!selectedMount) return [];
         return weaponBuilds.filter((item) => {
-            return isWeaponSizeCompatible(selectedMount.size, item.data.spec.size);
+            return isWeaponSizeCompatible(selectedMount.size, item.spec.size);
         });
     }, [selectedMount, weaponBuilds]);
 
@@ -418,11 +416,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyShipPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("customize:token", { action: "copy_preset", presetId }) as { ship?: ShipBuild };
+            const res = await networkManager.send("customize:token", { action: "copy_preset", presetId }) as { ship?: InventoryToken };
             notify.success("已复制");
             await reloadData();
-            if (res.ship?.id) {
-                setSelectedShipBuildId(res.ship.id);
+            if (res.ship?.$id) {
+                setSelectedShipBuildId(res.ship.$id);
             }
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "复制失败");
@@ -431,11 +429,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyWeaponPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponBuild };
+            const res = await networkManager.send("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponJSON };
             notify.success("已复制");
             await reloadData();
-            if (res.weapon?.id) {
-                setSelectedWeaponBuildId(res.weapon.id);
+            if (res.weapon?.$id) {
+                setSelectedWeaponBuildId(res.weapon.$id);
             }
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "复制失败");
@@ -529,8 +527,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Select.Trigger style={{ width: 200 }} />
                                                 <Select.Content>
                                                     {shipBuilds.map((item) => (
-                                                        <Select.Item key={item.id} value={item.id}>
-                                                            {item.data.metadata?.name ?? shortId(item.id)}
+                                                        <Select.Item key={item.$id} value={item.$id}>
+                                                            {item.metadata?.name ?? shortId(item.$id)}
                                                         </Select.Item>
                                                     ))}
                                                 </Select.Content>
@@ -688,15 +686,15 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         value={selectedMount.weapon?.$id ?? ""}
                                                         onValueChange={(v) => {
                                                             if (!v) return;
-                                                            const matched = weaponBuilds.find((item) => item.data.$id === v || item.id === v);
+                                                            const matched = weaponBuilds.find((item) => item.$id === v);
                                                             if (!matched) return;
-                                                            if (!isWeaponSizeCompatible(selectedMount.size, matched.data.spec.size)) {
+                                                            if (!isWeaponSizeCompatible(selectedMount.size, matched.spec.size)) {
                                                                 notify.error("尺寸不兼容");
                                                                 return;
                                                             }
                                                             updateShipDraft((draft) => {
                                                                 const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
-                                                                if (mount) mount.weapon = matched.data;
+                                                                if (mount) mount.weapon = matched;
                                                             });
                                                             notify.success("已挂载");
                                                         }}
@@ -704,8 +702,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Select.Trigger placeholder="选择武器..." />
                                                         <Select.Content>
                                                             {compatibleWeapons.map((item) => (
-                                                                <Select.Item key={item.data.$id} value={item.data.$id}>
-                                                                    {item.data.metadata?.name ?? shortId(item.data.$id)} ({item.data.spec.size})
+                                                                <Select.Item key={item.$id} value={item.$id}>
+                                                                    {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
                                                                 </Select.Item>
                                                             ))}
                                                         </Select.Content>
@@ -909,8 +907,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Select.Trigger style={{ width: 200 }} />
                                                 <Select.Content>
                                                     {weaponBuilds.map((item) => (
-                                                        <Select.Item key={item.id} value={item.id}>
-                                                            {item.data.metadata?.name ?? shortId(item.id)}
+                                                        <Select.Item key={item.$id} value={item.$id}>
+                                                            {item.metadata?.name ?? shortId(item.$id)}
                                                         </Select.Item>
                                                     ))}
                                                 </Select.Content>

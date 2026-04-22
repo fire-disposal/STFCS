@@ -8,7 +8,6 @@ import type { WsEventName, WsPayload, WsResponseData, EditLogContext } from "@vt
 import { validateWsPayload, createWsResponse } from "@vt/data";
 import type { RoomManager } from "../rooms/RoomManager.js";
 import type { Room } from "../rooms/Room.js";
-import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 export { MutativeStateManager };
 
@@ -28,7 +27,6 @@ export interface RpcContext {
   role: "HOST" | "PLAYER" | null;
   room: Room | null;
   roomManager: RoomManager;
-  persistence: PersistenceManager;
   services: RpcServices;
   state: MutativeStateManager;
   data: SocketData;
@@ -49,6 +47,7 @@ export interface RpcServices {
   playerProfile: unknown;
   playerInfo: unknown;
   shipBuild: unknown;
+  weapon: unknown;
   preset: unknown;
   asset: unknown;
 }
@@ -71,8 +70,8 @@ export class RpcRegistry {
     return this;
   }
 
-  createMiddleware(): (socket: Socket, io: IOServer, roomManager: RoomManager, persistence: PersistenceManager, services: RpcServices) => void {
-    return (socket, io, roomManager, persistence, services) => {
+  createMiddleware(): (socket: Socket, io: IOServer, roomManager: RoomManager, services: RpcServices) => void {
+    return (socket, io, roomManager, services) => {
       socket.on("request", async (data: { event: WsEventName; requestId: string; payload: unknown }) => {
         const { event, requestId, payload } = data;
         const sd = socket.data as SocketData;
@@ -94,7 +93,6 @@ export class RpcRegistry {
           role: sd.role ?? null,
           room,
           roomManager,
-          persistence,
           services,
           state,
           data: sd,

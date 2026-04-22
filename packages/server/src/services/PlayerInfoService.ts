@@ -1,142 +1,193 @@
 import fs from "fs/promises";
 import path from "path";
-import type { PlayerInfo } from "@vt/data";
-import { validatePlayerInfo } from "@vt/data";
+import type { PlayerInfo, InventoryToken, WeaponJSON, RoomArchive } from "@vt/data";
+import { validatePlayerInfo, InventoryTokenSchema, WeaponJSONSchema } from "@vt/data";
 
 const PLAYERS_DIR = path.resolve(process.cwd(), "data", "players");
 
-async function ensureDir(): Promise<void> {
-	try {
-		await fs.mkdir(PLAYERS_DIR, { recursive: true });
-	} catch {}
+interface PlayerFile {
+	info: PlayerInfo;
+	ships: InventoryToken[];
+	weapons: WeaponJSON[];
+	roomSaves: RoomArchive[];
 }
 
-function getFileName(username: string, playerId: string): string {
-	return `${username}${playerId}.json`;
+async function ensureDir(): Promise<void> {
+	await fs.mkdir(PLAYERS_DIR, { recursive: true });
+}
+
+function getFilePath(username: string, playerId: string): string {
+	return path.join(PLAYERS_DIR, `${username}${playerId}.json`);
+}
+
+function findFilePathByPlayerId(files: string[], playerId: string): string | null {
+	return files.find((f) => f.endsWith(`${playerId}.json`)) ?? null;
+}
+
+function findFilePathByUsername(files: string[], username: string): string | null {
+	return files.find((f) => f.startsWith(`${username}#`) && f.endsWith(".json")) ?? null;
 }
 
 export class PlayerInfoService {
-	private cache = new Map<string, PlayerInfo>();
-	private usernameToPlayerId = new Map<string, string>();
-
-	async getPlayerInfo(playerId: string): Promise<PlayerInfo | null> {
-		const cached = this.cache.get(playerId);
-		if (cached) return cached;
-
-		await ensureDir();
-		const files = await fs.readdir(PLAYERS_DIR);
-		for (const file of files) {
-			if (!file.endsWith(".json")) continue;
-			const filePath = path.join(PLAYERS_DIR, file);
-			try {
-				const content = await fs.readFile(filePath, "utf-8");
-				const data = JSON.parse(content) as Record<string, unknown>;
-				const info = data["info"] as PlayerInfo | undefined;
-				if (!info) continue;
-				const validated = validatePlayerInfo(info);
-				this.cache.set(validated.playerId, validated);
-				this.usernameToPlayerId.set(validated.username, validated.playerId);
-				if (validated.playerId === playerId) return validated;
-			} catch {}
-		}
-		return null;
-	}
-
-	async getPlayerInfoByUsername(username: string): Promise<PlayerInfo | null> {
-		const cachedPlayerId = this.usernameToPlayerId.get(username);
-		if (cachedPlayerId) return this.getPlayerInfo(cachedPlayerId);
-
-		await ensureDir();
-		const files = await fs.readdir(PLAYERS_DIR);
-		for (const file of files) {
-			if (!file.endsWith(".json")) continue;
-			if (!file.startsWith(username)) continue;
-			const filePath = path.join(PLAYERS_DIR, file);
-			try {
-				const content = await fs.readFile(filePath, "utf-8");
-				const data = JSON.parse(content) as Record<string, unknown>;
-				const info = data["info"] as PlayerInfo | undefined;
-				if (!info || info.username !== username) continue;
-				const validated = validatePlayerInfo(info);
-				this.cache.set(validated.playerId, validated);
-				this.usernameToPlayerId.set(validated.username, validated.playerId);
-				return validated;
-			} catch {}
-		}
-		return null;
-	}
-
-	async createPlayerInfo(username: string, playerId: string): Promise<PlayerInfo> {
-		await ensureDir();
-		const now = Date.now();
-		const info: PlayerInfo = {
-			playerId,
-			username,
-			displayName: username,
-			avatar: null,
-			stats: {
-				gamesPlayed: 0,
-				wins: 0,
-				totalDamage: 0,
-			},
-			createdAt: now,
-			updatedAt: now,
-			lastLogin: now,
-		};
-
-		await this.savePlayerInfo(username, playerId, info);
-		this.usernameToPlayerId.set(username, playerId);
-		return info;
-	}
-
-	async updatePlayerInfo(username: string, playerId: string, patch: Partial<PlayerInfo>): Promise<PlayerInfo | null> {
-		const existing = await this.getPlayerInfo(playerId);
-		if (!existing) return null;
-
-		const now = Date.now();
-		const updated: PlayerInfo = {
-			...existing,
-			...patch,
-			updatedAt: now,
-		};
-
-		await this.savePlayerInfo(username, playerId, validatePlayerInfo(updated));
-		return updated;
-	}
-
-	async updateLastLogin(playerId: string): Promise<PlayerInfo | null> {
-		const existing = await this.getPlayerInfo(playerId);
-		if (!existing) return null;
-
-		const now = Date.now();
-		const updated: PlayerInfo = {
-			...existing,
-			lastLogin: now,
-			updatedAt: now,
-		};
-
-		await this.savePlayerInfo(updated.username, playerId, updated);
-		return updated;
-	}
-
-	private async savePlayerInfo(username: string, playerId: string, info: PlayerInfo): Promise<void> {
-		this.cache.set(playerId, info);
-		await ensureDir();
-		const fileName = getFileName(username, playerId);
-		const filePath = path.join(PLAYERS_DIR, fileName);
-
-		let data: Record<string, unknown> = {};
+	async loadPlayerFile(filePath: string): Promise<PlayerFile | null> {
 		try {
 			const content = await fs.readFile(filePath, "utf-8");
-			data = JSON.parse(content) as Record<string, unknown>;
-		} catch {}
+			const data = JSON.parse(content) as PlayerFile;
+			if (data.info) data.info = validatePlayerInfo(data.info);
+			return data;
+		} catch {
+			return null;
+		}
+	}
 
-		data["info"] = info;
+	async savePlayerFile(filePath: string, data: PlayerFile): Promise<void> {
+		await ensureDir();
 		await fs.writeFile(filePath, JSON.stringify(data, null, 2));
 	}
 
-	clearCache(): void {
-		this.cache.clear();
-		this.usernameToPlayerId.clear();
+	async findByPlayerId(playerId: string): Promise<{ file: PlayerFile; path: string } | null> {
+		await ensureDir();
+		const files = await fs.readdir(PLAYERS_DIR);
+		const fileName = findFilePathByPlayerId(files, playerId);
+		if (!fileName) return null;
+		const filePath = path.join(PLAYERS_DIR, fileName);
+		const file = await this.loadPlayerFile(filePath);
+		if (!file) return null;
+		return { file, path: filePath };
+	}
+
+	async findByUsername(username: string): Promise<{ file: PlayerFile; path: string } | null> {
+		await ensureDir();
+		const files = await fs.readdir(PLAYERS_DIR);
+		const fileName = findFilePathByUsername(files, username);
+		if (!fileName) return null;
+		const filePath = path.join(PLAYERS_DIR, fileName);
+		const file = await this.loadPlayerFile(filePath);
+		if (!file) return null;
+		return { file, path: filePath };
+	}
+
+	async create(username: string, playerId: string): Promise<PlayerFile> {
+		await ensureDir();
+		const filePath = getFilePath(username, playerId);
+		const now = Date.now();
+		const file: PlayerFile = {
+			info: {
+				playerId,
+				username,
+				displayName: username,
+				avatar: null,
+				stats: { gamesPlayed: 0, wins: 0, totalDamage: 0 },
+				createdAt: now,
+				updatedAt: now,
+				lastLogin: now,
+			},
+			ships: [],
+			weapons: [],
+			roomSaves: [],
+		};
+		await this.savePlayerFile(filePath, file);
+		return file;
+	}
+
+	async updateInfo(playerId: string, patch: Partial<PlayerInfo>): Promise<PlayerInfo | null> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return null;
+		const now = Date.now();
+		result.file.info = validatePlayerInfo({ ...result.file.info, ...patch, updatedAt: now });
+		await this.savePlayerFile(result.path, result.file);
+		return result.file.info;
+	}
+
+	async getShips(playerId: string): Promise<InventoryToken[]> {
+		const result = await this.findByPlayerId(playerId);
+		return result?.file.ships ?? [];
+	}
+
+	async getWeapons(playerId: string): Promise<WeaponJSON[]> {
+		const result = await this.findByPlayerId(playerId);
+		return result?.file.weapons ?? [];
+	}
+
+	async addShip(playerId: string, ship: InventoryToken): Promise<InventoryToken> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) throw new Error("玩家不存在");
+		const validated = InventoryTokenSchema.parse(ship) as InventoryToken;
+		result.file.ships.push(validated);
+		await this.savePlayerFile(result.path, result.file);
+		return validated;
+	}
+
+	async updateShip(playerId: string, shipId: string, updates: Partial<InventoryToken>): Promise<InventoryToken | null> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return null;
+		const idx = result.file.ships.findIndex((s) => s.$id === shipId);
+		if (idx === -1) return null;
+		const updated = InventoryTokenSchema.parse({ ...result.file.ships[idx], ...updates }) as InventoryToken;
+		result.file.ships[idx] = updated;
+		await this.savePlayerFile(result.path, result.file);
+		return updated;
+	}
+
+	async deleteShip(playerId: string, shipId: string): Promise<boolean> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return false;
+		const idx = result.file.ships.findIndex((s) => s.$id === shipId);
+		if (idx === -1) return false;
+		result.file.ships.splice(idx, 1);
+		await this.savePlayerFile(result.path, result.file);
+		return true;
+	}
+
+	async addWeapon(playerId: string, weapon: WeaponJSON): Promise<WeaponJSON> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) throw new Error("玩家不存在");
+		const validated = WeaponJSONSchema.parse(weapon) as WeaponJSON;
+		result.file.weapons.push(validated);
+		await this.savePlayerFile(result.path, result.file);
+		return validated;
+	}
+
+	async updateWeapon(playerId: string, weaponId: string, updates: Partial<WeaponJSON>): Promise<WeaponJSON | null> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return null;
+		const idx = result.file.weapons.findIndex((w) => w.$id === weaponId);
+		if (idx === -1) return null;
+		const updated = WeaponJSONSchema.parse({ ...result.file.weapons[idx], ...updates }) as WeaponJSON;
+		result.file.weapons[idx] = updated;
+		await this.savePlayerFile(result.path, result.file);
+		return updated;
+	}
+
+	async deleteWeapon(playerId: string, weaponId: string): Promise<boolean> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return false;
+		const idx = result.file.weapons.findIndex((w) => w.$id === weaponId);
+		if (idx === -1) return false;
+		result.file.weapons.splice(idx, 1);
+		await this.savePlayerFile(result.path, result.file);
+		return true;
+	}
+
+	async addRoomSave(playerId: string, save: RoomArchive): Promise<void> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return;
+		result.file.roomSaves.push(save);
+		await this.savePlayerFile(result.path, result.file);
+	}
+
+	async getRoomSaves(playerId: string): Promise<RoomArchive[]> {
+		const result = await this.findByPlayerId(playerId);
+		return result?.file.roomSaves ?? [];
+	}
+
+	async deleteRoomSave(playerId: string, saveId: string): Promise<boolean> {
+		const result = await this.findByPlayerId(playerId);
+		if (!result) return false;
+		const idx = result.file.roomSaves.findIndex((s) => s.id === saveId);
+		if (idx === -1) return false;
+		result.file.roomSaves.splice(idx, 1);
+		await this.savePlayerFile(result.path, result.file);
+		return true;
 	}
 }

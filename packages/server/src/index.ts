@@ -9,8 +9,6 @@ import { fileURLToPath } from "url";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handlers.js";
-import { PresetLoader } from "./services/preset/PresetLoader.js";
-import { persistence } from "./persistence/PersistenceManager.js";
 import { assetService } from "./services/AssetService.js";
 
 const logger = createLogger("server");
@@ -39,13 +37,6 @@ export class STFCServer {
 
 async start(): Promise<void> {
 		try {
-			await (persistence.roomSaves as any).init();
-			await (persistence.ships as any).init();
-			await (persistence.weapons as any).init();
-
-			const presetLoader = new PresetLoader(persistence);
-			await presetLoader.loadAllPresets();
-
 			await assetService.initialize();
 
 			this.httpServer = createServer();
@@ -129,7 +120,6 @@ export { RoomManager, Room, type RoomTransportCallbacks } from "./server/rooms/i
 export { MutativeStateManager } from "./core/state/index.js";
 
 export {
-	PresetLoader,
 	PresetService,
 	ShipBuildService,
 	WeaponService,
@@ -142,17 +132,5 @@ export {
 	PlayerProfileService,
 	SimpleObjectCreationService,
 } from "./services/index.js";
-
-export {
-	PersistenceManager,
-	persistence,
-	FileBaseRepository,
-	FileShipRepository,
-	FileWeaponRepository,
-	FileRoomSaveRepository,
-	FileUserRepository,
-	type ShipBuild,
-	type WeaponBuild,
-} from "./persistence/index.js";
 
 export { setupSocketIO, createRpcRegistry, type RpcContext } from "./server/socketio/index.js";
