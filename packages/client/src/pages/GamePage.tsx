@@ -26,6 +26,8 @@ import ShieldPanel from "@/ui/panels/ShieldPanel";
 import RealityEditPanel from "@/ui/panels/RealityEditPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
+import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
+import DMControlPanel from "@/ui/panels/DMControlPanel";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -69,6 +71,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	});
 	const currentPlayer = currentPlayerKey ? room?.state?.players[currentPlayerKey] : undefined;
 	const isHost = currentPlayer?.role === "HOST";
+	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
+	const turnCount = room?.state?.turnCount ?? 1;
+	const activeFaction = room?.state?.activeFaction ?? "PLAYER";
 
 	if (!room || !room.state) {
 		return (
@@ -85,6 +90,13 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
+			{/* Ready Status Float - 部署阶段显示 */}
+			<ReadyStatusFloat
+				networkManager={networkManager}
+				players={room.state.players}
+				playerId={room.sessionId ?? networkManager.getPlayerId()}
+				phase={phase}
+			/>
 			{/* Header */}
 			<Card style={{ flexShrink: 0, height: "40px", borderRadius: 0, background: "rgba(10, 20, 35, 0.95)", borderBottom: "1px solid rgba(74, 158, 255, 0.2)" }}>
 				<Flex justify="between" align="center" height="100%" px="3">
@@ -171,6 +183,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						icon: <Rocket size={14} />,
 						component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 }} isHost={Boolean(isHost)} />,
 						enabled: true,
+					},
+					{
+						id: "dm-control",
+						label: "DM控制",
+						icon: <Crown size={14} />,
+						component: <DMControlPanel
+							networkManager={networkManager}
+							players={room.state.players}
+							isHost={Boolean(isHost)}
+							phase={phase}
+							turnCount={turnCount}
+							activeFaction={activeFaction}
+						/>,
+						enabled: Boolean(isHost),
 					},
 					{
 						id: "view-control",

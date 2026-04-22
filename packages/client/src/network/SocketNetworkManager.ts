@@ -226,6 +226,41 @@ export class SocketNetworkManager {
 		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "start" } });
 	}
 
+	kickPlayer(targetId: string): void {
+		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "kick", targetId } });
+	}
+
+	transferHost(targetId: string): void {
+		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "transfer_host", targetId } });
+	}
+
+	async forceEndTurn(faction?: "PLAYER" | "ENEMY" | "NEUTRAL"): Promise<{ success: boolean; error?: string }> {
+		try {
+			await this.request("edit:room", { action: "force_end_turn", faction });
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
+		}
+	}
+
+	async setPhase(phase: string): Promise<{ success: boolean; error?: string }> {
+		try {
+			await this.request("edit:room", { action: "set_phase", phase });
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
+		}
+	}
+
+	async setTurn(turn: number): Promise<{ success: boolean; error?: string }> {
+		try {
+			await this.request("edit:room", { action: "set_turn", turn });
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
+		}
+	}
+
 	async sendGameAction(payload: WsPayload<"game:action">): Promise<{ success: boolean; error?: string }> {
 		try {
 			await this.request("game:action", payload);
