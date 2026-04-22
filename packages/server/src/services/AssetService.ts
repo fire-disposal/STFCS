@@ -27,7 +27,7 @@ const ASSET_TYPE_DIR: Record<AssetType, string> = {
 };
 
 // 资产基础目录
-const ASSETS_BASE_DIR = join(process.cwd(), "data", "assets");
+const ASSETS_BASE_DIR = join(process.cwd(), "storage", "assets");
 
 // 扩展名映射
 const MIME_TO_EXT: Record<string, string> = {

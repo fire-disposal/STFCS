@@ -61,4 +61,4 @@ yarn.lock
 .kilo
 
 #saves
-packages/server/data
+storage/

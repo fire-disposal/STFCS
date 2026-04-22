@@ -3,7 +3,7 @@ import path from "path";
 import type { PlayerInfo, InventoryToken, WeaponJSON, RoomArchive } from "@vt/data";
 import { validatePlayerInfo, InventoryTokenSchema, WeaponJSONSchema } from "@vt/data";
 
-const PLAYERS_DIR = path.resolve(process.cwd(), "data", "players");
+const PLAYERS_DIR = path.resolve(process.cwd(), "storage", "players");
 
 interface PlayerFile {
 	info: PlayerInfo;

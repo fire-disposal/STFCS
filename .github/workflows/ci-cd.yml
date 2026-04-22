@@ -130,8 +130,10 @@ jobs:
             docker pull ghcr.io/fire-disposal/stfcs-app:latest
             docker rm -f stfcs-app || true
             docker network create stfcs-network 2>/dev/null || true
+            mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
             docker run -d --name stfcs-app --restart unless-stopped --network stfcs-network \
               -p 2567:2567 -e NODE_ENV=production -e PORT=2567 -e CORS_ORIGINS=https://stfcs.205716.xyz \
+              -v /srv/stfcs/storage:/app/storage \
               ghcr.io/fire-disposal/stfcs-app:latest
             sleep 10
             docker ps --filter name=stfcs-app
