@@ -1,12 +1,11 @@
 {
-	"$schema": "weapon-v2",
 	"$id": "preset:missile-large",
 	"metadata": {
 		"name": "大型导弹发射器",
 		"description": "重型高爆导弹，高伤害低射速",
 		"author": "STFCS"
 	},
-	"weapon": {
+	"spec": {
 		"damageType": "HIGH_EXPLOSIVE",
 		"size": "LARGE",
 		"damage": 500,

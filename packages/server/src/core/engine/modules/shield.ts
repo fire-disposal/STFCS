@@ -41,12 +41,12 @@ export function applyShield(context: EngineContext): { newState: any; events: an
 	if (action.type === "TOGGLE_SHIELD") {
 		const shieldResult = processShieldToggle(ship, payload);
 		
-		updates.set(`ship:${ship.id}`, {
+		updates.set(`ship:${ship.$id}`, {
 			runtime: shieldResult.newRuntime,
 		});
 
 		events.push(createShieldToggleEvent(
-			ship.id,
+			ship.$id,
 			shieldResult.newRuntime.shield?.active || false,
 			shieldResult.previousActive
 		));
@@ -61,7 +61,7 @@ export function applyShield(context: EngineContext): { newState: any; events: an
  */
 function processShieldToggle(ship: any, payload: any) {
 	const runtime = { ...ship.runtime };
-	const spec = ship.tokenJson.token;
+	const spec = ship.spec;
 	
 	const previousActive = runtime.shield?.active || false;
 	const newActive = payload.active !== undefined ? payload.active : !previousActive;
@@ -109,7 +109,7 @@ export function isShieldHit(
 	ship: CombatToken,
 	attackerPosition: { x: number; y: number }
 ): { hit: boolean; shieldAngle?: number } {
-	const runtime = ship.tokenJson.runtime;
+	const runtime = ship.runtime;
 	const shield = runtime?.shield;
 
 	if (!shield || !shield.active || shield.value <= 0) {
@@ -121,19 +121,18 @@ export function isShieldHit(
 	const dy = attackerPosition.y - position.y;
 	const attackAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
 
-	const shieldSpec = ship.tokenJson.token.shield;
+	const shieldSpec = ship.spec.shield;
 	if (!shieldSpec) return { hit: false };
 
-	if (shieldSpec.type === "OMNI") {
+	const shieldArc = shieldSpec.arc || 360;
+
+	if (shieldArc >= 360) {
 		return { hit: true, shieldAngle: attackAngle };
 	}
 
-	const shieldDirection = shieldSpec.direction || 0;
-	const shieldArc = shieldSpec.arc || 120;
-
 	const inArc = isAngleInShieldArc(
 		runtime?.heading ?? 0,
-		shieldDirection,
+		0,
 		shieldArc,
 		attackAngle
 	);
@@ -152,8 +151,8 @@ export function calculateShieldFlux(damage: number, efficiency: number): number 
  * 计算护盾维持消耗
  */
 export function calculateShieldUpkeep(ship: CombatToken): number {
-	const shield = ship.tokenJson.runtime?.shield;
-	const shieldSpec = ship.tokenJson.token.shield;
+	const shield = ship.runtime?.shield;
+	const shieldSpec = ship.spec.shield;
 
 	if (!shield || !shield.active || !shieldSpec) {
 		return 0;
@@ -169,7 +168,7 @@ export function applyShieldDamage(
 	ship: CombatToken,
 	damage: number
 ): { shieldDamage: number; overflow: number } {
-	const shield = ship.tokenJson.runtime?.shield;
+	const shield = ship.runtime?.shield;
 
 	if (!shield || !shield.active || shield.value <= 0) {
 		return { shieldDamage: 0, overflow: damage };
@@ -192,18 +191,18 @@ export function toggleShield(
 	ship: CombatToken,
 	active: boolean
 ): ShieldToggleResult {
-	const shield = ship.tokenJson.runtime?.shield;
-	const shieldSpec = ship.tokenJson.token.shield;
+	const shield = ship.runtime?.shield;
+	const shieldSpec = ship.spec.shield;
 
 	if (!shieldSpec || !shield) {
 		return { success: false, newActive: false, reason: "Ship has no shield" };
 	}
 
-	if (ship.tokenJson.runtime?.overloaded) {
+	if (ship.runtime?.overloaded) {
 		return { success: false, newActive: shield.active, reason: "Ship is overloaded" };
 	}
 
-	if (active && ship.tokenJson.runtime?.venting) {
+	if (active && ship.runtime?.venting) {
 		return { success: false, newActive: false, reason: "Cannot activate shield while venting" };
 	}
 
@@ -225,12 +224,12 @@ export function getShieldStatus(ship: CombatToken): {
 	value: number;
 	maxShield: number;
 	percentage: number;
-	type: string;
+	isOmni: boolean;
 	upkeep: number;
 	canToggle: boolean;
 } {
-	const shield = ship.tokenJson.runtime?.shield;
-	const shieldSpec = ship.tokenJson.token.shield;
+	const shield = ship.runtime?.shield;
+	const shieldSpec = ship.spec.shield;
 
 	if (!shieldSpec || !shield) {
 		return {
@@ -239,14 +238,14 @@ export function getShieldStatus(ship: CombatToken): {
 			value: 0,
 			maxShield: 0,
 			percentage: 0,
-			type: "NONE",
+			isOmni: false,
 			upkeep: 0,
 			canToggle: false,
 		};
 	}
 
 	const maxShield = shieldSpec.radius || 100;
-	const canToggle = !ship.tokenJson.runtime?.overloaded && !ship.tokenJson.runtime?.destroyed;
+	const canToggle = !ship.runtime?.overloaded && !ship.runtime?.destroyed;
 
 	return {
 		hasShield: true,
@@ -254,7 +253,7 @@ export function getShieldStatus(ship: CombatToken): {
 		value: shield.value,
 		maxShield,
 		percentage: maxShield > 0 ? (shield.value / maxShield) * 100 : 0,
-		type: shieldSpec.type,
+		isOmni: shieldSpec.arc >= 360,
 		upkeep: shieldSpec.upkeep || 0,
 		canToggle,
 	};
@@ -307,8 +306,8 @@ export function checkShieldHit(
 	attackAngle: number,
 	_hitPosition: { x: number; y: number }
 ): { hit: boolean; angleDiff: number } {
-	const spec = ship.tokenJson.token;
-	const runtime = ship.tokenJson.runtime;
+	const spec = ship.spec;
+	const runtime = ship.runtime;
 
 	if (!runtime?.shield?.active || !spec.shield) {
 		return { hit: false, angleDiff: 0 };
@@ -335,8 +334,8 @@ export function checkShieldHit(
  * 检查护盾切换合法性
  */
 export function validateShieldToggle(ship: any, newActive: boolean): { valid: boolean; error?: string } {
-	const runtime = ship.tokenJson.runtime;
-	const spec = ship.tokenJson.token;
+	const runtime = ship.runtime;
+	const spec = ship.spec;
 
 	if (runtime?.destroyed) {
 		return { valid: false, error: "Ship is destroyed" };

@@ -14,14 +14,11 @@ export type {
 	UserStats,
 	UserPreferences,
 	UserProfile,
-	ShipCustomization,
-	ShipBuild,
 	RoomArchiveMetadata,
 	RoomArchive,
 } from "./types.js";
 
-// WeaponBuild 类型（从内存实现导出）
-export type { WeaponBuild } from "./memory/MemoryWeaponRepository.js";
+export type { ShipBuild, WeaponBuild } from "@vt/data";
 
 // 接口
 export type { Repository, QueryableRepository, StorageProvider } from "./interfaces.js";

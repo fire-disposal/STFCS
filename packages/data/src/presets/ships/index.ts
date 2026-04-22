@@ -6,10 +6,12 @@ import frigateBasic from "./frigate-basic.json";
 import destroyerStandard from "./destroyer-standard.json";
 import cruiserAssault from "./cruiser-assault.json";
 
-export const presetShips = [
-	frigateBasic,
-	destroyerStandard,
-	cruiserAssault,
-] as const;
+import type { InventoryToken } from "../../core/GameSchemas.js";
 
-export type PresetShip = typeof presetShips[number];
+export const presetShips: InventoryToken[] = [
+	frigateBasic as InventoryToken,
+	destroyerStandard as InventoryToken,
+	cruiserAssault as InventoryToken,
+];
+
+export type PresetShip = InventoryToken;

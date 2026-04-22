@@ -5,7 +5,7 @@
  * 此模块仅计算命中率和辐能，详细伤害计算由 damage.ts 处理
  */
 
-import type { WeaponJSON, TokenJSON } from "@vt/data";
+import type { WeaponSpec, WeaponRuntime, TokenSpec, TokenRuntime } from "@vt/data";
 
 import type { Point } from "../../types/common.js";
 import { distance } from "../geometry/index.js";
@@ -29,12 +29,12 @@ export interface WeaponAttackResult {
  * 计算武器攻击（基础结果，详细伤害由 damage.ts 计算）
  */
 export function calculateWeaponAttack(
-	weaponSpec: WeaponJSON["weapon"],
-	_weaponRuntime: WeaponJSON["runtime"],
-	attackerSpec: TokenJSON["token"],
-	_attackerRuntime: TokenJSON["runtime"],
-	_targetSpec: TokenJSON["token"],
-	targetRuntime: TokenJSON["runtime"],
+	weaponSpec: WeaponSpec,
+	_weaponRuntime: WeaponRuntime | undefined,
+	attackerSpec: TokenSpec,
+	_attackerRuntime: TokenRuntime,
+	_targetSpec: TokenSpec,
+	targetRuntime: TokenRuntime,
 	attackerPosition: Point,
 	targetPosition: Point,
 	targetQuadrant?: number
@@ -97,7 +97,7 @@ export function calculateWeaponAttack(
 export function calculateHitChance(
 	distance: number,
 	maxRange: number,
-	weaponSpec: WeaponJSON["weapon"]
+	weaponSpec: WeaponSpec
 ): number {
 	if (distance > maxRange) return 0;
 
@@ -132,7 +132,7 @@ export function calculateDamageModifier(
  * 计算武器冷却
  */
 export function calculateWeaponCooldown(
-	_weaponSpec: WeaponJSON["weapon"],
+	_weaponSpec: WeaponSpec,
 	currentCooldown: number
 ): number {
 	return Math.max(0, currentCooldown - 1);
@@ -142,7 +142,7 @@ export function calculateWeaponCooldown(
  * 检查武器是否就绪
  */
 export function isWeaponReady(
-	weaponRuntime: WeaponJSON["runtime"]
+	weaponRuntime: WeaponRuntime | undefined
 ): boolean {
 	if (!weaponRuntime) return false;
 	return weaponRuntime.state === "READY";
@@ -152,23 +152,20 @@ export function isWeaponReady(
  * 武器开火后状态更新
  */
 export function setWeaponFired(
-	weaponRuntime: WeaponJSON["runtime"]
-): WeaponJSON["runtime"] {
+	weaponRuntime: WeaponRuntime | undefined
+): WeaponRuntime | undefined {
 	if (!weaponRuntime) return weaponRuntime;
 
 	return {
 		...weaponRuntime,
 		state: "FIRED",
-	} as WeaponJSON["runtime"];
+	};
 }
 
-/**
- * 回合结束时处理武器状态转换
- */
 export function updateWeaponStateAtTurnEnd(
-	weaponRuntime: WeaponJSON["runtime"],
-	weaponSpec?: WeaponJSON["weapon"]
-): WeaponJSON["runtime"] {
+	weaponRuntime: WeaponRuntime | undefined,
+	weaponSpec?: WeaponSpec
+): WeaponRuntime | undefined {
 	if (!weaponRuntime) return weaponRuntime;
 
 	if (weaponRuntime.state === "FIRED") {
@@ -177,13 +174,13 @@ export function updateWeaponStateAtTurnEnd(
 			return {
 				...weaponRuntime,
 				state: "READY",
-			} as WeaponJSON["runtime"];
+			};
 		} else {
 			return {
 				...weaponRuntime,
 				state: "COOLDOWN",
 				cooldownRemaining: cooldown,
-			} as WeaponJSON["runtime"];
+			};
 		}
 	}
 
@@ -193,7 +190,7 @@ export function updateWeaponStateAtTurnEnd(
 			...weaponRuntime,
 			state: newCooldown === 0 ? "READY" : "COOLDOWN",
 			cooldownRemaining: newCooldown,
-		} as WeaponJSON["runtime"];
+		};
 	}
 
 	return weaponRuntime;

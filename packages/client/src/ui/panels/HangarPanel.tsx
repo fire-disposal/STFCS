@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Target, Filter, Search, Rocket } from "lucide-react";
 import { Badge, Box, Button, Card, Flex, Grid, Text, TextField, Select } from "@radix-ui/themes";
 import type { TokenJSON } from "@vt/data";
-import type { SocketNetworkManager } from "@/network";
+import type { SocketNetworkManager, SocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 
 interface UserShipProfile {
@@ -27,13 +27,7 @@ interface UserShipProfile {
 export interface HangarPanelProps {
 	cursorPosition?: { x: number; y: number };
 	networkManager: SocketNetworkManager;
-	room: {
-		send: (event: string, payload: unknown) => Promise<any>;
-		state?: {
-			players?: Map<string, { role: string; sessionId: string }>;
-		};
-		sessionId?: string | null;
-	} | null;
+	room: SocketRoom | undefined;
 	isHost: boolean;
 }
 
@@ -126,10 +120,9 @@ export const HangarPanel: React.FC<HangarPanelProps> = ({
 
 		try {
 			await room.send("dm:spawn", {
-				action: "spawn",
-				tokenId: ship.id,
-				position: { x: cursorPosition.x, y: cursorPosition.y },
+				token: ship.sourceShip!,
 				faction: "PLAYER",
+				position: { x: cursorPosition.x, y: cursorPosition.y },
 			});
 			notify.success(`已部署 ${ship.name} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
 		} catch (error) {

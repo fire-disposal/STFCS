@@ -158,7 +158,7 @@ describe("Weapon Targeting", () => {
 				},
 			]
 		);
-		attacker.tokenJson.runtime!.hasFired = true;
+		attacker.runtime!.hasFired = true;
 
 		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
 		const result = calculateShipWeaponTargets(attacker, [target]);
@@ -189,7 +189,7 @@ describe("Weapon Targeting", () => {
 		);
 
 		const target = createTestShip("ship2", "Target", { x: 100, y: 0 }, []);
-		target.tokenJson.runtime!.destroyed = true;
+		target.runtime!.destroyed = true;
 
 		const result = calculateShipWeaponTargets(attacker, [target]);
 

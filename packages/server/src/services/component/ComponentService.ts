@@ -5,7 +5,7 @@
  * 组件类型：引擎、护盾、辐能电容、火控、传感器等
  */
 
-import type { ShipJSON } from "@vt/data";
+import type { InventoryToken } from "@vt/data";
 
 export type ComponentType =
 	| "ENGINE"
@@ -103,16 +103,16 @@ export class ComponentService {
 		return this.getAllComponents().filter((c) => c.type === type);
 	}
 
-	checkComponentCompatibility(componentId: string, shipJson: ShipJSON): boolean {
+	checkComponentCompatibility(componentId: string, shipJson: InventoryToken): boolean {
 		const component = this.getComponentById(componentId);
 		if (!component?.requirements) return true;
 
 		const req = component.requirements;
 
-		if (req.shipSize && !req.shipSize.includes(shipJson.token.size)) return false;
-		if (req.shipClass && !req.shipClass.includes(shipJson.token.class)) return false;
+		if (req.shipSize && !req.shipSize.includes(shipJson.spec.size)) return false;
+		if (req.shipClass && !req.shipClass.includes(shipJson.spec.class)) return false;
 		if (req.power) {
-			const availablePower = shipJson.token.fluxCapacity ?? 100;
+			const availablePower = shipJson.spec.fluxCapacity ?? 100;
 			if (req.power > availablePower * 0.3) return false;
 		}
 

@@ -7,7 +7,7 @@
 
 import type { Repository, QueryableRepository } from "./interfaces.js";
 import type { UserProfile, ShipBuild, RoomArchive } from "./types.js";
-import type { WeaponBuild } from "./memory/MemoryWeaponRepository.js";
+import type { WeaponBuild } from "@vt/data";
 import {
 	MemoryUserRepository,
 	MemoryShipRepository,
@@ -23,7 +23,6 @@ interface Repositories {
 		findByOwner(ownerId: string): Promise<ShipBuild[]>;
 		findPresets(): Promise<ShipBuild[]>;
 		findCustomByOwner(ownerId: string): Promise<ShipBuild[]>;
-		findPublic(): Promise<ShipBuild[]>;
 		incrementUsage(id: string): Promise<ShipBuild | null>;
 		clear(): void;
 	};

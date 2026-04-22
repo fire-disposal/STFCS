@@ -1,12 +1,11 @@
 {
-	"$schema": "weapon-v2",
 	"$id": "preset:laser-medium",
 	"metadata": {
 		"name": "中型激光炮",
 		"description": "标准中型能量武器，均衡性能",
 		"author": "STFCS"
 	},
-	"weapon": {
+	"spec": {
 		"damageType": "ENERGY",
 		"size": "MEDIUM",
 		"damage": 100,

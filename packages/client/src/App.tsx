@@ -9,9 +9,8 @@ import { DEFAULT_WS_URL } from "@/config";
 import GamePage from "@/pages/GamePage";
 type AppState = "auth" | "lobby" | "game" | "loading";
 
-import { SocketNetworkManager } from "@/network";
+import { SocketNetworkManager, useRoomList } from "@/network";
 import { userService } from "@/services/UserService";
-import { useRoomList } from "@/sync";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
 const App: React.FC = () => {
@@ -19,7 +18,7 @@ const App: React.FC = () => {
 	const [networkManager, setNetworkManager] = useState<SocketNetworkManager | null>(null);
 	const networkManagerRef = useRef<SocketNetworkManager | null>(null);
 	const [userName, setUserName] = useState<string>("");
-	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string; avatarAssetId?: string }>({ nickname: "", avatar: "" });
+	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string | null; avatarAssetId?: string }>({ nickname: "", avatar: null });
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const { rooms, isLoading: roomsLoading } = useRoomList(
@@ -44,7 +43,7 @@ const App: React.FC = () => {
 				manager.authenticate(restoredName).then((result) => {
 					if (result.success) {
 						setUserName(restoredName);
-						setUserProfile(result.profile ?? { nickname: restoredName, avatar: "" });
+						setUserProfile(result.profile ?? { nickname: restoredName, avatar: null });
 						setAppState("lobby");
 						notify.success(`欢迎回来，${restoredName}！`);
 						setRefreshKey(Date.now());
@@ -65,7 +64,7 @@ const App: React.FC = () => {
 		const result = await networkManagerRef.current.authenticate(username);
 		if (result.success) {
 			setUserName(username);
-			setUserProfile(result.profile ?? { nickname: username, avatar: "" });
+			setUserProfile(result.profile ?? { nickname: username, avatar: null });
 			userService.setUsername(username);
 			setAppState("lobby");
 			notify.success(`欢迎，${username}！`);

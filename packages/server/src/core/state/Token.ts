@@ -1,76 +1,40 @@
 /**
  * Token状态 - 基于 @vt/data 权威设计
  *
- * 后端只管理核心游戏状态，显示属性由前端本地管理
- * Token 本质上是 TokenJSON 的运行时包装
+ * CombatToken 直接使用 schema 定义的类型
+ * InventoryToken 用于存档管理（无runtime）
  */
 
 import type {
-	TokenJSON,
+	CombatToken as CombatTokenSchema,
+	InventoryToken as InventoryTokenSchema,
 	TokenSpec,
 	TokenRuntime,
 	Faction,
-	FluxState,
-	MovementState,
 	Point,
+	MovementState,
 } from "@vt/data";
 import {
 	Faction as FactionEnum,
-	FluxState as FluxStateEnum,
 	MovementPhase as MovementPhaseEnum,
 } from "@vt/data";
 
-/**
- * Token类型枚举（后端特有，扩展schema）
- */
+export type CombatToken = CombatTokenSchema;
+export type InventoryToken = InventoryTokenSchema;
+
 export type TokenType = "SHIP" | "STATION" | "ASTEROID" | "PROJECTILE" | "EFFECT";
 
-/**
- * Token运行时状态（后端特有，用于非Ship类型的Token）
- */
-export interface TokenRuntimeBase {
-	position: Point;
-	heading: number;
-	faction?: Faction;
-	ownerId?: string;
-}
-
-/**
- * CombatToken - 直接使用TokenJSON作为数据载体
- *
- * 后端只维护核心游戏状态：
- * - TokenJSON 包含 spec + runtime + metadata
- * - runtime 中的 position/heading/hull/armor/flux 等是游戏逻辑状态
- * - 显示状态(selected/visible等)由前端本地管理
- */
-export interface CombatToken {
-	id: string;
-	type: "SHIP";
-	tokenJson: TokenJSON;
-}
-
-/**
- * 其他类型Token（地形、效果等）
- */
 export interface OtherToken {
-	id: string;
-	type: "STATION" | "ASTEROID" | "PROJECTILE" | "EFFECT";
-	runtime: TokenRuntimeBase;
+	$id: string;
+	type: TokenType;
+	runtime: TokenRuntime;
 	dataRef: string;
 }
 
-/**
- * Token联合类型
- */
 export type Token = CombatToken | OtherToken;
 
-/**
- * 派生状态（用于快速访问，不从schema推导）
- *
- * 这些是计算值，用于简化前端显示逻辑
- */
 export interface DerivedTokenState {
-	fluxState: FluxState;
+	fluxState: string;
 	fluxPercentage: number;
 	hullPercentage: number;
 	armorPercentages: number[];
@@ -81,18 +45,15 @@ export interface DerivedTokenState {
 	weaponsTotal: number;
 }
 
-/**
- * 创建CombatToken
- */
 export function createCombatToken(
-	id: string,
-	tokenJson: TokenJSON,
+	$id: string,
+	inventoryToken: InventoryToken,
 	position: Point,
 	heading: number = 0,
 	faction?: Faction,
 	ownerId?: string
 ): CombatToken {
-	const spec = tokenJson.token;
+	const spec = inventoryToken.spec;
 
 	const runtime: TokenRuntime = {
 		position,
@@ -117,24 +78,18 @@ export function createCombatToken(
 		...(spec.shield ? { shield: { active: false, value: spec.shield.radius } } : {}),
 	};
 
-	const fullTokenJson: TokenJSON = {
-		...tokenJson,
-		runtime,
-	};
-
 	return {
-		id,
-		type: "SHIP",
-		tokenJson: fullTokenJson,
+		$id,
+		$presetRef: inventoryToken.$presetRef,
+		spec,
+		runtime,
+		metadata: inventoryToken.metadata,
 	};
 }
 
-/**
- * 计算派生状态
- */
-export function calculateDerivedState(tokenJson: TokenJSON): DerivedTokenState {
-	const spec = tokenJson.token;
-	const runtime = tokenJson.runtime;
+export function calculateDerivedState(token: CombatToken): DerivedTokenState {
+	const spec = token.spec;
+	const runtime = token.runtime;
 	if (!runtime) {
 		return createDefaultDerivedState(spec);
 	}
@@ -143,13 +98,13 @@ export function calculateDerivedState(tokenJson: TokenJSON): DerivedTokenState {
 	const fluxCapacity = spec.fluxCapacity ?? 100;
 	const fluxRatio = totalFlux / fluxCapacity;
 
-	let fluxState: FluxState = FluxStateEnum.NORMAL;
+	let fluxState = "NORMAL";
 	if (runtime.overloaded) {
-		fluxState = FluxStateEnum.OVERLOADED;
+		fluxState = "OVERLOADED";
 	} else if (runtime.venting) {
-		fluxState = FluxStateEnum.VENTING;
+		fluxState = "VENTING";
 	} else if (fluxRatio >= 0.7) {
-		fluxState = FluxStateEnum.HIGH;
+		fluxState = "HIGH";
 	}
 
 	const weapons = runtime.weapons ?? [];
@@ -176,7 +131,7 @@ export function calculateDerivedState(tokenJson: TokenJSON): DerivedTokenState {
 
 function createDefaultDerivedState(spec: TokenSpec): DerivedTokenState {
 	return {
-		fluxState: FluxStateEnum.NORMAL,
+		fluxState: "NORMAL",
 		fluxPercentage: 0,
 		hullPercentage: 100,
 		armorPercentages: Array(6).fill(100),
@@ -188,38 +143,24 @@ function createDefaultDerivedState(spec: TokenSpec): DerivedTokenState {
 	};
 }
 
-/**
- * 更新CombatToken的runtime
- */
 export function updateTokenRuntime(token: CombatToken, runtimeUpdates: Partial<TokenRuntime>): CombatToken {
-	const currentRuntime = token.tokenJson.runtime;
+	const currentRuntime = token.runtime;
 	if (!currentRuntime) {
 		return {
 			...token,
-			tokenJson: {
-				...token.tokenJson,
-				runtime: runtimeUpdates as TokenRuntime,
-			},
+			runtime: runtimeUpdates as TokenRuntime,
 		};
 	}
 
-	const newRuntime = {
-		...currentRuntime,
-		...runtimeUpdates,
-	};
-
 	return {
 		...token,
-		tokenJson: {
-			...token.tokenJson,
-			runtime: newRuntime,
+		runtime: {
+			...currentRuntime,
+			...runtimeUpdates,
 		},
 	};
 }
 
-/**
- * 应用伤害到CombatToken
- */
 export function applyDamage(
 	token: CombatToken,
 	hullDamage: number,
@@ -228,7 +169,7 @@ export function applyDamage(
 	fluxHardGenerated: number,
 	shieldHit: boolean
 ): CombatToken {
-	const runtime = token.tokenJson.runtime;
+	const runtime = token.runtime;
 	if (!runtime) return token;
 
 	const newHull = Math.max(0, runtime.hull - hullDamage);
@@ -241,7 +182,7 @@ export function applyDamage(
 		? (runtime.fluxHard ?? 0) + fluxHardGenerated
 		: runtime.fluxHard;
 
-	const spec = token.tokenJson.token;
+	const spec = token.spec;
 	const totalFlux = (runtime.fluxSoft ?? 0) + (newFluxHard ?? 0);
 	const fluxCapacity = spec.fluxCapacity ?? 100;
 	const newOverloaded = totalFlux > fluxCapacity && !runtime.overloaded;
@@ -256,11 +197,8 @@ export function applyDamage(
 	});
 }
 
-/**
- * 移动CombatToken
- */
 export function moveToken(token: CombatToken, newPosition: Point, phase: "A" | "C", distance: number): CombatToken {
-	const runtime = token.tokenJson.runtime;
+	const runtime = token.runtime;
 	if (!runtime) return token;
 
 	const movement = runtime.movement ?? {
@@ -282,11 +220,8 @@ export function moveToken(token: CombatToken, newPosition: Point, phase: "A" | "
 	});
 }
 
-/**
- * 旋转CombatToken
- */
 export function rotateToken(token: CombatToken, newHeading: number, angleUsed: number): CombatToken {
-	const runtime = token.tokenJson.runtime;
+	const runtime = token.runtime;
 	if (!runtime) return token;
 
 	const normalizedHeading = ((newHeading % 360) + 360) % 360;
@@ -307,11 +242,8 @@ export function rotateToken(token: CombatToken, newHeading: number, angleUsed: n
 	});
 }
 
-/**
- * 推进移动阶段
- */
 export function advanceMovementPhase(token: CombatToken): CombatToken {
-	const runtime = token.tokenJson.runtime;
+	const runtime = token.runtime;
 	if (!runtime) return token;
 
 	const movement = runtime.movement ?? {
@@ -335,73 +267,55 @@ export function advanceMovementPhase(token: CombatToken): CombatToken {
 	});
 }
 
-/**
- * Token是否可行动
- */
 export function canAct(token: Token): boolean {
-	if (token.type !== "SHIP") return false;
-	const runtime = token.tokenJson.runtime;
+	if (!isCombatToken(token)) return false;
+	const runtime = token.runtime;
 	if (!runtime) return false;
 	return !runtime.destroyed && !runtime.overloaded;
 }
 
-/**
- * Token是否被摧毁
- */
 export function isDestroyed(token: Token): boolean {
-	if (token.type !== "SHIP") return false;
-	return token.tokenJson.runtime?.destroyed ?? false;
+	if (!isCombatToken(token)) return false;
+	return token.runtime?.destroyed ?? false;
 }
 
-/**
- * 获取Token名称
- */
 export function getTokenName(token: Token): string {
-	if (token.type === "SHIP") {
-		return token.tokenJson.metadata.name;
+	if (isCombatToken(token)) {
+		return token.metadata.name;
 	}
-	return `Token_${token.id.substring(0, 8)}`;
+	return `Token_${token.$id.substring(0, 8)}`;
 }
 
-/**
- * 获取Token位置
- */
 export function getTokenPosition(token: Token): Point {
-	if (token.type === "SHIP") {
-		return token.tokenJson.runtime?.position ?? { x: 0, y: 0 };
+	if (isCombatToken(token)) {
+		return token.runtime?.position ?? { x: 0, y: 0 };
 	}
-	return token.runtime.position;
+	return token.runtime?.position ?? { x: 0, y: 0 };
 }
 
-/**
- * 获取Token朝向
- */
 export function getTokenHeading(token: Token): number {
-	if (token.type === "SHIP") {
-		return token.tokenJson.runtime?.heading ?? 0;
+	if (isCombatToken(token)) {
+		return token.runtime?.heading ?? 0;
 	}
-	return token.runtime.heading;
+	return token.runtime?.heading ?? 0;
 }
 
-/**
- * 获取Token阵营
- */
 export function getTokenFaction(token: Token): Faction {
-	if (token.type === "SHIP") {
-		return token.tokenJson.runtime?.faction ?? FactionEnum.NEUTRAL;
+	if (isCombatToken(token)) {
+		return token.runtime?.faction ?? FactionEnum.NEUTRAL;
 	}
-	return token.runtime.faction ?? FactionEnum.NEUTRAL;
+	return token.runtime?.faction ?? FactionEnum.NEUTRAL;
 }
 
-/** @deprecated 使用 CombatToken */
-export type ShipToken = CombatToken;
-/** @deprecated 使用 DerivedTokenState */
-export type DerivedShipState = DerivedTokenState;
-/** @deprecated 使用 createCombatToken */
-export const createShipToken = createCombatToken;
-/** @deprecated 使用 updateTokenRuntime */
-export const updateShipRuntime = updateTokenRuntime;
-/** @deprecated 使用 moveToken */
-export const moveShip = moveToken;
-/** @deprecated 使用 rotateToken */
-export const rotateShip = rotateToken;
+export function isCombatToken(token: Token): token is CombatToken {
+	return 'runtime' in token && token.runtime !== undefined;
+}
+
+export function stripRuntime(token: CombatToken): InventoryToken {
+	return {
+		$id: token.$id,
+		$presetRef: token.$presetRef,
+		spec: token.spec,
+		metadata: token.metadata,
+	};
+}

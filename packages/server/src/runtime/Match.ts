@@ -169,7 +169,7 @@ export class Match {
    * 获取舰船数量
    */
   getShipCount(): number {
-    return this.stateManager.getShipTokens().length;
+    return this.stateManager.getCombatTokens().length;
   }
 
   /**

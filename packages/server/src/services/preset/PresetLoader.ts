@@ -8,9 +8,9 @@
 import {
 	presetShips,
 	presetWeapons,
-	TokenJSONSchema,
+	InventoryTokenSchema,
 	WeaponJSONSchema,
-	type TokenJSON,
+	type InventoryToken,
 	type WeaponJSON,
 } from "@vt/data";
 import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
@@ -33,7 +33,7 @@ export class PresetLoader {
 
 		for (const rawShip of presetShips) {
 			try {
-				const shipJson = TokenJSONSchema.parse(rawShip) as TokenJSON;
+				const shipJson = InventoryTokenSchema.parse(rawShip) as InventoryToken;
 
 				const existing = await this.persistence.ships.findById(shipJson.$id);
 				if (existing) {
@@ -43,12 +43,10 @@ export class PresetLoader {
 
 				const shipBuild: ShipBuild = {
 					id: shipJson.$id,
-					shipJson,
+					data: shipJson,
 					ownerId: "system",
-					customizations: {},
 					isPreset: true,
-					isPublic: true,
-					tags: ["preset", shipJson.token.class, shipJson.token.size],
+					tags: ["preset", shipJson.spec.class, shipJson.spec.size],
 					usageCount: 0,
 					createdAt: shipJson.metadata.createdAt ?? Date.now(),
 					updatedAt: Date.now(),
@@ -75,11 +73,11 @@ export class PresetLoader {
 
 				const weaponBuild = {
 					id: weaponJson.$id,
-					weaponJson,
+					data: weaponJson,
 					ownerId: "system",
 					isPreset: true,
 					isPublic: true,
-					tags: ["preset", weaponJson.weapon.damageType, weaponJson.weapon.size],
+					tags: ["preset", weaponJson.spec.damageType, weaponJson.spec.size],
 					usageCount: 0,
 					createdAt: weaponJson.metadata?.createdAt ?? Date.now(),
 					updatedAt: Date.now(),

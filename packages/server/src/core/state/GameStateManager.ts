@@ -6,24 +6,20 @@ import {
   GamePhase,
   Faction,
 } from "@vt/data";
-
-type TokenJSON = any;
-type WeaponJSON = any;
+import type { CombatToken, WeaponJSON } from "@vt/data";
 
 import type {
   GameState,
   PlayerState,
 } from "../types/common.js";
 
-import type {
-  Token,
-  CombatToken,
-} from "./Token.js";
+import type { Token } from "./Token.js";
 
 import {
-  createCombatToken,
-  updateTokenRuntime,
-  applyDamage
+	createCombatToken,
+	updateTokenRuntime,
+	applyDamage,
+	isCombatToken,
 } from "./Token.js";
 
 import { processTurnEndFlux } from "../engine/modules/flux.js";
@@ -115,7 +111,7 @@ export class GameStateManager {
   // ==================== Token管理 ====================
 
   addToken(token: Token): void {
-    this.state.tokens.set(token.id, token);
+    this.state.tokens.set(token.$id, token);
   }
 
   removeToken(tokenId: string): boolean {
@@ -128,7 +124,7 @@ export class GameStateManager {
 
   getCombatToken(tokenId: string): CombatToken | undefined {
     const token = this.state.tokens.get(tokenId);
-    return token?.type === "SHIP" ? token as CombatToken : undefined;
+    return token && isCombatToken(token) ? token : undefined;
   }
 
   updateToken(tokenId: string, updates: Partial<Token>): boolean {
@@ -209,35 +205,34 @@ export class GameStateManager {
 
   getCombatTokens(): CombatToken[] {
     return this.getAllTokens()
-      .filter(token => token.type === "SHIP")
-      .map(token => token as CombatToken);
+      .filter(isCombatToken);
   }
 
   getTokensByFaction(faction: string): Token[] {
     return this.getAllTokens().filter(token =>
-      token.type === "SHIP" && (token as CombatToken).tokenJson.runtime?.faction === faction
+      isCombatToken(token) && token.runtime?.faction === faction
     );
   }
 
   getCombatTokensByFaction(faction: string): CombatToken[] {
     return this.getCombatTokens().filter(ship =>
-      ship.tokenJson.runtime?.faction === faction
+      ship.runtime?.faction === faction
     );
   }
 
   getAliveCombatTokens(): CombatToken[] {
-    return this.getCombatTokens().filter(ship => !ship.tokenJson.runtime?.destroyed);
+    return this.getCombatTokens().filter(ship => !ship.runtime?.destroyed);
   }
 
   getPlayerTokens(playerId: string): Token[] {
     return this.getAllTokens().filter(token =>
-      token.type === "SHIP" && (token as CombatToken).tokenJson.runtime?.ownerId === playerId
+      isCombatToken(token) && token.runtime?.ownerId === playerId
     );
   }
 
   getPlayerCombatTokens(playerId: string): CombatToken[] {
     return this.getCombatTokens().filter(ship =>
-      ship.tokenJson.runtime?.ownerId === playerId
+      ship.runtime?.ownerId === playerId
     );
   }
 
@@ -334,8 +329,8 @@ export class GameStateManager {
 
   isGameOver(): boolean {
     const aliveShips = this.getAliveCombatTokens();
-    const playerShips = aliveShips.filter(ship => ship.tokenJson.runtime?.faction === Faction.PLAYER);
-    const enemyShips = aliveShips.filter(ship => ship.tokenJson.runtime?.faction === Faction.ENEMY);
+    const playerShips = aliveShips.filter(ship => ship.runtime?.faction === Faction.PLAYER);
+    const enemyShips = aliveShips.filter(ship => ship.runtime?.faction === Faction.ENEMY);
 
     return playerShips.length === 0 || enemyShips.length === 0;
   }
@@ -344,7 +339,7 @@ export class GameStateManager {
     if (!this.isGameOver()) return null;
 
     const aliveShips = this.getAliveCombatTokens();
-    const playerShips = aliveShips.filter(ship => ship.tokenJson.runtime?.faction === Faction.PLAYER);
+    const playerShips = aliveShips.filter(ship => ship.runtime?.faction === Faction.PLAYER);
 
     return playerShips.length > 0 ? Faction.PLAYER : Faction.ENEMY;
   }
@@ -363,10 +358,9 @@ export class GameStateManager {
 
   private processAllFluxAtTurnEnd(): void {
     for (const [, token] of this.state.tokens.entries()) {
-      if (token.type === "SHIP") {
-        const combatToken = token as CombatToken;
-        if (!combatToken.tokenJson.runtime?.destroyed) {
-          processTurnEndFlux(combatToken);
+      if (isCombatToken(token)) {
+        if (!token.runtime?.destroyed) {
+          processTurnEndFlux(token);
         }
       }
     }
@@ -374,9 +368,8 @@ export class GameStateManager {
 
   private resetTokenTurnStates(): void {
     for (const [tokenId, token] of this.state.tokens.entries()) {
-      if (token.type === "SHIP") {
-        const combatToken = token as CombatToken;
-        const updatedToken = updateTokenRuntime(combatToken, {
+      if (isCombatToken(token)) {
+        const updatedToken = updateTokenRuntime(token, {
           movement: {
             currentPhase: "A",
             hasMoved: false,
@@ -395,11 +388,10 @@ export class GameStateManager {
 
   private updateAllWeaponStates(): void {
     for (const [tokenId, token] of this.state.tokens.entries()) {
-      if (token.type === "SHIP") {
-        const combatToken = token as CombatToken;
-        if (combatToken.tokenJson.runtime?.weapons) {
-          const updatedWeapons = combatToken.tokenJson.runtime.weapons.map((weaponRuntime: any) => {
-            const mount = combatToken.tokenJson.token.mounts?.find(
+      if (isCombatToken(token)) {
+        if (token.runtime?.weapons) {
+          const updatedWeapons = token.runtime.weapons.map((weaponRuntime: any) => {
+            const mount = token.spec.mounts?.find(
               (m: any) => m.id === weaponRuntime.mountId
             );
             const weaponSpec = mount
@@ -410,7 +402,7 @@ export class GameStateManager {
             return updateWeaponStateAtTurnEnd(weaponRuntime, weaponSpec || undefined) || weaponRuntime;
           });
 
-          const updatedToken = updateTokenRuntime(combatToken, {
+          const updatedToken = updateTokenRuntime(token, {
             weapons: updatedWeapons,
           });
           this.state.tokens.set(tokenId, updatedToken);
@@ -422,30 +414,30 @@ export class GameStateManager {
   // ==================== 工厂方法 ====================
 
   createCombatTokenFromJson(
-    tokenJson: TokenJSON,
+    tokenJson: CombatToken,
     position: { x: number; y: number },
     heading: number = 0,
     faction?: string,
     ownerId?: string
   ): CombatToken {
     const tokenId = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    return createCombatToken(tokenId, tokenJson, position, heading, faction as any, ownerId);
+    return createCombatToken(tokenId, tokenJson as any, position, heading, faction as any, ownerId);
   }
 
   createWeaponComponentFromJson(
-    weaponJson: WeaponJSON,
+    data: WeaponJSON,
     mountId: string,
     tokenId: string
   ): WeaponComponentState {
     const componentId = `weapon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullMountId = `${tokenId}_${mountId}`;
-    return createWeaponComponentState(componentId, fullMountId, weaponJson);
+    return createWeaponComponentState(componentId, fullMountId, data);
   }
 
   // ==================== 批量操作 ====================
 
   addTokenWithComponents(
-    tokenJson: TokenJSON,
+    tokenJson: CombatToken,
     position: { x: number; y: number },
     heading: number = 0,
     faction?: string,
@@ -455,7 +447,7 @@ export class GameStateManager {
     this.addToken(combatToken);
 
     const components: WeaponComponentState[] = [];
-    const spec = tokenJson.token;
+    const spec = combatToken.spec;
 
     if (spec.mounts) {
       for (const mount of spec.mounts) {
@@ -463,7 +455,7 @@ export class GameStateManager {
           const weaponComponent = this.createWeaponComponentFromJson(
             mount.weapon,
             mount.id,
-            combatToken.id
+            combatToken.$id
           );
           this.addComponent(weaponComponent);
           components.push(weaponComponent);
@@ -487,27 +479,4 @@ export class GameStateManager {
 
     return true;
   }
-
-  // ==================== 兼容别名 ====================
-
-  /** @deprecated 使用 getCombatToken */
-  getShipToken = this.getCombatToken;
-  /** @deprecated 使用 updateCombatToken */
-  updateShipToken = this.updateCombatToken;
-  /** @deprecated 使用 getCombatTokens */
-  getShipTokens = this.getCombatTokens;
-  /** @deprecated 使用 getCombatTokensByFaction */
-  getShipTokensByFaction = this.getCombatTokensByFaction;
-  /** @deprecated 使用 getAliveCombatTokens */
-  getAliveShipTokens = this.getAliveCombatTokens;
-  /** @deprecated 使用 getPlayerCombatTokens */
-  getPlayerShipTokens = this.getPlayerCombatTokens;
-  /** @deprecated 使用 applyDamageToCombatToken */
-  applyDamageToShip = this.applyDamageToCombatToken;
-  /** @deprecated 使用 createCombatTokenFromJson */
-  createShipTokenFromJson = this.createCombatTokenFromJson;
-  /** @deprecated 使用 addTokenWithComponents */
-  addShipWithComponents = this.addTokenWithComponents;
-  /** @deprecated 使用 removeTokenWithComponents */
-  removeShipWithComponents = this.removeTokenWithComponents;
 }

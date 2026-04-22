@@ -6,27 +6,27 @@ export class WeaponService {
 
 	async getWeaponById(id: string): Promise<WeaponJSON | null> {
 		const build = await this.persistence.weapons.findById(id);
-		return build?.weaponJson ?? null;
+		return build?.data ?? null;
 	}
 
 	async getAllWeapons(): Promise<WeaponJSON[]> {
 		const builds = await this.persistence.weapons.findAll();
-		return builds.items.map((b) => b.weaponJson);
+		return builds.items.map((b) => b.data);
 	}
 
 	async getWeaponsByOwner(ownerId: string): Promise<WeaponJSON[]> {
 		const builds = await this.persistence.weapons.findCustomByOwner(ownerId);
-		return builds.map((b) => b.weaponJson);
+		return builds.map((b) => b.data);
 	}
 
 	async getWeaponsBySize(size: string): Promise<WeaponJSON[]> {
 		const builds = await this.persistence.weapons.findBySize(size);
-		return builds.map((b) => b.weaponJson);
+		return builds.map((b) => b.data);
 	}
 
 	async getWeaponsByDamageType(damageType: string): Promise<WeaponJSON[]> {
 		const builds = await this.persistence.weapons.findByDamageType(damageType);
-		return builds.map((b) => b.weaponJson);
+		return builds.map((b) => b.data);
 	}
 
 	checkWeaponCompatibility(_weaponId: string, mountSize: string): boolean {
@@ -45,7 +45,7 @@ export class WeaponService {
 		fluxPerSecond: number;
 		effectiveRange: number;
 	} {
-		const spec = weaponJson.weapon;
+		const spec = weaponJson.spec;
 		const cooldown = spec.cooldown ?? 1;
 		const burstCount = spec.burstCount ?? 1;
 		const projectiles = spec.projectilesPerShot ?? 1;

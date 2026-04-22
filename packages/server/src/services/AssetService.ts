@@ -248,7 +248,6 @@ export class AssetService {
 		const ownerId = userId.startsWith("player:") ? userId : `player:${userId}`;
 
 		const asset: Asset = {
-			$schema: "asset-v1",
 			$id: assetId,
 			type,
 			filename,

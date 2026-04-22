@@ -1,12 +1,12 @@
 {
-	"$schema": "ship-v2",
 	"$id": "preset:destroyer-standard",
 	"metadata": {
 		"name": "标准驱逐舰",
 		"description": "中型驱逐舰，均衡火力与防护",
-		"author": "STFCS"
+		"author": "STFCS",
+		"createdAt": 1700000000000
 	},
-	"ship": {
+	"spec": {
 		"size": "DESTROYER",
 		"class": "COMBAT",
 		"width": 60,
@@ -20,7 +20,6 @@
 		"maxSpeed": 100,
 		"maxTurnRate": 20,
 		"shield": {
-			"type": "OMNI",
 			"arc": 360,
 			"radius": 80,
 			"efficiency": 1.0,
@@ -34,7 +33,20 @@
 				"facing": 0,
 				"arc": 90,
 				"size": "MEDIUM",
-				"weapon": "preset:laser-medium"
+				"weapon": {
+					"$id": "preset:laser-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 100,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 100,
+						"cooldown": 1.0,
+						"fluxCostPerShot": 20,
+						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
+					}
+				}
 			},
 			{
 				"id": "mount-front-2",
@@ -43,7 +55,20 @@
 				"facing": 15,
 				"arc": 60,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			},
 			{
 				"id": "mount-front-3",
@@ -52,7 +77,20 @@
 				"facing": -15,
 				"arc": 60,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			}
 		],
 		"rangeModifier": 1.0

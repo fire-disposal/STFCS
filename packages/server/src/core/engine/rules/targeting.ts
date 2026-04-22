@@ -109,32 +109,32 @@ export function calculateShipWeaponTargets(
 	potentialTargets: CombatToken[]
 ): ShipTargetingResult {
 	const result: ShipTargetingResult = {
-		shipId: attacker.id,
-		shipName: attacker.tokenJson.metadata.name || attacker.id,
+		shipId: attacker.$id,
+		shipName: attacker.metadata.name || attacker.$id,
 		canAttack: true,
 		weapons: [],
 	};
 
-	if (attacker.tokenJson.runtime?.destroyed) {
+	if (attacker.runtime?.destroyed) {
 		result.canAttack = false;
 		result.cannotAttackReason = "Ship is destroyed";
 		return result;
 	}
 
-	if (attacker.tokenJson.runtime?.overloaded) {
+	if (attacker.runtime?.overloaded) {
 		result.canAttack = false;
 		result.cannotAttackReason = "Ship is overloaded";
 		return result;
 	}
 
-	if (attacker.tokenJson.runtime?.hasFired) {
+	if (attacker.runtime?.hasFired) {
 		result.canAttack = false;
 		result.cannotAttackReason = "Ship has already fired this turn";
 		return result;
 	}
 
-	const spec = attacker.tokenJson.token;
-	const runtime = attacker.tokenJson.runtime;
+	const spec = attacker.spec;
+	const runtime = attacker.runtime;
 
 	// 遍历所有挂载点
 	if (!spec.mounts || spec.mounts.length === 0) {
@@ -142,17 +142,15 @@ export function calculateShipWeaponTargets(
 	}
 
 	for (const mount of spec.mounts) {
-		// 查找对应的武器运行时状态
 		const weaponRuntime = runtime?.weapons?.find(
-			(w: any) => w.mountId === mount.id
+			(w) => w.mountId === mount.id
 		);
 
 		if (!weaponRuntime) {
-			// 挂载点没有武器
 			continue;
 		}
 
-		const weaponSpec = weaponRuntime.weapon;
+		const weaponSpec = mount.weapon?.spec;
 		if (!weaponSpec) {
 			continue;
 		}
@@ -181,7 +179,7 @@ function calculateWeaponTargets(
 	weaponSpec: WeaponSpec,
 	targets: CombatToken[]
 ): WeaponTargetingResult {
-	const effectiveRange = weaponSpec.range * (attacker.tokenJson.token.rangeModifier || 1.0);
+	const effectiveRange = weaponSpec.range * (attacker.spec.rangeModifier || 1.0);
 	const minRange = weaponSpec.minRange || 0;
 	const mountFacing = mount.facing || 0;
 
@@ -255,12 +253,12 @@ function calculateWeaponTargets(
 	// 计算每个潜在目标
 	for (const target of targets) {
 		// 跳过自己
-		if (target.id === attacker.id) continue;
+		if (target.$id === attacker.$id) continue;
 
 		// 跳过已摧毁目标
-		if (target.tokenJson.runtime?.destroyed) continue;
+		if (target.runtime?.destroyed) continue;
 
-		const dist = distance(attacker.tokenJson.runtime?.position ?? { x: 0, y: 0 }, target.tokenJson.runtime?.position ?? { x: 0, y: 0 });
+		const dist = distance(attacker.runtime?.position ?? { x: 0, y: 0 }, target.runtime?.position ?? { x: 0, y: 0 });
 
 		// 检查射程
 		const inRange = dist >= minRange && dist <= effectiveRange;
@@ -270,25 +268,25 @@ function calculateWeaponTargets(
 		if (arc < 360) {
 			// 计算目标相对攻击者的角度
 			const targetAngle = angleBetween(
-				attacker.tokenJson.runtime?.position ?? { x: 0, y: 0 },
-				target.tokenJson.runtime?.position ?? { x: 0, y: 0 }
+				attacker.runtime?.position ?? { x: 0, y: 0 },
+				target.runtime?.position ?? { x: 0, y: 0 }
 			);
-			const heading = attacker.tokenJson.runtime?.heading || 0;
+			const heading = attacker.runtime?.heading || 0;
 			const relativeAngle = ((targetAngle - heading - mountFacing + 540) % 360) - 180;
 			inArc = Math.abs(relativeAngle) <= arc / 2;
 		}
 
 		// 计算命中角度和护甲象限
 		const hitAngle = angleBetween(
-			attacker.tokenJson.runtime?.position ?? { x: 0, y: 0 },
-			target.tokenJson.runtime?.position ?? { x: 0, y: 0 }
+			attacker.runtime?.position ?? { x: 0, y: 0 },
+			target.runtime?.position ?? { x: 0, y: 0 }
 		);
-		const relativeAngle = ((hitAngle - (target.tokenJson.runtime?.heading || 0) + 360) % 360);
+		const relativeAngle = ((hitAngle - (target.runtime?.heading || 0) + 360) % 360);
 		const targetQuadrant = Math.floor(relativeAngle / 60) % 6;
 
 		const targetInfo: WeaponTargetInfo = {
-			targetId: target.id,
-			targetName: target.tokenJson.metadata.name || target.id,
+			targetId: target.$id,
+			targetName: target.metadata.name || target.$id,
 			distance: Math.round(dist * 100) / 100,
 			inRange,
 			inArc,
@@ -345,31 +343,31 @@ export function validateAttackAllocations(
 		warnings: [],
 	};
 
-	if (attacker.tokenJson.runtime?.destroyed) {
+	if (attacker.runtime?.destroyed) {
 		result.valid = false;
 		result.errors.push("Attacker is destroyed");
 		return result;
 	}
 
-	if (attacker.tokenJson.runtime?.overloaded) {
+	if (attacker.runtime?.overloaded) {
 		result.valid = false;
 		result.errors.push("Attacker is overloaded");
 		return result;
 	}
 
-	const spec = attacker.tokenJson.token;
+	const spec = attacker.spec;
 
 	// 验证每个武器分配
 	for (const allocation of allocations) {
-		const mount = spec.mounts?.find((m: any) => m.id === allocation.mountId);
+		const mount = spec.mounts?.find((m) => m.id === allocation.mountId);
 		if (!mount) {
 			result.valid = false;
 			result.errors.push(`Invalid mount ID: ${allocation.mountId}`);
 			continue;
 		}
 
-		const weaponRuntime = attacker.tokenJson.runtime?.weapons?.find(
-			(w: any) => w.mountId === allocation.mountId
+		const weaponRuntime = attacker.runtime?.weapons?.find(
+			(w) => w.mountId === allocation.mountId
 		);
 		if (!weaponRuntime) {
 			result.valid = false;
@@ -377,7 +375,6 @@ export function validateAttackAllocations(
 			continue;
 		}
 
-		// 检查武器级别状态（与舰船 hasFired 分离）
 		if (weaponRuntime.state === "FIRED") {
 			result.valid = false;
 			result.errors.push(`Weapon has already fired this turn: ${allocation.mountId}`);
@@ -390,7 +387,7 @@ export function validateAttackAllocations(
 			continue;
 		}
 
-		const weaponSpec = weaponRuntime.weapon;
+		const weaponSpec = mount.weapon?.spec;
 		if (!weaponSpec) {
 			result.valid = false;
 			result.errors.push(`No weapon spec for: ${allocation.mountId}`);

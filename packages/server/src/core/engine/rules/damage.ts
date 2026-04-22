@@ -18,7 +18,7 @@
  * - 若 (X - D) / X > 最大护甲减伤比，则 D = X * (1 - 最大护甲减伤比)
  */
 
-import type { TokenJSON, DamageTypeValue } from "@vt/data";
+import type { TokenSpec, TokenRuntime, DamageTypeValue } from "@vt/data";
 import { GAME_RULES } from "@vt/data";
 
 import type { Point } from "../../types/common.js";
@@ -42,8 +42,8 @@ export interface DamageResult {
  * 计算伤害 - 符合 docs/design/issues.md 公式
  */
 export function calculateDamage(
-	targetSpec: TokenJSON["token"],
-	targetRuntime: TokenJSON["runtime"],
+	targetSpec: TokenSpec,
+	targetRuntime: TokenRuntime,
 	damageAmount: number,
 	damageType: DamageTypeValue,
 	attackerPosition: Point,
@@ -77,12 +77,12 @@ export function calculateDamage(
 
 	// 1. 护盾阶段
 	if (targetRuntime.shield?.active && targetSpec.shield) {
-		const shieldAngle = targetSpec.shield.direction || 0;
 		const shieldArc = targetSpec.shield.arc || 360;
+		const shipHeading = targetRuntime.heading ?? 0;
 		const hitAngle = angleBetween(targetPosition, attackerPosition);
-		const angleDiff = Math.abs(((hitAngle - shieldAngle + 180) % 360) - 180);
+		const angleDiff = Math.abs(((hitAngle - shipHeading + 180) % 360) - 180);
 
-		if (angleDiff <= shieldArc / 2) {
+		if (shieldArc >= 360 || angleDiff <= shieldArc / 2) {
 			result.shieldHit = true;
 
 			// 对护盾伤害 Y = X * shieldMultiplier
@@ -160,8 +160,8 @@ export function calculateDamage(
  */
 export function calculateEmpDamage(
 	empAmount: number,
-	targetSpec: TokenJSON["token"],
-	targetRuntime: TokenJSON["runtime"]
+	targetSpec: TokenSpec,
+	targetRuntime: TokenRuntime
 ): { empApplied: number; fluxGenerated: number; systemsDisabled: string[] } {
 	const result = {
 		empApplied: 0,

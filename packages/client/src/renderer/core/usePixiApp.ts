@@ -25,7 +25,7 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import { Container, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";
-import type { CameraState } from "@/sync/types";
+import type { CameraState } from "@/state/stores/gameStore";
 import type { CanvasSize } from "./useCanvasResize";
 import type { DragState } from "../interactions/InteractionHandler";
 import type { LayerRegistry } from "./useLayerSystem";

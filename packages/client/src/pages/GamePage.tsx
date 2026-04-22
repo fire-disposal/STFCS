@@ -2,7 +2,7 @@ import { GamePhase, PlayerRole } from "@vt/data";
 import type { ShipViewModel } from "@/renderer";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useSocketRoom, useShips } from "@/sync";
+import { useSocketRoom, useShips } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
 import React, { useState } from "react";
@@ -36,10 +36,22 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
 
-	const ships = useShips(room) as ShipViewModel[];
+	const ships = useShips(room) as unknown as ShipViewModel[];
 	const selectedShip = ships.find((s) => s.id === selectedShipId) ?? null;
 
 	const { handleToggleShield, handleVent } = useGameInteraction(room, selectedShip);
+
+	const handleRealityEdit = async (shipId: string, runtimeData: Record<string, unknown>) => {
+		if (!room) return;
+		try {
+			for (const [field, value] of Object.entries(runtimeData)) {
+				await room.send("dm:modify", { tokenId: shipId, field, value });
+			}
+			notify.success("舰船数据已提交修改");
+		} catch (error) {
+			notify.error(error instanceof Error ? error.message : "修改失败");
+		}
+	};
 
 	const currentPlayer = room?.state?.players?.get(room.sessionId ?? "") ?? null;
 	const isHost = currentPlayer?.role === PlayerRole.HOST;
@@ -102,7 +114,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						id: "reality-edit",
 						label: "现实修改",
 						icon: <Edit size={14} />,
-						component: <RealityEditPanel ship={selectedShip} onSubmit={() => { notify.success("舰船数据已提交修改"); }} />,
+						component: <RealityEditPanel ship={selectedShip} onSubmit={handleRealityEdit} />,
 						enabled: isHost,
 					},
 					{

@@ -4,7 +4,7 @@
  * 管理舰船修正器（BUFF/减益）的定义和应用
  */
 
-import type { ShipModifier, ShipRuntime } from "@vt/data";
+import type { TokenModifier, TokenRuntime } from "@vt/data";
 
 export type ModifierType =
 	| "RANGE"
@@ -219,7 +219,7 @@ export class ModifierService {
 		}
 	}
 
-	applyToShipRuntime(runtime: ShipRuntime, modifier: ShipModifier): ShipRuntime {
+	applyToTokenRuntime(runtime: TokenRuntime, modifier: TokenModifier): TokenRuntime {
 		const updatedRuntime = { ...runtime };
 		const modifiers = updatedRuntime.modifiers ?? [];
 

@@ -30,7 +30,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 interface LobbyPageProps {
 	networkManager: SocketNetworkManager;
 	playerName: string;
-	profile: { nickname: string; avatar: string };
+	profile: { nickname: string; avatar: string | null };
 	currentShortId: number | null;
 	rooms: RoomInfo[];
 	isLoading: boolean;

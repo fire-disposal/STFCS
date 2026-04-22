@@ -2,9 +2,9 @@
  * 核心类型定义 - 基于 @vt/data 权威设计
  */
 
-import type { ShipJSON, ShipRuntime, Faction, GamePhase, PlayerRoleValue } from "@vt/data";
+import type { Faction, GamePhase, PlayerRoleValue } from "@vt/data";
 
-import type { Token, TokenType } from "../state/Token.js";
+import type { Token } from "../state/Token.js";
 import type { ComponentState } from "../state/Component.js";
 
 // 本地定义这些类型（@vt/data 中不存在）
@@ -43,15 +43,6 @@ export interface PlayerState {
   jitterMs?: number;
   connectionQuality?: string;
   avatar?: string;
-}
-
-/** 舰船状态（兼容旧接口） - 基于ShipTokenState */
-export interface ShipState {
-  id: string;
-  shipJson: ShipJSON;
-  runtime: ShipRuntime;
-  tokenType?: TokenType;
-  tokenTurnState?: TokenTurnState;
 }
 
 /** 游戏元数据 */

@@ -87,7 +87,6 @@ export class PlayerAvatarStorageService {
         const now = Date.now();
         const username = this.normalizeKey(playerName);
         const draft: PlayerProfile = {
-            $schema: "player-v1",
             $id: `player:${username}`,
             username,
             displayName: playerName,

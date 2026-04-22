@@ -5,10 +5,9 @@
  * 账户创建时自动载入预设数据
  */
 
-import { presetShips, presetWeapons, type ShipJSON, type WeaponJSON, type GameSave } from "@vt/data";
+import { presetShips, presetWeapons, type InventoryToken, type CombatToken, type WeaponJSON, type GameSave, type WeaponBuild } from "@vt/data";
 import type { PersistenceManager } from "../persistence/PersistenceManager.js";
 import type { ShipBuild, RoomArchive } from "../persistence/types.js";
-import type { WeaponBuild } from "../persistence/memory/MemoryWeaponRepository.js";
 import { ShipBuildService } from "./ship/ShipBuildService.js";
 import { AssetService } from "./AssetService.js";
 
@@ -28,9 +27,6 @@ export class PlayerProfileService {
 		this.assetService = new AssetService();
 	}
 
-	/**
-	 * 创建玩家账户，自动载入预设舰船和武器
-	 */
 	async createAccount(userId: string): Promise<void> {
 		const existingShips = await this.persistence.ships.findBy({ ownerId: userId });
 		if (existingShips.length > 0) {
@@ -38,12 +34,14 @@ export class PlayerProfileService {
 		}
 
 		for (const preset of presetShips) {
-			const shipJson = JSON.parse(JSON.stringify(preset)) as ShipJSON;
-			shipJson.$id = generateId("ship", userId);
-			shipJson.$presetRef = preset.$id;
-			shipJson.metadata = {
-				...preset.metadata,
-			 createdAt: Date.now(),
+			const shipJson: InventoryToken = {
+				$id: generateId("ship", userId),
+				$presetRef: preset.$id,
+				spec: preset.spec,
+				metadata: {
+					...preset.metadata,
+					createdAt: Date.now(),
+				},
 			};
 
 			await this.shipService.createShipBuild(userId, shipJson);
@@ -55,14 +53,13 @@ export class PlayerProfileService {
 
 			const weaponBuild: WeaponBuild = {
 				id: weaponJson.$id,
-				weaponJson,
+				data: weaponJson,
 				ownerId: userId,
 				isPreset: false,
-				isPublic: false,
 				tags: ["preset-copy"],
 				usageCount: 0,
-			 createdAt: Date.now(),
-			 updatedAt: Date.now(),
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
 			};
 
 			await this.persistence.weapons.create(weaponBuild);
@@ -71,9 +68,6 @@ export class PlayerProfileService {
 		console.log(`[PlayerProfileService] Created account for ${userId} with ${presetShips.length} ships, ${presetWeapons.length} weapons`);
 	}
 
-	/**
-	 * 重置玩家舰船和武器到初始预设状态
-	 */
 	async resetToDefaults(userId: string): Promise<{ ships: number; weapons: number }> {
 		const userShips = await this.persistence.ships.findBy({ ownerId: userId });
 		const userWeapons = await this.persistence.weapons.findBy({ ownerId: userId });
@@ -114,67 +108,66 @@ export class PlayerProfileService {
 		return weapon;
 	}
 
- async deletePlayerShip(userId: string, shipId: string): Promise<boolean> {
-	 const ship = await this.persistence.ships.findById(shipId);
-	 if (!ship || ship.ownerId !== userId) return false;
-	 return await this.persistence.ships.delete(shipId);
- }
+	async deletePlayerShip(userId: string, shipId: string): Promise<boolean> {
+		const ship = await this.persistence.ships.findById(shipId);
+		if (!ship || ship.ownerId !== userId) return false;
+		return await this.persistence.ships.delete(shipId);
+	}
 
- async deletePlayerWeapon(userId: string, weaponId: string): Promise<boolean> {
-	 const weapon = await this.persistence.weapons.findById(weaponId);
-	 if (!weapon || weapon.ownerId !== userId) return false;
-	 return await this.persistence.weapons.delete(weaponId);
- }
+	async deletePlayerWeapon(userId: string, weaponId: string): Promise<boolean> {
+		const weapon = await this.persistence.weapons.findById(weaponId);
+		if (!weapon || weapon.ownerId !== userId) return false;
+		return await this.persistence.weapons.delete(weaponId);
+	}
 
- async createSave(userId: string, name: string, ships: ShipJSON[]): Promise<GameSave> {
-	 const save: GameSave = {
-		 $schema: "save-v1",
-		 $id: generateId("save", userId),
-		 metadata: { name, createdAt: Date.now(), updatedAt: Date.now() },
-		 tokens: ships,
-		 createdAt: Date.now(),
-	 };
+	async createSave(userId: string, name: string, ships: CombatToken[]): Promise<GameSave> {
+		const save: GameSave = {
+			$id: generateId("save", userId),
+			metadata: { name, createdAt: Date.now(), updatedAt: Date.now() },
+			tokens: ships,
+			createdAt: Date.now(),
+		};
 
-	 const archive: RoomArchive = {
-		 id: save.$id,
-		 name,
-		 saveJson: save,
-		 metadata: {
-			 roomId: "",
-			 roomName: name,
-			 mapWidth: 2000,
-			 mapHeight: 2000,
-			 maxPlayers: 2,
-			 playerCount: 1,
-			 totalTurns: 0,
-			 gameDuration: 0,
-		 },
-		 playerIds: [userId],
-		 isAutoSave: false,
-		 tags: [],
-		 createdAt: Date.now(),
-		 updatedAt: Date.now(),
-	 };
+		const archive: RoomArchive = {
+			id: save.$id,
+			name,
+			saveJson: save,
+			metadata: {
+				roomId: "",
+				roomName: name,
+				mapWidth: 2000,
+				mapHeight: 2000,
+				maxPlayers: 2,
+				playerCount: 1,
+				totalTurns: 0,
+				gameDuration: 0,
+			},
+			playerIds: [userId],
+			isAutoSave: false,
+			tags: [],
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+		};
 
-	 await this.persistence.roomSaves.create(archive);
+		await this.persistence.roomSaves.create(archive);
 
-	 return save;
- }
+		return save;
+	}
 
- async listSaves(userId: string): Promise<GameSave[]> {
-	 const archives = await this.persistence.roomSaves.findBy({ playerIds: [userId] });
-	 return archives.map((a) => a.saveJson);
- }
+	async listSaves(userId: string): Promise<GameSave[]> {
+		const archives = await this.persistence.roomSaves.findBy({ playerIds: [userId] });
+		return archives.map((a) => a.saveJson);
+	}
 
- async uploadAvatar(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
-	 return this.assetService.uploadAvatar(userId, buffer, filename, mimeType);
- }
+	async uploadAvatar(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
+		return this.assetService.uploadAvatar(userId, buffer, filename, mimeType);
+	}
 
- async uploadShipTexture(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
-	 return this.assetService.uploadShipTexture(userId, buffer, filename, mimeType);
- }
+	async uploadShipTexture(userId: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
+		return this.assetService.uploadShipTexture(userId, buffer, filename, mimeType);
+	}
 
- async getAssetData(assetId: string): Promise<Uint8Array | null> {
-	 return this.assetService.getAssetData(assetId);
- }
+	async getAssetData(assetId: string): Promise<Uint8Array | null> {
+		return this.assetService.getAssetData(assetId);
+	}
 }

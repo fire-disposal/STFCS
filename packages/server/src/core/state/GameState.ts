@@ -4,7 +4,8 @@
 
 import type { Faction, GamePhase } from "@vt/data";
 import type { GameState, PlayerState } from "../types/common.js";
-import type { Token, ShipToken } from "./Token.js";
+import type { Token, CombatToken } from "./Token.js";
+import { isCombatToken } from "./Token.js";
 
 /** 游戏状态管理器 */
 export class GameStateManager {
@@ -55,7 +56,7 @@ export class GameStateManager {
   // ==================== Token管理 ====================
 
   addToken(token: Token): void {
-    this.state.tokens.set(token.id, token);
+    this.state.tokens.set(token.$id, token);
   }
 
   removeToken(tokenId: string): boolean {
@@ -98,10 +99,10 @@ export class GameStateManager {
     return Array.from(this.state.tokens.values());
   }
 
-  getPlayerShips(playerId: string): ShipToken[] {
+  getPlayerShips(playerId: string): CombatToken[] {
     return this.getAllTokens()
-      .filter((token): token is ShipToken => token.type === "SHIP")
-      .filter(ship => ship.tokenJson.runtime?.ownerId === playerId);
+      .filter(isCombatToken)
+      .filter(ship => ship.runtime?.ownerId === playerId);
   }
 
   // ==================== 状态快照 ====================

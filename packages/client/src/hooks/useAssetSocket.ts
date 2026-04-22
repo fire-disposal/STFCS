@@ -2,9 +2,7 @@ import { useCallback, useRef } from "react";
 import type { Socket } from "socket.io-client";
 import type {
 	AssetType,
-	AssetUploadPayload,
-	AssetListPayload,
-	AssetBatchGetPayload,
+	WsPayload,
 	AssetListItem,
 } from "@vt/data";
 
@@ -73,7 +71,7 @@ export function useAssetSocket(socket: Socket | null) {
 
 			const base64 = await fileToBase64(file);
 
-			const payload: AssetUploadPayload = {
+			const payload: WsPayload<"asset:upload"> = {
 				type,
 				filename: file.name,
 				mimeType: file.type,
@@ -89,7 +87,7 @@ export function useAssetSocket(socket: Socket | null) {
 
 	const list = useCallback(
 		async (type?: AssetType, ownerId?: string): Promise<AssetListItem[]> => {
-			const payload: AssetListPayload = { type, ownerId };
+			const payload: WsPayload<"asset:list"> = { type, ownerId };
 			const result = await sendRequest<{ assets: AssetListItem[] }>("asset:list", payload);
 			return result.assets;
 		},
@@ -98,7 +96,7 @@ export function useAssetSocket(socket: Socket | null) {
 
 	const batchGet = useCallback(
 		async (assetIds: string[], includeData = false): Promise<AssetBatchGetResult[]> => {
-			const payload: AssetBatchGetPayload = { assetIds, includeData };
+			const payload: WsPayload<"asset:batch_get"> = { assetIds, includeData };
 			const result = await sendRequest<{ results: AssetBatchGetResult[] }>("asset:batch_get", payload);
 			return result.results;
 		},

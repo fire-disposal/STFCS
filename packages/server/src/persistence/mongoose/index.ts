@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 import { models } from "./Schemas.js";
 import { MongoBaseRepository } from "./MongoBaseRepository.js";
 import type { ShipBuild, UserProfile, RoomArchive } from "../types.js";
-import type { WeaponBuild } from "../memory/MemoryWeaponRepository.js";
+import type { WeaponBuild } from "@vt/data";
 
 export type MongoConfig = {
 	uri: string;

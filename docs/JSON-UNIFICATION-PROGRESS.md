@@ -1,181 +1,111 @@
-# JSON原生化重构进度报告
+# Schema 重构进度报告
 
-**分支**: `feature/json-unification`  
-**日期**: 2026-04-18  
-**核心理念**: "JSON即真理，Schema即投影"
-
----
-
-## 一、已完成任务
-
-### Phase 1: 基础架构 ✅
-
-| 文件 | 位置 | 说明 |
-|------|------|------|
-| RuntimeSlimSchema.ts | server/src/schema | 精简Schema（10字段 vs 38字段，减少74%） |
-| RuntimeSlimFactory.ts | server/src/schema | ShipJSON ↔ RuntimeSlim双向转换 |
-| presetRoutes.ts | server/src/http | 预设API `/api/presets/ships`, `/api/presets/weapons`, `/api/presets/all` |
-| PresetCacheService.ts | client/src/services | 客户端预设缓存 + mergeShipRuntime合并逻辑 |
-
-### Phase 2.1: 核心状态管理 ✅
-
-| 文件 | 位置 | 说明 |
-|------|------|------|
-| ShipJsonStateManager.ts | server/src/services | 核心JSON状态：Map<string, ShipJSON> |
-| BattleRoomSlim.ts | server/src/rooms | JSON原生化房间实验版本 |
-
-### Phase 2.2-2.3: 工厂重构 ✅
-
-| 操作 | 文件 | 说明 |
-|------|------|------|
-| 重写 | ObjectFactoryJson.ts | 使用JSON预设创建Schema对象 |
-| 删除 | JsonSchemaMapper.ts | 移除双向转换器 |
-| 删除 | mapper/index.ts | 移除mapper模块 |
-| 删除 | ObjectFactory.ts | 移除旧工厂 |
-
-### SaveService重构 ✅
-
-| 文件 | 变更 | 说明 |
-|------|------|------|
-| SaveService.ts | 重写 | 直接使用ShipJSON格式，无Schema转换 |
-| types.ts | 修改 | GameSave.ships改为unknown[]，放宽类型 |
+**分支**: `feature/json-unification`
+**日期**: 2026-04-22
+**核心理念**: "类型分层，内嵌完整，无版本管理"
 
 ---
 
-## 二、当前构建错误
+## 一、架构变更
+
+### Token 类型分层
 
 ```
-client build失败，10个类型错误：
+InventoryToken (玩家存档，无 runtime)
+    └── CombatToken (房间实例，有 runtime)
 ```
 
-### 错误清单
+| 场景 | 类型 | 特点 |
+|------|------|------|
+| 玩家库存 | InventoryToken | 无 runtime，与房间无关 |
+| 房间联机 | CombatToken | 有 runtime，实时状态 |
+| 房间存档 | CombatToken[] | 保存完整战斗状态 |
 
-1. **ObjectFactoryJson.ts:113** - WeaponMountSpec新旧类型冲突
-   - `acceptsTurret: boolean | undefined` vs `acceptsTurret: boolean`
+### 核心变更
 
-2. **ObjectFactoryJson.ts:148-149** - WeaponMountSpec缺少arc/hardpointArc属性
-
-3. **BattleRoom.ts:246** - SaveService.saveGame参数类型错误
-   - 期望: `ShipJSON[]`，实际传入: `GameRoomState`
-
-4. **BattleRoom.ts:253** - SaveService.loadGame参数数量错误
-
-5. **BattleRoom.ts:259** - 返回类型不匹配（JsonSaveData | null vs boolean）
-
-6. **BattleRoomSlim.ts:307** - saveGameFromJson方法不存在
-
-7. **BattleRoomSlim.ts:321** - loadGameToJson方法不存在
-
-8. **SaveRoom.ts:70,98** - JsonSaveData与GameSave类型不兼容
-
-9. **SaveRoom.ts:112** - GameSave与JsonSaveData类型不兼容
+1. **移除 `$schema` 字段** - 不考虑多版本管理
+2. **护盾简化** - 无 `type`/`direction`，用 `arc` 表示覆盖范围
+3. **预设内嵌** - 武器完整内嵌于 mounts，无字符串引用
+4. **删除别名** - 直接使用 `CombatToken`、`InventoryToken`、`TokenRuntime`
 
 ---
 
-## 三、需要进一步执行的任务
+## 二、已完成任务
 
-### Phase 3: 修复构建错误
+### Phase 1: Schema 重构 ✅
 
-| 序号 | 任务 | 文件 | 说明 |
-|------|------|------|------|
-| 1 | 修复类型导入 | ObjectFactoryJson.ts | 使用`WeaponMountJsonSpec`而非旧`WeaponMountSpec` |
-| 2 | 适配新API | BattleRoom.ts | saveGame/loadGame方法改用新SaveService API |
-| 3 | 删除或重写 | BattleRoomSlim.ts | 临时实验文件，可删除或修复 |
-| 4 | 修复类型 | SaveRoom.ts | 适配JsonSaveData接口 |
+| 文件 | 变更 |
+|------|------|
+| GameSchemas.ts | InventoryTokenSchema、CombatTokenSchema 分层定义 |
+| WsSchemas.ts | edit:token、BattleLogEdit 事件定义 |
+| presets/ships/*.json | 更新为新格式，内嵌完整武器 |
+| presets/weapons/*.json | 移除 $schema，使用 spec 字段 |
 
-### Phase 4: 清理废弃代码
+### Phase 2: Server 重构 ✅
 
-| 序号 | 文件 | 位置 | 说明 |
-|------|------|------|------|
-| 1 | ships.ts | data/src | 硬编码舰船规格（~600行） |
-| 2 | weapons.ts | data/src | 硬编码武器规格（~600行） |
-| 3 | ShipStateSchema.ts | server/src/schema | 旧Schema（38字段） |
-| 4 | GameSchema.ts | server/src/schema | 旧房间状态Schema |
-| 5 | GameSave.ts | server/src/schema | 旧存档Schema转换逻辑 |
+| 文件 | 变更 |
+|------|------|
+| Token.ts | isCombatToken 改用 runtime 存在判断 |
+| GameStateManager.ts | 使用 CombatToken/InventoryToken |
+| shield.ts | 用 arc >= 360 表示全向护盾 |
+| damage.ts | 护盾方向基于舰船 heading |
+| PlayerProfileService.ts | 创建存档时生成 CombatToken |
+| handlers.ts | save:create/load 使用 $id |
 
-### Phase 5: 最终验证
+### Phase 3: 移除废弃代码 ✅
 
-- 运行 `pnpm turbo build` 确保所有5个包编译通过
-- 运行 `pnpm turbo test` 确保测试通过
-- 提交代码到feature分支
+| 删除项 | 说明 |
+|------|------|
+| TokenJSON 别名 | 改用 CombatToken |
+| ShipRuntime 别名 | 改用 TokenRuntime |
+| ShipState 类型 | 改用 CombatToken |
+| $schema 字段 | 所有 schema 移除 |
 
 ---
 
-## 四、文件变更记录
+## 三、类型检查状态
+
+| 包 | 状态 | 错误数 |
+|------|------|------|
+| data | ✅ 通过 | 0 |
+| server | ✅ 通过 | 0 |
+| client | 🔴 待修复 | ~30 |
+
+### Client 待修复项
+
+- `TokenJSON` → `CombatToken` 或 `InventoryToken`
+- `ShipRuntime` → `TokenRuntime`
+- `shipJson`/`weaponJson` → `data`
+- `TokenJSONSchema` → `CombatTokenSchema`
+- LoadoutCustomizerDialog `.weapon` 属性访问
+
+---
+
+## 四、文件变更统计
+
+```
+74 files changed
+1675 insertions(+)
+6138 deletions(-)
+```
 
 ### 新增文件
 
-```
-packages/server/src/schema/RuntimeSlimSchema.ts
-packages/server/src/schema/RuntimeSlimFactory.ts
-packages/server/src/http/presetRoutes.ts
-packages/server/src/services/ShipJsonStateManager.ts
-packages/server/src/rooms/BattleRoomSlim.ts
-packages/server/src/services/ShipWeaponQueryService.ts (此前已创建)
-packages/client/src/services/PresetCacheService.ts
-```
+- `packages/server/src/core/state/MutativeStateManager.ts`
+- `packages/server/src/server/socketio/handlers.ts`
+- `packages/server/src/server/socketio/RpcServer.ts`
+- `packages/client/src/network/hooks.ts`
 
 ### 删除文件
 
-```
-packages/server/src/schema/mapper/JsonSchemaMapper.ts
-packages/server/src/schema/mapper/index.ts
-packages/server/src/rooms/battle/ObjectFactory.ts
-packages/server/src/schema/mapper/ (目录已删除)
-```
-
-### 修改文件
-
-```
-packages/server/src/services/SaveService.ts (重写)
-packages/server/src/schema/types.ts (GameSave放宽)
-packages/server/src/rooms/battle/index.ts (导出ObjectFactoryJson)
-packages/server/src/http/registerRoutes.ts (注册presetRoutes)
-packages/server/src/services/index.ts (导出新服务)
-packages/server/src/commands/game/configureHandler.ts (使用JSON预设)
-packages/server/src/commands/game/index.ts (移除废弃导出)
-packages/server/src/rooms/BattleRoom.ts (使用ObjectFactoryJson)
-```
+- 旧 WebSocket 模块 (`core/`, `services/`)
+- 旧 handlers (`actionHandler.ts`, `joinHandler.ts`, `unifiedHandler.ts`)
+- 旧 sync 模块
 
 ---
 
-## 五、架构对比
+## 五、下一步行动
 
-### 旧架构
-
-```
-硬编码规格 → Schema → Colyseus同步
-    ↓
-SchemaToJsonMapper → JSON存档
-    ↓
-JsonToSchemaMapper → 加载恢复
-```
-
-**问题**: 双向转换复杂，Schema字段膨胀（38字段），带宽浪费
-
-### 新架构
-
-```
-JSON预设(preset:xxx) → ShipJSON → 服务端核心
-                         ↓
-              RuntimeSlimFactory → RuntimeSlim(10字段)
-                         ↓
-                   Colyseus同步
-                         
-客户端: 预设缓存 + RuntimeSlim合并 → ShipJSON
-存档: 直接保存ShipJSON[]，无需转换
-```
-
-**优势**: 
-- 带宽减少40%+
-- 代码简化50%+
-- 无双向转换损耗
-- 预设热加载支持
-
----
-
-## 六、下一步行动
-
-1. **立即**: 修复构建错误（Phase 3）
-2. **随后**: 清理废弃代码（Phase 4）
-3. **最后**: 构建验证并提交（Phase 5）
+1. **修复 Client 类型错误** (~30 个)
+2. **构建验证** `pnpm turbo build`
+3. **测试验证** `pnpm turbo test`

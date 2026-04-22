@@ -405,18 +405,13 @@ export class Room {
 	get isPrivate(): boolean { return false; }
 	get password(): string | undefined { return undefined; }
 	get gameState(): any { return this.getGameState(); }
-	getShipTokens() { return this.stateManager.getShipTokens(); }
-	getShipToken(shipId: string) { return this.stateManager.getShipToken(shipId); }
+	getCombatTokens() { return this.stateManager.getCombatTokens(); }
+	getCombatToken(shipId: string) { return this.stateManager.getCombatToken(shipId); }
 
-	updateShipTokenRuntime(shipId: string, runtimeUpdates: Record<string, unknown>): boolean {
-		const token = this.stateManager.getShipToken(shipId);
+	updateCombatTokenRuntime(shipId: string, runtimeUpdates: Record<string, unknown>): boolean {
+		const token = this.stateManager.getCombatToken(shipId);
 		if (!token) return false;
-		this.stateManager.updateShipToken(shipId, {
-			shipJson: {
-				...token.tokenJson,
-				runtime: { ...token.tokenJson.runtime, ...runtimeUpdates },
-			},
-		});
+		this.stateManager.updateCombatToken(shipId, runtimeUpdates);
 		return true;
 	}
 

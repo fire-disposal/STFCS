@@ -5,5 +5,5 @@
 export { MemoryBaseRepository } from "./MemoryBaseRepository.js";
 export { MemoryUserRepository } from "./MemoryUserRepository.js";
 export { MemoryShipRepository } from "./MemoryShipRepository.js";
-export { MemoryWeaponRepository, type WeaponBuild } from "./MemoryWeaponRepository.js";
+export { MemoryWeaponRepository } from "./MemoryWeaponRepository.js";
 export { MemoryRoomSaveRepository } from "./MemoryRoomSaveRepository.js";

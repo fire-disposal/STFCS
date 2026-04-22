@@ -1,12 +1,12 @@
 {
-	"$schema": "ship-v2",
 	"$id": "preset:cruiser-assault",
 	"metadata": {
 		"name": "突击巡洋舰",
 		"description": "重型巡洋舰，高火力配置",
-		"author": "STFCS"
+		"author": "STFCS",
+		"createdAt": 1700000000000
 	},
-	"ship": {
+	"spec": {
 		"size": "CRUISER",
 		"class": "ASSAULT",
 		"width": 80,
@@ -20,7 +20,6 @@
 		"maxSpeed": 70,
 		"maxTurnRate": 15,
 		"shield": {
-			"type": "OMNI",
 			"arc": 360,
 			"radius": 120,
 			"efficiency": 0.9,
@@ -34,7 +33,20 @@
 				"facing": 0,
 				"arc": 90,
 				"size": "LARGE",
-				"weapon": "preset:missile-large"
+				"weapon": {
+					"$id": "preset:missile-large",
+					"spec": {
+						"damageType": "HIGH_EXPLOSIVE",
+						"size": "LARGE",
+						"damage": 500,
+						"projectilesPerShot": 1,
+						"range": 1000,
+						"minRange": 200,
+						"cooldown": 5.0,
+						"fluxCostPerShot": 100,
+						"tags": ["GUIDED", "HE", "ANTI_SHIP"]
+					}
+				}
 			},
 			{
 				"id": "mount-front-2",
@@ -43,7 +55,20 @@
 				"facing": 20,
 				"arc": 120,
 				"size": "MEDIUM",
-				"weapon": "preset:laser-medium"
+				"weapon": {
+					"$id": "preset:laser-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 100,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 100,
+						"cooldown": 1.0,
+						"fluxCostPerShot": 20,
+						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
+					}
+				}
 			},
 			{
 				"id": "mount-front-3",
@@ -52,7 +77,20 @@
 				"facing": -20,
 				"arc": 120,
 				"size": "MEDIUM",
-				"weapon": "preset:laser-medium"
+				"weapon": {
+					"$id": "preset:laser-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 100,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 100,
+						"cooldown": 1.0,
+						"fluxCostPerShot": 20,
+						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
+					}
+				}
 			},
 			{
 				"id": "mount-side-left",
@@ -61,7 +99,20 @@
 				"facing": 90,
 				"arc": 120,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			},
 			{
 				"id": "mount-side-right",
@@ -70,7 +121,20 @@
 				"facing": -90,
 				"arc": 120,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			}
 		],
 		"rangeModifier": 1.0

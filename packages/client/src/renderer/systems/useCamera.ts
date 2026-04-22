@@ -19,7 +19,7 @@
 
 import { screenDeltaToWorldDelta as deltaUtil, screenToWorld } from "@/utils/coordinateSystem";
 import { useCallback, useRef } from "react";
-import type { CameraState } from "@/sync/types";
+import type { CameraState } from "@/state/stores/gameStore";
 import type { CanvasSize } from "../core/useCanvasResize";
 
 export interface UseCameraResult {

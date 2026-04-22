@@ -55,14 +55,8 @@ export interface ComponentRuntime {
  */
 export interface WeaponComponentState extends ComponentState {
   type: "WEAPON";
-  
-  // 完整的武器JSON数据
-  weaponJson: WeaponJSON;
-  
-  // 武器规格（从weaponJson.weapon复制，便于访问）
+  data: WeaponJSON;
   spec: WeaponSpec;
-  
-  // 派生的战斗状态
   combatState: WeaponCombatState;
 }
 
@@ -164,32 +158,30 @@ export function createComponentState(
 export function createWeaponComponentState(
   id: string,
   mountId: string,
-  weaponJson: WeaponJSON,
+  data: WeaponJSON,
   metadata: Partial<ComponentMetadata> = {}
 ): WeaponComponentState {
-  const spec = weaponJson.weapon;
+  const spec = data.spec;
   
-  // 创建基础组件状态
   const baseComponent = createComponentState(
     id,
     "WEAPON",
     mountId,
-    weaponJson.$id,
+    data.$id,
     {
-      name: weaponJson.metadata?.name || `Weapon_${id.substring(0, 8)}`,
-      description: weaponJson.metadata?.description,
-      tags: weaponJson.metadata?.tags || [],
+      name: data.metadata?.name || `Weapon_${id.substring(0, 8)}`,
+      description: data.metadata?.description,
+      tags: data.metadata?.tags || [],
       ...metadata,
     }
   );
 
-  // 计算战斗状态
   const combatState = calculateWeaponCombatState(spec);
 
   return {
     ...baseComponent,
     type: "WEAPON" as const,
-    weaponJson,
+    data,
     spec,
     combatState,
   };

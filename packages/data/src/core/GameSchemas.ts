@@ -158,16 +158,14 @@ export const WeaponRuntimeSchema = z.object({
 	mountId: z.string(),
 	state: WeaponStateSchema,
 	cooldownRemaining: z.number().optional(),
-	currentHeading: z.number().optional(),  // 当前指向角度（渲染用，开火时更新）
+	currentHeading: z.number().optional(),
 	statusEffects: z.array(StatusEffectSchema).optional(),
-	weapon: WeaponSpecSchema.optional(),
 });
 export type WeaponRuntime = z.infer<typeof WeaponRuntimeSchema>;
 
 export const WeaponJSONSchema = z.object({
-	$schema: z.literal("weapon-v2"),
 	$id: z.string(),
-	weapon: WeaponSpecSchema,
+	spec: WeaponSpecSchema,
 	runtime: WeaponRuntimeSchema.optional(),
 	metadata: MetadataSchema.optional(),
 });
@@ -178,9 +176,7 @@ export type WeaponJSON = z.infer<typeof WeaponJSONSchema>;
 // ============================================================
 
 export const ShieldSpecSchema = z.object({
-	type: ShieldTypeSchema,
 	arc: z.number().min(0).max(360),
-	direction: z.number().min(0).max(360).default(0),
 	radius: z.number().min(0),
 	efficiency: z.number().min(0).default(1.0),
 	upkeep: z.number().min(0).default(0),
@@ -191,12 +187,10 @@ export const MountSpecSchema = z.object({
 	id: z.string(),
 	displayName: z.string().optional(),
 	position: PointSchema,
-	/** 射界中心方向（度），0 = 船头正前方 */
 	facing: z.number().optional(),
-	/** 射界角度（度）。360 = 全向炮塔，20 = 固定挂载（左右各10°） */
 	arc: z.number().min(0).max(360).default(360),
 	size: WeaponSlotSizeSchema,
-	weapon: z.union([WeaponJSONSchema, z.string()]).optional(),
+	weapon: WeaponJSONSchema.optional(),
 	group: z.string().optional(),
 });
 export type MountSpec = z.infer<typeof MountSpecSchema>;
@@ -228,8 +222,6 @@ export const TokenSpecSchema = z.object({
 	texture: TextureSchema.optional(),
 });
 export type TokenSpec = z.infer<typeof TokenSpecSchema>;
-/** @deprecated 使用 TokenSpec */
-export type ShipSpec = TokenSpec;
 
 export const TranslationLockSchema = z.enum(["FORWARD_BACKWARD", "LEFT_RIGHT"]).nullable();
 export type TranslationLock = z.infer<typeof TranslationLockSchema>;
@@ -269,8 +261,6 @@ export const TokenModifierSchema = z.object({
 	metadata: z.record(z.string(), z.any()).optional(),
 });
 export type TokenModifier = z.infer<typeof TokenModifierSchema>;
-/** @deprecated 使用 TokenModifier */
-export type ShipModifier = TokenModifier;
 
 // ============================================================
 // 预定义修正模板（工厂函数）
@@ -423,7 +413,7 @@ export const TokenRuntimeSchema = z.object({
 	armor: z.array(z.number().min(0)).length(6),
 	fluxSoft: z.number().min(0).optional(),
 	fluxHard: z.number().min(0).optional(),
-	shield: z.object({ active: z.boolean(), value: z.number().min(0) }).optional(),
+	shield: z.object({ active: z.boolean(), value: z.number().min(0), direction: z.number().min(0).max(360).optional() }).optional(),
 	overloaded: z.boolean().default(false),
 	overloadTime: z.number().min(0).default(1),
 	destroyed: z.boolean().default(false),
@@ -437,29 +427,33 @@ export const TokenRuntimeSchema = z.object({
 	venting: z.boolean().optional(),
 });
 export type TokenRuntime = z.infer<typeof TokenRuntimeSchema>;
-/** @deprecated 使用 TokenRuntime */
-export type ShipRuntime = TokenRuntime;
 
-export const TokenJSONSchema = z.object({
-	$schema: z.literal("token-v2"),
+// ============================================================
+// Token分层：库存配置 vs 战斗实例
+// ============================================================
+
+/**
+ * 库存Token - 用户保存的舰船配置
+ * 不含runtime，用于 PlayerProfile.tokens
+ * 持久化到数据库时只保存这部分
+ */
+export const InventoryTokenSchema = z.object({
 	$id: z.string(),
 	$presetRef: z.string().optional(),
-	token: TokenSpecSchema,
-	runtime: TokenRuntimeSchema.optional(),
+	spec: TokenSpecSchema,
 	metadata: MetadataSchema,
 });
-export type TokenJSON = z.infer<typeof TokenJSONSchema>;
-/** @deprecated 使用 TokenJSON */
-export type ShipJSON = TokenJSON;
+export type InventoryToken = z.infer<typeof InventoryTokenSchema>;
 
-/** @deprecated 使用 TokenSpecSchema */
-export const ShipSpecSchema = TokenSpecSchema;
-/** @deprecated 使用 TokenRuntimeSchema */
-export const ShipRuntimeSchema = TokenRuntimeSchema;
-/** @deprecated 使用 TokenJSONSchema */
-export const ShipJSONSchema = TokenJSONSchema;
-/** @deprecated 使用 TokenModifierSchema */
-export const ShipModifierSchema = TokenModifierSchema;
+export const CombatTokenSchema = z.object({
+	$id: z.string(),
+	$presetRef: z.string().optional(),
+	spec: TokenSpecSchema,
+	runtime: TokenRuntimeSchema,
+	metadata: MetadataSchema,
+});
+export type CombatToken = z.infer<typeof CombatTokenSchema>;
+
 
 // ============================================================
 // 地图类型
@@ -515,7 +509,7 @@ export const GameRoomStateSchema = z.object({
 	turnCount: z.number().default(0),
 	activeFaction: FactionSchema.optional(),
 	players: z.record(z.string(), RoomPlayerStateSchema),
-	tokens: z.record(z.string(), TokenJSONSchema),
+	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
 	createdAt: z.number(),
@@ -539,27 +533,21 @@ export const SaveMetadataSchema = z.object({
 export type SaveMetadata = z.infer<typeof SaveMetadataSchema>;
 
 export const GameSaveSchema = z.object({
-	$schema: z.literal("save-v1"),
 	$id: z.string(),
 	metadata: SaveMetadataSchema,
 	room: GameRoomStateSchema.optional(),
-	tokens: z.array(TokenJSONSchema),
+	tokens: z.array(CombatTokenSchema),
 	createdAt: z.number(),
 	updatedAt: z.number().optional(),
 });
 export type GameSave = z.infer<typeof GameSaveSchema>;
 
-// ============================================================
-// 玩家档案类型
-// ============================================================
-
 export const PlayerProfileSchema = z.object({
-	$schema: z.literal("player-v1"),
 	$id: z.string(),
 	username: z.string(),
 	displayName: z.string(),
 	avatarAssetId: z.string().optional(),
-	tokens: z.array(TokenJSONSchema),
+	tokens: z.array(InventoryTokenSchema),
 	weapons: z.array(WeaponJSONSchema),
 	saveIds: z.array(z.string()).optional(),
 	stats: z.object({
@@ -582,7 +570,6 @@ export const AssetType = AssetTypeSchema.enum;
 export type AssetType = z.infer<typeof AssetTypeSchema>;
 
 export const AssetSchema = z.object({
-	$schema: z.literal("asset-v1"),
 	$id: z.string(),
 	type: AssetTypeSchema,
 	filename: z.string(),
@@ -655,12 +642,12 @@ export const ExportJSONSchema = z.object({
 	$schema: z.string(),
 	$type: z.enum(["TOKEN", "WEAPON", "FLEET"]),
 	$exportedAt: z.string(),
-	token: TokenJSONSchema.optional(),
+	token: CombatTokenSchema.optional(),
 	weapon: WeaponJSONSchema.optional(),
 	fleet: z.object({
 		name: z.string(),
 		description: z.string().optional(),
-		tokens: z.array(TokenJSONSchema),
+		tokens: z.array(CombatTokenSchema),
 	}).optional(),
 });
 export type ExportJSON = z.infer<typeof ExportJSONSchema>;
@@ -683,17 +670,14 @@ function createTypeGuard<T>(schema: z.ZodTypeAny): (data: unknown) => data is T 
 // 验证函数导出（由工厂生成）
 // ============================================================
 
-export const validateTokenJSON = createValidator<TokenJSON>(TokenJSONSchema);
+export const validateCombatToken = createValidator<CombatToken>(CombatTokenSchema);
+export const validateInventoryToken = createValidator<InventoryToken>(InventoryTokenSchema);
 export const validateWeaponJSON = createValidator<WeaponJSON>(WeaponJSONSchema);
 export const validatePlayerProfile = createValidator<PlayerProfile>(PlayerProfileSchema);
 export const validateGameSave = createValidator<GameSave>(GameSaveSchema);
 export const validateGameMap = createValidator<GameMap>(GameMapSchema);
 export const validateGameRoomState = createValidator<GameRoomState>(GameRoomStateSchema);
 
-export const isValidTokenJSON = createTypeGuard<TokenJSON>(TokenJSONSchema);
+export const isValidCombatToken = createTypeGuard<CombatToken>(CombatTokenSchema);
+export const isValidInventoryToken = createTypeGuard<InventoryToken>(InventoryTokenSchema);
 export const isValidWeaponJSON = createTypeGuard<WeaponJSON>(WeaponJSONSchema);
-
-/** @deprecated 使用 validateTokenJSON */
-export const validateShipJSON = validateTokenJSON;
-/** @deprecated 使用 isValidTokenJSON */
-export const isValidShipJSON = isValidTokenJSON;

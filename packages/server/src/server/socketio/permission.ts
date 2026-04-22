@@ -9,7 +9,7 @@
 import type { Socket } from "socket.io";
 import type { Room } from "../rooms/Room.js";
 import type { CombatToken } from "../../core/state/Token.js";
-import type { TokenJSON, Faction } from "@vt/data";
+import type { TokenRuntime, Faction } from "@vt/data";
 
 export type UserRole = "HOST" | "PLAYER";
 
@@ -60,8 +60,8 @@ export function isPlayer(socket: Socket, room: Room): boolean {
 	return role === "HOST" || role === "PLAYER";
 }
 
-export function getCombatTokenRuntime(token: CombatToken): TokenJSON["runtime"] | undefined {
-	return token.tokenJson.runtime;
+export function getCombatTokenRuntime(token: CombatToken): TokenRuntime | undefined {
+	return token.runtime;
 }
 
 export function canControlToken(socket: Socket, room: Room, tokenId: string): boolean {
@@ -70,7 +70,7 @@ export function canControlToken(socket: Socket, room: Room, tokenId: string): bo
 
 	if (isHost(socket, room)) return true;
 
-	const token = room.getShipToken(tokenId);
+	const token = room.getCombatToken(tokenId);
 	if (!token) return false;
 
 	const runtime = getCombatTokenRuntime(token);
@@ -100,12 +100,12 @@ export function checkPermission(socket: Socket, room: Room, action: string): boo
 	return true;
 }
 
-export function getTokenFaction(tokenJson: TokenJSON): Faction | undefined {
-	return tokenJson.runtime?.faction;
+export function getTokenFaction(token: CombatToken): Faction | undefined {
+	return token.runtime?.faction;
 }
 
-export function isTokenOwnedByPlayer(tokenJson: TokenJSON, playerId: string): boolean {
-	return tokenJson.runtime?.ownerId === playerId;
+export function isTokenOwnedByPlayer(token: CombatToken, playerId: string): boolean {
+	return token.runtime?.ownerId === playerId;
 }
 
 export function canPlayerControlFaction(socket: Socket, room: Room, faction: Faction): boolean {

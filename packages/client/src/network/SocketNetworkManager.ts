@@ -1,31 +1,33 @@
 /**
  * SocketNetworkManager - Socket.IO 连接管理
  *
- * 负责：
- * - 建立/维护 Socket.IO 连接
- * - 认证流程
- * - 房间列表获取
- * - 房间创建/加入/离开
+ * 完全基于 @vt/data 的 WsEventDefinitions，使用泛型自动推导类型
  */
 
 import { io, Socket } from "socket.io-client";
-import type { SocketIOActionEvent, WeaponJSON, RoomInfo } from "@vt/data";
+import type {
+	WsEventName,
+	WsPayload,
+	WsResponseData,
+	WsResponse,
+	RoomInfo,
+	TokenJSON,
+	WeaponJSON,
+	GameRoomState,
+	DeltaChange,
+} from "@vt/data";
 
 const logger = {
-	info: (...args: any[]) => console.log("[network]", ...args),
-	warn: (...args: any[]) => console.warn("[network]", ...args),
-	error: (...args: any[]) => console.error("[network]", ...args),
+	info: (...args: unknown[]) => console.log("[network]", ...args),
+	warn: (...args: unknown[]) => console.warn("[network]", ...args),
+	error: (...args: unknown[]) => console.error("[network]", ...args),
 };
-
 
 export interface AuthResult {
 	success: boolean;
 	playerId?: string;
 	playerName?: string;
-	profile?: {
-		nickname: string;
-		avatar: string;
-	};
+	profile?: { nickname: string; avatar: string | null; avatarAssetId?: string };
 	error?: string;
 }
 
@@ -42,22 +44,16 @@ export interface RoomJoinResult {
 
 export interface PlayerLoadoutResult {
 	success: boolean;
-	loadout?: {
-		ships: ShipJSON[];
-		weapons: WeaponJSON[];
-	};
+	loadout?: { ships: TokenJSON[]; weapons: WeaponJSON[] };
 	error?: string;
 }
 
-interface SocketGameState {
+interface InternalGameState {
 	phase?: string;
-	currentPhase?: string;
 	turn?: number;
-	turnCount?: number;
 	activeFaction?: string;
-	tokens?: Record<string, any>;
-	ships?: Record<string, any>;
-	players?: Record<string, any>;
+	tokens?: Record<string, TokenJSON>;
+	players?: Record<string, unknown>;
 }
 
 export class SocketNetworkManager {
@@ -66,19 +62,16 @@ export class SocketNetworkManager {
 	private playerId: string | null = null;
 	private playerName: string | null = null;
 	private currentRoomId: string | null = null;
-	private gameState: SocketGameState | null = null;
-	private listeners: Map<string, Set<(data: any) => void>> = new Map();
-	private pendingRequests: Map<string, { resolve: Function; reject: Function; timeout: ReturnType<typeof setTimeout> }> = new Map();
+	private gameState: InternalGameState | null = null;
+	private listeners: Map<string, Set<(data: unknown) => void>> = new Map();
+	private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timeout: ReturnType<typeof setTimeout> }> = new Map();
 
 	constructor(serverUrl: string) {
 		this.serverUrl = serverUrl;
 	}
 
 	async connect(): Promise<boolean> {
-		if (this.socket?.connected) {
-			logger.info("Already connected");
-			return true;
-		}
+		if (this.socket?.connected) return true;
 
 		this.socket = io(this.serverUrl, {
 			transports: ["websocket"],
@@ -101,25 +94,45 @@ export class SocketNetworkManager {
 		});
 	}
 
+	/**
+	 * 泛型请求方法 - 自动推导类型
+	 */
+	async request<E extends WsEventName>(
+		event: E,
+		payload: WsPayload<E>,
+		timeoutMs = 10000
+	): Promise<WsResponseData<E>> {
+		if (!this.socket?.connected) throw new Error("Not connected");
+
+		const requestId = crypto.randomUUID();
+
+		return new Promise<WsResponseData<E>>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.pendingRequests.delete(requestId);
+				reject(new Error(`Request timeout: ${event}`));
+			}, timeoutMs);
+
+			this.pendingRequests.set(requestId, {
+				resolve: resolve as (value: unknown) => void,
+				reject,
+				timeout,
+			});
+
+			this.socket!.emit("request", { event, requestId, payload });
+		});
+	}
+
 	async authenticate(playerName: string): Promise<AuthResult> {
-		if (!this.socket?.connected) {
-			return { success: false, error: "Not connected" };
-		}
+		if (!this.socket?.connected) return { success: false, error: "Not connected" };
 
 		try {
-			const data = await this.sendRequest<{
-				playerId: string;
-				playerName: string;
-				isHost: boolean;
-				role: string;
-				profile?: { nickname: string; avatar: string; avatarAssetId?: string };
-			}>("auth:login", { playerName });
-
+			const data = await this.request("auth:login", { playerName });
 			this.playerId = data.playerId;
 			this.playerName = data.playerName;
 			logger.info("Authenticated", { playerId: data.playerId });
 
-			return { success: true, ...data, profile: data.profile };
+			const profile = await this.getProfile();
+			return { success: true, ...data, profile: profile.profile };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Auth failed" };
 		}
@@ -127,33 +140,29 @@ export class SocketNetworkManager {
 
 	async getRoomList(): Promise<RoomInfo[]> {
 		try {
-			const data = await this.sendRequest<{ rooms: RoomInfo[] }>("room:list", {});
-			return data.rooms || [];
+			const data = await this.request("room:list", {});
+			return data.rooms ?? [];
 		} catch {
 			return [];
 		}
 	}
 
-	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string; avatarAssetId?: string }; error?: string }> {
-		if (!this.socket?.connected) {
-			return { success: false, error: "Not connected" };
-		}
+	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
+		if (!this.socket?.connected) return { success: false, error: "Not connected" };
 
 		try {
-			const data = await this.sendRequest<{ profile: { nickname: string; avatar: string; avatarAssetId?: string } }>("profile:get", {});
+			const data = await this.request("profile:get", {});
 			return { success: true, profile: data.profile };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Profile fetch failed" };
 		}
 	}
 
-	async updateProfile(profile: { nickname?: string; avatar?: string; avatarAssetId?: string }): Promise<{ success: boolean; profile?: { nickname: string; avatar: string; avatarAssetId?: string }; error?: string }> {
-		if (!this.socket?.connected) {
-			return { success: false, error: "Not connected" };
-		}
+	async updateProfile(profile: { nickname?: string; avatar?: string }): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
+		if (!this.socket?.connected) return { success: false, error: "Not connected" };
 
 		try {
-			const data = await this.sendRequest<{ profile: { nickname: string; avatar: string; avatarAssetId?: string } }>("profile:update", profile);
+			const data = await this.request("profile:update", { nickname: profile.nickname, avatar: profile.avatar });
 			return { success: true, profile: data.profile };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Profile update failed" };
@@ -161,23 +170,16 @@ export class SocketNetworkManager {
 	}
 
 	async getLoadout(): Promise<PlayerLoadoutResult> {
-		if (!this.socket?.connected) {
-			return { success: false, error: "Not connected" };
-		}
+		if (!this.socket?.connected) return { success: false, error: "Not connected" };
 
 		try {
 			const [tokenData, weaponData] = await Promise.all([
-				this.sendRequest<{ ships: Array<{ shipJson?: ShipJSON } | ShipJSON> }>("token:list", {}),
-				this.sendRequest<{ weapons: Array<{ weaponJson?: WeaponJSON } | WeaponJSON> }>("weapon:list", {}),
+				this.request("token:list", {}),
+				this.request("weapon:list", {}),
 			]);
 
-			const ships = (tokenData.ships || [])
-				.map((item) => ((item as any).shipJson ?? item) as ShipJSON)
-				.filter(Boolean);
-
-			const weapons = (weaponData.weapons || [])
-				.map((item) => ((item as any).weaponJson ?? item) as WeaponJSON)
-				.filter(Boolean);
+			const ships = (tokenData.ships ?? []).filter((s) => s !== null).map((s) => s.shipJson as TokenJSON).filter(Boolean);
+			const weapons = (weaponData.weapons ?? []).filter((w) => w !== null).map((w) => w.weaponJson as WeaponJSON).filter(Boolean);
 
 			return { success: true, loadout: { ships, weapons } };
 		} catch (error) {
@@ -186,16 +188,10 @@ export class SocketNetworkManager {
 	}
 
 	async createRoom(options: RoomCreateOptions): Promise<RoomJoinResult> {
-		if (!this.socket?.connected || !this.playerId) {
-			return { success: false, error: "Not authenticated" };
-		}
+		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
 
 		try {
-			const data = await this.sendRequest<{ roomId: string; roomName: string; isHost: boolean }>("room:create", {
-				name: options.roomName,
-				maxPlayers: options.maxPlayers ?? 4,
-			}, 10000);
-
+			const data = await this.request("room:create", { name: options.roomName, maxPlayers: options.maxPlayers ?? 4 }, 10000);
 			this.currentRoomId = data.roomId;
 			logger.info("Room created and joined", { roomId: data.roomId });
 			return { success: true, roomId: data.roomId };
@@ -205,13 +201,10 @@ export class SocketNetworkManager {
 	}
 
 	async joinRoom(roomId: string): Promise<RoomJoinResult> {
-		if (!this.socket?.connected || !this.playerId) {
-			return { success: false, error: "Not authenticated" };
-		}
+		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
 
 		try {
-			const data = await this.sendRequest<{ roomId: string; roomName: string; isHost: boolean; role: string }>("room:join", { roomId });
-
+			const data = await this.request("room:join", { roomId });
 			this.currentRoomId = roomId;
 			return { success: true, roomId: data.roomId };
 		} catch (error) {
@@ -227,7 +220,7 @@ export class SocketNetworkManager {
 		}
 	}
 
-	setReady(_isReady: boolean): void {
+	setReady(): void {
 		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "ready" } });
 	}
 
@@ -235,14 +228,17 @@ export class SocketNetworkManager {
 		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "start" } });
 	}
 
-	sendAction(event: SocketIOActionEvent, payload: unknown): Promise<{ success: boolean; error?: string }> {
-		const action = event.replace("game:", "");
-		const finalPayload = typeof payload === "object" && payload !== null ? { action, ...payload } : { action };
-		return this.sendRequest("game:action", finalPayload);
+	async sendGameAction(payload: WsPayload<"game:action">): Promise<{ success: boolean; error?: string }> {
+		try {
+			await this.request("game:action", payload);
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Action failed" };
+		}
 	}
 
-	send(event: string, payload: unknown): Promise<any> {
-		return this.sendRequest(event, payload);
+	send<E extends WsEventName>(event: E, payload: WsPayload<E>): Promise<WsResponseData<E>> {
+		return this.request(event, payload);
 	}
 
 	getPlayerId(): string | null {
@@ -257,7 +253,7 @@ export class SocketNetworkManager {
 		return this.currentRoomId;
 	}
 
-	getGameState(): SocketGameState | null {
+	getGameState(): InternalGameState | null {
 		return this.gameState;
 	}
 
@@ -269,15 +265,13 @@ export class SocketNetworkManager {
 		return this.socket;
 	}
 
-	on(event: string, handler: (data: any) => void): void {
-		if (!this.listeners.has(event)) {
-			this.listeners.set(event, new Set());
-		}
+	on(event: string, handler: (data: unknown) => void): void {
+		if (!this.listeners.has(event)) this.listeners.set(event, new Set());
 		this.listeners.get(event)!.add(handler);
 		this.socket?.on(event, handler);
 	}
 
-	off(event: string, handler?: (data: any) => void): void {
+	off(event: string, handler?: (data: unknown) => void): void {
 		if (handler) {
 			this.listeners.get(event)?.delete(handler);
 			this.socket?.off(event, handler);
@@ -287,16 +281,12 @@ export class SocketNetworkManager {
 		}
 	}
 
-	emit(event: string, data: any): void {
-		const handlers = this.listeners.get(event);
-		if (handlers) {
-			handlers.forEach((h) => h(data));
-		}
+	emit(event: string, data: unknown): void {
+		this.listeners.get(event)?.forEach((h) => h(data));
 	}
 
 	buildInviteLink(roomId: string): string {
-		const baseUrl = window.location.origin;
-		return `${baseUrl}/join/${roomId}`;
+		return `${window.location.origin}/join/${roomId}`;
 	}
 
 	private setupEventHandlers(): void {
@@ -312,20 +302,22 @@ export class SocketNetworkManager {
 			this.emit("reconnect", { attemptNumber });
 		});
 
-		this.socket.on("response", (data: { requestId: string; success: boolean; data?: any; error?: { code: string; message: string } }) => {
-			this.handleResponse(data);
-		});
+		this.socket.on("response", (data: WsResponse) => this.handleResponse(data));
 
-		this.socket.on("sync:full", (state: SocketGameState) => {
-			this.gameState = state;
+		this.socket.on("sync:full", (state: GameRoomState) => {
+			this.gameState = {
+				phase: state.phase,
+				turn: state.turnCount,
+				activeFaction: state.activeFaction,
+				tokens: state.tokens,
+				players: state.players,
+			};
 			this.emit("sync:full", state);
 			this.emit("state:full", state);
 		});
 
-		this.socket.on("sync:delta", (data: { timestamp: number; changes: any[] }) => {
-			if (this.gameState) {
-				this.applyDelta(data.changes);
-			}
+		this.socket.on("sync:delta", (data: { timestamp: number; changes: DeltaChange[] }) => {
+			if (this.gameState) this.applyDelta(data.changes);
 			this.emit("sync:delta", data);
 			this.emit("state:delta", data);
 		});
@@ -344,7 +336,7 @@ export class SocketNetworkManager {
 		});
 	}
 
-	private handleResponse(data: { requestId: string; success: boolean; data?: any; error?: { code: string; message: string } }): void {
+	private handleResponse(data: WsResponse): void {
 		const pending = this.pendingRequests.get(data.requestId);
 		if (!pending) return;
 
@@ -358,86 +350,47 @@ export class SocketNetworkManager {
 		}
 	}
 
-	private sendRequest<T>(event: string, payload: unknown, timeoutMs = 10000): Promise<T> {
-		if (!this.socket?.connected) {
-			return Promise.reject(new Error("Not connected"));
-		}
-
-		const requestId = crypto.randomUUID();
-
-		return new Promise<T>((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				this.pendingRequests.delete(requestId);
-				reject(new Error(`Request timeout: ${event}`));
-			}, timeoutMs);
-
-			this.pendingRequests.set(requestId, { resolve, reject, timeout });
-			this.socket!.emit("request", { event, requestId, payload });
-		});
-	}
-
-	private applyDelta(events: any[]): void {
+	private applyDelta(events: DeltaChange[]): void {
 		for (const change of events) {
+			if (!this.gameState) continue;
+
 			switch (change.type) {
 				case "token_add":
-					if (this.gameState && change.id) {
-						this.gameState.tokens = this.gameState.tokens ?? {};
-						this.gameState.tokens[change.id] = change.value;
+					if (change.id) {
+						this.gameState.tokens ??= {};
+						this.gameState.tokens[change.id] = change.value as TokenJSON;
 					}
 					break;
 				case "token_update":
-					if (this.gameState && change.id) {
-						this.gameState.tokens = this.gameState.tokens ?? {};
-						if (change.field === "runtime" && this.gameState.tokens[change.id]?.tokenJson) {
-							this.gameState.tokens[change.id] = {
-								...this.gameState.tokens[change.id],
-								tokenJson: {
-									...this.gameState.tokens[change.id].tokenJson,
-									runtime: {
-										...this.gameState.tokens[change.id].tokenJson.runtime,
-										...change.value,
-									},
-								},
-							};
-						} else {
-							this.gameState.tokens[change.id] = change.value ?? this.gameState.tokens[change.id];
-						}
+					if (change.id && this.gameState.tokens?.[change.id]) {
+						this.gameState.tokens[change.id] = { ...this.gameState.tokens[change.id], ...(change.value as Partial<TokenJSON>) };
 					}
 					break;
 				case "token_remove":
 				case "token_destroyed":
-					if (this.gameState?.tokens && change.id) {
+					if (change.id && this.gameState.tokens) {
 						delete this.gameState.tokens[change.id];
 					}
 					break;
-				case "player_update":
 				case "player_join":
-					if (this.gameState && change.id) {
-						this.gameState.players = this.gameState.players ?? {};
+					if (change.id) {
+						this.gameState.players ??= {};
 						this.gameState.players[change.id] = change.value;
 					}
 					break;
 				case "player_leave":
-					if (this.gameState?.players && change.id) {
+					if (change.id && this.gameState.players) {
 						delete this.gameState.players[change.id];
 					}
 					break;
 				case "phase_change":
-					if (this.gameState && change.value) {
-						this.gameState.phase = change.value;
-						this.gameState.currentPhase = change.value;
-					}
+					this.gameState.phase = change.value as string;
 					break;
 				case "turn_change":
-					if (this.gameState && typeof change.value === "number") {
-						this.gameState.turn = change.value;
-						this.gameState.turnCount = change.value;
-					}
+					this.gameState.turn = change.value as number;
 					break;
 				case "faction_turn":
-					if (this.gameState && change.value) {
-						this.gameState.activeFaction = change.value;
-					}
+					this.gameState.activeFaction = change.value as string;
 					break;
 			}
 		}
@@ -450,7 +403,6 @@ export class SocketNetworkManager {
 				pending.reject(new Error("Disconnected"));
 			}
 			this.pendingRequests.clear();
-
 			this.socket.disconnect();
 			this.socket = null;
 			this.playerId = null;
@@ -462,4 +414,4 @@ export class SocketNetworkManager {
 	}
 }
 
-export type { SocketIOActionEvent, RoomInfo };
+export type { RoomInfo };

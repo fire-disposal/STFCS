@@ -34,9 +34,9 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
   const attackResult = calculateWeaponAttack(
     weapon.weapon || {},
     weapon,
-    ship.tokenJson.token,
+    ship.spec,
     ship.runtime,
-    targetShip.tokenJson.token,
+    targetShip.spec,
     targetShip.runtime,
     ship.runtime.position,
     targetShip.runtime.position,
@@ -55,11 +55,11 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
   newAttackerRuntime.fluxSoft = (newAttackerRuntime.fluxSoft || 0) + weaponFluxCost;
 
   const attackerUpdates = { runtime: newAttackerRuntime };
-  updates.set(`ship:${ship.id}`, attackerUpdates);
+  updates.set(`ship:${ship.$id}`, attackerUpdates);
 
   // 创建攻击事件
   events.push(createAttackEvent(
-    ship.id,
+    ship.$id,
     targetShip.id,
     payload.weaponId,
     attackResult.damage,
@@ -78,7 +78,7 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
 
     // 计算详细伤害
     const damageResult = calculateDamage(
-      targetShip.tokenJson.token,
+      targetShip.spec,
       targetShip.runtime,
       finalDamage,
       (weapon.weapon as any)?.damageType || "KINETIC",
@@ -95,7 +95,7 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
       targetShip.id,
       damageResult.damageApplied,
       (weapon.weapon as any)?.damageType || "KINETIC",
-      ship.id,
+      ship.$id,
       damageResult.shieldHit,
       damageResult.armorHit
     ));
@@ -104,7 +104,7 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
     if (damageResult.targetDestroyed) {
       events.push(createShipDestroyedEvent(
         targetShip.id,
-        ship.id,
+        ship.$id,
         payload.weaponId
       ));
     }
@@ -180,7 +180,7 @@ function applyDamageToShip(ship: any, damageResult: any): any {
 
   // 检查过载
   const totalFlux = (newRuntime.fluxSoft || 0) + (newRuntime.fluxHard || 0);
-  const fluxCapacity = ship.tokenJson.token.fluxCapacity || 0;
+  const fluxCapacity = ship.spec.fluxCapacity || 0;
   
   if (totalFlux > fluxCapacity && !newRuntime.overloaded) {
     newRuntime.overloaded = true;
@@ -231,7 +231,7 @@ export function validateAttack(
 
   // 检查射程
   const weaponSpec = weapon.weapon || {};
-  const effectiveRange = weaponSpec.range * (attacker.tokenJson.token.rangeModifier || 1.0);
+  const effectiveRange = weaponSpec.range * (attacker.spec.rangeModifier || 1.0);
   
   if (distance > effectiveRange) {
     return { valid: false, error: "Target out of range" };

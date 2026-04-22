@@ -87,7 +87,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
   if (action.type === "MOVE") {
     const moveResult = processMovement(ship, payload);
     
-    updates.set(`ship:${ship.id}`, {
+    updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
         position: moveResult.newPosition,
@@ -96,7 +96,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
     });
 
     events.push(createMoveEvent(
-      ship.id,
+      ship.$id,
       ship.runtime.position,
       moveResult.newPosition,
       Math.abs(payload.distance)
@@ -105,7 +105,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
   } else if (action.type === "ROTATE") {
     const rotateResult = processRotation(ship, payload);
     
-    updates.set(`ship:${ship.id}`, {
+    updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
         heading: rotateResult.newHeading,
@@ -114,7 +114,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
     });
 
     events.push(createRotateEvent(
-      ship.id,
+      ship.$id,
       ship.runtime.heading || 0,
       rotateResult.newHeading,
       payload.angle
@@ -122,7 +122,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
   } else if (action.type === "ADVANCE_PHASE") {
     const phaseResult = advancePhase(ship);
     
-    updates.set(`ship:${ship.id}`, {
+    updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
         movement: phaseResult.newMovementState,
@@ -131,7 +131,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
 
     events.push({
       type: "PHASE_ADVANCED",
-      shipId: ship.id,
+      shipId: ship.$id,
       fromPhase: phaseResult.fromPhase,
       toPhase: phaseResult.toPhase,
     });
@@ -155,45 +155,36 @@ function processMovement(ship: any, payload: any) {
   const heading = ship.runtime.heading || 0;
   const movement = getMovementState(ship);
 
-  // 计算新位置（浮点数精确计算）
   let newPosition = { ...currentPos };
   const rad = (heading * Math.PI) / 180;
 
-  // 前后移动（forwardDistance > 0 向前，< 0 向后）
   if (forwardDistance !== 0) {
     newPosition.x += Math.cos(rad) * forwardDistance;
     newPosition.y += Math.sin(rad) * forwardDistance;
   }
 
-  // 侧向移动（strafeDistance > 0 向左，< 0 向右）
   if (strafeDistance !== 0) {
-    // 向左：垂直于船头方向 +90°
-    // 向右：垂直于船头方向 -90°
     const strafeRad = strafeDistance > 0
-      ? rad + Math.PI / 2   // 向左
-      : rad - Math.PI / 2;  // 向右
+      ? rad + Math.PI / 2
+      : rad - Math.PI / 2;
     const absStrafe = Math.abs(strafeDistance);
     newPosition.x += Math.cos(strafeRad) * absStrafe;
     newPosition.y += Math.sin(strafeRad) * absStrafe;
   }
 
-  // 确定移动类型和消耗
   const isStrafe = strafeDistance !== 0;
   const distance = isStrafe ? Math.abs(strafeDistance) : Math.abs(forwardDistance);
   const directionType = getTranslationType(isStrafe);
 
-  // 更新移动状态
   const newMovementState = { ...movement };
 
   if (movement.currentPhase === "A") {
     newMovementState.phaseAUsed = movement.phaseAUsed + distance;
-    // 锁定方向
     if (!movement.phaseALock) {
       newMovementState.phaseALock = directionType;
     }
   } else if (movement.currentPhase === "C") {
     newMovementState.phaseCUsed = movement.phaseCUsed + distance;
-    // 锁定方向
     if (!movement.phaseCLock) {
       newMovementState.phaseCLock = directionType;
     }
@@ -204,6 +195,7 @@ function processMovement(ship: any, payload: any) {
     newMovementState,
   };
 }
+export { processMovement };
 
 /**
  * 处理旋转（B阶段）
@@ -213,11 +205,9 @@ function processRotation(ship: any, payload: any) {
   const currentHeading = ship.runtime.heading || 0;
   const movement = getMovementState(ship);
 
-  // 计算新朝向（规范化到0-360度）
   let newHeading = (currentHeading + angle) % 360;
   if (newHeading < 0) newHeading += 360;
 
-  // 更新移动状态
   const newMovementState = { ...movement };
   newMovementState.turnAngleUsed = movement.turnAngleUsed + Math.abs(angle);
 
@@ -226,6 +216,7 @@ function processRotation(ship: any, payload: any) {
     newMovementState,
   };
 }
+export { processRotation };
 
 /**
  * 推进到下一阶段
@@ -272,6 +263,7 @@ function advancePhase(ship: any): {
     toPhase,
   };
 }
+export { advancePhase };
 
 // ==================== 验证函数 ====================
 
@@ -289,7 +281,7 @@ export function validateMovement(
 	strafeDistance: number
 ): { valid: boolean; error?: string } {
 	// 应用 speed modifier
-	const baseMaxSpeed = ship.tokenJson.token.maxSpeed || 0;
+	const baseMaxSpeed = ship.spec.maxSpeed || 0;
 	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
 	const movement = getMovementState(ship);
 
@@ -355,7 +347,7 @@ export function validateRotation(
 	angle: number
 ): { valid: boolean; error?: string } {
 	// 应用 turnRate modifier
-	const baseMaxTurn = ship.tokenJson.token.maxTurnRate || 0;
+	const baseMaxTurn = ship.spec.maxTurnRate || 0;
 	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
 	const movement = getMovementState(ship);
 

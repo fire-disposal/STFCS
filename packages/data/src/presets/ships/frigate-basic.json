@@ -1,12 +1,11 @@
 {
-	"$schema": "ship-v2",
 	"$id": "preset:frigate-basic",
 	"metadata": {
 		"name": "标准护卫舰",
 		"description": "基础护卫舰配置，适合新手",
 		"author": "STFCS"
 	},
-	"ship": {
+	"spec": {
 		"size": "FRIGATE",
 		"class": "STRIKE",
 		"width": 40,
@@ -20,7 +19,6 @@
 		"maxSpeed": 150,
 		"maxTurnRate": 30,
 		"shield": {
-			"type": "OMNI",
 			"arc": 360,
 			"radius": 50,
 			"efficiency": 1.0,
@@ -34,7 +32,20 @@
 				"facing": 0,
 				"arc": 60,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			},
 			{
 				"id": "mount-front-2",
@@ -43,7 +54,20 @@
 				"facing": 0,
 				"arc": 60,
 				"size": "SMALL",
-				"weapon": "preset:railgun-small"
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 50,
+						"projectilesPerShot": 1,
+						"range": 400,
+						"minRange": 50,
+						"cooldown": 0.5,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
 			}
 		],
 		"rangeModifier": 1.0
