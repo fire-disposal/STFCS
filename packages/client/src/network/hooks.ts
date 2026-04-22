@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { RoomInfo, CombatToken, StatePatch, WsEventName, WsPayload, WsResponseData } from "@vt/data";
 import { GamePhase, Faction } from "@vt/data";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
+import { setGameRoomRef } from "@/state/stores/uiStore";
 
 export interface RoomState {
 	roomId: string | null;
@@ -178,7 +179,17 @@ export function useSocketRoom(
 
 	if (!roomState?.roomId) return null;
 
-	return { state: roomState, sessionId: roomState.playerId, roomId: roomState.roomId, send, leave };
+	const socketRoom: SocketRoom = {
+		state: roomState,
+		sessionId: roomState.playerId,
+		roomId: roomState.roomId,
+		send,
+		leave,
+	};
+
+	setGameRoomRef(socketRoom);
+
+	return socketRoom;
 }
 
 function applyPatchToToken(token: CombatToken, path: (string | number)[], patch: StatePatch): CombatToken {

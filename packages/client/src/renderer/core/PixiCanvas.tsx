@@ -40,6 +40,7 @@ import { useShipHUDRendering } from "../entities/ShipHUDRenderer";
 import { useStarfieldRendering } from "../systems/StarfieldRenderer";
 import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
 import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
+import { useWeaponArcRendering } from "../entities/WeaponArcRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 
@@ -159,6 +160,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useMovementVisualRendering(layerSystem.layers, shipsWithSelected, selectedShipId ?? null, movementPreview, {
 		show: showMovementRange,
 	});
+	useWeaponArcRendering(layerSystem.layers, shipsWithSelected, selectedShipId ?? null);
 	useGridRendering(layerSystem.layers, showGrid);
 
 	useEffect(() => {

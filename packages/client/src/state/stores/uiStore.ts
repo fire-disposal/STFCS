@@ -1,4 +1,4 @@
-import type { PlayerRole } from "@vt/data";
+import type { PlayerRole, WsEventName, WsPayload, WsResponseData } from "@vt/data";
 import { create } from "zustand";
 
 // 交互模式枚举
@@ -9,6 +9,18 @@ export type CoordinatePrecision = "exact" | "rounded10" | "rounded100";
 
 // 角度模式类型
 export type AngleMode = "degrees" | "radians" | "nav";
+
+// Action sender interface
+export interface GameActionSender {
+	send: <E extends WsEventName>(event: E, payload: WsPayload<E>) => Promise<WsResponseData<E>>;
+	isAvailable: () => boolean;
+}
+
+// Default empty sender
+const emptySender: GameActionSender = {
+	send: async () => { throw new Error("Room not available"); },
+	isAvailable: () => false,
+};
 
 interface UIState {
 	// 连接状态
@@ -242,6 +254,8 @@ interface GameStateRef {
 	ships: Map<string, any>;
 	currentPhase: string;
 	turnCount: number;
+	room: any | null;
+	actionSender: GameActionSender;
 }
 
 export const gameStateRef: GameStateRef = {
@@ -249,6 +263,8 @@ export const gameStateRef: GameStateRef = {
 	ships: new Map(),
 	currentPhase: "DEPLOYMENT",
 	turnCount: 1,
+	room: null,
+	actionSender: emptySender,
 };
 
 export function updateGameStateRef(state: any): void {
@@ -260,4 +276,20 @@ export function updateGameStateRef(state: any): void {
 	for (const [key, ship] of (state.ships as unknown as Map<string, any>).entries()) {
 		gameStateRef.ships.set(key, ship);
 	}
+}
+
+export function setGameRoomRef(room: any): void {
+	gameStateRef.room = room;
+	if (room && room.send) {
+		gameStateRef.actionSender = {
+			send: room.send,
+			isAvailable: () => true,
+		};
+	} else {
+		gameStateRef.actionSender = emptySender;
+	}
+}
+
+export function getGameActionSender(): GameActionSender {
+	return gameStateRef.actionSender;
 }

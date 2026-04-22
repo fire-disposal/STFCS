@@ -121,7 +121,7 @@ function generateStar(z: number, range: number): Star {
 /**
  * 生成星云
  */
-function generateNebula(range: number): Nebula {
+function generateNebula(_range: number): Nebula {
   const angle = Math.random() * Math.PI * 2;
   const radius = 500 + Math.random() * 1500;
 
@@ -176,29 +176,17 @@ export class StarfieldGenerator {
     );
   }
 
-  /**
-   * 更新闪烁动画
-   */
+/**
+    * 更新闪烁动画
+    */
   update(deltaTime: number = 0.016): void {
     this.time += deltaTime;
   }
 
   /**
-   * 计算视差偏移
-   */
-  getParallaxOffset(cameraX: number, cameraY: number, z: number): { x: number; y: number } {
-    const { parallaxStrength } = this.config;
-    const factor = (1 - z) * parallaxStrength;
-    return {
-      x: cameraX * factor,
-      y: cameraY * factor,
-    };
-  }
-
-  /**
-   * 绘制深层星空
-   * 注意：视差效果已在容器层级通过 useLayerSystem.updateWorldTransforms 实现
-   */
+    * 绘制深层星空
+    * 视差效果由 useLayerSystem.updateWorldTransforms 在容器层级实现
+    */
   drawDeepStars(graphics: Graphics): void {
     for (const star of this.deepStars) {
       // 闪烁效果
@@ -270,13 +258,12 @@ export class StarfieldGenerator {
     }
   }
 
-  /**
-   * 绘制完整星空背景
-   */
+/**
+    * 绘制完整星空背景（单 Graphics 用）
+    */
   draw(
     graphics: Graphics,
-    cameraX: number,
-    cameraY: number,
+    _camera: { x: number; y: number } = { x: 0, y: 0 },
     layers: ('deep' | 'mid' | 'near' | 'nebula')[] = ['deep', 'mid', 'near', 'nebula']
   ): void {
     graphics.clear();

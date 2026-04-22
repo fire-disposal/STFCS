@@ -11,7 +11,8 @@
  * 渲染内容：
  * ├── 舰船本体：根据 faction 显示不同颜色
  * ├── 朝向箭头：指向 heading 方向
- * ├── 武器挂载点：显示武器类型图标
+ * ├── 挂载点：SMALL=正方形, MEDIUM=八边形, LARGE=圆形
+ * ├── 武器标记：显示武器类型图标，颜色区分伤害类型
  * ├── 状态指示：destroyed 标记
  * └── 命中区域：hitArea 圆形
  *
@@ -22,7 +23,7 @@
 
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipViewModel, ShipRenderOptions } from "../types";
-import type { WeaponRuntime, MountSpec } from "@vt/data";
+import type { WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
 import { Faction, DamageType, WeaponTag } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -44,7 +45,7 @@ const DAMAGE_TYPE_COLORS: Record<string, number> = {
 	[DamageType.FRAGMENTATION]: 0x32cd32,
 };
 
-const WEAPON_SIZE_SCALE: Record<string, number> = {
+const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
 	SMALL: 6,
 	MEDIUM: 10,
 	LARGE: 14,
@@ -57,6 +58,7 @@ export interface ShipCacheItem {
 	root: Container;
 	tacticalToken: Graphics;
 	hitbox: Graphics;
+	mountMarkers: Graphics;
 	weaponMarkers: Graphics;
 	isSelected: boolean;
 	lastState?: {
@@ -176,6 +178,7 @@ function updateShipToken(
 		drawHitbox(cached.hitbox, halfWidth, halfLength, isSelected);
 	}
 
+	drawMountMarkers(cached.mountMarkers, ship.spec.mounts, isSelected);
 	drawWeaponMarkers(cached.weaponMarkers, ship, isSelected);
 
 	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
@@ -218,6 +221,10 @@ function createShipToken(
 	drawTacticalToken(tacticalToken, color, halfWidth, halfLength, isSelected);
 	root.addChild(tacticalToken);
 
+	const mountMarkers = new Graphics();
+	drawMountMarkers(mountMarkers, ship.spec.mounts, isSelected);
+	root.addChild(mountMarkers);
+
 	const weaponMarkers = new Graphics();
 	drawWeaponMarkers(weaponMarkers, ship, isSelected);
 	root.addChild(weaponMarkers);
@@ -258,6 +265,7 @@ function createShipToken(
 		root,
 		tacticalToken,
 		hitbox,
+		mountMarkers,
 		weaponMarkers,
 		isSelected,
 		lastState: {
@@ -330,6 +338,62 @@ function drawTacticalToken(
 	target.circle(0, 0, 2.5).fill({ color: 0xffffff, alpha: 0.9 });
 }
 
+function drawMountSlotShape(
+	target: Graphics,
+	x: number,
+	y: number,
+	size: WeaponSlotSize,
+	slotRadius: number,
+	alpha: number
+): void {
+	const r = slotRadius;
+	switch (size) {
+		case "SMALL":
+			target.rect(x - r, y - r, r * 2, r * 2);
+			target.stroke({ color: 0x5a6a8a, width: 1, alpha });
+			break;
+		case "MEDIUM":
+			const o = r * 0.4;
+			target.poly([
+				x - r + o, y - r,
+				x + r - o, y - r,
+				x + r, y - r + o,
+				x + r, y + r - o,
+				x + r - o, y + r,
+				x - r + o, y + r,
+				x - r, y + r - o,
+				x - r, y - r + o,
+			]);
+			target.stroke({ color: 0x5a6a8a, width: 1, alpha });
+			break;
+		case "LARGE":
+			target.circle(x, y, r);
+			target.stroke({ color: 0x5a6a8a, width: 1.2, alpha });
+			break;
+	}
+}
+
+function drawMountMarkers(
+	target: Graphics,
+	mounts: MountSpec[] | undefined,
+	isSelected: boolean
+): void {
+	target.clear();
+
+	if (!mounts) return;
+
+	const alpha = isSelected ? 0.85 : 0.5;
+
+	for (const mount of mounts) {
+		const offsetX = mount.position?.x ?? 0;
+		const offsetY = mount.position?.y ?? 0;
+		const mountSize = mount.size;
+		const slotRadius = MOUNT_SLOT_SIZE[mountSize];
+
+		drawMountSlotShape(target, offsetX, offsetY, mountSize, slotRadius, alpha);
+	}
+}
+
 function drawWeaponMarkers(
 	target: Graphics,
 	ship: ShipViewModel,
@@ -351,15 +415,17 @@ function drawSingleWeaponMarker(
 	isSelected: boolean
 ): void {
 	const mount = mounts?.find((m) => m.id === weapon.mountId);
-	const spec = mount?.weapon?.spec;
+	if (!mount?.weapon) return;
+
+	const spec = mount.weapon.spec;
 	if (!spec) return;
 
-	const offsetX = mount?.position?.x ?? 0;
-	const offsetY = mount?.position?.y ?? 0;
-	const facingRad = (mount?.facing ?? 0) * Math.PI / 180;
+	const offsetX = mount.position?.x ?? 0;
+	const offsetY = mount.position?.y ?? 0;
+	const facingRad = (mount.facing ?? 0) * Math.PI / 180;
 
 	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType] ?? 0x7b68ee;
-	const iconSize = WEAPON_SIZE_SCALE[spec.size] ?? 8;
+	const iconSize = MOUNT_SLOT_SIZE[spec.size];
 	const alpha = isSelected ? 0.95 : 0.75;
 	const outlineAlpha = isSelected ? 1 : 0.8;
 

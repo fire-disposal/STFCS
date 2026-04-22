@@ -1,33 +1,29 @@
-import type { UseCameraAnimationResult } from "@/renderer";
-import { useUIStore } from "@/state/stores/uiStore";
+/**
+ * 视图控制面板 - 横向布局
+ */
+
 import React from "react";
-import { CursorCoordinateInput } from "./CursorCoordinateInput";
-import { CoordinateInput } from "@/ui/shared/CoordinateInput";
 import {
-	Crosshair,
 	Grid3X3,
-	Home,
 	Image,
-	Maximize,
-	Monitor,
-	Move,
+	Crosshair,
 	Navigation2,
-	RotateCcw,
-	RotateCw,
-	Sparkles,
 	Tag,
+	Sparkles,
+	Monitor,
+	Shield,
 	ZoomIn,
 	ZoomOut,
-	Shield,
+	Maximize,
+	RotateCcw,
+	RotateCw,
+	Home,
 } from "lucide-react";
+import { Button, Flex, Box, Text, IconButton } from "@radix-ui/themes";
+import { useUIStore } from "@/state/stores/uiStore";
+import "./battle-panel.css";
 
-interface ViewControlPanelProps {
-	cameraAnimation?: UseCameraAnimationResult;
-}
-
-export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
-	cameraAnimation,
-}) => {
+export const ViewControlPanel: React.FC = () => {
 	const {
 		zoom,
 		cameraPosition,
@@ -40,7 +36,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		showEffects,
 		showShipIcons,
 		showHexagonArmor,
-		mapCursor,
 		setZoom,
 		setCameraPosition,
 		setViewRotation,
@@ -52,8 +47,6 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		toggleEffects,
 		toggleShipIcons,
 		toggleHexagonArmor,
-		setMapCursor,
-		clearMapCursor,
 	} = useUIStore();
 
 	const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));
@@ -70,307 +63,81 @@ export const ViewControlPanel: React.FC<ViewControlPanelProps> = ({
 		setZoom(1);
 	};
 
-	const handleResetView = () => {
-		setCameraPosition(0, 0);
-		setZoom(1);
-		setViewRotation(0);
-	};
-
-	const viewPresets = [
-		{ name: "全局", zoom: 0.5, x: 0, y: 0, rotation: 0 },
-		{ name: "标准", zoom: 1, x: 0, y: 0, rotation: 0 },
-		{ name: "局部", zoom: 2, x: 0, y: 0, rotation: 0 },
-		{ name: "细节", zoom: 3, x: 0, y: 0, rotation: 0 },
+	const viewToggles = [
+		{ key: "grid", icon: <Grid3X3 size={12} />, label: "网格", active: showGrid, toggle: toggleGrid },
+		{ key: "bg", icon: <Image size={12} />, label: "背景", active: showBackground, toggle: toggleBackground },
+		{ key: "arcs", icon: <Crosshair size={12} />, label: "弧线", active: showWeaponArcs, toggle: toggleWeaponArcs },
+		{ key: "move", icon: <Navigation2 size={12} />, label: "范围", active: showMovementRange, toggle: toggleMovementRange },
+		{ key: "labels", icon: <Tag size={12} />, label: "标签", active: showLabels, toggle: toggleLabels },
+		{ key: "fx", icon: <Sparkles size={12} />, label: "特效", active: showEffects, toggle: toggleEffects },
+		{ key: "icons", icon: <Monitor size={12} />, label: "图标", active: showShipIcons, toggle: toggleShipIcons },
+		{ key: "armor", icon: <Shield size={12} />, label: "护甲", active: showHexagonArmor, toggle: toggleHexagonArmor },
 	];
 
-	const applyPreset = (preset: typeof viewPresets[0]) => {
-		setZoom(preset.zoom);
-		setCameraPosition(preset.x, preset.y);
-		setViewRotation(preset.rotation);
-	};
-
 	return (
-		<div className="view-control-panel">
-			<div className="view-status-bar">
-				<div className="view-status-item">
-					<span className="view-status-label">坐标</span>
-					<span className="view-status-value">
-						({Math.round(cameraPosition.x)}, {Math.round(cameraPosition.y)})
-					</span>
-				</div>
-				<div className="view-status-divider" />
-				<div className="view-status-item">
-					<span className="view-status-label">缩放</span>
-					<span className="view-status-value">{zoom.toFixed(2)}x</span>
-				</div>
-				<div className="view-status-divider" />
-				<div className="view-status-item">
-					<span className="view-status-label">旋转</span>
-					<span className="view-status-value">{Math.round(viewRotation)}°</span>
-				</div>
-			</div>
+		<Flex className="panel-row" gap="3">
+			<Flex className="panel-section" align="center" gap="2">
+				<Text size="1" color="gray">坐标</Text>
+				<Text size="1" weight="bold">({Math.round(cameraPosition.x)}, {Math.round(cameraPosition.y)})</Text>
+			</Flex>
 
-			<div className="view-section">
-				<div className="view-section__title">
-					<Monitor className="view-section__icon" />
-					<span>视图信息</span>
-				</div>
+			<Box className="panel-divider" />
 
-				<div className="view-field-group">
-					<div className="view-field__label">
-						<Navigation2 className="view-field__icon" />
-						<span>相机坐标</span>
-					</div>
-					<CoordinateInput
-						cameraX={cameraPosition.x}
-						cameraY={cameraPosition.y}
-						viewRotation={viewRotation}
-						zoom={zoom}
-						onCameraChange={setCameraPosition}
-						onViewRotationChange={setViewRotation}
-						onZoomChange={setZoom}
-						animateToCoords={cameraAnimation?.animateToCoords}
-						worldBounds={{
-							minX: -10000,
-							maxX: 10000,
-							minY: -10000,
-							maxY: 10000,
-							minZoom: 0.5,
-							maxZoom: 5,
-						}}
-					/>
-				</div>
+			<Flex className="panel-section" align="center" gap="2">
+				<ZoomIn size={14} />
+				<Text size="1" color="gray">缩放</Text>
+				<Text size="1" weight="bold">{(zoom * 100).toFixed(0)}%</Text>
+				<IconButton size="1" variant="soft" onClick={handleZoomOut}>
+					<ZoomOut size={12} />
+				</IconButton>
+				<IconButton size="1" variant="soft" onClick={handleZoomReset}>
+					<Maximize size={12} />
+				</IconButton>
+				<IconButton size="1" variant="soft" onClick={handleZoomIn}>
+					<ZoomIn size={12} />
+				</IconButton>
+			</Flex>
 
-				<div className="view-field-group">
-					<div className="view-field__label">
-						<Move className="view-field__icon" />
-						<span>游标位置</span>
-					</div>
-					<CursorCoordinateInput
-						cursorX={mapCursor?.x ?? null}
-						cursorY={mapCursor?.y ?? null}
-						cursorR={mapCursor?.r ?? null}
-						cameraX={cameraPosition.x}
-						cameraY={cameraPosition.y}
-						viewRotation={viewRotation}
-						onCameraChange={setCameraPosition}
-						onSetMapCursor={setMapCursor}
-						onClearMapCursor={clearMapCursor}
-						worldBounds={{
-							minX: -10000,
-							maxX: 10000,
-							minY: -10000,
-							maxY: 10000,
-						}}
-					/>
-				</div>
+			<Box className="panel-divider" />
 
-				<div className="view-field-group">
-					<div className="view-field__label">
-						<ZoomIn className="view-field__icon" />
-						<span>缩放级别</span>
-					</div>
-					<div className="view-field__row">
-						<div className="view-field__value-display">
-							<span className="view-field__value">{(zoom * 100).toFixed(0)}%</span>
-						</div>
-						<div className="view-field__buttons">
-							<button
-								data-magnetic
-								className="view-field__control-btn"
-								onClick={handleZoomOut}
-								title="缩小"
-							>
-								<ZoomOut className="game-icon--sm" />
-							</button>
-							<button
-								data-magnetic
-								className="view-field__control-btn"
-								onClick={handleZoomReset}
-								title="重置缩放"
-							>
-								<Maximize className="game-icon--sm" />
-							</button>
-							<button
-								data-magnetic
-								className="view-field__control-btn"
-								onClick={handleZoomIn}
-								title="放大"
-							>
-								<ZoomIn className="game-icon--sm" />
-							</button>
-						</div>
-					</div>
-					<div className="view-field__slider-container">
-						<input
-							type="range"
-							className="view-field__slider"
-							min="0.5"
-							max="5"
-							step="0.1"
-							value={zoom}
-							onChange={(e) => setZoom(parseFloat(e.target.value))}
-						/>
-					</div>
-				</div>
+			<Flex className="panel-section" align="center" gap="2">
+				<RotateCcw size={14} />
+				<Text size="1" color="gray">旋转</Text>
+				<Text size="1" weight="bold">{Math.round(viewRotation)}°</Text>
+				<IconButton size="1" variant="soft" onClick={handleRotateLeft}>
+					<RotateCcw size={12} />
+				</IconButton>
+				<IconButton size="1" variant="soft" onClick={handleRotateReset}>
+					<Home size={12} />
+				</IconButton>
+				<IconButton size="1" variant="soft" onClick={handleRotateRight}>
+					<RotateCw size={12} />
+				</IconButton>
+			</Flex>
 
-				<div className="view-field-group">
-					<div className="view-field__label">
-						<RotateCcw className="view-field__icon" />
-						<span>视图旋转</span>
-					</div>
-					<div className="view-field__buttons view-field__buttons--spread">
-						<button
-							data-magnetic
-							className="view-field__control-btn view-field__control-btn--labeled"
-							onClick={handleRotateLeft}
-							title="逆时针旋转 15°"
-						>
-							<RotateCcw className="game-icon--sm" />
-							<span>-15°</span>
-						</button>
-						<button
-							data-magnetic
-							className="view-field__control-btn view-field__control-btn--labeled"
-							onClick={handleRotateReset}
-							title="重置旋转"
-						>
-							<Home className="game-icon--sm" />
-							<span>归零</span>
-						</button>
-						<button
-							data-magnetic
-							className="view-field__control-btn view-field__control-btn--labeled"
-							onClick={handleRotateRight}
-							title="顺时针旋转 15°"
-						>
-							<RotateCw className="game-icon--sm" />
-							<span>+15°</span>
-						</button>
-					</div>
-				</div>
-			</div>
+			<Box className="panel-divider" />
 
-			<div className="view-section">
-				<div className="view-section__title">
-					<Grid3X3 className="view-section__icon" />
-					<span>图层显示</span>
-				</div>
+			<Flex className="panel-section view-toggles-row" align="center" gap="1">
+				{viewToggles.map((t) => (
+					<Button
+						key={t.key}
+						size="1"
+						variant={t.active ? "solid" : "soft"}
+						color={t.active ? "blue" : "gray"}
+						onClick={t.toggle}
+						style={{ padding: "2px 4px" }}
+					>
+						{t.icon}
+					</Button>
+				))}
+			</Flex>
 
-				<div className="view-toggles">
-					<label className="view-toggle">
-						<input type="checkbox" checked={showGrid} onChange={toggleGrid} />
-						<span className="view-toggle__indicator" />
-						<Grid3X3 className="view-toggle__icon" />
-						<span className="view-toggle__label">网格</span>
-					</label>
+			<Box className="panel-divider" />
 
-					<label className="view-toggle">
-						<input type="checkbox" checked={showBackground} onChange={toggleBackground} />
-						<span className="view-toggle__indicator" />
-						<Image className="view-toggle__icon" />
-						<span className="view-toggle__label">背景</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showWeaponArcs} onChange={toggleWeaponArcs} />
-						<span className="view-toggle__indicator" />
-						<Crosshair className="view-toggle__icon" />
-						<span className="view-toggle__label">武器弧</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showMovementRange} onChange={toggleMovementRange} />
-						<span className="view-toggle__indicator" />
-						<Navigation2 className="view-toggle__icon" />
-						<span className="view-toggle__label">移动范围</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showLabels} onChange={toggleLabels} />
-						<span className="view-toggle__indicator" />
-						<Tag className="view-toggle__icon" />
-						<span className="view-toggle__label">标签</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showEffects} onChange={toggleEffects} />
-						<span className="view-toggle__indicator" />
-						<Sparkles className="view-toggle__icon" />
-						<span className="view-toggle__label">特效</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showShipIcons} onChange={toggleShipIcons} />
-						<span className="view-toggle__indicator" />
-						<Monitor className="view-toggle__icon" />
-						<span className="view-toggle__label">图标</span>
-					</label>
-
-					<label className="view-toggle">
-						<input type="checkbox" checked={showHexagonArmor} onChange={toggleHexagonArmor} />
-						<span className="view-toggle__indicator" />
-						<Shield className="view-toggle__icon" />
-						<span className="view-toggle__label">护甲</span>
-					</label>
-				</div>
-			</div>
-
-			<div className="view-section">
-				<div className="view-section__title">
-					<Monitor className="view-section__icon" />
-					<span>视图预设</span>
-				</div>
-				<div className="view-presets">
-					{viewPresets.map((preset) => (
-						<button
-							key={preset.name}
-							data-magnetic
-							className="view-preset-btn"
-							onClick={() => applyPreset(preset)}
-							title={`缩放：${preset.zoom * 100}%, 位置：(${preset.x}, ${preset.y}), 旋转：${preset.rotation}°`}
-						>
-							{preset.name}
-						</button>
-					))}
-				</div>
-			</div>
-
-			<div className="view-section">
-				<div className="view-section__title">
-					<Move className="view-section__icon" />
-					<span>视图操作</span>
-				</div>
-
-				<div className="view-actions">
-					<button data-magnetic className="view-action-btn" onClick={handleResetAll}>
-						<RotateCcw className="game-icon--sm" />
-						<span>重置视图</span>
-					</button>
-					<button data-magnetic className="view-action-btn" onClick={handleResetView}>
-						<Home className="game-icon--sm" />
-						<span>返回原点</span>
-					</button>
-				</div>
-			</div>
-
-			<div className="view-section view-section--hints">
-				<div className="view-hints">
-					<div className="view-hint">
-						<span className="view-hint__key">滚轮</span>
-						<span className="view-hint__desc">缩放视图</span>
-					</div>
-					<div className="view-hint">
-						<span className="view-hint__key">拖拽</span>
-						<span className="view-hint__desc">平移视图</span>
-					</div>
-					<div className="view-hint">
-						<span className="view-hint__key">空格 + 拖拽</span>
-						<span className="view-hint__desc">旋转视图</span>
-					</div>
-				</div>
-			</div>
-		</div>
+			<Button size="1" variant="soft" color="amber" onClick={handleResetAll}>
+				<Home size={12} /> 重置视图
+			</Button>
+		</Flex>
 	);
 };
 

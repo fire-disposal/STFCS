@@ -50,6 +50,7 @@ export { useArmorHexagonRendering } from "./entities/ArmorHexagonRenderer";
 export { useShieldArcRendering } from "./entities/ShieldArcRenderer";
 export { useFluxIndicatorRendering } from "./entities/FluxIndicatorRenderer";
 export { useMovementVisualRendering } from "./entities/MovementVisualRenderer";
+export { useWeaponArcRendering } from "./entities/WeaponArcRenderer";
 
 export { useGridRendering } from "./systems/GridRenderer";
 export { useStarfieldRendering } from "./systems/StarfieldRenderer";

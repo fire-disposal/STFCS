@@ -151,8 +151,12 @@ export function useLayerSystem(): UseLayerSystemResult {
 			currentLayers.starfieldMid.visible = showBackground;
 			currentLayers.starfieldNear.visible = showBackground;
 
-			// 视差效果：星空层不直接跟随 world 层，而是使用独立的位置计算
-			// 视差系数越小，星空移动越慢（感觉越远）
+			// 视差效果：星空层是 world 的子容器，继承 world.pivot/scale/rotation
+			// 通过子层 position 堆叠实现视差：
+			// - world.pivot = (x, y) 相机位置
+			// - starfield.position = (x*(1-factor), y*(1-factor))
+			// - 实际屏幕偏移 = position - pivot = -x*factor（视差移动）
+			// factor 越大，星空移动越多（越近）
 			const parallaxBase = 0.5;
 			const nebulaFactor = parallaxBase * 0.2;  // 最远
 			const deepFactor = parallaxBase * 0.3;
@@ -240,7 +244,7 @@ export function worldToScreen(
 	worldX: number,
 	worldY: number,
 	camera: { x: number; y: number; zoom: number; viewRotation: number },
-	canvasSize: { width: number; height: number }
+	_canvasSize: { width: number; height: number }
 ): { screenX: number; screenY: number } {
 	// 相对于相机中心的偏移（世界坐标系）
 	const dx = worldX - camera.x;

@@ -162,6 +162,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			starfieldNear.zIndex = 3;
 			starfieldNear.eventMode = "none";
 
+			// 星空层作为 world 子容器（视差通过 position 堆叠）
+			// background 是静态背景，星空层有视差效果
+
 			const grid = new Container();
 			grid.zIndex = 4;
 			grid.eventMode = "none";

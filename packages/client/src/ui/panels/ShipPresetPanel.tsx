@@ -1,0 +1,251 @@
+/**
+ * ShipPresetPanel - 舰船预设面板
+ * 横向布局，显示用户存档内的舰船配置
+ * 单选卡片 + Pixi预览 + 部署按钮
+ */
+
+import React, { useState, useEffect, useMemo } from "react";
+import { Rocket, Target, Search, Filter } from "lucide-react";
+import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea } from "@radix-ui/themes";
+import type { InventoryToken, CombatToken } from "@vt/data";
+import { Faction as FactionEnum, HullSize } from "@vt/data";
+import type { SocketRoom, SocketNetworkManager } from "@/network";
+import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
+import { notify } from "@/ui/shared/Notification";
+import "./battle-panel.css";
+
+const HULL_SIZE_NAMES: Record<string, string> = {
+	[HullSize.FRIGATE]: "护卫舰",
+	[HullSize.DESTROYER]: "驱逐舰",
+	[HullSize.CRUISER]: "巡洋舰",
+	[HullSize.CAPITAL]: "主力舰",
+};
+
+interface ShipPresetItem {
+	id: string;
+	token: InventoryToken;
+	name: string;
+	hullSize: string;
+	weaponCount: number;
+}
+
+export interface ShipPresetPanelProps {
+	room: SocketRoom | null;
+	networkManager: SocketNetworkManager;
+	cursorPosition: { x: number; y: number };
+	isHost: boolean;
+}
+
+export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
+	room,
+	networkManager,
+	cursorPosition,
+	isHost,
+}) => {
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [filterSize, setFilterSize] = useState<string>("all");
+	const [shipPresets, setShipPresets] = useState<ShipPresetItem[]>([]);
+	const [loading, setLoading] = useState(false);
+
+	useEffect(() => {
+		let disposed = false;
+		const loadPresets = async () => {
+			setLoading(true);
+			const result = await networkManager.getLoadout();
+			if (disposed) return;
+			if (!result.success || !result.loadout) {
+				notify.error(result.error || "预设加载失败");
+				setShipPresets([]);
+			} else {
+				const presets: ShipPresetItem[] = result.loadout.ships.map((t: CombatToken) => ({
+					id: t.$id,
+					token: t as InventoryToken,
+					name: t.metadata?.name ?? t.$id.slice(-6),
+					hullSize: t.spec.size,
+					weaponCount: (t.spec.mounts ?? []).filter((m) => m.weapon).length,
+				}));
+				setShipPresets(presets);
+			}
+			setLoading(false);
+		};
+		void loadPresets();
+		return () => { disposed = true; };
+	}, [networkManager]);
+
+	const filteredPresets = useMemo(() => {
+		return shipPresets.filter((preset) => {
+			const matchesSearch = searchQuery === "" ||
+				preset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				HULL_SIZE_NAMES[preset.hullSize]?.toLowerCase().includes(searchQuery.toLowerCase());
+			const matchesSize = filterSize === "all" || preset.hullSize === filterSize;
+			return matchesSearch && matchesSize;
+		});
+	}, [shipPresets, searchQuery, filterSize]);
+
+	const selectedPreset = selectedId ? shipPresets.find((p) => p.id === selectedId) : null;
+
+	const handleDeploy = async () => {
+		if (!room || !selectedPreset || !isHost) {
+			notify.error("只有房主可以部署舰船");
+			return;
+		}
+
+		const combatToken: CombatToken = {
+			...selectedPreset.token,
+			runtime: {
+				position: cursorPosition,
+				heading: 0,
+				hull: selectedPreset.token.spec.maxHitPoints,
+				armor: Array(6).fill(selectedPreset.token.spec.armorMaxPerQuadrant),
+				fluxSoft: 0,
+				fluxHard: 0,
+				overloaded: false,
+				overloadTime: 1,
+				destroyed: false,
+				faction: FactionEnum.PLAYER,
+				venting: false,
+				weapons: (selectedPreset.token.spec.mounts ?? []).map((m) => ({
+					mountId: m.id,
+					state: "READY",
+					cooldownRemaining: 0,
+				})),
+			},
+		};
+
+		try {
+			await room.send("edit:token", {
+				action: "create",
+				token: combatToken,
+				faction: FactionEnum.PLAYER,
+				position: cursorPosition,
+			});
+			notify.success(`已部署 ${selectedPreset.name} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
+		} catch (error) {
+			notify.error(error instanceof Error ? error.message : "部署失败");
+		}
+	};
+
+	if (loading) {
+		return (
+			<Flex align="center" gap="2" className="panel-row">
+				<Text size="2" color="gray">加载预设...</Text>
+			</Flex>
+		);
+	}
+
+	return (
+		<Flex className="panel-row" gap="3" style={{ minWidth: 0, flex: 1 }}>
+			<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 140 }}>
+				<TextField.Root
+					size="1"
+					value={searchQuery}
+					onChange={(e) => setSearchQuery(e.target.value)}
+					placeholder="搜索舰船..."
+					style={{ width: 100 }}
+				>
+					<TextField.Slot>
+						<Search size={12} />
+					</TextField.Slot>
+				</TextField.Root>
+
+				<Select.Root value={filterSize} onValueChange={setFilterSize}>
+					<Select.Trigger style={{ minWidth: 70 }}>
+						<Filter size={12} />
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="all">全部</Select.Item>
+						<Select.Item value="FRIGATE">护卫</Select.Item>
+						<Select.Item value="DESTROYER">驱逐</Select.Item>
+						<Select.Item value="CRUISER">巡洋</Select.Item>
+						<Select.Item value="CAPITAL">主力</Select.Item>
+					</Select.Content>
+				</Select.Root>
+			</Flex>
+
+			<Box className="panel-divider" />
+
+			<Box style={{ flex: 1, minWidth: 0, maxWidth: 400 }}>
+				<ScrollArea style={{ height: 58 }}>
+					<Flex gap="2" style={{ paddingRight: 8 }}>
+						{filteredPresets.length === 0 ? (
+							<Text size="1" color="gray">暂无预设舰船</Text>
+						) : (
+							filteredPresets.map((preset) => (
+								<Flex
+									key={preset.id}
+									direction="column"
+									align="center"
+									gap="1"
+									style={{
+										padding: 4,
+										background: selectedId === preset.id
+											? "rgba(74, 158, 255, 0.2)"
+											: "rgba(26, 45, 66, 0.4)",
+										border: selectedId === preset.id
+											? "1px solid rgba(74, 158, 255, 0.6)"
+											: "1px solid rgba(43, 66, 97, 0.4)",
+										borderRadius: 4,
+										cursor: "pointer",
+										minWidth: 72,
+									}}
+									onClick={() => setSelectedId(preset.id)}
+								>
+									<ShipPreviewCanvas
+										token={preset.token}
+										size={50}
+										selected={selectedId === preset.id}
+									/>
+									<Text size="1" style={{
+										maxWidth: 68,
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+										color: selectedId === preset.id ? "#4fc3ff" : "#cfe8ff",
+									}}>
+										{preset.name}
+									</Text>
+								</Flex>
+							))
+						)}
+					</Flex>
+				</ScrollArea>
+			</Box>
+
+			<Box className="panel-divider" />
+
+			<Flex className="panel-section" align="center" gap="2">
+				<Target size={14} />
+				<Text size="1" color="gray">游标</Text>
+				<Text size="1" weight="bold">
+					({Math.round(cursorPosition.x)}, {Math.round(cursorPosition.y)})
+				</Text>
+			</Flex>
+
+			{selectedPreset && (
+				<Flex className="panel-section" align="center" gap="2">
+					<Badge size="1" variant="soft">
+						{HULL_SIZE_NAMES[selectedPreset.hullSize] ?? selectedPreset.hullSize}
+					</Badge>
+					<Badge size="1" variant="outline">
+						{selectedPreset.weaponCount} 武器
+					</Badge>
+				</Flex>
+			)}
+
+			<Button
+				size="1"
+				variant="solid"
+				color="green"
+				onClick={handleDeploy}
+				disabled={!isHost || !selectedPreset}
+			>
+				<Rocket size={12} /> 部署
+			</Button>
+
+			{!isHost && <Text size="1" color="amber">仅房主可部署</Text>}
+		</Flex>
+	);
+};
+
+export default ShipPresetPanel;

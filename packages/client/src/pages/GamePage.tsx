@@ -15,15 +15,17 @@ import {
 	ScrollArea,
 	IconButton,
 } from "@radix-ui/themes";
-import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
+import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
 import React, { useState } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
+import MovementPanel from "@/ui/panels/MovementPanel";
+import WeaponPanel from "@/ui/panels/WeaponPanel";
+import ShieldPanel from "@/ui/panels/ShieldPanel";
 import RealityEditPanel from "@/ui/panels/RealityEditPanel";
-import HangarPanel from "@/ui/panels/HangarPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
-import { useGameInteraction } from "./GamePage/useGameInteraction";
+import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -48,8 +50,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const tokens = useTokens(room) as unknown as ShipViewModel[];
 	const selectedShip = tokens.find((t) => t.id === selectedShipId) ?? null;
 
-	const { handleToggleShield, handleVent } = useGameInteraction(room, selectedShip);
-
 	const handleRealityEdit = async (shipId: string, runtimeData: Record<string, unknown>) => {
 		if (!room) return;
 		try {
@@ -69,8 +69,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	});
 	const currentPlayer = currentPlayerKey ? room?.state?.players[currentPlayerKey] : undefined;
 	const isHost = currentPlayer?.role === "HOST";
-
-	const cursorPosition = mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 };
 
 	if (!room || !room.state) {
 		return (
@@ -136,7 +134,28 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						id: "ship-info",
 						label: "舰船信息",
 						icon: <Info size={14} />,
-						component: <ShipInfoPanel ship={selectedShip} canControl={true} onToggleShield={handleToggleShield} onVent={handleVent} />,
+						component: <ShipInfoPanel ship={selectedShip} canControl={true} />,
+						enabled: true,
+					},
+					{
+						id: "movement",
+						label: "移动控制",
+						icon: <Move size={14} />,
+						component: <MovementPanel ship={selectedShip} canControl={true} />,
+						enabled: true,
+					},
+					{
+						id: "weapon",
+						label: "武器火控",
+						icon: <Crosshair size={14} />,
+						component: <WeaponPanel ship={selectedShip} canControl={true} />,
+						enabled: true,
+					},
+					{
+						id: "shield",
+						label: "护盾管理",
+						icon: <Shield size={14} />,
+						component: <ShieldPanel ship={selectedShip} canControl={true} />,
 						enabled: true,
 					},
 					{
@@ -147,18 +166,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						enabled: Boolean(isHost),
 					},
 					{
-						id: "hangar",
-						label: "机库",
-						icon: <Ship size={14} />,
-						component: (
-							<HangarPanel
-								cursorPosition={cursorPosition}
-								networkManager={networkManager}
-								room={room ?? undefined}
-								isHost={Boolean(isHost)}
-							/>
-						),
-						enabled: Boolean(isHost),
+						id: "ship-preset",
+						label: "舰船预设",
+						icon: <Rocket size={14} />,
+						component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 }} isHost={Boolean(isHost)} />,
+						enabled: true,
 					},
 					{
 						id: "view-control",
