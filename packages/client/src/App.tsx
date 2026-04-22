@@ -19,6 +19,7 @@ const App: React.FC = () => {
 	const networkManagerRef = useRef<SocketNetworkManager | null>(null);
 	const [userName, setUserName] = useState<string>("");
 	const [userProfile, setUserProfile] = useState<{ nickname: string; avatar: string | null; avatarAssetId?: string }>({ nickname: "", avatar: null });
+	const [myRoomId, setMyRoomId] = useState<string | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const { rooms, isLoading: roomsLoading } = useRoomList(
@@ -77,6 +78,7 @@ const App: React.FC = () => {
 	const handleLogout = useCallback(() => {
 		userService.logout();
 		setUserName("");
+		setMyRoomId(null);
 		setAppState("auth");
 		networkManagerRef.current?.leaveRoom();
 		notify.info("已退出");
@@ -91,14 +93,31 @@ const App: React.FC = () => {
 			maxPlayers: 4,
 		});
 
-		if (result.success) {
-			notify.success("房间创建成功");
-			setAppState("game");
+		if (result.success && result.roomId) {
+			setMyRoomId(result.roomId);
+			notify.success("房间创建成功，点击「进入房间」开始游戏");
+			setAppState("lobby");
+			setRefreshKey(Date.now());
 		} else {
 			notify.error(result.error || "创建房间失败");
 			setAppState("lobby");
 		}
 	}, [userName]);
+
+	const handleEnterMyRoom = useCallback(async () => {
+		if (!networkManagerRef.current || !myRoomId) return;
+
+		setAppState("loading");
+		const result = await networkManagerRef.current.joinRoom(myRoomId);
+
+		if (result.success) {
+			notify.success("进入房间成功");
+			setAppState("game");
+		} else {
+			notify.error(result.error || "进入房间失败");
+			setAppState("lobby");
+		}
+	}, [myRoomId]);
 
 	const handleJoinRoom = useCallback(async (roomId: string) => {
 		if (!networkManagerRef.current) return;
@@ -119,6 +138,7 @@ const App: React.FC = () => {
 		setAppState("lobby");
 		networkManagerRef.current?.leaveRoom();
 		setRefreshKey(Date.now());
+		setMyRoomId(null);
 		notify.info("已返回大厅");
 	}, []);
 
@@ -161,7 +181,9 @@ const App: React.FC = () => {
 					currentShortId={null}
 					rooms={rooms}
 					isLoading={roomsLoading}
+					myRoomId={myRoomId}
 					onCreateRoom={handleCreateRoom}
+					onEnterMyRoom={handleEnterMyRoom}
 					onJoinRoom={handleJoinRoom}
 					onDeleteRoom={handleDeleteRoom}
 					onRefresh={handleRefresh}

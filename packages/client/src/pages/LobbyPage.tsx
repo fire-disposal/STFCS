@@ -24,7 +24,7 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, Plus, RefreshCw, Save, Upload, UserCircle, Wrench } from "lucide-react";
+import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 
 interface LobbyPageProps {
@@ -34,7 +34,9 @@ interface LobbyPageProps {
 	currentShortId: number | null;
 	rooms: RoomInfo[];
 	isLoading: boolean;
+	myRoomId: string | null;
 	onCreateRoom: () => void;
+	onEnterMyRoom: () => void;
 	onJoinRoom: (roomId: string) => void;
 	onDeleteRoom: (roomId: string) => void;
 	onRefresh: () => void;
@@ -49,7 +51,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	currentShortId,
 	rooms,
 	isLoading,
+	myRoomId,
 	onCreateRoom,
+	onEnterMyRoom,
 	onJoinRoom,
 	onDeleteRoom,
 	onRefresh,
@@ -252,9 +256,15 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
 					<Flex direction="column" gap="3">
 						<Card className="radix-surface-card" size="3">
-							<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>
-								<Plus size={16} /> 创建新房间
-							</Button>
+							{myRoomId ? (
+								<Button size="3" color="green" className="radix-full-btn" onClick={onEnterMyRoom} data-magnetic>
+									<Play size={16} /> 进入房间
+								</Button>
+							) : (
+								<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>
+									<Plus size={16} /> 创建新房间
+								</Button>
+							)}
 						</Card>
 
 						<Card className="radix-surface-card" size="3">
