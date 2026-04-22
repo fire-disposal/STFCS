@@ -203,6 +203,15 @@ rpc.namespace("room", {
     const assets = await assetService.batchGetAssets([...new Set(assetIds)], p.includeData);
     return { assets };
   },
+  delete: async (payload: unknown, ctx) => {
+    ctx.requireAuth();
+    const p = payload as WsPayload<"room:delete">;
+    const room = ctx.roomManager.getRoom(p.roomId);
+    if (!room) throw err("房间不存在", "ROOM_NOT_FOUND");
+    if (room.creatorId !== ctx.playerId) throw err("只有房主可以删除房间", "NOT_HOST");
+    await ctx.roomManager.removeRoom(p.roomId);
+    return;
+  },
 });
 
 rpc.namespace("customize", {

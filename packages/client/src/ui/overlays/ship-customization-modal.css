@@ -187,12 +187,11 @@
 }
 
 .customizer-preview-texture {
-	max-width: 180px;
-	max-height: 180px;
 	opacity: 0.72;
 	filter: drop-shadow(0 0 8px rgba(100, 180, 255, 0.35));
 	transform: translate(-50%, -50%);
 	user-select: none;
+	object-fit: contain;
 }
 
 .customizer-preview-crosshair {

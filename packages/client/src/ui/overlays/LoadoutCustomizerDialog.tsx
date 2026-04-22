@@ -522,7 +522,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     </Flex>
                                     <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={texturePreviewUrl} />
                                     <Flex justify="center" gap="2" mt="1">
-                                        <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.5, shipPreviewZoom - 0.25))}>-</Button>
+                                        <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
                                         <Text size="1">{shipPreviewZoom.toFixed(2)}x</Text>
                                         <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.min(4, shipPreviewZoom + 0.25))}>+</Button>
                                     </Flex>
@@ -928,19 +928,71 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
 <Card>
                                         <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">贴图</Text>
+                                            <Text weight="bold">贴图预览</Text>
                                             <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
                                                 <Upload size={12} /> 上传图片
                                             </Button>
                                         </Flex>
 
-                                        <Flex direction="column" gap="2">
-                                            {weaponTexturePreviewUrl && (
-                                                <Box style={{ width: 100, height: 100, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden", background: "rgba(0,0,0,0.3)" }}>
-                                                    <MiniWeaponPreview weapon={weaponDraft} texturePreviewUrl={weaponTexturePreviewUrl} />
-                                                </Box>
+                                        <Flex direction="column" gap="2" align="center">
+                                            {weaponDraft && (
+                                                <MiniWeaponPreview weapon={weaponDraft} texturePreviewUrl={weaponTexturePreviewUrl} />
+                                            )}
+                                            {!weaponDraft && (
+                                                <Text size="1" color="gray">请先选择武器</Text>
                                             )}
                                         </Flex>
+
+                                        {weaponDraft && weaponTexturePreviewUrl && (
+                                            <Flex direction="column" gap="2" mt="2">
+                                                <Text size="1" weight="bold">贴图位置调整</Text>
+                                                <Grid columns="3" gap="3">
+                                                    <Box>
+                                                        <Text size="1" color="gray">X 偏移</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={-50}
+                                                                max={50}
+                                                                value={weaponDraft.spec.texture?.offsetX ?? 0}
+                                                                onChange={(e) => updateWeaponTexture({ offsetX: Number(e.target.value) })}
+                                                                style={{ width: 60 }}
+                                                            />
+                                                            <Text size="1">{weaponDraft.spec.texture?.offsetX ?? 0}</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">Y 偏移</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={-50}
+                                                                max={50}
+                                                                value={weaponDraft.spec.texture?.offsetY ?? 0}
+                                                                onChange={(e) => updateWeaponTexture({ offsetY: Number(e.target.value) })}
+                                                                style={{ width: 60 }}
+                                                            />
+                                                            <Text size="1">{weaponDraft.spec.texture?.offsetY ?? 0}</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                    <Box>
+                                                        <Text size="1" color="gray">缩放</Text>
+                                                        <Flex align="center" gap="1">
+                                                            <input
+                                                                type="range"
+                                                                min={0.5}
+                                                                max={2}
+                                                                step={0.1}
+                                                                value={weaponDraft.spec.texture?.scale ?? 1}
+                                                                onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) })}
+                                                                style={{ width: 60 }}
+                                                            />
+                                                            <Text size="1">{(weaponDraft.spec.texture?.scale ?? 1).toFixed(1)}x</Text>
+                                                        </Flex>
+                                                    </Box>
+                                                </Grid>
+                                            </Flex>
+                                        )}
 
                                         <input
                                             ref={weaponTextureInputRef}

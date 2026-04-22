@@ -234,6 +234,19 @@ export class SocketNetworkManager {
 		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "transfer_host", targetId } });
 	}
 
+	async deleteRoom(roomId: string): Promise<{ success: boolean; error?: string }> {
+		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
+
+		try {
+			await this.request("room:delete", { roomId });
+			this.currentRoomId = null;
+			this.gameState = null;
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Delete failed" };
+		}
+	}
+
 	async forceEndTurn(faction?: "PLAYER" | "ENEMY" | "NEUTRAL"): Promise<{ success: boolean; error?: string }> {
 		try {
 			await this.request("edit:room", { action: "force_end_turn", faction });

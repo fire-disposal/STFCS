@@ -15,7 +15,7 @@ interface MiniShipPreviewProps {
 }
 
 function clampZoom(value: number): number {
-    return Math.min(2.2, Math.max(0.4, value));
+    return Math.min(4, Math.max(0.2, value));
 }
 
 function createLayers(app: any): LayerRegistry {
@@ -142,14 +142,14 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
     }, [token]);
 
     const texture = token?.spec.texture;
+    const textureScale = texture?.scale ?? 1;
+    const textureOffsetX = texture?.offsetX ?? 0;
+    const textureOffsetY = texture?.offsetY ?? 0;
     const textureStyle = useMemo(() => {
-        const s = texture?.scale ?? 1;
-        const ox = texture?.offsetX ?? 0;
-        const oy = texture?.offsetY ?? 0;
         return {
-            transform: `translate(${ox}px, ${oy}px) scale(${s})`,
+            transform: `translate(${textureOffsetX}px, ${textureOffsetY}px) scale(${textureScale})`,
         };
-    }, [texture]);
+    }, [textureScale, textureOffsetX, textureOffsetY]);
 
     useShipRendering(
         layerSystem.layers,
@@ -208,8 +208,8 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
 
             <input
                 type="range"
-                min={0.4}
-                max={2.2}
+                min={0.2}
+                max={4}
                 step={0.01}
                 value={zoom}
                 onChange={(e) => onZoomChange(clampZoom(Number(e.target.value)))}

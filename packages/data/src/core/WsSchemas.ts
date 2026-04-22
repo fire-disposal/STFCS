@@ -167,6 +167,11 @@ export const RoomGetAssetsDef = {
   }),
 } as const satisfies WsEventDef<any, any>
 
+export const RoomDeleteDef = {
+  payload: z.object({ roomId: z.string() }),
+  response: VoidSchema,
+} as const satisfies WsEventDef<any, any>
+
 export const CustomizeTokenDef = {
   payload: z.object({
     action: z.enum(["list", "get", "upsert", "delete", "copy_preset"]),
@@ -451,6 +456,7 @@ export const WsEventDefinitions = {
   "room:leave": RoomLeaveDef,
   "room:action": RoomActionDef,
   "room:get_assets": RoomGetAssetsDef,
+  "room:delete": RoomDeleteDef,
   "customize:token": CustomizeTokenDef,
   "customize:weapon": CustomizeWeaponDef,
   "save:action": SaveActionDef,

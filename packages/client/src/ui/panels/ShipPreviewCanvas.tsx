@@ -11,7 +11,7 @@ import { Application } from "@pixi/react";
 import { Graphics } from "pixi.js";
 import React, { useRef, useCallback } from "react";
 import type { InventoryToken } from "@vt/data";
-import { WeaponTag, WeaponSlotSize } from "@vt/data";
+import { WeaponSlotSize } from "@vt/data";
 
 const DAMAGE_TYPE_COLORS = {
 	KINETIC: 0xffd700,
@@ -92,7 +92,7 @@ function drawMountSlotShape(
 	g.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
 }
 
-function drawWeaponMarker(
+function drawWeaponBar(
 	g: Graphics,
 	x: number,
 	y: number,
@@ -100,51 +100,49 @@ function drawWeaponMarker(
 	iconSize: number,
 	color: number,
 	alpha: number,
-	tags: string[] | undefined
+	damageType: string
 ): void {
-	const isBallistic = tags?.includes(WeaponTag.BALLISTIC);
-	const isEnergy = tags?.includes(WeaponTag.ENERGY);
-	const isMissile = tags?.includes(WeaponTag.GUIDED);
+	const length = iconSize * 1.4;
+	const width = iconSize * 0.25;
 
-	if (isBallistic) {
-		g.poly([
-			x + Math.cos(facingRad) * iconSize * 0.7, y + Math.sin(facingRad) * iconSize * 0.7,
-			x + Math.cos(facingRad + Math.PI * 0.6) * iconSize * 0.35, y + Math.sin(facingRad + Math.PI * 0.6) * iconSize * 0.35,
-			x + Math.cos(facingRad + Math.PI) * iconSize * 0.25, y + Math.sin(facingRad + Math.PI) * iconSize * 0.25,
-			x + Math.cos(facingRad - Math.PI * 0.6) * iconSize * 0.35, y + Math.sin(facingRad - Math.PI * 0.6) * iconSize * 0.35,
-		]);
-		g.fill({ color, alpha: alpha * 0.6 });
-		g.stroke({ color, width: 1.2, alpha });
+	g.moveTo(x + Math.cos(facingRad + Math.PI) * length * 0.3, y + Math.sin(facingRad + Math.PI) * length * 0.3);
+	g.lineTo(x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length);
+	g.stroke({ color, width, alpha: alpha * 0.7 });
 
-		g.moveTo(x, y);
-		g.lineTo(x + Math.cos(facingRad) * iconSize * 1.1, y + Math.sin(facingRad) * iconSize * 1.1);
-		g.stroke({ color, width: 1.5, alpha });
-	} else if (isEnergy) {
-		g.poly([
-			x + Math.cos(facingRad) * iconSize, y + Math.sin(facingRad) * iconSize,
-			x + Math.cos(facingRad + Math.PI * 0.7) * iconSize * 0.4, y + Math.sin(facingRad + Math.PI * 0.7) * iconSize * 0.4,
-			x + Math.cos(facingRad - Math.PI * 0.7) * iconSize * 0.4, y + Math.sin(facingRad - Math.PI * 0.7) * iconSize * 0.4,
-		]);
-		g.fill({ color, alpha: alpha * 0.5 });
-		g.stroke({ color, width: 1.2, alpha });
+	g.poly([
+		x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length,
+		x + Math.cos(facingRad + Math.PI * 0.85) * length * 0.15, y + Math.sin(facingRad + Math.PI * 0.85) * length * 0.15,
+		x + Math.cos(facingRad + Math.PI) * length * 0.3, y + Math.sin(facingRad + Math.PI) * length * 0.3,
+		x + Math.cos(facingRad - Math.PI * 0.85) * length * 0.15, y + Math.sin(facingRad - Math.PI * 0.85) * length * 0.15,
+	]);
+	g.fill({ color, alpha: alpha * 0.5 });
+	g.stroke({ color, width: 1.2, alpha });
 
-		g.circle(x + Math.cos(facingRad) * iconSize * 0.3, y + Math.sin(facingRad) * iconSize * 0.3, iconSize * 0.12);
-		g.fill({ color: 0xffffff, alpha: alpha * 0.8 });
-	} else if (isMissile) {
-		g.poly([
-			x + Math.cos(facingRad) * iconSize * 1.1, y + Math.sin(facingRad) * iconSize * 1.1,
-			x + Math.cos(facingRad + Math.PI * 0.5) * iconSize * 0.35, y + Math.sin(facingRad + Math.PI * 0.5) * iconSize * 0.35,
-			x + Math.cos(facingRad + Math.PI) * iconSize * 0.4, y + Math.sin(facingRad + Math.PI) * iconSize * 0.4,
-			x + Math.cos(facingRad - Math.PI * 0.5) * iconSize * 0.35, y + Math.sin(facingRad - Math.PI * 0.5) * iconSize * 0.35,
-		]);
-		g.fill({ color, alpha: alpha * 0.5 });
-		g.stroke({ color, width: 1.2, alpha });
-
-		g.circle(x, y, iconSize * 0.18);
-		g.fill({ color: 0xffffff, alpha: alpha * 0.7 });
-	} else {
-		g.circle(x, y, iconSize * 0.4);
-		g.fill({ color, alpha });
+	switch (damageType) {
+		case "KINETIC":
+			g.circle(x + Math.cos(facingRad) * length * 0.6, y + Math.sin(facingRad) * length * 0.6, iconSize * 0.1);
+			g.fill({ color: 0xffffff, alpha: alpha * 0.6 });
+			break;
+		case "HIGH_EXPLOSIVE":
+			g.poly([
+				x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length,
+				x + Math.cos(facingRad + Math.PI * 0.75) * iconSize * 0.2, y + Math.sin(facingRad + Math.PI * 0.75) * iconSize * 0.2,
+				x + Math.cos(facingRad - Math.PI * 0.75) * iconSize * 0.2, y + Math.sin(facingRad - Math.PI * 0.75) * iconSize * 0.2,
+			]);
+			g.fill({ color, alpha: alpha * 0.8 });
+			break;
+		case "ENERGY":
+			g.circle(x + Math.cos(facingRad) * length * 0.4, y + Math.sin(facingRad) * length * 0.4, iconSize * 0.12);
+			g.fill({ color: 0xffffff, alpha: alpha * 0.9 });
+			break;
+		case "FRAGMENTATION":
+			for (let i = -1; i <= 1; i += 2) {
+				const branchAngle = facingRad + i * Math.PI * 0.3;
+				g.moveTo(x + Math.cos(facingRad) * length * 0.7, y + Math.sin(facingRad) * length * 0.7);
+				g.lineTo(x + Math.cos(branchAngle) * length * 0.9, y + Math.sin(branchAngle) * length * 0.9);
+				g.stroke({ color, width: width * 0.6, alpha: alpha * 0.6 });
+			}
+			break;
 	}
 }
 
@@ -227,16 +225,17 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 			const iconSize = MOUNT_SLOT_SIZE[weaponSpec.size] * scale;
 			const wAlpha = selected ? 0.9 : 0.7;
 
-			drawWeaponMarker(g, offsetX, offsetY, facingRad, iconSize, weaponColor, wAlpha, weaponSpec.tags);
+			drawWeaponBar(g, offsetX, offsetY, facingRad, iconSize, weaponColor, wAlpha, weaponSpec.damageType);
 		}
 	}, [token, size, selected]);
 
 	const handleInit = useCallback((app: any) => {
 		const g = new Graphics();
 		graphicsRef.current = g;
+		g.position.set(size / 2, size / 2);
 		app.stage.addChild(g);
 		drawShip(g);
-	}, [drawShip]);
+	}, [drawShip, size]);
 
 	return (
 		<div

@@ -24,7 +24,7 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipViewModel, ShipRenderOptions } from "../types";
 import type { WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
-import { Faction, WeaponTag } from "@vt/data";
+import { Faction } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -450,23 +450,10 @@ function drawSingleWeaponMarker(
 	const alpha = isSelected ? 0.95 : 0.75;
 	const outlineAlpha = isSelected ? 1 : 0.8;
 
-	const isBallistic = spec.tags?.includes(WeaponTag.BALLISTIC);
-	const isEnergy = spec.tags?.includes(WeaponTag.ENERGY);
-	const isMissile = spec.tags?.includes(WeaponTag.GUIDED);
-
-	if (isBallistic) {
-		drawBallisticWeapon(target, offsetX, offsetY, facingRad, iconSize, weaponColor, alpha, outlineAlpha);
-	} else if (isEnergy) {
-		drawEnergyWeapon(target, offsetX, offsetY, facingRad, iconSize, weaponColor, alpha, outlineAlpha);
-	} else if (isMissile) {
-		drawMissileWeapon(target, offsetX, offsetY, facingRad, iconSize, weaponColor, alpha, outlineAlpha);
-	} else {
-		target.circle(offsetX, offsetY, iconSize * 0.5);
-		target.fill({ color: weaponColor, alpha });
-	}
+	drawWeaponBar(target, offsetX, offsetY, facingRad, iconSize, weaponColor, alpha, outlineAlpha, spec.damageType);
 }
 
-function drawBallisticWeapon(
+function drawWeaponBar(
 	target: Graphics,
 	x: number,
 	y: number,
@@ -474,64 +461,51 @@ function drawBallisticWeapon(
 	size: number,
 	color: number,
 	alpha: number,
-	outlineAlpha: number
+	outlineAlpha: number,
+	damageType: string
 ): void {
-	target.poly([
-		x + Math.cos(facingRad) * size * 0.8, y + Math.sin(facingRad) * size * 0.8,
-		x + Math.cos(facingRad + Math.PI * 0.6) * size * 0.4, y + Math.sin(facingRad + Math.PI * 0.6) * size * 0.4,
-		x + Math.cos(facingRad + Math.PI) * size * 0.3, y + Math.sin(facingRad + Math.PI) * size * 0.3,
-		x + Math.cos(facingRad - Math.PI * 0.6) * size * 0.4, y + Math.sin(facingRad - Math.PI * 0.6) * size * 0.4,
-	]);
-	target.fill({ color, alpha: alpha * 0.6 });
-	target.stroke({ color, width: 1.2, alpha: outlineAlpha });
+	const length = size * 1.4;
+	const width = size * 0.25;
 
 	target
-		.moveTo(x, y)
-		.lineTo(x + Math.cos(facingRad) * size * 1.2, y + Math.sin(facingRad) * size * 1.2)
-		.stroke({ color, width: 1.5, alpha: outlineAlpha });
-}
+		.moveTo(x + Math.cos(facingRad + Math.PI) * length * 0.3, y + Math.sin(facingRad + Math.PI) * length * 0.3)
+		.lineTo(x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length)
+		.stroke({ color, width: width, alpha: alpha * 0.7 });
 
-function drawEnergyWeapon(
-	target: Graphics,
-	x: number,
-	y: number,
-	facingRad: number,
-	size: number,
-	color: number,
-	alpha: number,
-	outlineAlpha: number
-): void {
 	target.poly([
-		x + Math.cos(facingRad) * size, y + Math.sin(facingRad) * size,
-		x + Math.cos(facingRad + Math.PI * 0.7) * size * 0.5, y + Math.sin(facingRad + Math.PI * 0.7) * size * 0.5,
-		x + Math.cos(facingRad - Math.PI * 0.7) * size * 0.5, y + Math.sin(facingRad - Math.PI * 0.7) * size * 0.5,
+		x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length,
+		x + Math.cos(facingRad + Math.PI * 0.85) * length * 0.15, y + Math.sin(facingRad + Math.PI * 0.85) * length * 0.15,
+		x + Math.cos(facingRad + Math.PI) * length * 0.3, y + Math.sin(facingRad + Math.PI) * length * 0.3,
+		x + Math.cos(facingRad - Math.PI * 0.85) * length * 0.15, y + Math.sin(facingRad - Math.PI * 0.85) * length * 0.15,
 	]);
 	target.fill({ color, alpha: alpha * 0.5 });
 	target.stroke({ color, width: 1.2, alpha: outlineAlpha });
 
-	target.circle(x + Math.cos(facingRad) * size * 0.3, y + Math.sin(facingRad) * size * 0.3, size * 0.15);
-	target.fill({ color: 0xffffff, alpha: alpha * 0.8 });
-}
-
-function drawMissileWeapon(
-	target: Graphics,
-	x: number,
-	y: number,
-	facingRad: number,
-	size: number,
-	color: number,
-	alpha: number,
-	outlineAlpha: number
-): void {
-	target.poly([
-		x + Math.cos(facingRad) * size * 1.2, y + Math.sin(facingRad) * size * 1.2,
-		x + Math.cos(facingRad + Math.PI * 0.5) * size * 0.4, y + Math.sin(facingRad + Math.PI * 0.5) * size * 0.4,
-		x + Math.cos(facingRad + Math.PI) * size * 0.5, y + Math.sin(facingRad + Math.PI) * size * 0.5,
-		x + Math.cos(facingRad - Math.PI * 0.5) * size * 0.4, y + Math.sin(facingRad - Math.PI * 0.5) * size * 0.4,
-	]);
-	target.fill({ color, alpha: alpha * 0.5 });
-	target.stroke({ color, width: 1.2, alpha: outlineAlpha });
-
-	target.circle(x, y, size * 0.2);
-	target.fill({ color: 0xffffff, alpha: alpha * 0.7 });
+	switch (damageType) {
+		case "KINETIC":
+			target.circle(x + Math.cos(facingRad) * length * 0.6, y + Math.sin(facingRad) * length * 0.6, size * 0.1);
+			target.fill({ color: 0xffffff, alpha: alpha * 0.6 });
+			break;
+		case "HIGH_EXPLOSIVE":
+			target.poly([
+				x + Math.cos(facingRad) * length, y + Math.sin(facingRad) * length,
+				x + Math.cos(facingRad + Math.PI * 0.75) * size * 0.2, y + Math.sin(facingRad + Math.PI * 0.75) * size * 0.2,
+				x + Math.cos(facingRad - Math.PI * 0.75) * size * 0.2, y + Math.sin(facingRad - Math.PI * 0.75) * size * 0.2,
+			]);
+			target.fill({ color, alpha: alpha * 0.8 });
+			break;
+		case "ENERGY":
+			target.circle(x + Math.cos(facingRad) * length * 0.4, y + Math.sin(facingRad) * length * 0.4, size * 0.12);
+			target.fill({ color: 0xffffff, alpha: alpha * 0.9 });
+			break;
+		case "FRAGMENTATION":
+			for (let i = -1; i <= 1; i += 2) {
+				const branchAngle = facingRad + i * Math.PI * 0.3;
+				target
+					.moveTo(x + Math.cos(facingRad) * length * 0.7, y + Math.sin(facingRad) * length * 0.7)
+					.lineTo(x + Math.cos(branchAngle) * length * 0.9, y + Math.sin(branchAngle) * length * 0.9)
+					.stroke({ color, width: width * 0.6, alpha: alpha * 0.6 });
+			}
+			break;
+	}
 }

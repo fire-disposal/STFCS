@@ -166,8 +166,16 @@ setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
 		[]
 	);
 
-	const handleDeleteRoom = useCallback(async (_roomId: string) => {
-		notify.info("房间删除功能暂未实现");
+	const handleDeleteRoom = useCallback(async (roomId: string) => {
+		if (!networkManagerRef.current) return;
+
+		const result = await networkManagerRef.current.deleteRoom(roomId);
+		if (result.success) {
+			notify.success("房间已删除");
+			setRefreshKey(Date.now());
+		} else {
+			notify.error(result.error || "删除房间失败");
+		}
 	}, []);
 
 	if (!networkManager) {
