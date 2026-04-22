@@ -1,7 +1,19 @@
-import { MemoryBaseRepository } from "./MemoryBaseRepository.js";
 import type { WeaponBuild } from "@vt/data";
+import { FileBaseRepository } from "./FileBaseRepository.js";
 
-export class MemoryWeaponRepository extends MemoryBaseRepository<WeaponBuild> {
+export class FileWeaponRepository extends FileBaseRepository<WeaponBuild> {
+	constructor() {
+		super("weapons");
+	}
+
+	protected getFileName(entity: WeaponBuild): string {
+		return `${this.extractPlayerId(entity)}.json`;
+	}
+
+	protected extractPlayerId(entity: WeaponBuild): string {
+		return entity.ownerId;
+	}
+
 	async findByOwner(ownerId: string): Promise<WeaponBuild[]> {
 		return this.findBy({ ownerId });
 	}
@@ -11,20 +23,19 @@ export class MemoryWeaponRepository extends MemoryBaseRepository<WeaponBuild> {
 	}
 
 	async findCustomByOwner(ownerId: string): Promise<WeaponBuild[]> {
-		return Array.from(this.storage.values()).filter(
-			(w) => w && w.ownerId === ownerId && !w.isPreset
-		);
+		const weapons = await this.findByOwner(ownerId);
+		return weapons.filter((w) => !w.isPreset);
 	}
 
 	async findByDamageType(damageType: string): Promise<WeaponBuild[]> {
 		return Array.from(this.storage.values()).filter(
-			(w) => w && w.data.spec.damageType === damageType
+			(w) => w.data.spec.damageType === damageType
 		);
 	}
 
 	async findBySize(size: string): Promise<WeaponBuild[]> {
 		return Array.from(this.storage.values()).filter(
-			(w) => w && w.data.spec.size === size
+			(w) => w.data.spec.size === size
 		);
 	}
 

@@ -134,18 +134,13 @@ export {
 export {
 	PersistenceManager,
 	persistence,
-	MemoryBaseRepository,
-	MemoryUserRepository,
-	MemoryShipRepository,
-	MemoryWeaponRepository,
-	MemoryRoomSaveRepository,
-	connectMongo,
-	disconnectMongo,
-	mongoRepositories,
+	FileBaseRepository,
+	FileShipRepository,
+	FileWeaponRepository,
+	FileRoomSaveRepository,
+	FileUserRepository,
 	type ShipBuild,
 	type WeaponBuild,
-	type PersistenceType,
-	type MongoConfig,
 } from "./persistence/index.js";
 
 export { setupSocketIO, createRpcRegistry, type RpcContext } from "./server/socketio/index.js";

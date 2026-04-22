@@ -1,21 +1,12 @@
-/**
- * 持久化管理器
- *
- * 统一管理所有 Repository
- * 支持内存存储和 MongoDB 切换
- */
-
 import type { Repository, QueryableRepository } from "./interfaces.js";
 import type { UserProfile, ShipBuild, RoomArchive } from "./types.js";
 import type { WeaponBuild } from "@vt/data";
 import {
-	MemoryUserRepository,
-	MemoryShipRepository,
-	MemoryWeaponRepository,
-	MemoryRoomSaveRepository,
-} from "./memory/index.js";
-
-export type PersistenceType = "memory" | "mongo";
+	FileUserRepository,
+	FileShipRepository,
+	FileWeaponRepository,
+	FileRoomSaveRepository,
+} from "./file/index.js";
 
 interface Repositories {
 	users: Repository<UserProfile> & QueryableRepository<UserProfile>;
@@ -44,52 +35,42 @@ export class PersistenceManager implements Repositories {
 	weapons: Repositories["weapons"];
 	roomSaves: Repositories["roomSaves"];
 
-	private type: PersistenceType;
-
-	constructor(repos: Repositories, type: PersistenceType = "memory") {
+	constructor(repos: Repositories) {
 		this.users = repos.users;
 		this.ships = repos.ships;
 		this.weapons = repos.weapons;
 		this.roomSaves = repos.roomSaves;
-		this.type = type;
 	}
 
-	getType(): PersistenceType {
-		return this.type;
+	static async createFile(): Promise<PersistenceManager> {
+		const users = new FileUserRepository();
+		const ships = new FileShipRepository();
+		const weapons = new FileWeaponRepository();
+		const roomSaves = new FileRoomSaveRepository();
+
+		await Promise.all([
+			users.init(),
+			ships.init(),
+			weapons.init(),
+			roomSaves.init(),
+		]);
+
+		return new PersistenceManager({ users, ships, weapons, roomSaves });
 	}
 
-	/** 创建内存存储（默认） */
-	static createMemory(): PersistenceManager {
-		return new PersistenceManager(
-			{
-				users: new MemoryUserRepository(),
-				ships: new MemoryShipRepository(),
-				weapons: new MemoryWeaponRepository(),
-				roomSaves: new MemoryRoomSaveRepository(),
-			},
-			"memory"
-		);
-	}
-
-	/** 根据环境变量自动选择 */
 	static create(): PersistenceManager {
-		const type = (process.env["PERSISTENCE_TYPE"] ?? "memory") as PersistenceType;
-		
-		if (type === "mongo") {
-			throw new Error("MongoDB persistence requires explicit connection. Use connectMongo() first.");
-		}
-		
-		return PersistenceManager.createMemory();
+		return new PersistenceManager({
+			users: new FileUserRepository(),
+			ships: new FileShipRepository(),
+			weapons: new FileWeaponRepository(),
+			roomSaves: new FileRoomSaveRepository(),
+		});
 	}
 
-	/** 清空所有数据 */
 	async clearAll(): Promise<void> {
-		if (this.type === "memory") {
-			(this.ships as MemoryShipRepository).clear();
-			(this.weapons as MemoryWeaponRepository).clear();
-		}
+		(this.ships as FileShipRepository).clear();
+		(this.weapons as FileWeaponRepository).clear();
 	}
 }
 
-/** 全局默认实例（内存存储） */
-export const persistence = PersistenceManager.createMemory();
+export const persistence = PersistenceManager.create();
