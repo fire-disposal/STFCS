@@ -19,7 +19,6 @@ import {
     DamageType,
     HullSize,
     ShipClass,
-    ShieldType,
     TokenJSONSchema,
     WeaponJSONSchema,
     WeaponSlotSize,
@@ -28,6 +27,9 @@ import {
     type TokenJSON,
     type WeaponJSON,
     type AssetType,
+    type ShipBuild,
+    type WeaponBuild,
+    type InventoryToken,
 } from "@vt/data";
 import { Plus, Save, Upload, WandSparkles, Wrench, Copy, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
@@ -45,14 +47,14 @@ interface LoadoutCustomizerDialogProps {
 
 interface ShipBuildRecord {
     id: string;
-    shipJson: unknown;
+    data: InventoryToken;
     ownerId?: string;
     isPreset?: boolean;
 }
 
 interface WeaponBuildRecord {
     id: string;
-    weaponJson: unknown;
+    data: WeaponJSON;
     ownerId?: string;
     isPreset?: boolean;
 }
@@ -69,26 +71,37 @@ function clone<T>(value: T): T {
 }
 
 function normalizeTokenJSON(input: unknown): TokenJSON | null {
-    const raw = (input as any)?.shipJson ?? input;
+    const raw = (input as any)?.data ?? input;
     const direct = TokenJSONSchema.safeParse(raw);
     if (direct.success) return direct.data;
 
-    if (raw && typeof raw === "object" && (raw as any).ship) {
-        const legacy = {
-            ...(raw as Record<string, unknown>),
-            $schema: "token-v2",
-            token: (raw as any).ship,
-        };
-        delete (legacy as any).ship;
-        const migrated = TokenJSONSchema.safeParse(legacy);
-        if (migrated.success) return migrated.data;
+    if (raw && typeof raw === "object") {
+        const obj = raw as Record<string, unknown>;
+        if (obj.ship) {
+            const legacy = {
+                ...obj,
+                $schema: "token-v2",
+                token: obj.ship,
+            };
+            delete (legacy as any).ship;
+            const migrated = TokenJSONSchema.safeParse(legacy);
+            if (migrated.success) return migrated.data;
+        }
+        if (obj.spec) {
+            const converted = {
+                ...obj,
+                token: obj.spec,
+            };
+            const migrated = TokenJSONSchema.safeParse(converted);
+            if (migrated.success) return migrated.data;
+        }
     }
 
     return null;
 }
 
 function normalizeWeaponJSON(input: unknown): WeaponJSON | null {
-    const raw = (input as any)?.weaponJson ?? input;
+    const raw = (input as any)?.data ?? input;
     const parsed = WeaponJSONSchema.safeParse(raw);
     return parsed.success ? parsed.data : null;
 }
@@ -103,7 +116,7 @@ function ensureShipDefaults(token: TokenJSON): TokenJSON {
 function ensureWeaponDefaults(weapon: WeaponJSON): WeaponJSON {
     const next = clone(weapon);
     next.metadata = next.metadata ?? { name: next.$id };
-    next.weapon.tags = next.weapon.tags ?? [];
+    next.spec.tags = next.spec.tags ?? [];
     return next;
 }
 
@@ -241,8 +254,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             });
 
             const dataPromise = Promise.all([
-                networkManager.send("token:list", {}),
-                networkManager.send("weapon:list", {}),
+                networkManager.send("customize:token", { action: "list" }),
+                networkManager.send("customize:weapon", { action: "list" }),
                 networkManager.send("preset:list_tokens", {}),
                 networkManager.send("preset:list_weapons", {}),
             ]);
@@ -252,8 +265,18 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                 timeoutPromise
             ]) as any[];
 
-            const nextShipBuilds = (shipListRes?.ships ?? []) as ShipBuildRecord[];
-            const nextWeaponBuilds = (weaponListRes?.weapons ?? []) as WeaponBuildRecord[];
+            const nextShipBuilds = ((shipListRes?.ships ?? []) as ShipBuild[]).map((s) => ({
+                id: s.id,
+                data: s.data,
+                ownerId: s.ownerId,
+                isPreset: s.isPreset,
+            }));
+            const nextWeaponBuilds = ((weaponListRes?.weapons ?? []) as WeaponBuild[]).map((w) => ({
+                id: w.id,
+                data: w.data,
+                ownerId: w.ownerId,
+                isPreset: w.isPreset,
+            }));
             const nextShipPresets = (shipPresetRes?.presets ?? [])
                 .map((item: unknown) => normalizeTokenJSON(item))
                 .filter((item: TokenJSON | null): item is TokenJSON => Boolean(item));
@@ -302,7 +325,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             return;
         }
 
-        const parsed = normalizeTokenJSON(selected.shipJson);
+        const parsed = normalizeTokenJSON(selected.data);
         if (!parsed) {
             notify.error(`舰船 ${selected.id} 数据不符合 schema`);
             return;
@@ -322,7 +345,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             return;
         }
 
-        const parsed = normalizeWeaponJSON(selected.weaponJson);
+        const parsed = normalizeWeaponJSON(selected.data);
         if (!parsed) {
             notify.error(`武器 ${selected.id} 数据不符合 schema`);
             return;
@@ -341,9 +364,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const compatibleWeapons = useMemo(() => {
         if (!selectedMount) return [];
         return weaponBuilds.filter((item) => {
-            const w = normalizeWeaponJSON(item.weaponJson);
+            const w = normalizeWeaponJSON(item.data);
             if (!w) return false;
-            return isWeaponSizeCompatible(selectedMount.size, w.weapon.size);
+            return isWeaponSizeCompatible(selectedMount.size, w.spec.size);
         });
     }, [selectedMount, weaponBuilds]);
 
@@ -408,9 +431,16 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
 
         try {
-            await networkManager.send("token:update", {
+            const inventoryToken: InventoryToken = {
+                $id: valid.data.$id,
+                $presetRef: valid.data.$presetRef,
+                spec: valid.data.token,
+                metadata: valid.data.metadata,
+            };
+            await networkManager.send("customize:token", {
+                action: "upsert",
                 tokenId: selectedShipBuildId,
-                updates: { shipJson: valid.data },
+                token: inventoryToken,
             });
             notify.success("舰船已保存");
             await reloadData();
@@ -428,9 +458,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
 
         try {
-            await networkManager.send("weapon:update", {
+            await networkManager.send("customize:weapon", {
+                action: "upsert",
                 weaponId: selectedWeaponBuildId,
-                updates: { weaponJson: valid.data },
+                weapon: valid.data,
             });
             notify.success("武器已保存");
             await reloadData();
@@ -441,10 +472,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyShipPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("token:copy_preset", { presetId });
+            const res = await networkManager.send("customize:token", { action: "copy_preset", presetId });
             notify.success("已从预设复制舰船");
             await reloadData();
-            if (res?.ship?.id) {
+            if (res && "ship" in res && res.ship?.id) {
                 setSelectedShipBuildId(res.ship.id);
             }
         } catch (error) {
@@ -454,10 +485,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyWeaponPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("weapon:copy_preset", { presetId });
+            const res = await networkManager.send("customize:weapon", { action: "copy_preset", presetId });
             notify.success("已从预设复制武器");
             await reloadData();
-            if (res?.weapon?.id) {
+            if (res && "weapon" in res && res.weapon?.id) {
                 setSelectedWeaponBuildId(res.weapon.id);
             }
         } catch (error) {
@@ -496,8 +527,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             }
             if (assetType === "weapon_texture") {
                 updateWeaponDraft((draft) => {
-                    draft.weapon.texture = {
-                        ...draft.weapon.texture,
+                    draft.spec.texture = {
+                        ...draft.spec.texture,
                         assetId,
                     };
                 });
@@ -557,7 +588,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Select.Trigger style={{ width: 240 }} />
                                                     <Select.Content>
                                                         {shipBuilds.map((item) => {
-                                                            const parsed = normalizeTokenJSON(item.shipJson);
+                                                            const parsed = normalizeTokenJSON(item.data);
                                                             return (
                                                                 <Select.Item key={item.id} value={item.id}>
                                                                     {parsed?.metadata?.name ?? idLabel(item.id)}
@@ -678,67 +709,45 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     </Select.Root>
 
                                                     <Select.Root
-                                                        value={typeof selectedMount?.weapon === "string" ? selectedMount.weapon : (selectedMount?.weapon?.$id ?? "")}
+                                                        value={selectedMount?.weapon?.$id ?? ""}
                                                         onValueChange={(weaponId) => {
                                                             if (!selectedMount || !shipDraft) return;
                                                             if (!weaponId) return;
                                                             const matched = weaponBuilds.find((item) => item.id === weaponId);
-                                                            const parsed = normalizeWeaponJSON(matched?.weaponJson);
+                                                            const parsed = normalizeWeaponJSON(matched?.data);
                                                             if (!parsed) return;
-                                                            if (!isWeaponSizeCompatible(selectedMount.size, parsed.weapon.size)) {
+                                                            if (!isWeaponSizeCompatible(selectedMount.size, parsed.spec.size)) {
                                                                 notify.error("武器尺寸与挂点不兼容");
                                                                 return;
                                                             }
-                                                            void (async () => {
-                                                                try {
-                                                                    const tokenId = selectedShipBuildId ?? shipDraft?.$id;
-                                                                    if (!tokenId) {
-                                                                        notify.error("未找到舰船ID");
-                                                                        return;
-                                                                    }
-                                                                    await networkManager.send("token:mount", {
-                                                                        tokenId,
-                                                                        mountId: selectedMount.id,
-                                                                        weaponId,
-                                                                    });
-                                                                    notify.success("挂载成功");
-                                                                    await reloadData();
-                                                                } catch (error) {
-                                                                    notify.error(error instanceof Error ? error.message : "挂载失败");
+                                                            updateShipDraft((draft) => {
+                                                                const mount = draft.token.mounts?.find((m) => m.id === selectedMount.id);
+                                                                if (mount) {
+                                                                    mount.weapon = parsed;
                                                                 }
-                                                            })();
+                                                            });
+                                                            notify.success("武器已挂载到挂点");
                                                         }}
                                                     >
                                                         <Select.Trigger placeholder="选择可兼容武器" />
                                                         <Select.Content>
                                                             {compatibleWeapons.map((item) => {
-                                                                const parsed = normalizeWeaponJSON(item.weaponJson);
+                                                                const parsed = normalizeWeaponJSON(item.data);
                                                                 if (!parsed) return null;
-                                                                return <Select.Item key={item.id} value={item.id}>{parsed.metadata?.name ?? item.id} ({parsed.weapon.size})</Select.Item>;
+                                                                return <Select.Item key={item.id} value={item.id}>{parsed.metadata?.name ?? item.id} ({parsed.spec.size})</Select.Item>;
                                                             })}
                                                         </Select.Content>
                                                     </Select.Root>
 
                                                     <Button variant="soft" color="gray" onClick={() => {
-                                                        if (!selectedMount) return;
-                                                        void (async () => {
-                                                            try {
-                                                                const tokenId = selectedShipBuildId ?? shipDraft?.$id;
-                                                                if (!tokenId) {
-                                                                    notify.error("未找到舰船ID");
-                                                                    return;
-                                                                }
-                                                                await networkManager.send("token:mount", {
-                                                                    tokenId,
-                                                                    mountId: selectedMount.id,
-                                                                    weaponId: null,
-                                                                });
-                                                                notify.success("已卸载挂点武器");
-                                                                await reloadData();
-                                                            } catch (error) {
-                                                                notify.error(error instanceof Error ? error.message : "卸载失败");
+                                                        if (!selectedMount || !shipDraft) return;
+                                                        updateShipDraft((draft) => {
+                                                            const mount = draft.token.mounts?.find((m) => m.id === selectedMount.id);
+                                                            if (mount) {
+                                                                mount.weapon = undefined;
                                                             }
-                                                        })();
+                                                        });
+                                                        notify.success("已卸载挂点武器");
                                                     }}>卸载当前挂点</Button>
                                                 </Flex>
                                             ) : (
@@ -812,23 +821,20 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             onClick={() => updateShipDraft((d) => {
                                                                 d.token.shield = d.token.shield
                                                                     ? undefined
-                                                                    : { type: ShieldType.OMNI, arc: 360, direction: 0, radius: 50, efficiency: 1, upkeep: 0 };
+                                                                    : { arc: 360, radius: 50, efficiency: 1, upkeep: 0 };
                                                             })}
                                                         >
                                                             {shipDraft.token.shield ? "禁用护盾" : "启用护盾"}
                                                         </Button>
                                                         {!shipDraft.token.shield && <Badge color="gray">NONE</Badge>}
+                                                        {shipDraft.token.shield && shipDraft.token.shield.arc >= 360 && <Badge color="blue">全向</Badge>}
+                                                        {shipDraft.token.shield && shipDraft.token.shield.arc < 360 && <Badge color="orange">定向</Badge>}
                                                     </Flex>
 
                                                     {shipDraft.token.shield && (
-                                                        <Grid columns="3" gap="2">
-                                                            <Select.Root value={shipDraft.token.shield.type} onValueChange={(v) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.type = v as any; })}>
-                                                                <Select.Trigger />
-                                                                <Select.Content>{Object.values(ShieldType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                            </Select.Root>
+                                                        <Grid columns="4" gap="2">
                                                             <TextField.Root type="number" value={String(shipDraft.token.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.arc = Number(e.target.value) || 0; })} placeholder="护盾角度" />
                                                             <TextField.Root type="number" value={String(shipDraft.token.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.radius = Number(e.target.value) || 0; })} placeholder="护盾半径" />
-                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.direction ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.direction = Number(e.target.value) || 0; })} placeholder="护盾方向" />
                                                             <TextField.Root type="number" value={String(shipDraft.token.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.efficiency = Number(e.target.value) || 1; })} placeholder="效率" />
                                                             <TextField.Root type="number" value={String(shipDraft.token.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.upkeep = Number(e.target.value) || 0; })} placeholder="维持" />
                                                         </Grid>
@@ -884,7 +890,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Select.Trigger style={{ width: 260 }} />
                                                     <Select.Content>
                                                         {weaponBuilds.map((item) => {
-                                                            const parsed = normalizeWeaponJSON(item.weaponJson);
+                                                            const parsed = normalizeWeaponJSON(item.data);
                                                             return <Select.Item key={item.id} value={item.id}>{parsed?.metadata?.name ?? idLabel(item.id)}</Select.Item>;
                                                         })}
                                                     </Select.Content>
@@ -896,33 +902,33 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <TextField.Root value={weaponDraft.metadata?.name ?? ""} onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...d.metadata, name: e.target.value }; })} placeholder="武器名称" />
                                                     <TextField.Root value={weaponDraft.metadata?.description ?? ""} onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), name: d.metadata?.name ?? d.$id, description: e.target.value }; })} placeholder="武器描述" />
                                                     <Grid columns="3" gap="2">
-                                                        <Select.Root value={weaponDraft.weapon.size} onValueChange={(v) => updateWeaponDraft((d) => { d.weapon.size = v as any; })}>
+                                                        <Select.Root value={weaponDraft.spec.size} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.size = v as any; })}>
                                                             <Select.Trigger />
                                                             <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
-                                                        <Select.Root value={weaponDraft.weapon.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.weapon.damageType = v as any; })}>
+                                                        <Select.Root value={weaponDraft.spec.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.damageType = v as any; })}>
                                                             <Select.Trigger />
                                                             <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
-                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.damage)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.damage = Number(e.target.value) || 0; })} placeholder="伤害" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.spec.damage)} onChange={(e) => updateWeaponDraft((d) => { d.spec.damage = Number(e.target.value) || 0; })} placeholder="伤害" />
                                                     </Grid>
                                                     <Grid columns="4" gap="2">
-                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.range)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.range = Number(e.target.value) || 0; })} placeholder="射程" />
-                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.minRange = Number(e.target.value) || 0; })} placeholder="最小射程" />
-                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.cooldown = Number(e.target.value) || 0; })} placeholder="冷却" />
-                                                        <TextField.Root type="number" value={String(weaponDraft.weapon.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.weapon.fluxCostPerShot = Number(e.target.value) || 0; })} placeholder="辐耗" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.spec.range)} onChange={(e) => updateWeaponDraft((d) => { d.spec.range = Number(e.target.value) || 0; })} placeholder="射程" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.spec.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.minRange = Number(e.target.value) || 0; })} placeholder="最小射程" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.spec.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.cooldown = Number(e.target.value) || 0; })} placeholder="冷却" />
+                                                        <TextField.Root type="number" value={String(weaponDraft.spec.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.spec.fluxCostPerShot = Number(e.target.value) || 0; })} placeholder="辐耗" />
                                                     </Grid>
 
                                                     <Text size="1" color="gray">标签（逗号分隔）</Text>
                                                     <TextField.Root
-                                                        value={(weaponDraft.weapon.tags ?? []).join(",")}
+                                                        value={(weaponDraft.spec.tags ?? []).join(",")}
                                                         onChange={(e) => {
                                                             const values = e.target.value
                                                                 .split(",")
                                                                 .map((x) => x.trim())
                                                                 .filter((x): x is keyof typeof WeaponTag => Boolean(x) && Object.values(WeaponTag).includes(x as any));
                                                             updateWeaponDraft((d) => {
-                                                                d.weapon.tags = values as any;
+                                                                d.spec.tags = values as any;
                                                             });
                                                         }}
                                                         placeholder="ANTI_SHIP,ENERGY"
@@ -934,8 +940,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Card>
                                             <Text size="2" weight="bold" mb="2">武器贴图</Text>
                                             <Flex direction="column" gap="2">
-                                                <Select.Root value={weaponDraft?.weapon.texture?.assetId ?? ""} onValueChange={(id) => updateWeaponDraft((d) => {
-                                                    d.weapon.texture = { ...d.weapon.texture, assetId: id };
+                                                <Select.Root value={weaponDraft?.spec.texture?.assetId ?? ""} onValueChange={(id) => updateWeaponDraft((d) => {
+                                                    d.spec.texture = { ...d.spec.texture, assetId: id };
                                                 })}>
                                                     <Select.Trigger placeholder="选择已有武器贴图" />
                                                     <Select.Content>
@@ -978,7 +984,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Flex key={preset.$id} justify="between" align="center" className="ship-customization-modal__ship-item">
                                                         <Box>
                                                             <Text size="2">{preset.metadata?.name ?? preset.$id}</Text>
-                                                            <Text size="1" color="gray">{preset.weapon.size} / {preset.weapon.damageType}</Text>
+                                                            <Text size="1" color="gray">{preset.spec.size} / {preset.spec.damageType}</Text>
                                                         </Box>
                                                         <Button size="1" variant="soft" onClick={() => void copyWeaponPreset(preset.$id)}><Plus size={12} /> 复制</Button>
                                                     </Flex>

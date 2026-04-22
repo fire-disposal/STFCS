@@ -27,12 +27,6 @@ export interface SocketRoom {
 	leave: () => void;
 }
 
-function toMap(value: unknown): Map<string, unknown> {
-	if (value instanceof Map) return value;
-	if (value && typeof value === "object") return new Map(Object.entries(value as Record<string, unknown>));
-	return new Map();
-}
-
 export function useRoomList(
 	networkManager: SocketNetworkManager | null,
 	refreshKey?: number
@@ -78,8 +72,8 @@ export function useSocketRoom(
 				currentPhase: (s.phase as string) || GamePhase.DEPLOYMENT,
 				turnCount: (s.turnCount as number) || 1,
 				activeFaction: (s.activeFaction as string) || Faction.PLAYER,
-				tokens: toMap(s.tokens) as Map<string, CombatToken>,
-				players: toMap(s.players) as Map<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>,
+				tokens: (s.tokens as Record<string, CombatToken>) || {},
+				players: (s.players as Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>) || {},
 			};
 			stateRef.current = newState;
 			setRoomState(newState);
@@ -97,42 +91,42 @@ export function useSocketRoom(
 				const [rootKey, ...restPath] = path;
 
 				if (rootKey === "tokens") {
-					newState.tokens = new Map(newState.tokens);
+					newState.tokens = { ...newState.tokens };
 					if (restPath.length === 0) {
 						if (patch.op === "add" && patch.value) {
 							const token = patch.value as CombatToken;
-							newState.tokens.set(token.$id, token);
+							newState.tokens[token.$id] = token;
 						}
 					} else {
 						const tokenId = String(restPath[0]);
 						if (patch.op === "remove") {
-							newState.tokens.delete(tokenId);
+							delete newState.tokens[tokenId];
 						} else {
-							const existing = newState.tokens.get(tokenId);
+							const existing = newState.tokens[tokenId];
 							if (existing) {
 								const updated = applyPatchToToken(existing, restPath.slice(1), patch);
-								newState.tokens.set(tokenId, updated);
+								newState.tokens[tokenId] = updated;
 							} else if (patch.op === "add" && patch.value) {
-								newState.tokens.set(tokenId, patch.value as CombatToken);
+								newState.tokens[tokenId] = patch.value as CombatToken;
 							}
 						}
 					}
 				} else if (rootKey === "players") {
-					newState.players = new Map(newState.players);
+					newState.players = { ...newState.players };
 					if (restPath.length === 0) {
 						if (patch.op === "add" && patch.value) {
 							const player = patch.value as { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean };
-							newState.players.set(player.sessionId, player);
+							newState.players[player.sessionId] = player;
 						}
 					} else {
 						const playerId = String(restPath[0]);
 						if (patch.op === "remove") {
-							newState.players.delete(playerId);
+							delete newState.players[playerId];
 						} else {
-							const existing = newState.players.get(playerId);
+							const existing = newState.players[playerId];
 							if (existing) {
 								const updated = applyPatchToPlayer(existing, restPath.slice(1), patch);
-								newState.players.set(playerId, updated);
+								newState.players[playerId] = updated;
 							}
 						}
 					}
@@ -240,9 +234,9 @@ export function useTokens(room: SocketRoom | null): Array<CombatToken & { id: st
 		}
 
 		const tokenArray: Array<CombatToken & { id: string }> = [];
-		room.state.tokens.forEach((token, tokenId) => {
+		for (const [tokenId, token] of Object.entries(room.state.tokens)) {
 			tokenArray.push({ ...token, id: token.$id ?? tokenId });
-		});
+		}
 		setTokens(tokenArray);
 	}, [room?.state?.tokens]);
 

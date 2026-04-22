@@ -119,8 +119,9 @@ export const HangarPanel: React.FC<HangarPanelProps> = ({
 		}
 
 		try {
-			await room.send("dm:spawn", {
-				token: ship.sourceShip!,
+			await room.send("edit:token", {
+				action: "spawn",
+				token: ship.sourceShip,
 				faction: "PLAYER",
 				position: { x: cursorPosition.x, y: cursorPosition.y },
 			});

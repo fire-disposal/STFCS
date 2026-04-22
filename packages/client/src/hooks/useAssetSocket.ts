@@ -1,7 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { Socket } from "socket.io-client";
 import type {
-	AssetType,
 	WsPayload,
 	AssetListItem,
 } from "@vt/data";
@@ -17,7 +16,7 @@ interface AssetBatchGetResult {
 }
 
 export function useAssetSocket(socket: Socket | null) {
-	const pendingRequests = useRef<Map<string, { resolve: Function; reject: Function }>>(new Map());
+	const pendingRequests = useRef<Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>>(new Map());
 
 	const sendRequest = useCallback(
 		<T>(event: string, payload: unknown): Promise<T> => {
@@ -28,7 +27,7 @@ export function useAssetSocket(socket: Socket | null) {
 			const requestId = crypto.randomUUID();
 
 			return new Promise<T>((resolve, reject) => {
-				pendingRequests.current.set(requestId, { resolve, reject });
+				pendingRequests.current.set(requestId, { resolve: resolve as (value: unknown) => void, reject });
 
 				socket.emit("request", { event, requestId, payload });
 
@@ -58,10 +57,10 @@ export function useAssetSocket(socket: Socket | null) {
 	}, []);
 
 	const upload = useCallback(
-		async (type: AssetType, file: File): Promise<string> => {
+		async (type: "avatar" | "ship_texture" | "weapon_texture", file: File): Promise<string> => {
 			const limits = ASSET_LIMITS[type];
 
-			if (!limits.allowedMimeTypes.includes(file.type as any)) {
+			if (!limits.allowedMimeTypes.includes(file.type as "image/png" | "image/jpeg" | "image/gif")) {
 				throw new Error(`不支持的格式: ${limits.allowedMimeTypes.join(", ")}`);
 			}
 
@@ -86,26 +85,27 @@ export function useAssetSocket(socket: Socket | null) {
 	);
 
 	const list = useCallback(
-		async (type?: AssetType, ownerId?: string): Promise<AssetListItem[]> => {
-			const payload: WsPayload<"asset:list"> = { type, ownerId };
-			const result = await sendRequest<{ assets: AssetListItem[] }>("asset:list", payload);
-			return result.assets;
+		async (type?: "avatar" | "ship_texture" | "weapon_texture", ownerId?: string): Promise<AssetListItem[]> => {
+			const payload: WsPayload<"asset:action"> = { action: "list", type, ownerId };
+			const result = await sendRequest<{ assets: AssetListItem[] }>("asset:action", payload);
+			return result.assets ?? [];
 		},
 		[sendRequest]
 	);
 
 	const batchGet = useCallback(
 		async (assetIds: string[], includeData = false): Promise<AssetBatchGetResult[]> => {
-			const payload: WsPayload<"asset:batch_get"> = { assetIds, includeData };
-			const result = await sendRequest<{ results: AssetBatchGetResult[] }>("asset:batch_get", payload);
-			return result.results;
+			const payload: WsPayload<"asset:action"> = { action: "batch_get", assetIds, includeData };
+			const result = await sendRequest<{ results: AssetBatchGetResult[] }>("asset:action", payload);
+			return result.results ?? [];
 		},
 		[sendRequest]
 	);
 
 	const deleteAsset = useCallback(
 		async (assetId: string): Promise<void> => {
-			await sendRequest("asset:delete", { assetId });
+			const payload: WsPayload<"asset:action"> = { action: "delete", assetId };
+			await sendRequest("asset:action", payload);
 		},
 		[sendRequest]
 	);
@@ -141,7 +141,14 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 	});
 }
 
-export const ASSET_LIMITS = {
+export const ASSET_LIMITS: Record<"avatar" | "ship_texture" | "weapon_texture", {
+	allowedMimeTypes: string[];
+	maxFileSize: number;
+	minWidth: number;
+	maxWidth: number;
+	minHeight: number;
+	maxHeight: number;
+}> = {
 	avatar: {
 		allowedMimeTypes: ["image/png", "image/jpeg", "image/gif"],
 		maxFileSize: 512 * 1024,
@@ -166,4 +173,4 @@ export const ASSET_LIMITS = {
 		minHeight: 32,
 		maxHeight: 256,
 	},
-} as const;
+};
