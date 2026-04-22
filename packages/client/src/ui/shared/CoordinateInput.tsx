@@ -153,8 +153,7 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
 	);
 
 	// 处理粘贴
-	const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
-		// 允许默认粘贴行为，然后在 onChange 中处理
+	const handlePaste = useCallback((_e: React.ClipboardEvent<HTMLInputElement>) => {
 		setState("EDITING");
 	}, []);
 

@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from "react";
-import { ChevronUp, ChevronDown, Info, Move, Crosshair, Shield, Edit, Eye } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { Box, Flex, IconButton, Tabs, Text, Tooltip } from "@radix-ui/themes";
 import "./battle-panel.css";
 

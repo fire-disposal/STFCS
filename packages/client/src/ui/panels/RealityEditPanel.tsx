@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { Edit, RotateCcw, Save, Eye, EyeOff } from "lucide-react";
+import { RotateCcw, Save } from "lucide-react";
 import { Badge, Box, Button, Flex, Switch, Text, TextField } from "@radix-ui/themes";
 import type { ShipViewModel } from "@/renderer";
 import type { TokenRuntime } from "@vt/data";

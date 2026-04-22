@@ -11,10 +11,9 @@ import "./battle-panel.css";
 
 export interface ShipInfoPanelProps {
 	ship: ShipViewModel | null;
-	canControl: boolean;
 }
 
-export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, canControl }) => {
+export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship }) => {
 	const hasShip = ship && ship.runtime;
 
 	const name = hasShip ? (ship.metadata?.name ?? ship.id.slice(-6)) : "未选择";
