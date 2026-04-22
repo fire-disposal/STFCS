@@ -646,10 +646,10 @@ rpc.namespace("edit", {
     const room = ctx.room!;
     
     switch (p.action) {
-      case "spawn": {
+      case "create": {
         if (!p.token) throw err("需要 token 数据", "TOKEN_DATA_REQUIRED");
         const tokenId = p.token.$id || `token_${Date.now()}`;
-        const spawnToken: CombatToken = {
+        const createToken: CombatToken = {
           ...p.token,
           runtime: {
             ...p.token.runtime,
@@ -659,7 +659,7 @@ rpc.namespace("edit", {
             ownerId: p.token.runtime?.ownerId ?? ctx.playerId,
           } as any,
         };
-        ctx.state.setToken(tokenId, spawnToken, ctx.editLogContext(p.reason ?? "生成舰船"));
+        ctx.state.setToken(tokenId, createToken, ctx.editLogContext(p.reason ?? "创建舰船"));
         return { tokenId };
       }
       case "modify": {

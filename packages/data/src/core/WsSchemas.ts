@@ -366,7 +366,7 @@ export type GameQueryPayload = z.infer<typeof GameQueryDef.payload>
 
 export const EditTokenDef = {
   payload: z.object({
-    action: z.enum(["spawn", "modify", "remove", "heal", "damage", "restore", "reset"]),
+    action: z.enum(["create", "modify", "remove", "heal", "damage", "restore", "reset"]),
     tokenId: z.string().optional(),
     token: CombatTokenSchema.optional(),
     path: z.string().optional(),
