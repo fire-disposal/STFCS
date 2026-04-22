@@ -19,17 +19,13 @@ import {
     DamageType,
     HullSize,
     ShipClass,
-    TokenJSONSchema,
-    WeaponJSONSchema,
     WeaponSlotSize,
     WeaponTag,
     isWeaponSizeCompatible,
-    type TokenJSON,
+    type InventoryToken,
     type WeaponJSON,
-    type AssetType,
     type ShipBuild,
     type WeaponBuild,
-    type InventoryToken,
 } from "@vt/data";
 import { Plus, Save, Upload, WandSparkles, Wrench, Copy, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
@@ -70,45 +66,43 @@ function clone<T>(value: T): T {
     return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizeTokenJSON(input: unknown): TokenJSON | null {
-    const raw = (input as any)?.data ?? input;
-    const direct = TokenJSONSchema.safeParse(raw);
-    if (direct.success) return direct.data;
-
-    if (raw && typeof raw === "object") {
-        const obj = raw as Record<string, unknown>;
-        if (obj.ship) {
-            const legacy = {
-                ...obj,
-                $schema: "token-v2",
-                token: obj.ship,
-            };
-            delete (legacy as any).ship;
-            const migrated = TokenJSONSchema.safeParse(legacy);
-            if (migrated.success) return migrated.data;
-        }
-        if (obj.spec) {
-            const converted = {
-                ...obj,
-                token: obj.spec,
-            };
-            const migrated = TokenJSONSchema.safeParse(converted);
-            if (migrated.success) return migrated.data;
-        }
+function normalizeInventoryToken(input: unknown): InventoryToken | null {
+    if (!input || typeof input !== "object") return null;
+    const raw = (input as { data?: unknown })?.data ?? input;
+    if (!raw || typeof raw !== "object") return null;
+    
+    const obj = raw as Record<string, unknown>;
+    if (obj.$id && obj.spec) {
+        return {
+            $id: obj.$id as string,
+            $presetRef: obj.$presetRef as string | undefined,
+            spec: obj.spec as InventoryToken["spec"],
+            metadata: (obj.metadata as InventoryToken["metadata"]) ?? { name: obj.$id as string },
+        };
     }
-
     return null;
 }
 
 function normalizeWeaponJSON(input: unknown): WeaponJSON | null {
-    const raw = (input as any)?.data ?? input;
-    const parsed = WeaponJSONSchema.safeParse(raw);
-    return parsed.success ? parsed.data : null;
+    if (!input || typeof input !== "object") return null;
+    const raw = (input as { data?: unknown })?.data ?? input;
+    if (!raw || typeof raw !== "object") return null;
+    
+    const obj = raw as Record<string, unknown>;
+    if (obj.$id && obj.spec) {
+        return {
+            $id: obj.$id as string,
+            spec: obj.spec as WeaponJSON["spec"],
+            runtime: obj.runtime as WeaponJSON["runtime"] | undefined,
+            metadata: (obj.metadata as WeaponJSON["metadata"]) ?? { name: obj.$id as string },
+        };
+    }
+    return null;
 }
 
-function ensureShipDefaults(token: TokenJSON): TokenJSON {
+function ensureShipDefaults(token: InventoryToken): InventoryToken {
     const next = clone(token);
-    next.token.mounts = next.token.mounts ?? [];
+    next.spec.mounts = next.spec.mounts ?? [];
     next.metadata = next.metadata ?? { name: next.$id };
     return next;
 }
@@ -193,12 +187,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const [shipBuilds, setShipBuilds] = useState<ShipBuildRecord[]>([]);
     const [weaponBuilds, setWeaponBuilds] = useState<WeaponBuildRecord[]>([]);
-    const [shipPresets, setShipPresets] = useState<TokenJSON[]>([]);
+    const [shipPresets, setShipPresets] = useState<InventoryToken[]>([]);
     const [weaponPresets, setWeaponPresets] = useState<WeaponJSON[]>([]);
 
     const [selectedShipBuildId, setSelectedShipBuildId] = useState<string | null>(null);
     const [selectedWeaponBuildId, setSelectedWeaponBuildId] = useState<string | null>(null);
-    const [shipDraft, setShipDraft] = useState<TokenJSON | null>(null);
+    const [shipDraft, setShipDraft] = useState<InventoryToken | null>(null);
     const [weaponDraft, setWeaponDraft] = useState<WeaponJSON | null>(null);
     const [shipRawJson, setShipRawJson] = useState("");
     const [weaponRawJson, setWeaponRawJson] = useState("");
@@ -278,8 +272,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                 isPreset: w.isPreset,
             }));
             const nextShipPresets = (shipPresetRes?.presets ?? [])
-                .map((item: unknown) => normalizeTokenJSON(item))
-                .filter((item: TokenJSON | null): item is TokenJSON => Boolean(item));
+                .map((item: unknown) => normalizeInventoryToken(item))
+                .filter((item: InventoryToken | null): item is InventoryToken => Boolean(item));
             const nextWeaponPresets = (weaponPresetRes?.presets ?? [])
                 .map((item: unknown) => normalizeWeaponJSON(item))
                 .filter((item: WeaponJSON | null): item is WeaponJSON => Boolean(item));
@@ -325,7 +319,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             return;
         }
 
-        const parsed = normalizeTokenJSON(selected.data);
+        const parsed = normalizeInventoryToken(selected.data);
         if (!parsed) {
             notify.error(`舰船 ${selected.id} 数据不符合 schema`);
             return;
@@ -334,7 +328,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         const normalized = ensureShipDefaults(parsed);
         setShipDraft(normalized);
         setShipRawJson(JSON.stringify(normalized, null, 2));
-        setMountSelection(normalized.token.mounts?.[0]?.id ?? "");
+        setMountSelection(normalized.spec.mounts?.[0]?.id ?? "");
     }, [shipBuilds, selectedShipBuildId]);
 
     useEffect(() => {
@@ -357,8 +351,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     }, [weaponBuilds, selectedWeaponBuildId]);
 
     const selectedMount = useMemo(() => {
-        if (!shipDraft?.token.mounts?.length || !mountSelection) return null;
-        return shipDraft.token.mounts.find((item) => item.id === mountSelection) ?? null;
+        if (!shipDraft?.spec.mounts?.length || !mountSelection) return null;
+        return shipDraft.spec.mounts.find((item: { id: string }) => item.id === mountSelection) ?? null;
     }, [shipDraft, mountSelection]);
 
     const compatibleWeapons = useMemo(() => {
@@ -370,7 +364,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         });
     }, [selectedMount, weaponBuilds]);
 
-    const updateShipDraft = useCallback((updater: (draft: TokenJSON) => void) => {
+    const updateShipDraft = useCallback((updater: (draft: InventoryToken) => void) => {
         setShipDraft((prev) => {
             if (!prev) return prev;
             const next = clone(prev);
@@ -393,14 +387,15 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const validateShipRaw = useCallback(() => {
         try {
             const parsed = JSON.parse(shipRawJson);
-            const result = TokenJSONSchema.safeParse(parsed);
-            if (!result.success) {
-                notify.error(result.error.issues[0]?.message ?? "舰船 JSON 校验失败");
+            const normalized = normalizeInventoryToken(parsed);
+            if (!normalized) {
+                notify.error("舰船 JSON 数据格式不正确");
                 return;
             }
-            setShipDraft(result.data);
-            setShipRawJson(JSON.stringify(result.data, null, 2));
-            notify.success("舰船 JSON 通过 Zod 校验");
+            const withDefaults = ensureShipDefaults(normalized);
+            setShipDraft(withDefaults);
+            setShipRawJson(JSON.stringify(withDefaults, null, 2));
+            notify.success("舰船 JSON 校验通过");
         } catch {
             notify.error("舰船 JSON 解析失败");
         }
@@ -409,14 +404,15 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const validateWeaponRaw = useCallback(() => {
         try {
             const parsed = JSON.parse(weaponRawJson);
-            const result = WeaponJSONSchema.safeParse(parsed);
-            if (!result.success) {
-                notify.error(result.error.issues[0]?.message ?? "武器 JSON 校验失败");
+            const normalized = normalizeWeaponJSON(parsed);
+            if (!normalized) {
+                notify.error("武器 JSON 数据格式不正确");
                 return;
             }
-            setWeaponDraft(result.data);
-            setWeaponRawJson(JSON.stringify(result.data, null, 2));
-            notify.success("武器 JSON 通过 Zod 校验");
+            const withDefaults = ensureWeaponDefaults(normalized);
+            setWeaponDraft(withDefaults);
+            setWeaponRawJson(JSON.stringify(withDefaults, null, 2));
+            notify.success("武器 JSON 校验通过");
         } catch {
             notify.error("武器 JSON 解析失败");
         }
@@ -424,23 +420,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const saveShip = useCallback(async () => {
         if (!shipDraft || !selectedShipBuildId) return;
-        const valid = TokenJSONSchema.safeParse(shipDraft);
-        if (!valid.success) {
-            notify.error(valid.error.issues[0]?.message ?? "舰船数据不合法");
-            return;
-        }
-
         try {
-            const inventoryToken: InventoryToken = {
-                $id: valid.data.$id,
-                $presetRef: valid.data.$presetRef,
-                spec: valid.data.token,
-                metadata: valid.data.metadata,
-            };
             await networkManager.send("customize:token", {
                 action: "upsert",
                 tokenId: selectedShipBuildId,
-                token: inventoryToken,
+                token: shipDraft,
             });
             notify.success("舰船已保存");
             await reloadData();
@@ -451,17 +435,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const saveWeapon = useCallback(async () => {
         if (!weaponDraft || !selectedWeaponBuildId) return;
-        const valid = WeaponJSONSchema.safeParse(weaponDraft);
-        if (!valid.success) {
-            notify.error(valid.error.issues[0]?.message ?? "武器数据不合法");
-            return;
-        }
-
         try {
             await networkManager.send("customize:weapon", {
                 action: "upsert",
                 weaponId: selectedWeaponBuildId,
-                weapon: valid.data,
+                weapon: weaponDraft,
             });
             notify.success("武器已保存");
             await reloadData();
@@ -500,8 +478,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         if (!shipDraft) return;
 
         updateShipDraft((draft) => {
-            draft.token.texture = {
-                ...draft.token.texture,
+            draft.spec.texture = {
+                ...draft.spec.texture,
                 assetId,
             };
         });
@@ -516,6 +494,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             setTexturePreviewDataUrl(null);
         }
     }, [assetSocket, shipDraft, updateShipDraft]);
+
+    type AssetType = "avatar" | "ship_texture" | "weapon_texture";
 
     const uploadTexture = useCallback(async (assetType: AssetType, file: File, useColorKey: boolean) => {
         try {
@@ -588,7 +568,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Select.Trigger style={{ width: 240 }} />
                                                     <Select.Content>
                                                         {shipBuilds.map((item) => {
-                                                            const parsed = normalizeTokenJSON(item.data);
+                                                            const parsed = normalizeInventoryToken(item.data);
                                                             return (
                                                                 <Select.Item key={item.id} value={item.id}>
                                                                     {parsed?.metadata?.name ?? idLabel(item.id)}
@@ -610,7 +590,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                             <Flex direction="column" gap="2">
                                                 <Select.Root
-                                                    value={shipDraft?.token.texture?.assetId ?? ""}
+                                                    value={shipDraft?.spec.texture?.assetId ?? ""}
                                                     onValueChange={(id) => {
                                                         if (!id) return;
                                                         void setTextureAssetForShip(id);
@@ -631,10 +611,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             type="range"
                                                             min={-200}
                                                             max={200}
-                                                            value={shipDraft?.token.texture?.offsetX ?? 0}
+                                                            value={shipDraft?.spec.texture?.offsetX ?? 0}
                                                             onChange={(e) => updateShipDraft((d) => {
-                                                                d.token.texture = {
-                                                                    ...d.token.texture,
+                                                                d.spec.texture = {
+                                                                    ...d.spec.texture,
                                                                     offsetX: Number(e.target.value),
                                                                 };
                                                             })}
@@ -646,10 +626,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             type="range"
                                                             min={-200}
                                                             max={200}
-                                                            value={shipDraft?.token.texture?.offsetY ?? 0}
+                                                            value={shipDraft?.spec.texture?.offsetY ?? 0}
                                                             onChange={(e) => updateShipDraft((d) => {
-                                                                d.token.texture = {
-                                                                    ...d.token.texture,
+                                                                d.spec.texture = {
+                                                                    ...d.spec.texture,
                                                                     offsetY: Number(e.target.value),
                                                                 };
                                                             })}
@@ -662,10 +642,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             min={0.2}
                                                             max={4}
                                                             step={0.01}
-                                                            value={shipDraft?.token.texture?.scale ?? 1}
+                                                            value={shipDraft?.spec.texture?.scale ?? 1}
                                                             onChange={(e) => updateShipDraft((d) => {
-                                                                d.token.texture = {
-                                                                    ...d.token.texture,
+                                                                d.spec.texture = {
+                                                                    ...d.spec.texture,
                                                                     scale: Number(e.target.value),
                                                                 };
                                                             })}
@@ -697,12 +677,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                         <Card>
                                             <Text size="2" weight="bold" mb="2">挂点武器挂载</Text>
-                                            {shipDraft?.token.mounts?.length ? (
+                                            {shipDraft?.spec.mounts?.length ? (
                                                 <Flex direction="column" gap="2">
                                                     <Select.Root value={mountSelection} onValueChange={setMountSelection}>
                                                         <Select.Trigger />
                                                         <Select.Content>
-                                                            {shipDraft.token.mounts.map((mount) => (
+                                                            {shipDraft.spec.mounts.map((mount: { id: string; displayName?: string; size: string }) => (
                                                                 <Select.Item key={mount.id} value={mount.id}>{mount.displayName ?? mount.id} ({mount.size})</Select.Item>
                                                             ))}
                                                         </Select.Content>
@@ -721,7 +701,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 return;
                                                             }
                                                             updateShipDraft((draft) => {
-                                                                const mount = draft.token.mounts?.find((m) => m.id === selectedMount.id);
+                                                                const mount = draft.spec.mounts?.find((m: { id: string }) => m.id === selectedMount.id);
                                                                 if (mount) {
                                                                     mount.weapon = parsed;
                                                                 }
@@ -742,7 +722,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Button variant="soft" color="gray" onClick={() => {
                                                         if (!selectedMount || !shipDraft) return;
                                                         updateShipDraft((draft) => {
-                                                            const mount = draft.token.mounts?.find((m) => m.id === selectedMount.id);
+                                                            const mount = draft.spec.mounts?.find((m: { id: string }) => m.id === selectedMount.id);
                                                             if (mount) {
                                                                 mount.weapon = undefined;
                                                             }
@@ -788,29 +768,29 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     </Grid>
 
                                                     <Grid columns="4" gap="2">
-                                                        <Select.Root value={shipDraft.token.size} onValueChange={(v) => updateShipDraft((d) => { d.token.size = v as any; })}>
+                                                        <Select.Root value={shipDraft.spec.size} onValueChange={(v) => updateShipDraft((d) => { d.spec.size = v as any; })}>
                                                             <Select.Trigger />
                                                             <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
-                                                        <Select.Root value={shipDraft.token.class} onValueChange={(v) => updateShipDraft((d) => { d.token.class = v as any; })}>
+                                                        <Select.Root value={shipDraft.spec.class} onValueChange={(v) => updateShipDraft((d) => { d.spec.class = v as any; })}>
                                                             <Select.Trigger />
                                                             <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
-                                                        <TextField.Root type="number" value={String(shipDraft.token.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.token.width = Number(e.target.value) || 40; })} placeholder="宽度" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.token.length = Number(e.target.value) || 60; })} placeholder="长度" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.spec.width = Number(e.target.value) || 40; })} placeholder="宽度" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.spec.length = Number(e.target.value) || 60; })} placeholder="长度" />
                                                     </Grid>
 
                                                     <Grid columns="4" gap="2">
-                                                        <TextField.Root type="number" value={String(shipDraft.token.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.token.maxHitPoints = Number(e.target.value) || 0; })} placeholder="最大船体" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.armorMaxPerQuadrant)} onChange={(e) => updateShipDraft((d) => { d.token.armorMaxPerQuadrant = Number(e.target.value) || 0; })} placeholder="每象限护甲" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.token.fluxCapacity = Number(e.target.value) || 0; })} placeholder="辐能容量" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.token.fluxDissipation = Number(e.target.value) || 0; })} placeholder="辐能散耗" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.spec.maxHitPoints = Number(e.target.value) || 0; })} placeholder="最大船体" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.armorMaxPerQuadrant)} onChange={(e) => updateShipDraft((d) => { d.spec.armorMaxPerQuadrant = Number(e.target.value) || 0; })} placeholder="每象限护甲" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxCapacity = Number(e.target.value) || 0; })} placeholder="辐能容量" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxDissipation = Number(e.target.value) || 0; })} placeholder="辐能散耗" />
                                                     </Grid>
 
                                                     <Grid columns="3" gap="2">
-                                                        <TextField.Root type="number" value={String(shipDraft.token.maxSpeed)} onChange={(e) => updateShipDraft((d) => { d.token.maxSpeed = Number(e.target.value) || 0; })} placeholder="最大速度" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.maxTurnRate)} onChange={(e) => updateShipDraft((d) => { d.token.maxTurnRate = Number(e.target.value) || 0; })} placeholder="转向速率" />
-                                                        <TextField.Root type="number" value={String(shipDraft.token.rangeModifier)} onChange={(e) => updateShipDraft((d) => { d.token.rangeModifier = Number(e.target.value) || 1; })} placeholder="射程系数" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxSpeed)} onChange={(e) => updateShipDraft((d) => { d.spec.maxSpeed = Number(e.target.value) || 0; })} placeholder="最大速度" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxTurnRate)} onChange={(e) => updateShipDraft((d) => { d.spec.maxTurnRate = Number(e.target.value) || 0; })} placeholder="转向速率" />
+                                                        <TextField.Root type="number" value={String(shipDraft.spec.rangeModifier)} onChange={(e) => updateShipDraft((d) => { d.spec.rangeModifier = Number(e.target.value) || 1; })} placeholder="射程系数" />
                                                     </Grid>
 
                                                     <Separator size="4" />
@@ -819,24 +799,24 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Button
                                                             variant="soft"
                                                             onClick={() => updateShipDraft((d) => {
-                                                                d.token.shield = d.token.shield
+                                                                d.spec.shield = d.spec.shield
                                                                     ? undefined
                                                                     : { arc: 360, radius: 50, efficiency: 1, upkeep: 0 };
                                                             })}
                                                         >
-                                                            {shipDraft.token.shield ? "禁用护盾" : "启用护盾"}
+                                                            {shipDraft.spec.shield ? "禁用护盾" : "启用护盾"}
                                                         </Button>
-                                                        {!shipDraft.token.shield && <Badge color="gray">NONE</Badge>}
-                                                        {shipDraft.token.shield && shipDraft.token.shield.arc >= 360 && <Badge color="blue">全向</Badge>}
-                                                        {shipDraft.token.shield && shipDraft.token.shield.arc < 360 && <Badge color="orange">定向</Badge>}
+                                                        {!shipDraft.spec.shield && <Badge color="gray">NONE</Badge>}
+                                                        {shipDraft.spec.shield && shipDraft.spec.shield.arc >= 360 && <Badge color="blue">全向</Badge>}
+                                                        {shipDraft.spec.shield && shipDraft.spec.shield.arc < 360 && <Badge color="orange">定向</Badge>}
                                                     </Flex>
 
-                                                    {shipDraft.token.shield && (
+                                                    {shipDraft.spec.shield && (
                                                         <Grid columns="4" gap="2">
-                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.arc = Number(e.target.value) || 0; })} placeholder="护盾角度" />
-                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.radius = Number(e.target.value) || 0; })} placeholder="护盾半径" />
-                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.efficiency = Number(e.target.value) || 1; })} placeholder="效率" />
-                                                            <TextField.Root type="number" value={String(shipDraft.token.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.token.shield) d.token.shield.upkeep = Number(e.target.value) || 0; })} placeholder="维持" />
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.arc = Number(e.target.value) || 0; })} placeholder="护盾角度" />
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.radius = Number(e.target.value) || 0; })} placeholder="护盾半径" />
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.efficiency = Number(e.target.value) || 1; })} placeholder="效率" />
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.upkeep = Number(e.target.value) || 0; })} placeholder="维持" />
                                                         </Grid>
                                                     )}
                                                 </Flex>
@@ -856,7 +836,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             <Flex justify="between" align="center" mt="2">
                                                 <Flex align="center" gap="2">
                                                     <AlertCircle size={14} />
-                                                    <Text size="1" color="gray">原始 JSON 支持复制粘贴，提交前会使用 TokenJSONSchema 进行权威校验。</Text>
+                                                    <Text size="1" color="gray">原始 JSON 支持复制粘贴，提交前会校验数据结构。</Text>
                                                 </Flex>
                                                 <Button onClick={() => void saveShip()}><Save size={14} /> 保存舰船</Button>
                                             </Flex>
@@ -871,7 +851,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Flex key={preset.$id} justify="between" align="center" className="ship-customization-modal__ship-item">
                                                         <Box>
                                                             <Text size="2">{preset.metadata.name}</Text>
-                                                            <Text size="1" color="gray">{preset.token.size} / {preset.token.class}</Text>
+                                                            <Text size="1" color="gray">{preset.spec.size} / {preset.spec.class}</Text>
                                                         </Box>
                                                         <Button size="1" variant="soft" onClick={() => void copyShipPreset(preset.$id)}><Plus size={12} /> 复制</Button>
                                                     </Flex>

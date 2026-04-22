@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Rectangle } from "pixi.js";
 import { Faction } from "@vt/data";
-import type { TokenJSON } from "@vt/data";
+import type { InventoryToken } from "@vt/data";
 import type { LayerRegistry, ShipViewModel } from "@/renderer";
 import { useLayerSystem, useShipRendering } from "@/renderer";
 import { useCanvasResize } from "@/renderer/core/useCanvasResize";
 
 interface MiniShipPreviewProps {
-    token: TokenJSON | null;
+    token: InventoryToken | null;
     zoom: number;
     onZoomChange: (value: number) => void;
     texturePreviewUrl?: string | null;
@@ -94,9 +94,9 @@ function createLayers(app: any): LayerRegistry {
     };
 }
 
-function toPreviewShip(token: TokenJSON): ShipViewModel {
-    const spec = token.token ?? token.spec;
-    const runtime = token.runtime ?? {
+function toPreviewShip(token: InventoryToken): ShipViewModel {
+    const spec = token.spec;
+    const runtime = {
         position: { x: 0, y: 0 },
         heading: 0,
         hull: spec.maxHitPoints,
@@ -141,7 +141,7 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
         return [toPreviewShip(token)];
     }, [token]);
 
-    const texture = token?.token.texture;
+    const texture = token?.spec.texture;
     const textureStyle = useMemo(() => {
         const s = texture?.scale ?? 1;
         const ox = texture?.offsetX ?? 0;
