@@ -276,7 +276,7 @@ export class ShipHUDManager {
 
 		const centerStyle = new TextStyle({
 			fill: hpColor,
-			fontSize: 14,
+			fontSize: 16,
 			fontFamily: "monospace",
 			fontWeight: "600",
 		});

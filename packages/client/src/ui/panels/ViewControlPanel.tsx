@@ -23,6 +23,19 @@ import { Button, Flex, Box, Text, IconButton } from "@radix-ui/themes";
 import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
+type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "fx" | "icons" | "armor";
+
+const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }> = [
+	{ key: "grid", icon: Grid3X3, label: "网格" },
+	{ key: "bg", icon: Image, label: "背景" },
+	{ key: "arcs", icon: Crosshair, label: "武器弧" },
+	{ key: "move", icon: Navigation2, label: "移动范围" },
+	{ key: "labels", icon: Tag, label: "舰船标签" },
+	{ key: "fx", icon: Sparkles, label: "特效" },
+	{ key: "icons", icon: Monitor, label: "舰船图标" },
+	{ key: "armor", icon: Shield, label: "护甲六边形" },
+];
+
 export const ViewControlPanel: React.FC = () => {
 	const {
 		zoom,
@@ -49,6 +62,28 @@ export const ViewControlPanel: React.FC = () => {
 		toggleHexagonArmor,
 	} = useUIStore();
 
+	const layerStates: Record<LayerKey, boolean> = {
+		grid: showGrid,
+		bg: showBackground,
+		arcs: showWeaponArcs,
+		move: showMovementRange,
+		labels: showLabels,
+		fx: showEffects,
+		icons: showShipIcons,
+		armor: showHexagonArmor,
+	};
+
+	const layerToggles: Record<LayerKey, () => void> = {
+		grid: toggleGrid,
+		bg: toggleBackground,
+		arcs: toggleWeaponArcs,
+		move: toggleMovementRange,
+		labels: toggleLabels,
+		fx: toggleEffects,
+		icons: toggleShipIcons,
+		armor: toggleHexagonArmor,
+	};
+
 	const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));
 	const handleZoomOut = () => setZoom(Math.max(zoom / 1.2, 0.5));
 	const handleZoomReset = () => setZoom(1);
@@ -63,19 +98,8 @@ export const ViewControlPanel: React.FC = () => {
 		setZoom(1);
 	};
 
-	const viewToggles = [
-		{ key: "grid", icon: <Grid3X3 size={12} />, label: "网格", active: showGrid, toggle: toggleGrid },
-		{ key: "bg", icon: <Image size={12} />, label: "背景", active: showBackground, toggle: toggleBackground },
-		{ key: "arcs", icon: <Crosshair size={12} />, label: "弧线", active: showWeaponArcs, toggle: toggleWeaponArcs },
-		{ key: "move", icon: <Navigation2 size={12} />, label: "范围", active: showMovementRange, toggle: toggleMovementRange },
-		{ key: "labels", icon: <Tag size={12} />, label: "标签", active: showLabels, toggle: toggleLabels },
-		{ key: "fx", icon: <Sparkles size={12} />, label: "特效", active: showEffects, toggle: toggleEffects },
-		{ key: "icons", icon: <Monitor size={12} />, label: "图标", active: showShipIcons, toggle: toggleShipIcons },
-		{ key: "armor", icon: <Shield size={12} />, label: "护甲", active: showHexagonArmor, toggle: toggleHexagonArmor },
-	];
-
 	return (
-		<Flex className="panel-row" gap="3">
+		<Flex className="panel-row" gap="3" style={{ width: "100%" }}>
 			<Flex className="panel-section" align="center" gap="2">
 				<Text size="1" color="gray">坐标</Text>
 				<Text size="1" weight="bold">({Math.round(cameraPosition.x)}, {Math.round(cameraPosition.y)})</Text>
@@ -117,19 +141,27 @@ export const ViewControlPanel: React.FC = () => {
 
 			<Box className="panel-divider" />
 
-			<Flex className="panel-section view-toggles-row" align="center" gap="1">
-				{viewToggles.map((t) => (
-					<Button
-						key={t.key}
-						size="1"
-						variant={t.active ? "solid" : "soft"}
-						color={t.active ? "blue" : "gray"}
-						onClick={t.toggle}
-						style={{ padding: "2px 4px" }}
-					>
-						{t.icon}
-					</Button>
-				))}
+			<Flex className="panel-section" align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
+				<Text size="1" weight="bold" color="gray">图层</Text>
+				<Flex gap="2" wrap="wrap">
+					{LAYER_CONFIG.map((layer) => {
+						const active = layerStates[layer.key];
+						const Icon = layer.icon;
+						return (
+							<Button
+								key={layer.key}
+								size="1"
+								variant={active ? "solid" : "outline"}
+								color={active ? "blue" : "gray"}
+								onClick={layerToggles[layer.key]}
+								style={{ minWidth: 60 }}
+							>
+								<Icon size={12} />
+								<Text size="1">{layer.label}</Text>
+							</Button>
+						);
+					})}
+				</Flex>
 			</Flex>
 
 			<Box className="panel-divider" />

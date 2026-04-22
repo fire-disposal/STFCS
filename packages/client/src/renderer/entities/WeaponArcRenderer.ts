@@ -1,21 +1,3 @@
-/**
- * WeaponArcRenderer - 武器射界与瞄准线渲染
- *
- * 职责：
- * 1. 渲染武器射界弧线（基于 mount.arc 和 mount.facing）
- * 2. 渲染射程范围圆（最大/最小射程）
- * 3. 渲染目标瞄准线（挂载点到有效目标）
- *
- * 渲染层：world.weaponArcs (zIndex 9)
- *
- * 数据来源：
- * - gameStateRef.room.send("game:query", { type: "targets", tokenId })
- * - uiStore.selectedShipId, showWeaponArcs
- *
- * 显示条件：
- * - 选中舰船 + showWeaponArcs=true + room已连接
- */
-
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { ShipViewModel } from "../types";
 import { Container, Graphics } from "pixi.js";
@@ -24,29 +6,23 @@ import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
 
 interface WeaponTargetInfo {
 	targetId: string;
-	targetName: string;
 	distance: number;
 	inRange: boolean;
 	inArc: boolean;
-	hitAngle: number;
-	targetQuadrant: number;
 }
 
 interface WeaponTargetingResult {
 	mountId: string;
-	weaponName: string;
 	range: number;
 	minRange: number;
 	arc: number;
 	mountFacing: number;
 	isAvailable: boolean;
-	uiStatus: string;
 	validTargets: WeaponTargetInfo[];
 }
 
 interface ShipTargetingResult {
 	shipId: string;
-	canAttack: boolean;
 	weapons: WeaponTargetingResult[];
 }
 
@@ -54,22 +30,21 @@ interface WeaponArcCache {
 	root: Container;
 	arcGraphics: Graphics;
 	rangeGraphics: Graphics;
-	aimLines: Graphics;
 	lastData?: {
-		mountId: string;
 		range: number;
 		minRange: number;
 		arc: number;
 		mountFacing: number;
-		targetCount: number;
 	};
+}
+
+interface AimLineCache {
+	graphics: Graphics;
+	lastTargets?: WeaponTargetInfo[];
 }
 
 const ARC_COLOR = 0x4fc3ff;
 const RANGE_COLOR = 0x3a8fdd;
-const AIM_LINE_COLOR = 0xff6b35;
-const VALID_TARGET_COLOR = 0x57e38d;
-const INVALID_TARGET_COLOR = 0xff5d7e;
 
 export function useWeaponArcRendering(
 	layers: LayerRegistry | null,
@@ -77,7 +52,8 @@ export function useWeaponArcRendering(
 	selectedShipId: string | null,
 	options: { show?: boolean } = {}
 ) {
-	const cacheRef = useRef<Map<string, WeaponArcCache>>(new Map());
+	const arcCacheRef = useRef<Map<string, WeaponArcCache>>(new Map());
+	const aimLineCacheRef = useRef<Map<string, AimLineCache>>(new Map());
 	const targetingDataRef = useRef<ShipTargetingResult | null>(null);
 	const pendingQueryRef = useRef(false);
 
@@ -92,13 +68,9 @@ export function useWeaponArcRendering(
 
 		pendingQueryRef.current = true;
 		try {
-			const result = await room.send("game:query", {
-				type: "targets",
-				tokenId: shipId,
-			});
+			const result = await room.send("game:query", { type: "targets", tokenId: shipId });
 			targetingDataRef.current = result.result as ShipTargetingResult;
-		} catch (error) {
-			console.warn("WeaponArcRenderer: Failed to fetch targets:", error);
+		} catch {
 			targetingDataRef.current = null;
 		} finally {
 			pendingQueryRef.current = false;
@@ -110,59 +82,83 @@ export function useWeaponArcRendering(
 			targetingDataRef.current = null;
 			return;
 		}
-
 		fetchTargets(selectedShipId);
 	}, [selectedShipId, show, fetchTargets]);
 
 	useEffect(() => {
-		if (!layers || !selectedShip || !show || !targetingDataRef.current) {
-			for (const [, cache] of cacheRef.current) {
-				if (cache.root.parent) {
-					cache.root.visible = false;
-				}
+		if (!layers || !selectedShip || !show) {
+			for (const [, cache] of arcCacheRef.current) {
+				cache.root.visible = false;
 			}
+			if (layers) layers.weaponArcs.visible = false;
 			return;
 		}
 
-		const cache = cacheRef.current;
 		const shipPosition = selectedShip.runtime?.position;
 		const shipHeading = selectedShip.runtime?.heading ?? 0;
-
 		if (!shipPosition) return;
 
 		const mounts = selectedShip.spec.mounts ?? [];
 		const currentMountIds = new Set(mounts.map((m) => m.id));
 
-		for (const [mountId, item] of cache) {
+		for (const [mountId, cache] of arcCacheRef.current) {
 			if (!currentMountIds.has(mountId)) {
-				layers.weaponArcs.removeChild(item.root);
-				cache.delete(mountId);
+				layers.weaponArcs.removeChild(cache.root);
+				arcCacheRef.current.delete(mountId);
 			}
 		}
 
-		for (const weapon of targetingDataRef.current.weapons) {
-			const mount = mounts.find((m) => m.id === weapon.mountId);
-			if (!mount) continue;
+		for (const mount of mounts) {
+			const weapon = mount.weapon;
+			if (!weapon) continue;
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
 			const mountFacing = (shipHeading + (mount.facing ?? 0)) * Math.PI / 180;
 
 			const offsetX = mountPos.x;
 			const offsetY = mountPos.y;
-			const worldX = shipPosition.x + offsetX * Math.cos(shipHeading * Math.PI / 180) - offsetY * Math.sin(shipHeading * Math.PI / 180);
-			const worldY = shipPosition.y + offsetX * Math.sin(shipHeading * Math.PI / 180) + offsetY * Math.cos(shipHeading * Math.PI / 180);
+			const cosH = Math.cos(shipHeading * Math.PI / 180);
+			const sinH = Math.sin(shipHeading * Math.PI / 180);
+			const worldX = shipPosition.x + offsetX * cosH - offsetY * sinH;
+			const worldY = shipPosition.y + offsetX * sinH + offsetY * cosH;
 
-			const cached = cache.get(weapon.mountId);
+			const range = weapon.spec.range;
+			const minRange = weapon.spec.minRange ?? 0;
+			const arc = mount.arc ?? 360;
+
+			const cached = arcCacheRef.current.get(mount.id);
 			if (!cached) {
-				createWeaponArc(layers, cache, weapon, worldX, worldY, mountFacing, ships);
-				continue;
+				createWeaponArc(layers, arcCacheRef.current, mount.id, worldX, worldY, mountFacing, range, minRange, arc);
+			} else if (shouldUpdateArc(cached, range, minRange, arc, mountFacing)) {
+				updateWeaponArc(cached, worldX, worldY, mountFacing, range, minRange, arc);
 			}
 
-			if (shouldUpdate(cached, weapon)) {
-				updateWeaponArc(cached, weapon, worldX, worldY, mountFacing, ships);
-			}
+			const finalCached = arcCacheRef.current.get(mount.id);
+			if (finalCached) finalCached.root.visible = true;
+		}
 
-			cached.root.visible = weapon.isAvailable;
+		if (targetingDataRef.current) {
+			for (const weapon of targetingDataRef.current.weapons) {
+				const mount = mounts.find((m) => m.id === weapon.mountId);
+				if (!mount) continue;
+
+				const mountPos = mount.position ?? { x: 0, y: 0 };
+				const mountFacing = (shipHeading + (mount.facing ?? 0)) * Math.PI / 180;
+				const cosH = Math.cos(shipHeading * Math.PI / 180);
+				const sinH = Math.sin(shipHeading * Math.PI / 180);
+				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH - (mountPos.y ?? 0) * sinH;
+				const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH + (mountPos.y ?? 0) * cosH;
+
+				const aimCached = aimLineCacheRef.current.get(weapon.mountId);
+				if (!aimCached) {
+					const graphics = new Graphics();
+					layers.weaponArcs.addChild(graphics);
+					aimLineCacheRef.current.set(weapon.mountId, { graphics });
+					drawAimLines(graphics, weapon, ships, worldX, worldY, mountFacing);
+				} else {
+					drawAimLines(aimCached.graphics, weapon, ships, worldX, worldY, mountFacing);
+				}
+			}
 		}
 
 		layers.weaponArcs.visible = show;
@@ -170,32 +166,32 @@ export function useWeaponArcRendering(
 
 	useEffect(() => {
 		return () => {
-			cacheRef.current.clear();
+			arcCacheRef.current.clear();
+			aimLineCacheRef.current.clear();
 		};
 	}, []);
 }
 
-function shouldUpdate(cached: WeaponArcCache, weapon: WeaponTargetingResult): boolean {
+function shouldUpdateArc(cached: WeaponArcCache, range: number, minRange: number, arc: number, mountFacing: number): boolean {
 	if (!cached.lastData) return true;
-
-	const last = cached.lastData;
 	return (
-		weapon.range !== last.range ||
-		weapon.minRange !== last.minRange ||
-		weapon.arc !== last.arc ||
-		weapon.mountFacing !== last.mountFacing ||
-		weapon.validTargets.length !== last.targetCount
+		range !== cached.lastData.range ||
+		minRange !== cached.lastData.minRange ||
+		arc !== cached.lastData.arc ||
+		mountFacing !== cached.lastData.mountFacing
 	);
 }
 
 function createWeaponArc(
 	layers: LayerRegistry,
 	cache: Map<string, WeaponArcCache>,
-	weapon: WeaponTargetingResult,
+	mountId: string,
 	worldX: number,
 	worldY: number,
 	mountFacing: number,
-	ships: ShipViewModel[]
+	range: number,
+	minRange: number,
+	arc: number
 ): void {
 	const root = new Container();
 	root.position.set(worldX, worldY);
@@ -207,58 +203,35 @@ function createWeaponArc(
 	const rangeGraphics = new Graphics();
 	root.addChild(rangeGraphics);
 
-	const aimLines = new Graphics();
-	root.addChild(aimLines);
-
-	drawWeaponArc(arcGraphics, weapon.arc, weapon.range);
-	drawRangeCircles(rangeGraphics, weapon.range, weapon.minRange);
-	drawAimLines(aimLines, weapon, ships, worldX, worldY, mountFacing);
+	drawWeaponArc(arcGraphics, arc, range);
+	drawRangeCircles(rangeGraphics, range, minRange);
 
 	layers.weaponArcs.addChild(root);
 
-	cache.set(weapon.mountId, {
+	cache.set(mountId, {
 		root,
 		arcGraphics,
 		rangeGraphics,
-		aimLines,
-		lastData: {
-			mountId: weapon.mountId,
-			range: weapon.range,
-			minRange: weapon.minRange,
-			arc: weapon.arc,
-			mountFacing: weapon.mountFacing,
-			targetCount: weapon.validTargets.length,
-		},
+		lastData: { range, minRange, arc, mountFacing },
 	});
-
-	root.visible = weapon.isAvailable;
 }
 
 function updateWeaponArc(
 	cached: WeaponArcCache,
-	weapon: WeaponTargetingResult,
 	worldX: number,
 	worldY: number,
 	mountFacing: number,
-	ships: ShipViewModel[]
+	range: number,
+	minRange: number,
+	arc: number
 ): void {
 	cached.root.position.set(worldX, worldY);
 	cached.root.rotation = mountFacing;
 
-	drawWeaponArc(cached.arcGraphics, weapon.arc, weapon.range);
-	drawRangeCircles(cached.rangeGraphics, weapon.range, weapon.minRange);
-	drawAimLines(cached.aimLines, weapon, ships, worldX, worldY, mountFacing);
+	drawWeaponArc(cached.arcGraphics, arc, range);
+	drawRangeCircles(cached.rangeGraphics, range, minRange);
 
-	cached.lastData = {
-		mountId: weapon.mountId,
-		range: weapon.range,
-		minRange: weapon.minRange,
-		arc: weapon.arc,
-		mountFacing: weapon.mountFacing,
-		targetCount: weapon.validTargets.length,
-	};
-
-	cached.root.visible = weapon.isAvailable;
+	cached.lastData = { range, minRange, arc, mountFacing };
 }
 
 function drawWeaponArc(graphics: Graphics, arc: number, range: number): void {
@@ -308,7 +281,11 @@ function drawAimLines(
 ): void {
 	graphics.clear();
 
-	if (weapon.validTargets.length === 0) return;
+	if (!weapon.validTargets || weapon.validTargets.length === 0) {
+		return;
+	}
+
+	const AIM_LINE_COLOR = 0xff6b35;
 
 	for (const target of weapon.validTargets) {
 		const targetShip = ships.find((s) => s.id === target.targetId);
@@ -318,26 +295,14 @@ function drawAimLines(
 
 		const dx = targetPos.x - mountWorldX;
 		const dy = targetPos.y - mountWorldY;
-		const distance = Math.sqrt(dx * dx + dy * dy);
 
-		const angleToTarget = Math.atan2(dy, dx);
-		const relativeAngle = angleToTarget - mountFacing;
-
-		const lineEndX = Math.cos(relativeAngle) * distance;
-		const lineEndY = Math.sin(relativeAngle) * distance;
-
-		const color = target.inRange && target.inArc ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR;
-		const alpha = target.inRange && target.inArc ? 0.7 : 0.3;
+		const color = target.inRange && target.inArc ? AIM_LINE_COLOR : 0xff5d7e;
+		const alpha = target.inRange && target.inArc ? 0.8 : 0.3;
 
 		graphics.moveTo(0, 0);
-		graphics.lineTo(lineEndX, lineEndY);
-		graphics.stroke({ color, width: 1.5, alpha });
-
-		if (target.inRange && target.inArc) {
-			graphics.circle(lineEndX, lineEndY, 4);
-			graphics.fill({ color: AIM_LINE_COLOR, alpha: 0.8 });
-		}
+		const localDx = dx * Math.cos(-mountFacing) - dy * Math.sin(-mountFacing);
+		const localDy = dx * Math.sin(-mountFacing) + dy * Math.cos(-mountFacing);
+		graphics.lineTo(localDx, localDy);
+		graphics.stroke({ color, width: 2, alpha });
 	}
 }
-
-export default useWeaponArcRendering;
