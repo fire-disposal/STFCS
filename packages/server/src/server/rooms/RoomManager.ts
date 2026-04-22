@@ -14,12 +14,14 @@ export interface RoomManagerOptions {
 	roomInactivityTimeout?: number;
 }
 
+export type RoomRemoveCallback = (room: Room, roomId: string) => Promise<void>;
+
 export class RoomManager {
 	private rooms = new Map<string, Room>();
 	private logger = createLogger("room-manager");
 	private options: Required<RoomManagerOptions>;
-	/** playerId -> socketId 映射（由外部 Socket.IO handler 维护并注入） */
 	private playerSocketMap = new Map<string, string>();
+	private onRoomRemove: RoomRemoveCallback | null = null;
 
 	constructor(options: RoomManagerOptions = {}) {
 		this.options = {
@@ -38,6 +40,10 @@ export class RoomManager {
 
 	removePlayerSocket(playerId: string): void {
 		this.playerSocketMap.delete(playerId);
+	}
+
+	setOnRoomRemove(callback: RoomRemoveCallback): void {
+		this.onRoomRemove = callback;
 	}
 
 	/** 创建新房间 */
@@ -86,9 +92,13 @@ export class RoomManager {
 	}
 
 	/** 移除房间 */
-	removeRoom(roomId: string): boolean {
+	async removeRoom(roomId: string): Promise<boolean> {
 		const room = this.rooms.get(roomId);
 		if (!room) return false;
+
+		if (this.onRoomRemove) {
+			await this.onRoomRemove(room, roomId);
+		}
 
 		room.cleanup();
 		this.rooms.delete(roomId);
@@ -219,18 +229,18 @@ export class RoomManager {
 		setInterval(() => this.cleanupInactiveRooms(), this.options.roomCleanupDelay);
 	}
 
-	private cleanupInactiveRooms(): void {
+	private async cleanupInactiveRooms(): Promise<void> {
 		const now = Date.now();
 		const toRemove: string[] = [];
 
 		for (const [roomId, room] of this.rooms.entries()) {
-			if (room.getPlayerCount() === 0 && now - room.createdAt > this.options.roomInactivityTimeout) {
+			if (room.getPlayerCount() === 0 && room.emptiedAt && now - room.emptiedAt > this.options.roomInactivityTimeout) {
 				toRemove.push(roomId);
 			}
 		}
 
 		for (const roomId of toRemove) {
-			this.removeRoom(roomId);
+			await this.removeRoom(roomId);
 		}
 
 		if (toRemove.length > 0) {
@@ -238,9 +248,9 @@ export class RoomManager {
 		}
 	}
 
-	cleanupAllRooms(): void {
+	async cleanupAllRooms(): Promise<void> {
 		for (const roomId of Array.from(this.rooms.keys())) {
-			this.removeRoom(roomId);
+			await this.removeRoom(roomId);
 		}
 		this.logger.info("All rooms cleaned up");
 	}

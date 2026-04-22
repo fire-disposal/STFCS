@@ -30,6 +30,7 @@ export interface RoomTransportCallbacks {
 export class Room {
 	readonly id: string;
 	readonly createdAt: number;
+	emptiedAt: number | null = null;
 
 	private stateManager: MutativeStateManager;
 	callbacks: RoomTransportCallbacks;
@@ -89,6 +90,8 @@ export class Room {
 		if (this.playerConnections.size >= this.options.maxPlayers) return false;
 		if (this.playerConnections.has(playerId)) return false;
 
+		this.emptiedAt = null;
+
 		this.stateManager.addPlayer(playerId, {
 			sessionId: connectionId,
 			nickname: playerName,
@@ -122,7 +125,9 @@ export class Room {
 			payload: { playerId, leftAt: Date.now(), totalPlayers: this.playerConnections.size },
 		});
 
-		if (this.playerConnections.size === 0) this.scheduleCleanup();
+		if (this.playerConnections.size === 0) {
+			this.emptiedAt = Date.now();
+		}
 
 		return true;
 	}
@@ -347,12 +352,6 @@ export class Room {
 			this.logger.error("Error handling player message", error, { playerId, messageType: type });
 			this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "COMMAND_ERROR", message: "命令处理失败" }, requestId });
 		}
-	}
-
-	private scheduleCleanup(delay: number = 30000): void {
-		setTimeout(() => {
-			if (this.playerConnections.size === 0) this.cleanup();
-		}, delay);
 	}
 
 	cleanup(): void {

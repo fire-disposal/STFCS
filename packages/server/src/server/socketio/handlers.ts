@@ -137,12 +137,7 @@ rpc.namespace("room", {
     
     if (room) {
       const playerCountAfter = room.getPlayerCount();
-      if (playerCountAfter === 0) {
-        ctx.roomManager.removeRoom(ctx.roomId);
-        ctx.io.emit("room:list_updated", { action: "removed", roomId: ctx.roomId });
-      } else {
-        ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
-      }
+      ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
     }
   },
   action: async (payload: unknown, ctx) => {
@@ -816,6 +811,40 @@ rpc.on("sync:request_full", async (_, ctx) => {
 export function setupSocketIO(io: any, roomManager: any): void {
   const services = { playerProfile: playerProfileService, shipBuild: shipBuildService, preset: presetService, asset: assetService, playerAvatar: playerAvatarStorage };
   const middleware = rpc.createMiddleware();
+
+  roomManager.setOnRoomRemove(async (room: any, roomId: string) => {
+    const gameState = room.getGameState();
+    const creatorId = room.creatorId;
+    
+    if (gameState && creatorId && gameState.turnCount > 0) {
+      const archiveId = `save_${roomId}_${Date.now()}`;
+      const archive = {
+        id: archiveId,
+        name: room.name,
+        saveJson: gameState,
+        metadata: {
+          roomId,
+          roomName: room.name,
+          mapWidth: gameState.mapWidth ?? 2000,
+          mapHeight: gameState.mapHeight ?? 2000,
+          maxPlayers: room.maxPlayers,
+          playerCount: 0,
+          totalTurns: gameState.turnCount,
+          gameDuration: Date.now() - room.createdAt,
+        },
+        playerIds: Object.keys(gameState.players ?? {}),
+        isAutoSave: true,
+        tags: ["auto_cleanup"],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      
+      await persistence.roomSaves.create(archive);
+      console.log(`[RoomManager] Auto-saved room ${roomId} to archive ${archiveId} for creator ${creatorId}`);
+    }
+    
+    io.emit("room:list_updated", { action: "removed", roomId });
+  });
 
   io.on("connection", (socket: any) => {
     middleware(socket, io, roomManager, persistence, services);
