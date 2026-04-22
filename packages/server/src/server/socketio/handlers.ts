@@ -38,6 +38,7 @@ rpc.namespace("auth", {
     ctx.socket.data.playerId = `player_${ctx.socket.id}`;
     ctx.socket.data.playerName = p.playerName;
     await playerAvatarStorage.getClientProfile(p.playerName);
+    await playerProfileService.createAccount(ctx.socket.data.playerId);
     return { playerId: ctx.socket.data.playerId, playerName: p.playerName, isHost: false, role: "PLAYER" };
   },
   logout: async (_, ctx) => {

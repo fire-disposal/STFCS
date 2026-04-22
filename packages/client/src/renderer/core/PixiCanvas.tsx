@@ -51,7 +51,7 @@ interface GameCanvasProps {
 }
 
 const useStarfield = () => {
-	return new StarfieldGenerator({
+	return useMemo(() => new StarfieldGenerator({
 		deepStars: 1000,
 		midStars: 300,
 		nearStars: 80,
@@ -60,7 +60,7 @@ const useStarfield = () => {
 		enableNebula: true,
 		nebulaCount: 4,
 		nebulaOpacity: 0.12,
-	});
+	}), []);
 };
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
