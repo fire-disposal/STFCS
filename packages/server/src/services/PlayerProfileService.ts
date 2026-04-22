@@ -27,12 +27,14 @@ export class PlayerProfileService {
 		this.assetService = new AssetService();
 	}
 
-	async createAccount(userId: string): Promise<void> {
+	async createAccount(userId: string, playerName?: string): Promise<void> {
 		const existingShips = await this.persistence.ships.findBy({ ownerId: userId });
 		if (existingShips.length > 0) {
+			console.log(`[PlayerProfileService] 用户 ${playerName ?? userId} 已有 ${existingShips.length} 艘舰船，跳过预设导入`);
 			return;
 		}
 
+		let shipsCreated = 0;
 		for (const preset of presetShips) {
 			const shipJson: InventoryToken = {
 				$id: generateId("ship", userId),
@@ -45,8 +47,11 @@ export class PlayerProfileService {
 			};
 
 			await this.shipService.createShipBuild(userId, shipJson);
+			shipsCreated++;
+			console.log(`[PlayerProfileService] 为 ${playerName ?? userId} 导入舰船预设: ${preset.metadata?.name ?? preset.$id}`);
 		}
 
+		let weaponsCreated = 0;
 		for (const preset of presetWeapons) {
 			const weaponJson = JSON.parse(JSON.stringify(preset)) as WeaponJSON;
 			weaponJson.$id = generateId("weapon", userId);
@@ -63,9 +68,11 @@ export class PlayerProfileService {
 			};
 
 			await this.persistence.weapons.create(weaponBuild);
+			weaponsCreated++;
+			console.log(`[PlayerProfileService] 为 ${playerName ?? userId} 导入武器预设: ${preset.metadata?.name ?? preset.$id}`);
 		}
 
-		console.log(`[PlayerProfileService] Created account for ${userId} with ${presetShips.length} ships, ${presetWeapons.length} weapons`);
+		console.log(`[PlayerProfileService] 已为用户 ${playerName ?? userId} 导入 ${shipsCreated} 艘舰船预设、${weaponsCreated} 个武器预设`);
 	}
 
 	async resetToDefaults(userId: string): Promise<{ ships: number; weapons: number }> {
@@ -80,7 +87,7 @@ export class PlayerProfileService {
 			await this.persistence.weapons.delete(weapon.id);
 		}
 
-		await this.createAccount(userId);
+		await this.createAccount(userId, userId);
 
 		return {
 			ships: presetShips.length,
