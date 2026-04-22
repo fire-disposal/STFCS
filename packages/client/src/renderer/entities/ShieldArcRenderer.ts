@@ -26,8 +26,7 @@ import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
 
 const SHIELD_ARC_RADIUS_OFFSET = 15;
-const SHIELD_ARC_WIDTH = 3;
-const SHIELD_GLOW_LAYERS = 3;
+const SHIELD_ARC_WIDTH = 2;
 const DEFAULT_SHIELD_RADIUS = 40;
 const DEFAULT_SHIELD_ARC = 120;
 
@@ -61,27 +60,19 @@ function drawShieldArc(
 	const startAngle = screenOrientation - arcRad / 2;
 	const endAngle = screenOrientation + arcRad / 2;
 
-	for (let layer = 0; layer < SHIELD_GLOW_LAYERS; layer++) {
-		const layerAlpha = alpha * (1 - layer * 0.25);
-		const layerWidth = SHIELD_ARC_WIDTH + layer * 2;
-		const layerRadius = radius + layer * 2;
+	graphics.arc(0, 0, radius, startAngle, endAngle);
+	graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 
-		graphics.arc(0, 0, layerRadius, startAngle, endAngle);
-		graphics.stroke({ color, width: layerWidth, alpha: layerAlpha });
-	}
-
-	const endpointRadius = 4;
-	const endpointAlpha = alpha * 1.2;
-
+	const endpointRadius = 3;
 	const startX = radius * Math.cos(startAngle);
 	const startY = radius * Math.sin(startAngle);
 	graphics.circle(startX, startY, endpointRadius);
-	graphics.fill({ color, alpha: endpointAlpha });
+	graphics.fill({ color, alpha: alpha * 1.2 });
 
 	const endX = radius * Math.cos(endAngle);
 	const endY = radius * Math.sin(endAngle);
 	graphics.circle(endX, endY, endpointRadius);
-	graphics.fill({ color, alpha: endpointAlpha });
+	graphics.fill({ color, alpha: alpha * 1.2 });
 }
 
 export interface ShieldArcCacheItem {

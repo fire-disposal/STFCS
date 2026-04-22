@@ -34,24 +34,28 @@ export function useRoomList(
 ): { rooms: RoomInfo[]; isLoading: boolean; refresh: () => void } {
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
+	const networkManagerRef = useRef(networkManager);
+	networkManagerRef.current = networkManager;
 
 	const fetchRooms = useCallback(async () => {
-		if (!networkManager?.isConnected()) return;
+		const nm = networkManagerRef.current;
+		if (!nm?.isConnected()) return;
 		setIsLoading(true);
 		try {
-			const list = await networkManager.getRoomList();
+			const list = await nm.getRoomList();
 			setRooms(list);
 		} finally {
 			setIsLoading(false);
 		}
-	}, [networkManager]);
+	}, []);
 
 	useEffect(() => {
 		fetchRooms();
 	}, [fetchRooms, refreshKey]);
 
 	useEffect(() => {
-		if (!networkManager?.isConnected()) return;
+		const nm = networkManagerRef.current;
+		if (!nm?.isConnected()) return;
 
 		const handleRoomUpdate = (data: unknown) => {
 			const update = data as { action: string; room?: RoomInfo; roomId?: string };
@@ -66,11 +70,11 @@ export function useRoomList(
 			}
 		};
 
-		networkManager.on("room:list_updated", handleRoomUpdate);
+		nm.on("room:list_updated", handleRoomUpdate);
 		return () => {
-			networkManager.off("room:list_updated", handleRoomUpdate);
+			nm.off("room:list_updated", handleRoomUpdate);
 		};
-	}, [networkManager, fetchRooms]);
+	}, [fetchRooms]);
 
 	return { rooms, isLoading, refresh: fetchRooms };
 }
@@ -81,16 +85,22 @@ export function useSocketRoom(
 ): SocketRoom | null {
 	const [roomState, setRoomState] = useState<RoomState | null>(null);
 	const stateRef = useRef<RoomState | null>(null);
+	const socketRoomRef = useRef<SocketRoom | null>(null);
+	const networkManagerRef = useRef(networkManager);
+	networkManagerRef.current = networkManager;
+	const onLeaveRoomRef = useRef(onLeaveRoom);
+	onLeaveRoomRef.current = onLeaveRoom;
 
 	useEffect(() => {
-		if (!networkManager?.isConnected()) return;
+		const nm = networkManagerRef.current;
+		if (!nm?.isConnected()) return;
 
 		const handleStateFull = (state: unknown) => {
 			const s = state as Record<string, unknown>;
 			const newState: RoomState = {
-				roomId: networkManager.getCurrentRoomId(),
-				playerId: networkManager.getPlayerId(),
-				playerName: networkManager.getPlayerName(),
+				roomId: nm.getCurrentRoomId(),
+				playerId: nm.getPlayerId(),
+				playerName: nm.getPlayerName(),
 				isConnected: true,
 				currentPhase: (s.phase as string) || GamePhase.DEPLOYMENT,
 				turnCount: (s.turnCount as number) || 1,
@@ -169,49 +179,54 @@ export function useSocketRoom(
 		const handleDisconnect = () => {
 			setRoomState(null);
 			stateRef.current = null;
-			if (onLeaveRoom) onLeaveRoom();
+			if (onLeaveRoomRef.current) onLeaveRoomRef.current();
 		};
 
-		networkManager.on("sync:full", handleStateFull);
-		networkManager.on("state:patch", handleStatePatch);
-		networkManager.on("disconnect", handleDisconnect);
+		nm.on("sync:full", handleStateFull);
+		nm.on("state:patch", handleStatePatch);
+		nm.on("disconnect", handleDisconnect);
 
-		const existing = networkManager.getGameState();
+		const existing = nm.getGameState();
 		if (existing) handleStateFull(existing);
 
 		return () => {
-			networkManager.off("sync:full", handleStateFull);
-			networkManager.off("state:patch", handleStatePatch);
-			networkManager.off("disconnect", handleDisconnect);
+			nm.off("sync:full", handleStateFull);
+			nm.off("state:patch", handleStatePatch);
+			nm.off("disconnect", handleDisconnect);
 		};
-	}, [networkManager, onLeaveRoom]);
+	}, []);
 
 	const send = useCallback(
 		async <E extends WsEventName>(event: E, payload: WsPayload<E>): Promise<WsResponseData<E>> => {
-			if (!networkManager) throw new Error("Network manager unavailable");
-			return networkManager.request(event, payload);
+			const nm = networkManagerRef.current;
+			if (!nm) throw new Error("Network manager unavailable");
+			return nm.request(event, payload);
 		},
-		[networkManager]
+		[]
 	);
 
 	const leave = useCallback(() => {
-		if (networkManager) networkManager.leaveRoom();
-		if (onLeaveRoom) onLeaveRoom();
-	}, [networkManager, onLeaveRoom]);
+		const nm = networkManagerRef.current;
+		if (nm) nm.leaveRoom();
+		if (onLeaveRoomRef.current) onLeaveRoomRef.current();
+	}, []);
 
 	if (!roomState?.roomId) return null;
 
-	const socketRoom: SocketRoom = {
-		state: roomState,
-		sessionId: roomState.playerId,
-		roomId: roomState.roomId,
-		send,
-		leave,
-	};
+	if (!socketRoomRef.current || socketRoomRef.current.roomId !== roomState.roomId) {
+		socketRoomRef.current = {
+			state: roomState,
+			sessionId: roomState.playerId,
+			roomId: roomState.roomId,
+			send,
+			leave,
+		};
+		setGameRoomRef(socketRoomRef.current);
+	} else {
+		socketRoomRef.current.state = roomState;
+	}
 
-	setGameRoomRef(socketRoom);
-
-	return socketRoom;
+	return socketRoomRef.current;
 }
 
 function applyPatchToToken(token: CombatToken, path: (string | number)[], patch: StatePatch): CombatToken {

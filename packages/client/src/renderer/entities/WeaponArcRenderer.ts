@@ -112,17 +112,6 @@ export function useWeaponArcRendering(
 		}
 
 		fetchTargets(selectedShipId);
-
-		const intervalId = setInterval(() => {
-			if (!pendingQueryRef.current) {
-				fetchTargets(selectedShipId);
-			}
-		}, 2000);
-
-		return () => {
-			clearInterval(intervalId);
-			targetingDataRef.current = null;
-		};
 	}, [selectedShipId, show, fetchTargets]);
 
 	useEffect(() => {
