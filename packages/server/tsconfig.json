@@ -26,7 +26,10 @@
 		"noUnusedParameters": true,
 		"checkJs": false,
 		"outDir": "./dist",
-		"rootDir": "./src"
+		"baseUrl": ".",
+		"paths": {
+			"@vt/data": ["../data/src/index.ts"]
+		}
 	},
 	"include": [
 		"src/**/*"

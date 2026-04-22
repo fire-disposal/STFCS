@@ -8,7 +8,6 @@ export default defineConfig({
 		alias: {
 			"@": resolve(__dirname, "src"),
 			"@vt/data": resolve(__dirname, "../data/src/index.ts"),
-			"@vt/rules": resolve(__dirname, "../rules/src/index.ts"),
 		},
 	},
 	server: {

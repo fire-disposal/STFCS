@@ -8,9 +8,7 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/data/package.json ./packages/data/
-COPY packages/rules/package.json ./packages/rules/
 COPY packages/server/package.json ./packages/server/
-COPY packages/schema-types/package.json ./packages/schema-types/
 COPY packages/client/package.json ./packages/client/
 RUN pnpm install --frozen-lockfile
 
@@ -19,9 +17,7 @@ FROM deps AS builder
 COPY tsconfig.base.json turbo.json ./
 COPY package.json ./
 COPY packages/data ./packages/data
-COPY packages/rules ./packages/rules
 COPY packages/server ./packages/server
-COPY packages/schema-types ./packages/schema-types
 COPY packages/client ./packages/client
 
 # 利用 Turbo 进行全量构建
@@ -44,7 +40,6 @@ COPY --from=builder /app/package.json /app/package.json
 # 复制构建后的产物，覆盖到原来的目录中
 COPY --from=builder /app/packages/server/dist /app/packages/server/dist
 COPY --from=builder /app/packages/data/dist /app/packages/data/dist
-COPY --from=builder /app/packages/rules/dist /app/packages/rules/dist
 
 # 托管前端
 COPY --from=builder /app/packages/client/dist /app/packages/server/dist/public

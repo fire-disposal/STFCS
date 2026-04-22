@@ -19,10 +19,8 @@
 		"forceConsistentCasingInFileNames": true,
 		"baseUrl": ".",
 		"paths": {
-			"@vt/types": ["packages/types/src/index.ts"],
 			"@vt/data": ["packages/data/src/index.ts"],
-			"@vt/server": ["packages/server/src/index.ts"],
-			"@vt/schema-types": ["packages/schema-types/src/index.ts"]
+			"@vt/server": ["packages/server/src/index.ts"]
 		},
 		"declaration": true,
 		"declarationMap": true,
