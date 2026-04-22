@@ -3,7 +3,7 @@
  */
 
 export { setupSocketIO } from "./handlers.js";
-export { createRpcRegistry, RpcRegistry, ObservableState, type RpcContext, type RpcServices, type SocketData } from "./RpcServer.js";
+export { createRpcRegistry, RpcRegistry, MutativeStateManager, type RpcContext, type RpcServices, type SocketData } from "./RpcServer.js";
 export {
   isHost,
   isPlayer,

@@ -1,15 +1,14 @@
 /**
- * 游戏房间（Socket.IO 适配版）
- *
- * 移除 ConnectionManager 依赖，改为通过回调函数与传输层交互。
- * 业务逻辑（玩家管理、游戏流程、消息处理）完全保留。
+ * 游戏房间（使用 MutativeStateManager）
  */
 
 import { v4 as uuidv4 } from "uuid";
 import { createLogger } from "../../infra/simple-logger.js";
-import { GameStateManager } from "../../core/state/GameStateManager.js";
+import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
+import type { Server as IOServer } from "socket.io";
+import type { GameRoomState, CombatToken, Faction, GamePhase, TokenRuntime } from "@vt/data";
+import { processTokenTurnEnd } from "../../core/engine/rules/turnEnd.js";
 
-/** 房间配置 */
 export interface RoomOptions {
 	roomName: string;
 	maxPlayers?: number;
@@ -18,19 +17,12 @@ export interface RoomOptions {
 	creatorSessionId?: string;
 }
 
-/** 传输层回调（由 Socket.IO handler 注入） */
 export interface RoomTransportCallbacks {
-	/** 发送消息给指定玩家 */
 	sendToPlayer: (playerId: string, message: any) => void;
-	/** 广播给房间内所有人 */
 	broadcast: (message: any) => void;
-	/** 广播给特定阵营 */
 	broadcastToFaction: (faction: string, message: any) => void;
-	/** 广播给除某玩家外的所有人 */
 	broadcastExcept: (excludePlayerId: string, message: any) => void;
-	/** 广播给观察者 */
 	broadcastToSpectators: (message: any) => void;
-	/** 广播给非观察者玩家 */
 	broadcastToPlayers: (message: any) => void;
 }
 
@@ -38,12 +30,12 @@ export class Room {
 	readonly id: string;
 	readonly createdAt: number;
 
-	private stateManager: GameStateManager;
+	private stateManager: MutativeStateManager;
 	callbacks: RoomTransportCallbacks;
 	private logger;
 
 	private options: Required<RoomOptions>;
-	private playerConnections = new Map<string, string>(); // playerId -> connectionId
+	private playerConnections = new Map<string, string>();
 	private isActive = true;
 
 	constructor(
@@ -64,11 +56,16 @@ export class Room {
 
 		this.logger = createLogger(`room-${this.id}`);
 
-		this.stateManager = new GameStateManager(
-			this.id,
-			this.options.roomName,
-			this.options.maxPlayers
-		);
+		this.stateManager = new MutativeStateManager(this.id, {
+			roomId: this.id,
+			ownerId: this.options.creatorSessionId,
+			phase: "DEPLOYMENT",
+			turnCount: 0,
+			players: {},
+			tokens: {},
+			globalModifiers: {},
+			createdAt: this.createdAt,
+		});
 
 		this.logger.info("Room created", {
 			roomName: this.options.roomName,
@@ -77,96 +74,68 @@ export class Room {
 		});
 	}
 
-	// ==================== 玩家管理 ====================
+	setIo(io: IOServer): void {
+		this.stateManager.setIo(io);
+	}
+
+	getStateManager(): MutativeStateManager {
+		return this.stateManager;
+	}
 
 	joinPlayer(connectionId: string, playerId: string, playerName: string): boolean {
-		if (!this.isActive) {
-			this.logger.warn("Room is not active, cannot join");
-			return false;
-		}
+		if (!this.isActive) return false;
+		if (this.playerConnections.size >= this.options.maxPlayers) return false;
+		if (this.playerConnections.has(playerId)) return false;
 
-		if (this.playerConnections.size >= this.options.maxPlayers) {
-			this.logger.warn("Room is full", { playerId, playerName });
-			return false;
-		}
-
-		if (this.playerConnections.has(playerId)) {
-			this.logger.warn("Player already in room", { playerId });
-			return false;
-		}
-
-		this.stateManager.addPlayer({
-			id: playerId,
+		this.stateManager.addPlayer(playerId, {
 			sessionId: connectionId,
-			name: playerName,
-			role: "PLAYER",
-			faction: "PLAYER",
-			ready: false,
+			nickname: playerName,
+			role: this.options.creatorSessionId === playerId ? "HOST" : "PLAYER",
+			isReady: false,
 			connected: true,
-			pingMs: 0,
 		});
 
 		this.playerConnections.set(playerId, connectionId);
 
-		this.logger.info("Player joined", {
-			playerId,
-			playerName,
-			connectionId,
-			totalPlayers: this.playerConnections.size,
-		});
+		this.logger.info("Player joined", { playerId, playerName, totalPlayers: this.playerConnections.size });
 
 		this.callbacks.broadcast({
 			type: "PLAYER_JOINED",
-			payload: {
-				playerId,
-				playerName,
-				joinedAt: Date.now(),
-				totalPlayers: this.playerConnections.size,
-			},
+			payload: { playerId, playerName, joinedAt: Date.now(), totalPlayers: this.playerConnections.size },
 		});
 
 		return true;
 	}
 
 	leavePlayer(playerId: string): boolean {
-		if (!this.playerConnections.has(playerId)) {
-			return false;
-		}
+		if (!this.playerConnections.has(playerId)) return false;
 
 		this.stateManager.removePlayer(playerId);
 		this.playerConnections.delete(playerId);
 
-		this.logger.info("Player left", {
-			playerId,
-			totalPlayers: this.playerConnections.size,
-		});
+		this.logger.info("Player left", { playerId, totalPlayers: this.playerConnections.size });
 
 		this.callbacks.broadcast({
 			type: "PLAYER_LEFT",
-			payload: {
-				playerId,
-				leftAt: Date.now(),
-				totalPlayers: this.playerConnections.size,
-			},
+			payload: { playerId, leftAt: Date.now(), totalPlayers: this.playerConnections.size },
 		});
 
-		if (this.playerConnections.size === 0) {
-			this.scheduleCleanup();
-		}
+		if (this.playerConnections.size === 0) this.scheduleCleanup();
 
 		return true;
 	}
 
 	togglePlayerReady(playerId: string): boolean {
-		const player = this.stateManager.getPlayer(playerId);
+		const state = this.stateManager.getState();
+		const player = state.players[playerId];
 		if (!player) return false;
 
-		const newReadyState = !player.ready;
-		this.stateManager.updatePlayer(playerId, { ready: newReadyState });
+		const newReady = !player.isReady;
+		this.stateManager.updatePlayer(playerId, { isReady: newReady });
 
 		this.callbacks.broadcast({
 			type: "PLAYER_READY_CHANGED",
-			payload: { playerId, ready: newReadyState },
+			payload: { playerId, ready: newReady },
 		});
 
 		this.checkAllPlayersReady();
@@ -174,176 +143,84 @@ export class Room {
 	}
 
 	private checkAllPlayersReady(): void {
-		const allPlayers = this.stateManager.getAllPlayers();
-		const allReady = allPlayers.length > 0 && allPlayers.every((p) => p.ready);
+		const state = this.stateManager.getState();
+		const playerList = Object.keys(state.players).map(k => state.players[k]);
+		const allReady = playerList.length > 0 && playerList.every(p => p?.isReady);
 
-		if (allReady && this.stateManager.getState().phase === "DEPLOYMENT") {
+		if (allReady && state.phase === "DEPLOYMENT") {
 			this.startGame();
 		}
 	}
 
-	// ==================== 游戏流程 ====================
-
 	startGame(): void {
-		this.stateManager.setPhase("DEPLOYMENT");
+		this.stateManager.changePhase("PLAYER_ACTION");
 		this.logger.info("Game started");
 
 		this.callbacks.broadcast({
 			type: "GAME_STARTED",
-			payload: {
-				startedAt: Date.now(),
-				turn: 1,
-				activeFaction: "PLAYER",
-			},
+			payload: { startedAt: Date.now(), turn: 1, activeFaction: "PLAYER" },
 		});
 	}
 
 	nextTurn(): void {
-		this.stateManager.nextTurn();
 		const state = this.stateManager.getState();
+		const newTurn = state.turnCount + 1;
+
+		this.processTurnEndLogic();
+
+		this.stateManager.changeTurn(newTurn);
+		const newState = this.stateManager.getState();
 
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
-			payload: {
-				turn: state.turn,
-				activeFaction: state.activeFaction,
-				changedAt: Date.now(),
-			},
+			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, changedAt: Date.now() },
 		});
 	}
 
-	switchActiveFaction(faction: string): void {
-		this.stateManager.setActiveFaction(faction);
+	private processTurnEndLogic(): void {
+		const state = this.stateManager.getState();
+
+		for (const tokenId of Object.keys(state.tokens)) {
+			const token = state.tokens[tokenId];
+			if (!token) continue;
+			if (token.runtime && !token.runtime.destroyed) {
+				const result = processTokenTurnEnd(token);
+
+				const updates: Partial<TokenRuntime> = {
+					fluxSoft: result.newFluxSoft,
+					fluxHard: result.newFluxHard,
+					venting: false,
+					movement: {
+						currentPhase: "A",
+						hasMoved: false,
+						phaseAUsed: 0,
+						turnAngleUsed: 0,
+						phaseCUsed: 0,
+					},
+					hasFired: false,
+				};
+
+				if (result.overloadEnded) {
+					updates.overloaded = false;
+					updates.overloadTime = 0;
+				}
+
+				if (result.weaponsUpdated && token.runtime.weapons) {
+					updates.weapons = token.runtime.weapons;
+				}
+
+				this.stateManager.updateTokenRuntime(token.$id, updates);
+			}
+		}
+	}
+
+	switchActiveFaction(faction: Faction): void {
+		this.stateManager.changeFaction(faction);
 		this.callbacks.broadcast({
 			type: "ACTIVE_FACTION_CHANGED",
 			payload: { faction, changedAt: Date.now() },
 		});
 	}
-
-	// ==================== 消息处理（核心入口） ====================
-
-	/** 处理玩家消息 —— 由 Socket.IO handler 直接调用 */
-	handlePlayerMessage(playerId: string, message: any): void {
-		if (!this.isActive) return;
-
-		const { type, payload, requestId } = message;
-
-		try {
-			switch (type) {
-				case "TOGGLE_READY":
-					this.handleToggleReady(playerId, payload, requestId);
-					break;
-				case "START_GAME":
-					this.handleStartGame(playerId, payload, requestId);
-					break;
-				case "NEXT_TURN":
-					this.handleNextTurn(playerId, payload, requestId);
-					break;
-				case "GAME_COMMAND":
-					this.handleGameCommand(playerId, payload, requestId);
-					break;
-				default:
-					this.sendError(playerId, "UNKNOWN_COMMAND", "未知命令", requestId);
-			}
-		} catch (error) {
-			this.logger.error("Error handling player message", error, { playerId, messageType: type });
-			this.sendError(playerId, "COMMAND_ERROR", "命令处理失败", requestId);
-		}
-	}
-
-	private handleToggleReady(playerId: string, _payload: any, requestId?: string): void {
-		const success = this.togglePlayerReady(playerId);
-		if (success) {
-			this.callbacks.sendToPlayer(playerId, {
-				type: "TOGGLE_READY_SUCCESS",
-				payload: { ready: this.stateManager.getPlayer(playerId)?.ready },
-				requestId,
-			});
-		} else {
-			this.sendError(playerId, "TOGGLE_READY_FAILED", "切换准备状态失败", requestId);
-		}
-	}
-
-	private handleStartGame(playerId: string, _payload: any, requestId?: string): void {
-		const state = this.stateManager.getState();
-		if (state.phase !== "DEPLOYMENT") {
-			this.sendError(playerId, "GAME_ALREADY_STARTED", "游戏已开始", requestId);
-			return;
-		}
-		this.startGame();
-		this.callbacks.sendToPlayer(playerId, {
-			type: "START_GAME_SUCCESS",
-			payload: { startedAt: Date.now() },
-			requestId,
-		});
-	}
-
-	private handleNextTurn(playerId: string, _payload: any, requestId?: string): void {
-		const player = this.stateManager.getPlayer(playerId);
-		const state = this.stateManager.getState();
-		if (player?.faction !== state.activeFaction) {
-			this.sendError(playerId, "NOT_YOUR_TURN", "不是你的回合", requestId);
-			return;
-		}
-		this.nextTurn();
-		this.callbacks.sendToPlayer(playerId, {
-			type: "NEXT_TURN_SUCCESS",
-			payload: { turn: state.turn + 1 },
-			requestId,
-		});
-	}
-
-	private handleGameCommand(playerId: string, payload: any, requestId?: string): void {
-		this.callbacks.broadcast({
-			type: "GAME_COMMAND_EXECUTED",
-			payload: {
-				playerId,
-				command: payload,
-				executedAt: Date.now(),
-			},
-			requestId,
-		});
-	}
-
-	// ==================== 消息发送（委托给回调）====================
-
-	send(playerId: string, message: any): void {
-		this.callbacks.sendToPlayer(playerId, message);
-	}
-
-	sendError(playerId: string, code: string, message: string, requestId?: string): void {
-		this.callbacks.sendToPlayer(playerId, {
-			type: "ERROR",
-			payload: { code, message },
-			requestId,
-		});
-	}
-
-	broadcast(message: any): void {
-		this.callbacks.broadcast(message);
-	}
-
-	broadcastToFaction(faction: string, message: any): void {
-		this.callbacks.broadcastToFaction(faction, message);
-	}
-
-	broadcastExcept(excludePlayerId: string, message: any): void {
-		this.callbacks.broadcastExcept(excludePlayerId, message);
-	}
-
-	broadcastToSpectators(message: any): void {
-		this.callbacks.broadcastToSpectators(message);
-	}
-
-	broadcastToPlayers(message: any): void {
-		this.callbacks.broadcastToPlayers(message);
-	}
-
-	sendToPlayer(playerId: string, message: any): void {
-		this.callbacks.sendToPlayer(playerId, message);
-	}
-
-	// ==================== 查询 ====================
 
 	getInfo(): any {
 		const state = this.stateManager.getState();
@@ -352,7 +229,7 @@ export class Room {
 			name: this.options.roomName,
 			createdAt: this.createdAt,
 			phase: state.phase,
-			turn: state.turn,
+			turn: state.turnCount,
 			activeFaction: state.activeFaction,
 			playerCount: this.playerConnections.size,
 			maxPlayers: this.options.maxPlayers,
@@ -362,36 +239,28 @@ export class Room {
 	}
 
 	getPlayers(): any[] {
-		return this.stateManager.getAllPlayers().map((player) => ({
-			id: player.id,
-			name: player.name,
-			role: player.role,
-			faction: player.faction,
-			ready: player.ready,
-			connected: player.connected,
-			pingMs: player.pingMs,
-		}));
+		const state = this.stateManager.getState();
+		return Object.keys(state.players).map(k => {
+			const player = state.players[k];
+			return {
+				id: player?.sessionId,
+				name: player?.nickname,
+				role: player?.role,
+				faction: "PLAYER",
+				ready: player?.isReady,
+				connected: player?.connected,
+			};
+		});
 	}
 
-	getGameState(): any {
-		return this.stateManager.getStateSnapshot();
+	getGameState(): GameRoomState {
+		return this.stateManager.getState();
 	}
 
-	getStateManager() {
-		return this.stateManager;
-	}
+	get gameState(): GameRoomState { return this.getGameState(); }
 
 	getPlayerCount(): number {
 		return this.playerConnections.size;
-	}
-
-	getPlayerBySessionId(sessionId: string): any {
-		for (const [playerId, connectionId] of this.playerConnections.entries()) {
-			if (connectionId === sessionId) {
-				return this.stateManager.getPlayer(playerId);
-			}
-		}
-		return null;
 	}
 
 	isRoomActive(): boolean {
@@ -400,30 +269,82 @@ export class Room {
 
 	get name(): string { return this.options.roomName; }
 	get creatorId(): string { return this.options.creatorSessionId; }
-	set creatorId(value: string) { this.options.creatorSessionId = value; }
+	set creatorId(value: string) {
+		this.options.creatorSessionId = value;
+		this.stateManager.changeHost(value);
+	}
 	get maxPlayers(): number { return this.options.maxPlayers; }
-	get isPrivate(): boolean { return false; }
-	get password(): string | undefined { return undefined; }
-	get gameState(): any { return this.getGameState(); }
-	getCombatTokens() { return this.stateManager.getCombatTokens(); }
-	getCombatToken(shipId: string) { return this.stateManager.getCombatToken(shipId); }
+	get phase(): GamePhase { return this.stateManager.getState().phase; }
 
-	updateCombatTokenRuntime(shipId: string, runtimeUpdates: Record<string, unknown>): boolean {
-		const token = this.stateManager.getCombatToken(shipId);
-		if (!token) return false;
-		this.stateManager.updateCombatToken(shipId, runtimeUpdates);
-		return true;
+	getCombatTokens(): CombatToken[] {
+		return Object.values(this.stateManager.getState().tokens);
 	}
 
-	addPlayer(playerState: any): boolean {
-		return this.joinPlayer(playerState.sessionId, playerState.id, playerState.name);
+	getCombatToken(tokenId: string): CombatToken | undefined {
+		return this.stateManager.getToken(tokenId);
+	}
+
+	updateCombatTokenRuntime(tokenId: string, updates: Partial<TokenRuntime>): void {
+		this.stateManager.updateTokenRuntime(tokenId, updates);
+	}
+
+	addPlayer(playerState: { id: string; sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean }): boolean {
+		this.stateManager.addPlayer(playerState.id, playerState);
+		this.playerConnections.set(playerState.id, playerState.sessionId);
+		return true;
 	}
 
 	removePlayer(playerId: string): boolean {
 		return this.leavePlayer(playerId);
 	}
 
-	// ==================== 生命周期 ====================
+	send(playerId: string, message: any): void {
+		this.callbacks.sendToPlayer(playerId, message);
+	}
+
+	sendError(playerId: string, code: string, message: string, requestId?: string): void {
+		this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code, message }, requestId });
+	}
+
+	broadcast(message: any): void {
+		this.callbacks.broadcast(message);
+	}
+
+	handlePlayerMessage(playerId: string, message: any): void {
+		if (!this.isActive) return;
+
+		const { type, requestId } = message;
+
+		try {
+			switch (type) {
+				case "TOGGLE_READY":
+					const success = this.togglePlayerReady(playerId);
+					this.callbacks.sendToPlayer(playerId, {
+						type: success ? "TOGGLE_READY_SUCCESS" : "TOGGLE_READY_FAILED",
+						payload: { ready: this.stateManager.getState().players[playerId]?.isReady },
+						requestId,
+					});
+					break;
+				case "START_GAME":
+					if (this.stateManager.getState().phase !== "DEPLOYMENT") {
+						this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" }, requestId });
+						return;
+					}
+					this.startGame();
+					this.callbacks.sendToPlayer(playerId, { type: "START_GAME_SUCCESS", payload: { startedAt: Date.now() }, requestId });
+					break;
+				case "NEXT_TURN":
+					this.nextTurn();
+					this.callbacks.sendToPlayer(playerId, { type: "NEXT_TURN_SUCCESS", payload: { turn: this.stateManager.getState().turnCount }, requestId });
+					break;
+				default:
+					this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "UNKNOWN_COMMAND", message: "未知命令" }, requestId });
+			}
+		} catch (error) {
+			this.logger.error("Error handling player message", error, { playerId, messageType: type });
+			this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "COMMAND_ERROR", message: "命令处理失败" }, requestId });
+		}
+	}
 
 	private scheduleCleanup(delay: number = 30000): void {
 		setTimeout(() => {
@@ -435,11 +356,7 @@ export class Room {
 		if (!this.isActive) return;
 		this.isActive = false;
 		this.logger.info("Room cleaning up");
-		this.callbacks.broadcast({
-			type: "ROOM_CLOSED",
-			payload: { reason: "empty", closedAt: Date.now() },
-		});
+		this.callbacks.broadcast({ type: "ROOM_CLOSED", payload: { reason: "empty", closedAt: Date.now() } });
 		this.playerConnections.clear();
-		this.logger.info("Room cleaned up");
 	}
 }

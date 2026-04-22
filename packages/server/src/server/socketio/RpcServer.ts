@@ -1,29 +1,22 @@
 /**
- * RPC Server - 类型安全的 handler 注册系统
+ * RPC Server - 类型安全的 handler 注册系统（Mutative 版）
  */
 
 import type { Socket } from "socket.io";
 import type { Server as IOServer } from "socket.io";
-import type { WsEventName, WsPayload, WsResponseData, DeltaChange, CombatToken } from "@vt/data";
-import { validateWsPayload, createWsResponse, createSyncDelta } from "@vt/data";
+import type { WsEventName, WsPayload, WsResponseData, EditLogContext } from "@vt/data";
+import { validateWsPayload, createWsResponse } from "@vt/data";
 import type { RoomManager } from "../rooms/RoomManager.js";
 import type { Room } from "../rooms/Room.js";
 import type { PersistenceManager } from "../../persistence/PersistenceManager.js";
+import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
+export { MutativeStateManager };
 
 export interface SocketData {
   playerId?: string;
   playerName?: string;
   roomId?: string;
   role?: "HOST" | "PLAYER";
-}
-
-export interface GameStateSnapshot {
-  phase: string;
-  turnCount: number;
-  activeFaction?: string;
-  tokens: Record<string, CombatToken>;
-  players: Record<string, unknown>;
-  modifiers: Record<string, number>;
 }
 
 export interface RpcContext {
@@ -37,7 +30,7 @@ export interface RpcContext {
   roomManager: RoomManager;
   persistence: PersistenceManager;
   services: RpcServices;
-  state: ObservableState;
+  state: MutativeStateManager;
   data: SocketData;
 
   requireAuth(): void;
@@ -48,6 +41,8 @@ export interface RpcContext {
 
   broadcast(event: string, data: unknown): void;
   broadcastTo(excludePlayerId: string, event: string, data: unknown): void;
+  
+  editLogContext(reason?: string): EditLogContext;
 }
 
 export interface RpcServices {
@@ -56,96 +51,6 @@ export interface RpcServices {
   preset: unknown;
   asset: unknown;
   playerAvatar: unknown;
-}
-
-export class ObservableState {
-  private changes: DeltaChange[] = [];
-  private io: IOServer;
-  private roomId: string;
-  private stateRef: () => GameStateSnapshot | null;
-
-  constructor(io: IOServer, roomId: string, stateRef: () => GameStateSnapshot | null) {
-    this.io = io;
-    this.roomId = roomId;
-    this.stateRef = stateRef;
-  }
-
-  private add(change: DeltaChange): this {
-    this.changes.push(change);
-    return this;
-  }
-
-  addToken(tokenId: string, token: CombatToken): this {
-    return this.add({ type: "token_add", id: tokenId, value: token });
-  }
-
-  removeToken(tokenId: string): this {
-    return this.add({ type: "token_remove", id: tokenId });
-  }
-
-  destroyToken(tokenId: string): this {
-    return this.add({ type: "token_destroyed", id: tokenId });
-  }
-
-  updateToken(tokenId: string, field: string, value: unknown, oldValue?: unknown): this {
-    return this.add({ type: "token_update", id: tokenId, field, value, oldValue });
-  }
-
-  updateTokenRuntime(tokenId: string, runtimeUpdates: Record<string, unknown>): this {
-    return this.add({ type: "token_update", id: tokenId, field: "runtime", value: runtimeUpdates });
-  }
-
-  addPlayer(playerId: string, player: unknown): this {
-    return this.add({ type: "player_join", id: playerId, value: player });
-  }
-
-  updatePlayer(playerId: string, player: unknown): this {
-    return this.add({ type: "player_update", id: playerId, value: player });
-  }
-
-  removePlayer(playerId: string): this {
-    return this.add({ type: "player_leave", id: playerId });
-  }
-
-  changeHost(newHostId: string): this {
-    return this.add({ type: "host_change", value: newHostId });
-  }
-
-  changePhase(phase: string): this {
-    return this.add({ type: "phase_change", value: phase });
-  }
-
-  changeTurn(turn: number): this {
-    return this.add({ type: "turn_change", value: turn });
-  }
-
-  changeFaction(faction: string): this {
-    return this.add({ type: "faction_turn", value: faction });
-  }
-
-  addModifier(key: string, value: number): this {
-    return this.add({ type: "modifier_add", field: key, value });
-  }
-
-  removeModifier(key: string): this {
-    return this.add({ type: "modifier_remove", field: key });
-  }
-
-  hasChanges(): boolean {
-    return this.changes.length > 0;
-  }
-
-  commit(): void {
-    if (this.changes.length > 0) {
-      this.io.to(this.roomId).emit("sync:delta", createSyncDelta(this.changes));
-      this.changes = [];
-    }
-  }
-
-  broadcastFull(): void {
-    const state = this.stateRef();
-    if (state) this.io.to(this.roomId).emit("sync:full", state);
-  }
 }
 
 type HandlerFn = (payload: WsPayload<WsEventName>, ctx: RpcContext) => WsResponseData<WsEventName> | void | Promise<WsResponseData<WsEventName> | void>;
@@ -172,12 +77,13 @@ export class RpcRegistry {
         const { event, requestId, payload } = data;
         const sd = socket.data as SocketData;
 
-        const state = new ObservableState(io, sd.roomId ?? "", () => {
-          const room = roomManager.getRoom(sd.roomId ?? "");
-          return room?.getGameState() ?? null;
-        });
-
         const room = roomManager.getRoom(sd.roomId ?? "") ?? null;
+        
+        if (room) {
+          room.setIo(io);
+        }
+        
+        const state = room?.getStateManager() ?? new MutativeStateManager(sd.roomId ?? "");
 
         const ctx: RpcContext = {
           socket,
@@ -207,15 +113,30 @@ export class RpcRegistry {
           requirePlayer() {
             this.requireRoom();
           },
-          requireTokenControl(_tokenId: string) {
-            this.requireRoom();
-            this.requireHost();
-          },
+requireTokenControl(tokenId: string): void {
+			this.requireRoom();
+			const token = this.room?.getCombatToken(tokenId);
+			if (!token) throw Object.assign(new Error("舰船不存在"), { code: "TOKEN_NOT_FOUND" });
+			
+			if (this.room?.creatorId === this.playerId) return;
+			
+			if (token.runtime?.ownerId !== this.playerId) {
+				throw Object.assign(new Error("无权操作此舰船"), { code: "NO_TOKEN_CONTROL" });
+			}
+		},
           broadcast(event: string, data: unknown) {
             if (sd.roomId) io.to(sd.roomId).emit(event, data);
           },
           broadcastTo(excludePlayerId: string, event: string, data: unknown) {
             if (sd.roomId) io.to(sd.roomId).emit(event, { excludePlayer: excludePlayerId, ...(data as Record<string, unknown>) });
+          },
+          editLogContext(reason?: string): EditLogContext {
+            const ctx: EditLogContext = {
+              playerId: this.playerId,
+              playerName: this.playerName,
+            };
+            if (reason !== undefined) ctx.reason = reason;
+            return ctx;
           },
         };
 
@@ -233,7 +154,6 @@ export class RpcRegistry {
 
         try {
           const result = await handler(validation.data, ctx);
-          ctx.state.commit();
           socket.emit("response", createWsResponse(requestId, true, result ?? undefined));
         } catch (error) {
           const message = error instanceof Error ? error.message : "Internal error";

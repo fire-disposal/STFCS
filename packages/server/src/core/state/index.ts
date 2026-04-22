@@ -1,8 +1,7 @@
 /**
- * 状态结构导出
- * 基于 @vt/data 权威设计
+ * 状态管理导出
  */
 
-export { GameStateManager } from "./GameStateManager.js";
+export { MutativeStateManager } from "./MutativeStateManager.js";
+export type { MutateResult, EditLogContext } from "./MutativeStateManager.js";
 export * from "./Token.js";
-export * from "./Component.js";

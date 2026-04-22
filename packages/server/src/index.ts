@@ -114,10 +114,7 @@ if (isDirectRun) {
 // ==================== 导出 ====================
 export { createLogger } from "./infra/simple-logger.js";
 export { RoomManager, Room, type RoomTransportCallbacks } from "./server/rooms/index.js";
-export { GameStateManager } from "./core/state/GameStateManager.js";
-export { gameRuntime, GameRuntime } from "./runtime/index.js";
-export { Match } from "./runtime/index.js";
-export { TurnManager } from "./runtime/index.js";
+export { MutativeStateManager } from "./core/state/index.js";
 
 export {
 	PresetLoader,

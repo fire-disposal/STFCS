@@ -1,9 +1,11 @@
 /**
- * 统一 WebSocket 事件 Schema
+ * 统一 WebSocket 事件 Schema - 重构版
  *
- * 全 WebSocket 方案，所有操作通过 Socket.IO 完成
- * 命名空间格式: {namespace}:{action}
- * 所有请求带 requestId，所有响应匹配 requestId
+ * 接口合并优化：
+ * - customize: 存档操作（InventoryToken/WeaponJSON）
+ * - edit: 实例编辑（CombatToken，广播BattleLogEdit）
+ * - game: 战斗操作（使用 GameActionDef）
+ * - sync: Patch 同步（替代 Delta）
  */
 
 import { z } from "zod"
@@ -13,11 +15,8 @@ import {
   CombatTokenSchema,
   InventoryTokenSchema,
   WeaponJSONSchema,
-  GameSaveSchema,
-  RoomPlayerStateSchema,
   GameRoomStateSchema,
   PointSchema,
-  PlayerProfileSchema,
   AssetListItemSchema,
 } from "./GameSchemas.js"
 
@@ -42,6 +41,12 @@ export type WsResponse = z.infer<typeof WsResponseSchema>
 export const EmptySchema = z.object({})
 export const VoidSchema = z.undefined()
 
+export interface EditLogContext {
+  playerId: string
+  playerName: string
+  reason?: string
+}
+
 interface WsEventDef<P extends z.ZodTypeAny, R extends z.ZodTypeAny> {
   payload: P
   response: R
@@ -49,6 +54,10 @@ interface WsEventDef<P extends z.ZodTypeAny, R extends z.ZodTypeAny> {
 
 type ExtractPayload<T> = T extends WsEventDef<infer P, infer _> ? z.infer<P> : never
 type ExtractResponse<T> = T extends WsEventDef<infer _, infer R> ? z.infer<R> : never
+
+// ============================================================
+// auth 命名空间
+// ============================================================
 
 export const AuthLoginDef = {
   payload: z.object({ playerName: z.string().min(1).max(50) }),
@@ -64,6 +73,10 @@ export const AuthLogoutDef = {
   payload: EmptySchema,
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
+
+// ============================================================
+// profile 命名空间
+// ============================================================
 
 const ClientProfileSchema = z.object({
   nickname: z.string(),
@@ -84,6 +97,10 @@ export const ProfileUpdateDef = {
   }),
   response: z.object({ profile: ClientProfileSchema }),
 } as const satisfies WsEventDef<any, any>
+
+// ============================================================
+// room 命名空间
+// ============================================================
 
 const RoomInfoSchema = z.object({
   roomId: z.string(),
@@ -140,26 +157,6 @@ export const RoomActionDef = {
 } as const satisfies WsEventDef<any, any>
 export type RoomActionPayload = z.infer<typeof RoomActionDef.payload>
 
-export const RoomReadyDef = {
-  payload: EmptySchema,
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const RoomStartDef = {
-  payload: EmptySchema,
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const RoomKickDef = {
-  payload: z.object({ targetId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const RoomTransferHostDef = {
-  payload: z.object({ targetId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
 export const RoomGetAssetsDef = {
   payload: z.object({ includeData: z.boolean().optional() }),
   response: z.object({
@@ -170,6 +167,10 @@ export const RoomGetAssetsDef = {
     })),
   }),
 } as const satisfies WsEventDef<any, any>
+
+// ============================================================
+// customize 命名空间（存档操作）
+// ============================================================
 
 const ShipBuildSchema = z.object({
   id: z.string(),
@@ -195,80 +196,39 @@ const WeaponBuildSchema = z.object({
 })
 export type WeaponBuild = z.infer<typeof WeaponBuildSchema>
 
-export const TokenListDef = {
-  payload: EmptySchema,
-  response: z.object({ ships: z.array(ShipBuildSchema) }),
-} as const satisfies WsEventDef<any, any>
-
-export const TokenGetDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: z.object({ ship: ShipBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const TokenCreateDef = {
-  payload: z.object({ token: InventoryTokenSchema }),
-  response: z.object({ ship: ShipBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const TokenUpdateDef = {
+export const CustomizeTokenDef = {
   payload: z.object({
-    tokenId: z.string(),
-    updates: z.record(z.string(), z.any()),
+    action: z.enum(["list", "get", "upsert", "delete", "copy_preset"]),
+    tokenId: z.string().optional(),
+    token: InventoryTokenSchema.optional(),
+    presetId: z.string().optional(),
   }),
-  response: z.object({ ship: ShipBuildSchema }),
+  response: z.union([
+    z.object({ ships: z.array(ShipBuildSchema) }),
+    z.object({ ship: ShipBuildSchema }),
+    VoidSchema,
+  ]),
 } as const satisfies WsEventDef<any, any>
+export type CustomizeTokenPayload = z.infer<typeof CustomizeTokenDef.payload>
 
-export const TokenDeleteDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const TokenCopyPresetDef = {
-  payload: z.object({ presetId: z.string() }),
-  response: z.object({ ship: ShipBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const TokenMountDef = {
+export const CustomizeWeaponDef = {
   payload: z.object({
-    tokenId: z.string(),
-    mountId: z.string(),
-    weaponId: z.string().nullable(),
+    action: z.enum(["list", "get", "upsert", "delete", "copy_preset"]),
+    weaponId: z.string().optional(),
+    weapon: WeaponJSONSchema.optional(),
+    presetId: z.string().optional(),
   }),
-  response: z.object({ ship: ShipBuildSchema }),
+  response: z.union([
+    z.object({ weapons: z.array(WeaponBuildSchema) }),
+    z.object({ weapon: WeaponBuildSchema }),
+    VoidSchema,
+  ]),
 } as const satisfies WsEventDef<any, any>
+export type CustomizeWeaponPayload = z.infer<typeof CustomizeWeaponDef.payload>
 
-export const WeaponListDef = {
-  payload: EmptySchema,
-  response: z.object({ weapons: z.array(WeaponBuildSchema) }),
-} as const satisfies WsEventDef<any, any>
-
-export const WeaponGetDef = {
-  payload: z.object({ weaponId: z.string() }),
-  response: z.object({ weapon: WeaponBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const WeaponCreateDef = {
-  payload: z.object({ weapon: WeaponJSONSchema }),
-  response: z.object({ weapon: WeaponBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const WeaponUpdateDef = {
-  payload: z.object({
-    weaponId: z.string(),
-    updates: z.record(z.string(), z.any()),
-  }),
-  response: z.object({ weapon: WeaponBuildSchema }),
-} as const satisfies WsEventDef<any, any>
-
-export const WeaponDeleteDef = {
-  payload: z.object({ weaponId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const WeaponCopyPresetDef = {
-  payload: z.object({ presetId: z.string() }),
-  response: z.object({ weapon: WeaponBuildSchema }),
-} as const satisfies WsEventDef<any, any>
+// ============================================================
+// save 命名空间
+// ============================================================
 
 const SaveBuildSchema = z.object({
   $id: z.string(),
@@ -281,29 +241,26 @@ const SaveBuildSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number().optional(),
 })
+export type SaveBuild = z.infer<typeof SaveBuildSchema>
 
-export const SaveListDef = {
-  payload: EmptySchema,
-  response: z.object({ saves: z.array(SaveBuildSchema) }),
-} as const satisfies WsEventDef<any, any>
-
-export const SaveCreateDef = {
+export const SaveActionDef = {
   payload: z.object({
-    name: z.string().min(1).max(100),
+    action: z.enum(["list", "create", "load", "delete"]),
+    saveId: z.string().optional(),
+    name: z.string().optional(),
     description: z.string().optional(),
   }),
-  response: z.object({ save: SaveBuildSchema }),
+  response: z.union([
+    z.object({ saves: z.array(SaveBuildSchema) }),
+    z.object({ save: SaveBuildSchema }),
+    VoidSchema,
+  ]),
 } as const satisfies WsEventDef<any, any>
+export type SaveActionPayload = z.infer<typeof SaveActionDef.payload>
 
-export const SaveLoadDef = {
-  payload: z.object({ saveId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const SaveDeleteDef = {
-  payload: z.object({ saveId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
+// ============================================================
+// asset 命名空间
+// ============================================================
 
 export const AssetUploadDef = {
   payload: z.object({
@@ -317,32 +274,30 @@ export const AssetUploadDef = {
   response: z.object({ assetId: z.string() }),
 } as const satisfies WsEventDef<any, any>
 
-export const AssetListDef = {
+export const AssetActionDef = {
   payload: z.object({
+    action: z.enum(["list", "batch_get", "delete"]),
+    assetIds: z.array(z.string()).optional(),
+    assetId: z.string().optional(),
     type: z.enum(["avatar", "ship_texture", "weapon_texture"]).optional(),
     ownerId: z.string().optional(),
-  }),
-  response: z.object({ assets: z.array(AssetListItemSchema) }),
-} as const satisfies WsEventDef<any, any>
-
-export const AssetBatchGetDef = {
-  payload: z.object({
-    assetIds: z.array(z.string()).min(1),
     includeData: z.boolean().optional(),
   }),
-  response: z.object({
-    results: z.array(z.object({
+  response: z.union([
+    z.object({ assets: z.array(AssetListItemSchema) }),
+    z.object({ results: z.array(z.object({
       assetId: z.string(),
       info: AssetListItemSchema.nullable(),
       data: z.string().optional(),
-    })),
-  }),
+    })) }),
+    VoidSchema,
+  ]),
 } as const satisfies WsEventDef<any, any>
+export type AssetActionPayload = z.infer<typeof AssetActionDef.payload>
 
-export const AssetDeleteDef = {
-  payload: z.object({ assetId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
+// ============================================================
+// preset 命名空间
+// ============================================================
 
 export const PresetListTokensDef = {
   payload: z.object({
@@ -370,6 +325,10 @@ export const PresetGetWeaponDef = {
   response: z.object({ preset: WeaponJSONSchema }),
 } as const satisfies WsEventDef<any, any>
 
+// ============================================================
+// game 命名空间
+// ============================================================
+
 export const GameActionDef = {
   payload: z.object({
     action: z.enum(["move", "rotate", "attack", "shield", "vent", "end_turn", "advance_phase"]),
@@ -378,7 +337,6 @@ export const GameActionDef = {
     strafe: z.number().optional(),
     angle: z.number().optional(),
     active: z.boolean().optional(),
-    direction: z.number().min(0).max(360).optional(),
     allocations: z.array(z.object({
       mountId: z.string(),
       targets: z.array(z.object({
@@ -392,167 +350,55 @@ export const GameActionDef = {
 } as const satisfies WsEventDef<any, any>
 export type GameActionPayload = z.infer<typeof GameActionDef.payload>
 
-export const GameMoveDef = {
-  payload: z.object({
-    tokenId: z.string(),
-    forward: z.number().optional(),
-    strafe: z.number().optional(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameRotateDef = {
-  payload: z.object({
-    tokenId: z.string(),
-    angle: z.number(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameAttackDef = {
-  payload: z.object({
-    tokenId: z.string(),
-    allocations: z.array(z.object({
-      mountId: z.string(),
-      targets: z.array(z.object({
-        targetId: z.string(),
-        shots: z.number(),
-        quadrant: z.number().optional(),
-      })),
-    })),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameShieldDef = {
-  payload: z.object({
-    tokenId: z.string(),
-    active: z.boolean(),
-    direction: z.number().min(0).max(360).optional(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameVentDef = {
-  payload: z.object({
-    tokenId: z.string(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameEndTurnDef = {
-  payload: z.object({
-    tokenId: z.string().optional(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const GameAdvancePhaseDef = {
-  payload: EmptySchema,
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
 export const GameQueryDef = {
   payload: z.object({
-    type: z.enum(["targets", "movement", "ownership", "combat_state"]),
+    type: z.enum(["targets", "movement", "ownership", "combat_state", "weapon_state"]),
     tokenId: z.string(),
+    mountId: z.string().optional(),
   }),
   response: z.object({ result: z.any() }),
 } as const satisfies WsEventDef<any, any>
 export type GameQueryPayload = z.infer<typeof GameQueryDef.payload>
 
-export const GameQueryTargetsDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: z.object({ targets: z.any() }),
-} as const satisfies WsEventDef<any, any>
-
-export const GameQueryMovementDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: z.object({ movement: z.any() }),
-} as const satisfies WsEventDef<any, any>
-
-export const GameQueryOwnershipDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: z.object({ ownerId: z.string().nullable(), faction: z.string().nullable() }),
-} as const satisfies WsEventDef<any, any>
-
-export const GameQueryCombatStateDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: z.object({
-    hull: z.number().nullable(),
-    flux: z.number().nullable(),
-    overloaded: z.boolean().nullable(),
-  }),
-} as const satisfies WsEventDef<any, any>
-
-export const DmSpawnDef = {
-  payload: z.object({
-    token: CombatTokenSchema,
-    faction: FactionSchema,
-    position: PointSchema.optional(),
-  }),
-  response: z.object({ tokenId: z.string() }),
-} as const satisfies WsEventDef<any, any>
-
-export const DmModifyDef = {
-  payload: z.object({
-    tokenId: z.string(),
-    field: z.string(),
-    value: z.any(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const DmRemoveDef = {
-  payload: z.object({ tokenId: z.string() }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const DmSetModifierDef = {
-  payload: z.object({
-    key: z.string(),
-    value: z.number(),
-    duration: z.number().optional(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
-export const DmForceEndTurnDef = {
-  payload: z.object({
-    faction: FactionSchema.optional(),
-  }),
-  response: VoidSchema,
-} as const satisfies WsEventDef<any, any>
-
 // ============================================================
-// 通用编辑接口（非DM专属，需日志广播）
+// edit 命名空间（实例编辑，广播BattleLogEdit）
 // ============================================================
 
 export const EditTokenDef = {
   payload: z.object({
-    tokenId: z.string(),
-    path: z.string(),
-    value: z.any(),
+    action: z.enum(["spawn", "modify", "remove", "heal", "damage", "restore", "reset"]),
+    tokenId: z.string().optional(),
+    token: CombatTokenSchema.optional(),
+    path: z.string().optional(),
+    value: z.any().optional(),
+    amount: z.number().optional(),
+    faction: FactionSchema.optional(),
+    position: PointSchema.optional(),
     reason: z.string().optional(),
   }),
-  response: VoidSchema,
+  response: z.union([
+    z.object({ tokenId: z.string() }),
+    VoidSchema,
+  ]),
 } as const satisfies WsEventDef<any, any>
 export type EditTokenPayload = z.infer<typeof EditTokenDef.payload>
 
-export const EditTokenBatchDef = {
+export const EditRoomDef = {
   payload: z.object({
-    edits: z.array(z.object({
-      tokenId: z.string(),
-      path: z.string(),
-      value: z.any(),
-    })),
-    reason: z.string().optional(),
+    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn"]),
+    key: z.string().optional(),
+    value: z.number().optional(),
+    duration: z.number().optional(),
+    faction: FactionSchema.optional(),
+    phase: z.string().optional(),
+    turn: z.number().optional(),
   }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
+export type EditRoomPayload = z.infer<typeof EditRoomDef.payload>
 
 // ============================================================
-// 状态同步：Patch格式（替代Delta）
+// sync 命名空间（Patch 格式）
 // ============================================================
 
 export const PatchOpSchema = z.enum(["add", "remove", "replace", "move", "copy", "test"])
@@ -572,8 +418,13 @@ export const StatePatchPayloadSchema = z.object({
 })
 export type StatePatchPayload = z.infer<typeof StatePatchPayloadSchema>
 
+export const SyncRequestFullDef = {
+  payload: EmptySchema,
+  response: GameRoomStateSchema,
+} as const satisfies WsEventDef<any, any>
+
 // ============================================================
-// 战斗日志事件（编辑操作日志）
+// BattleLog（编辑操作日志）
 // ============================================================
 
 export const BattleLogEditSchema = z.object({
@@ -614,10 +465,9 @@ export const BattleLogPayloadSchema = z.object({
 })
 export type BattleLogPayload = z.infer<typeof BattleLogPayloadSchema>
 
-export const SyncRequestFullDef = {
-  payload: EmptySchema,
-  response: GameRoomStateSchema,
-} as const satisfies WsEventDef<any, any>
+// ============================================================
+// WsEventDefinitions（合并后的接口）
+// ============================================================
 
 export const WsEventDefinitions = {
   "auth:login": AuthLoginDef,
@@ -629,62 +479,30 @@ export const WsEventDefinitions = {
   "room:join": RoomJoinDef,
   "room:leave": RoomLeaveDef,
   "room:action": RoomActionDef,
-  "room:ready": RoomReadyDef,
-  "room:start": RoomStartDef,
-  "room:kick": RoomKickDef,
-  "room:transfer_host": RoomTransferHostDef,
   "room:get_assets": RoomGetAssetsDef,
-  "token:list": TokenListDef,
-  "token:get": TokenGetDef,
-  "token:create": TokenCreateDef,
-  "token:update": TokenUpdateDef,
-  "token:delete": TokenDeleteDef,
-  "token:copy_preset": TokenCopyPresetDef,
-  "token:mount": TokenMountDef,
-  "weapon:list": WeaponListDef,
-  "weapon:get": WeaponGetDef,
-  "weapon:create": WeaponCreateDef,
-  "weapon:update": WeaponUpdateDef,
-  "weapon:delete": WeaponDeleteDef,
-  "weapon:copy_preset": WeaponCopyPresetDef,
-  "save:list": SaveListDef,
-  "save:create": SaveCreateDef,
-  "save:load": SaveLoadDef,
-  "save:delete": SaveDeleteDef,
+  "customize:token": CustomizeTokenDef,
+  "customize:weapon": CustomizeWeaponDef,
+  "save:action": SaveActionDef,
   "asset:upload": AssetUploadDef,
-  "asset:list": AssetListDef,
-  "asset:batch_get": AssetBatchGetDef,
-  "asset:delete": AssetDeleteDef,
+  "asset:action": AssetActionDef,
   "preset:list_tokens": PresetListTokensDef,
   "preset:list_weapons": PresetListWeaponsDef,
   "preset:get_token": PresetGetTokenDef,
   "preset:get_weapon": PresetGetWeaponDef,
   "game:action": GameActionDef,
-  "game:move": GameMoveDef,
-  "game:rotate": GameRotateDef,
-  "game:attack": GameAttackDef,
-  "game:shield": GameShieldDef,
-  "game:vent": GameVentDef,
-  "game:end_turn": GameEndTurnDef,
-  "game:advance_phase": GameAdvancePhaseDef,
   "game:query": GameQueryDef,
-  "game:query_targets": GameQueryTargetsDef,
-  "game:query_movement": GameQueryMovementDef,
-  "game:query_ownership": GameQueryOwnershipDef,
-  "game:query_combat_state": GameQueryCombatStateDef,
-  "dm:spawn": DmSpawnDef,
-  "dm:modify": DmModifyDef,
-  "dm:remove": DmRemoveDef,
-  "dm:set_modifier": DmSetModifierDef,
-  "dm:force_end_turn": DmForceEndTurnDef,
   "edit:token": EditTokenDef,
-  "edit:token_batch": EditTokenBatchDef,
+  "edit:room": EditRoomDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 
 export type WsEventName = keyof typeof WsEventDefinitions
 export type WsPayload<E extends WsEventName> = ExtractPayload<(typeof WsEventDefinitions)[E]>
 export type WsResponseData<E extends WsEventName> = ExtractResponse<(typeof WsEventDefinitions)[E]>
+
+// ============================================================
+// 辅助函数
+// ============================================================
 
 export function validateWsPayload<E extends WsEventName>(
   event: E,
@@ -721,102 +539,36 @@ export function createWsBroadcast(type: string, payload: unknown): { type: strin
   return { type, timestamp: Date.now(), payload }
 }
 
-export const DeltaTypeSchema = z.enum([
-  "token_update", "token_add", "token_remove", "token_destroyed",
-  "player_update", "player_join", "player_leave", "host_change",
-  "phase_change", "turn_change", "faction_turn",
-  "modifier_add", "modifier_remove",
-])
-export type DeltaType = z.infer<typeof DeltaTypeSchema>
-
-export const DeltaChangeSchema = z.object({
-  type: DeltaTypeSchema,
-  id: z.string().optional(),
-  field: z.string().optional(),
-  value: z.any().optional(),
-  oldValue: z.any().optional(),
-})
-export type DeltaChange = z.infer<typeof DeltaChangeSchema>
-
-export const SyncDeltaPayloadSchema = z.object({
-  timestamp: z.number(),
-  changes: z.array(DeltaChangeSchema),
-})
-export type SyncDeltaPayload = z.infer<typeof SyncDeltaPayloadSchema>
-
-export function createSyncDelta(changes: DeltaChange[]): SyncDeltaPayload {
-  return { timestamp: Date.now(), changes }
+// Patch 工具函数
+export function createPatch(op: PatchOp, path: (string | number)[], value?: unknown, old?: unknown): StatePatch {
+  return { op, path, value, old }
 }
 
-export const GameEventTypeSchema = z.enum([
-  "attack_result", "damage_log", "token_destroyed",
-  "flux_critical", "overloaded", "shield_break", "turn_summary",
-])
-export type GameEventType = z.infer<typeof GameEventTypeSchema>
-
-export const SyncEventPayloadSchema = z.object({
-  type: GameEventTypeSchema,
-  timestamp: z.number(),
-  payload: z.object({
-    attackerId: z.string().optional(),
-    targetId: z.string().optional(),
-    weaponId: z.string().optional(),
-    tokenId: z.string().optional(),
-    result: z.any().optional(),
-    log: z.string().optional(),
-    faction: z.string().optional(),
-  }),
-})
-export type SyncEventPayload = z.infer<typeof SyncEventPayloadSchema>
-
-export function deltaTokenUpdate(tokenId: string, field: string, value: unknown, oldValue?: unknown): DeltaChange {
-  return { type: "token_update", id: tokenId, field, value, oldValue }
+export function createPatchPayload(patches: StatePatch[]): StatePatchPayload {
+  return { patches, timestamp: Date.now() }
 }
 
-export function deltaTokenAdd(tokenId: string, token: unknown): DeltaChange {
-  return { type: "token_add", id: tokenId, value: token }
-}
-
-export function deltaTokenRemove(tokenId: string): DeltaChange {
-  return { type: "token_remove", id: tokenId }
-}
-
-export function deltaTokenDestroyed(tokenId: string): DeltaChange {
-  return { type: "token_destroyed", id: tokenId }
-}
-
-export function deltaPlayerUpdate(playerId: string, player: unknown): DeltaChange {
-  return { type: "player_update", id: playerId, value: player }
-}
-
-export function deltaPlayerJoin(playerId: string, player: unknown): DeltaChange {
-  return { type: "player_join", id: playerId, value: player }
-}
-
-export function deltaPlayerLeave(playerId: string): DeltaChange {
-  return { type: "player_leave", id: playerId }
-}
-
-export function deltaHostChange(newOwnerId: string): DeltaChange {
-  return { type: "host_change", value: newOwnerId }
-}
-
-export function deltaPhaseChange(phase: string): DeltaChange {
-  return { type: "phase_change", value: phase }
-}
-
-export function deltaTurnChange(turn: number): DeltaChange {
-  return { type: "turn_change", value: turn }
-}
-
-export function deltaFactionTurn(faction: string): DeltaChange {
-  return { type: "faction_turn", value: faction }
-}
-
-export function deltaModifierAdd(key: string, value: number): DeltaChange {
-  return { type: "modifier_add", field: key, value }
-}
-
-export function deltaModifierRemove(key: string): DeltaChange {
-  return { type: "modifier_remove", field: key }
+// BattleLog 工具函数
+export function createBattleLogEdit(
+  playerId: string,
+  playerName: string,
+  tokenId: string,
+  tokenName: string,
+  path: string,
+  oldValue: unknown,
+  newValue: unknown,
+  reason?: string
+): BattleLogEdit {
+  return {
+    type: "edit",
+    playerId,
+    playerName,
+    tokenId,
+    tokenName,
+    path,
+    oldValue,
+    newValue,
+    reason,
+    timestamp: Date.now(),
+  }
 }

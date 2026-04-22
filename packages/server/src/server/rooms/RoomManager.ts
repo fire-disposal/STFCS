@@ -6,7 +6,7 @@
 
 import { createLogger } from "../../infra/simple-logger.js";
 import { Room, type RoomTransportCallbacks } from "./Room.js";
-import type { GameState } from "../../core/types/common.js";
+import type { GameRoomState } from "@vt/data";
 
 export interface RoomManagerOptions {
 	maxRooms?: number;
@@ -126,7 +126,7 @@ export class RoomManager {
 		creatorId: string;
 		playerCount: number;
 		maxPlayers: number;
-		gameState: GameState;
+		gameState: GameRoomState;
 		phase: string;
 		createdAt: number;
 	}> {
