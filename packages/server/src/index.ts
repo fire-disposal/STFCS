@@ -9,6 +9,8 @@ import { fileURLToPath } from "url";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handlers.js";
+import { PresetLoader } from "./services/preset/PresetLoader.js";
+import { persistence } from "./persistence/PersistenceManager.js";
 
 const logger = createLogger("server");
 
@@ -34,12 +36,19 @@ export class STFCServer {
 		this.roomManager = new RoomManager();
 	}
 
-	async start(): Promise<void> {
+async start(): Promise<void> {
 		try {
+			await (persistence.roomSaves as any).init();
+			await (persistence.ships as any).init();
+			await (persistence.weapons as any).init();
+
+			const presetLoader = new PresetLoader(persistence);
+			await presetLoader.loadAllPresets();
+
 			this.httpServer = createServer();
 			this.io = new IOServer(this.httpServer, {
 				cors: { origin: this.config.corsOrigin },
-				maxHttpBufferSize: 10 * 1024 * 1024, // 10MB
+				maxHttpBufferSize: 10 * 1024 * 1024,
 			});
 
 			setupSocketIO(this.io, this.roomManager);

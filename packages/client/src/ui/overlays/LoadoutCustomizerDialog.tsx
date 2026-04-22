@@ -27,7 +27,7 @@ import {
     type WeaponBuild,
     type Texture,
 } from "@vt/data";
-import { Plus, Save, Upload, Copy, ShieldCheck } from "lucide-react";
+import { Plus, Save, Upload, Copy, ShieldCheck, Trash2 } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -421,6 +421,28 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [networkManager, reloadData]);
 
+    const deleteShip = useCallback(async (shipId: string) => {
+        try {
+            await networkManager.send("customize:token", { action: "delete", tokenId: shipId });
+            notify.success("已删除");
+            setSelectedShipBuildId(null);
+            await reloadData();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "删除失败");
+        }
+    }, [networkManager, reloadData]);
+
+    const deleteWeapon = useCallback(async (weaponId: string) => {
+        try {
+            await networkManager.send("customize:weapon", { action: "delete", weaponId });
+            notify.success("已删除");
+            setSelectedWeaponBuildId(null);
+            await reloadData();
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "删除失败");
+        }
+    }, [networkManager, reloadData]);
+
     const uploadShipTexture = useCallback(async (file: File, useColorKey: boolean) => {
         try {
             const uploadFile = await convertToPng(file, useColorKey ? { color: keyColor, tolerance: keyTolerance } : undefined);
@@ -480,16 +502,23 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 <Card>
                                     <Flex justify="between" align="center" mb="2">
                                         <Text weight="bold">舰船</Text>
-                                        <Select.Root value={selectedShipBuildId ?? ""} onValueChange={setSelectedShipBuildId}>
-                                            <Select.Trigger style={{ width: 200 }} />
-                                            <Select.Content>
-                                                {shipBuilds.map((item) => (
-                                                    <Select.Item key={item.id} value={item.id}>
-                                                        {item.data.metadata?.name ?? shortId(item.id)}
-                                                    </Select.Item>
-                                                ))}
-                                            </Select.Content>
-                                        </Select.Root>
+                                        <Flex gap="2" align="center">
+                                            <Select.Root value={selectedShipBuildId ?? ""} onValueChange={setSelectedShipBuildId}>
+                                                <Select.Trigger style={{ width: 200 }} />
+                                                <Select.Content>
+                                                    {shipBuilds.map((item) => (
+                                                        <Select.Item key={item.id} value={item.id}>
+                                                            {item.data.metadata?.name ?? shortId(item.id)}
+                                                        </Select.Item>
+                                                    ))}
+                                                </Select.Content>
+                                            </Select.Root>
+                                            {selectedShipBuildId && (
+                                                <Button size="1" variant="ghost" color="red" onClick={() => void deleteShip(selectedShipBuildId)}>
+                                                    <Trash2 size={12} />
+                                                </Button>
+                                            )}
+                                        </Flex>
                                     </Flex>
                                     <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={texturePreviewUrl} />
                                     <Flex justify="center" gap="2" mt="1">
@@ -775,16 +804,23 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 <Card>
                                     <Flex justify="between" align="center" mb="2">
                                         <Text weight="bold">武器</Text>
-                                        <Select.Root value={selectedWeaponBuildId ?? ""} onValueChange={setSelectedWeaponBuildId}>
-                                            <Select.Trigger style={{ width: 200 }} />
-                                            <Select.Content>
-                                                {weaponBuilds.map((item) => (
-                                                    <Select.Item key={item.id} value={item.id}>
-                                                        {item.data.metadata?.name ?? shortId(item.id)}
-                                                    </Select.Item>
-                                                ))}
-                                            </Select.Content>
-                                        </Select.Root>
+                                        <Flex gap="2" align="center">
+                                            <Select.Root value={selectedWeaponBuildId ?? ""} onValueChange={setSelectedWeaponBuildId}>
+                                                <Select.Trigger style={{ width: 200 }} />
+                                                <Select.Content>
+                                                    {weaponBuilds.map((item) => (
+                                                        <Select.Item key={item.id} value={item.id}>
+                                                            {item.data.metadata?.name ?? shortId(item.id)}
+                                                        </Select.Item>
+                                                    ))}
+                                                </Select.Content>
+                                            </Select.Root>
+                                            {selectedWeaponBuildId && (
+                                                <Button size="1" variant="ghost" color="red" onClick={() => void deleteWeapon(selectedWeaponBuildId)}>
+                                                    <Trash2 size={12} />
+                                                </Button>
+                                            )}
+                                        </Flex>
                                     </Flex>
 
                                     {weaponDraft && (

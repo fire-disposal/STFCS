@@ -252,6 +252,9 @@ rpc.namespace("customize", {
         if (!p.weapon) throw err("需要 weapon 数据", "WEAPON_DATA_REQUIRED");
         let weapon;
         if (p.weaponId) {
+          const existing = await persistence.weapons.findById(p.weaponId);
+          if (!existing) throw err("武器不存在", "WEAPON_NOT_FOUND");
+          if (existing.ownerId !== ctx.playerId) throw err("无权修改此武器", "NOT_OWNER");
           weapon = await persistence.weapons.update(p.weaponId, { data: p.weapon as WeaponJSON });
         } else {
           weapon = await persistence.weapons.create({
