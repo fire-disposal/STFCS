@@ -386,10 +386,8 @@ export function applyFlux(context: EngineContext): { newState: any; events: any[
 		
 		if (ventResult.success) {
 			updates.set(`ship:${ship.$id}`, {
-				tokenJson: {
-					...ship.tokenJson,
-					runtime: ship.runtime,
-				},
+				spec: ship.spec,
+				runtime: ship.runtime,
 			});
 
 			events.push(createFluxChangeEvent(
@@ -452,7 +450,7 @@ export function processFluxDissipation(state: any): {
 		const newTotalFlux = getTotalFlux(ship);
 		const newOverloaded = ship.runtime?.overloaded;
 
-		shipUpdates.set(shipId, { tokenJson: { ...ship.tokenJson, runtime: ship.runtime } });
+		shipUpdates.set(shipId, { spec: ship.spec, runtime: ship.runtime });
 
 		if (oldTotalFlux !== newTotalFlux || oldOverloaded !== newOverloaded) {
 			fluxChanges.set(shipId, {

@@ -405,8 +405,8 @@ export function getMovementStatus(ship: any): {
 	canMove: boolean;
 } {
 	// 应用 speed 和 turnRate modifier
-	const baseMaxSpeed = ship.tokenJson?.token?.maxSpeed || 0;
-	const baseMaxTurn = ship.tokenJson?.token?.maxTurnRate || 0;
+	const baseMaxSpeed = ship.spec?.maxSpeed || 0;
+	const baseMaxTurn = ship.spec?.maxTurnRate || 0;
 	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
 	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
 	const movement = getMovementState(ship);

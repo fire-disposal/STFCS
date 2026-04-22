@@ -15,8 +15,8 @@ export interface EngineContext {
   
   // 中间数据
   player?: any; // PlayerState
-  ship?: any;   // ShipState
-  targetShip?: any; // ShipState (for attack)
+  ship?: any;   // CombatToken
+  targetShip?: any; // CombatToken (for attack)
   weapon?: any; // WeaponRuntime (for attack)
   
   // 输出

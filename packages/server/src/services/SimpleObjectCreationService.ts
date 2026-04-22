@@ -61,7 +61,6 @@ export class SimpleObjectCreationService {
       // 创建基本对象结构
       const object = {
         $id: objectId,
-        $schema: `${request.objectType}-v1`,
         type: request.objectType,
         data: request.data,
         metadata: {
