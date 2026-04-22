@@ -29,7 +29,7 @@ import { Text, TextStyle, Container } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 
 const HP_BAR_OFFSET_Y = -40;
-const LABEL_OFFSET_Y = -25;
+const LABEL_OFFSET_Y = 25;
 const DEFAULT_HULL_MAX = 100;
 const DEFAULT_HP_PER_BAR = 20;
 const MAX_BARS_PER_SIDE = 15;
@@ -157,7 +157,7 @@ export class ShipHUDManager {
 			text: this.formatLabel(ship),
 			style: labelStyle,
 		});
-		label.anchor.set(0.5, 1);
+		label.anchor.set(0.5, 0);
 		label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 
 		this.hpBarLayer.addChild(hpBarContainer);
@@ -276,7 +276,7 @@ export class ShipHUDManager {
 
 		const centerStyle = new TextStyle({
 			fill: hpColor,
-			fontSize: 10,
+			fontSize: 14,
 			fontFamily: "monospace",
 			fontWeight: "600",
 		});
