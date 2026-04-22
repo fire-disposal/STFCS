@@ -4,11 +4,20 @@ import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
 import { useSocketRoom, useTokens } from "@/network";
 import { notify } from "@/ui/shared/Notification";
+import {
+	Box,
+	Flex,
+	Card,
+	Text,
+	Badge,
+	Button,
+	Dialog,
+	ScrollArea,
+	IconButton,
+} from "@radix-ui/themes";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Ship, Eye } from "lucide-react";
 import React, { useState } from "react";
 import type { SocketNetworkManager } from "@/network";
-import "@/styles/game-layout.css";
-
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
 import RealityEditPanel from "@/ui/panels/RealityEditPanel";
@@ -64,48 +73,63 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const cursorPosition = mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 };
 
 	if (!room || !room.state) {
-		return <div className="game-loading"><span>连接中...</span></div>;
+		return (
+			<Box style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+				<Text color="gray">连接中...</Text>
+			</Box>
+		);
 	}
 
 	const players = Object.values(room.state.players).filter((p) => p.connected);
-	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "#4a9eff"
-		: room.state.currentPhase === GamePhase.DM_ACTION ? "#ff6f8f"
-		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "#9b59b6" : "#f1c40f";
+	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "blue"
+		: room.state.currentPhase === GamePhase.DM_ACTION ? "red"
+		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "purple" : "amber";
 
 	return (
-		<div className="game-view">
-			<header className="game-header">
-				<div className="game-header__left">
-					<span className="game-phase" style={{ borderColor: phaseColor }}>
-						{room.state.currentPhase === GamePhase.DM_ACTION && <Crown size={14} style={{ color: phaseColor }} />}
-						<span>{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}</span>
-					</span>
-					<span className="game-turn">回合 {room.state.turnCount}</span>
-				</div>
+		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
+			{/* Header */}
+			<Card style={{ flexShrink: 0, height: "40px", borderRadius: 0, background: "rgba(10, 20, 35, 0.95)", borderBottom: "1px solid rgba(74, 158, 255, 0.2)" }}>
+				<Flex justify="between" align="center" height="100%" px="3">
+					<Flex align="center" gap="3">
+						<Badge color={phaseColor} variant="solid" style={{ fontSize: "12px" }}>
+							{room.state.currentPhase === GamePhase.DM_ACTION && <Crown size={12} style={{ marginRight: 4 }} />}
+							{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}
+						</Badge>
+						<Text size="2" color="gray">回合 {room.state.turnCount}</Text>
+					</Flex>
 
-				<div className="game-header__center">
-					{players.slice(0, 6).map((p) => (
-						<span key={p.sessionId} className={`player-chip ${p.role === "HOST" ? "player-chip--dm" : ""}`}>
-							{p.role === "HOST" && <Crown size={12} />}
-							<span className="player-chip__name">{p.nickname}</span>
-							{p.isReady ? <CheckCircle size={12} className="player-chip__ready" /> : <XCircle size={12} />}
-						</span>
-					))}
-				</div>
+					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
+						{players.slice(0, 6).map((p) => (
+							<Flex key={p.sessionId} align="center" gap="1" style={{ padding: "2px 6px", background: "rgba(26, 45, 66, 0.5)", borderRadius: 2 }}>
+								{p.role === "HOST" && <Crown size={10} color="#ff6f8f" />}
+								<Text size="1" style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>{p.nickname}</Text>
+								{p.isReady ? <CheckCircle size={10} color="#2ecc71" /> : <XCircle size={10} color="#6b7280" />}
+							</Flex>
+						))}
+					</Flex>
 
-				<div className="game-header__right">
-					<button className="game-btn game-btn--ghost" onClick={() => setShowPlayerRoster(true)}><Users size={16} /></button>
-					<button className="game-btn game-btn--ghost" onClick={() => setShowSettings(true)}><Settings size={16} /></button>
-					<button className="game-btn game-btn--danger" onClick={onLeaveRoom}><LogOut size={16} /></button>
-				</div>
-			</header>
+					<Flex align="center" gap="2">
+						<IconButton variant="ghost" size="1" onClick={() => setShowPlayerRoster(true)}>
+							<Users size={14} />
+						</IconButton>
+						<IconButton variant="ghost" size="1" onClick={() => setShowSettings(true)}>
+							<Settings size={14} />
+						</IconButton>
+						<Button variant="ghost" size="1" color="red" onClick={onLeaveRoom}>
+							<LogOut size={14} />
+						</Button>
+					</Flex>
+				</Flex>
+			</Card>
 
-			<main className="game-main">
-				<section className="game-map">
+			{/* Main */}
+			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
+				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
 					<PixiCanvas ships={tokens} />
-				</section>
-			</main>
+				</Box>
+			</Box>
 
+			{/* Battle Panel */}
 			<BattlePanel
 				tabs={[
 					{
@@ -147,59 +171,96 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				defaultActiveTab="ship-info"
 			/>
 
-			{showPlayerRoster && (
-				<div className="modal-overlay" onClick={() => setShowPlayerRoster(false)}>
-					<div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-						<div className="modal-header">
-							<span><Users size={16} /> 玩家列表</span>
-							<button className="modal-close" onClick={() => setShowPlayerRoster(false)}>×</button>
-						</div>
-						<div className="modal-body">
+			{/* Player Roster Modal */}
+			<Dialog.Root open={showPlayerRoster} onOpenChange={setShowPlayerRoster}>
+				<Dialog.Content style={{ maxWidth: 400 }}>
+					<Dialog.Title>
+						<Flex align="center" gap="2">
+							<Users size={16} /> 玩家列表
+						</Flex>
+					</Dialog.Title>
+					<ScrollArea style={{ maxHeight: 300 }}>
+						<Flex direction="column" gap="2">
 							{players.map((p) => (
-								<div key={p.sessionId} className={`player-row ${p.sessionId === room.sessionId ? "player-row--current" : ""}`}>
-									{p.role === "HOST" && <Crown size={14} className="player-row__icon" />}
-									<span className="player-row__name">{p.nickname}</span>
-									{p.isReady ? <CheckCircle size={12} className="player-row__ready" /> : <XCircle size={12} />}
-								</div>
+								<Card key={p.sessionId} variant="surface" style={{
+									borderLeft: p.sessionId === room.sessionId ? "2px solid #4a9eff" : "none"
+								}}>
+									<Flex align="center" gap="2">
+										{p.role === "HOST" && <Crown size={14} color="#ff6f8f" />}
+										<Text size="2" style={{ flex: 1 }}>{p.nickname}</Text>
+										{p.isReady ? <CheckCircle size={12} color="#2ecc71" /> : <XCircle size={12} color="#6b7280" />}
+									</Flex>
+								</Card>
 							))}
-						</div>
-						<div className="modal-footer">
-							{isHost && <button className="action-btn" onClick={() => { navigator.clipboard.writeText(networkManager.buildInviteLink(room.roomId)); notify.success("邀请链接已复制"); }}>邀请链接</button>}
-							<button className="action-btn action-btn--danger" onClick={onLeaveRoom}>离开房间</button>
-						</div>
-					</div>
-				</div>
-			)}
+						</Flex>
+					</ScrollArea>
+					<Flex justify="end" gap="2" mt="4">
+						{isHost && (
+							<Button variant="soft" onClick={() => {
+								navigator.clipboard.writeText(networkManager.buildInviteLink(room.roomId));
+								notify.success("邀请链接已复制");
+							}}>
+								邀请链接
+							</Button>
+						)}
+						<Button variant="soft" color="red" onClick={onLeaveRoom}>离开房间</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
 
-			{showSettings && (
-				<div className="modal-overlay" onClick={() => setShowSettings(false)}>
-					<div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-						<div className="modal-header">
-							<span><Settings size={16} /> 设置</span>
-							<button className="modal-close" onClick={() => setShowSettings(false)}>×</button>
-						</div>
-						<div className="modal-body">
-							<div className="setting-row">
-								<span>显示网格</span>
-								<button className={`toggle ${useUIStore.getState().showGrid ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleGrid()} />
-							</div>
-							<div className="setting-row">
-								<span>显示背景</span>
-								<button className={`toggle ${useUIStore.getState().showBackground ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleBackground()} />
-							</div>
-							<div className="setting-row">
-								<span>显示武器弧</span>
-								<button className={`toggle ${useUIStore.getState().showWeaponArcs ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleWeaponArcs()} />
-							</div>
-							<div className="setting-row">
-								<span>显示移动范围</span>
-								<button className={`toggle ${useUIStore.getState().showMovementRange ? "toggle--on" : ""}`} onClick={() => useUIStore.getState().toggleMovementRange()} />
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
-		</div>
+			{/* Settings Modal */}
+			<Dialog.Root open={showSettings} onOpenChange={setShowSettings}>
+				<Dialog.Content style={{ maxWidth: 360 }}>
+					<Dialog.Title>
+						<Flex align="center" gap="2">
+							<Settings size={16} /> 设置
+						</Flex>
+					</Dialog.Title>
+					<Flex direction="column" gap="3">
+						<Flex align="center" justify="between">
+							<Text size="2">显示网格</Text>
+							<IconButton
+								variant={useUIStore.getState().showGrid ? "solid" : "soft"}
+								color={useUIStore.getState().showGrid ? "blue" : "gray"}
+								onClick={() => useUIStore.getState().toggleGrid()}
+							>
+								{useUIStore.getState().showGrid ? <CheckCircle size={14} /> : <XCircle size={14} />}
+							</IconButton>
+						</Flex>
+						<Flex align="center" justify="between">
+							<Text size="2">显示背景</Text>
+							<IconButton
+								variant={useUIStore.getState().showBackground ? "solid" : "soft"}
+								color={useUIStore.getState().showBackground ? "blue" : "gray"}
+								onClick={() => useUIStore.getState().toggleBackground()}
+							>
+								{useUIStore.getState().showBackground ? <CheckCircle size={14} /> : <XCircle size={14} />}
+							</IconButton>
+						</Flex>
+						<Flex align="center" justify="between">
+							<Text size="2">显示武器弧</Text>
+							<IconButton
+								variant={useUIStore.getState().showWeaponArcs ? "solid" : "soft"}
+								color={useUIStore.getState().showWeaponArcs ? "blue" : "gray"}
+								onClick={() => useUIStore.getState().toggleWeaponArcs()}
+							>
+								{useUIStore.getState().showWeaponArcs ? <CheckCircle size={14} /> : <XCircle size={14} />}
+							</IconButton>
+						</Flex>
+						<Flex align="center" justify="between">
+							<Text size="2">显示移动范围</Text>
+							<IconButton
+								variant={useUIStore.getState().showMovementRange ? "solid" : "soft"}
+								color={useUIStore.getState().showMovementRange ? "blue" : "gray"}
+								onClick={() => useUIStore.getState().toggleMovementRange()}
+							>
+								{useUIStore.getState().showMovementRange ? <CheckCircle size={14} /> : <XCircle size={14} />}
+							</IconButton>
+						</Flex>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
+		</Box>
 	);
 };
 
