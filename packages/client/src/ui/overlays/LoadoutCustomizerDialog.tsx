@@ -164,11 +164,14 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [editorTab, setEditorTab] = useState<"form" | "json">("form");
 
     const [shipPreviewZoom, setShipPreviewZoom] = useState(1);
+    const [weaponPreviewZoom, setWeaponPreviewZoom] = useState(1);
     const [texturePreviewUrl, setTexturePreviewUrl] = useState<string | null>(null);
     const [weaponTexturePreviewUrl, setWeaponTexturePreviewUrl] = useState<string | null>(null);
 
     const [keyColor, setKeyColor] = useState("#000000");
     const [keyTolerance, setKeyTolerance] = useState(12);
+    const [weaponKeyColor, setWeaponKeyColor] = useState("#000000");
+    const [weaponKeyTolerance, setWeaponKeyTolerance] = useState(12);
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -449,9 +452,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [assetSocket, keyColor, keyTolerance, updateShipTexture, loadTexturePreview]);
 
-    const uploadWeaponTexture = useCallback(async (file: File) => {
+    const uploadWeaponTexture = useCallback(async (file: File, useColorKey: boolean) => {
         try {
-            const uploadFile = await convertToPng(file);
+            const uploadFile = await convertToPng(file, useColorKey ? { color: weaponKeyColor, tolerance: weaponKeyTolerance } : undefined);
             const assetId = await assetSocket.upload("weapon_texture", uploadFile);
             notify.success("上传成功");
             updateWeaponTexture({ assetId });
@@ -459,7 +462,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview]);
+    }, [assetSocket, weaponKeyColor, weaponKeyTolerance, updateWeaponTexture, loadWeaponTexturePreview]);
 
     if (loadError) {
         return (
@@ -928,7 +931,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
 <Card>
                                         <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">贴图预览</Text>
+                                            <Text weight="bold">武器预览</Text>
                                             <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
                                                 <Upload size={12} /> 上传图片
                                             </Button>
@@ -936,15 +939,28 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                         <Flex direction="column" gap="2" align="center">
                                             {weaponDraft && (
-                                                <MiniWeaponPreview weapon={weaponDraft} texturePreviewUrl={weaponTexturePreviewUrl} />
+                                                <MiniWeaponPreview 
+                                                    weapon={weaponDraft} 
+                                                    texturePreviewUrl={weaponTexturePreviewUrl}
+                                                    zoom={weaponPreviewZoom}
+                                                    onZoomChange={setWeaponPreviewZoom}
+                                                />
                                             )}
                                             {!weaponDraft && (
                                                 <Text size="1" color="gray">请先选择武器</Text>
                                             )}
                                         </Flex>
 
-                                        {weaponDraft && weaponTexturePreviewUrl && (
+                                        <Flex justify="center" gap="2" mt="1">
+                                            <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.max(0.2, weaponPreviewZoom - 0.25))}>-</Button>
+                                            <Text size="1">{weaponPreviewZoom.toFixed(2)}x</Text>
+                                            <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.min(4, weaponPreviewZoom + 0.25))}>+</Button>
+                                        </Flex>
+
+                                        {weaponDraft && (
                                             <Flex direction="column" gap="2" mt="2">
+                                                <Separator size="2" />
+
                                                 <Text size="1" weight="bold">贴图位置调整</Text>
                                                 <Grid columns="3" gap="3">
                                                     <Box>
@@ -952,11 +968,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
-                                                                min={-50}
-                                                                max={50}
+                                                                min={-100}
+                                                                max={100}
                                                                 value={weaponDraft.spec.texture?.offsetX ?? 0}
                                                                 onChange={(e) => updateWeaponTexture({ offsetX: Number(e.target.value) })}
-                                                                style={{ width: 60 }}
+                                                                style={{ width: 80 }}
                                                             />
                                                             <Text size="1">{weaponDraft.spec.texture?.offsetX ?? 0}</Text>
                                                         </Flex>
@@ -966,43 +982,55 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
-                                                                min={-50}
-                                                                max={50}
+                                                                min={-100}
+                                                                max={100}
                                                                 value={weaponDraft.spec.texture?.offsetY ?? 0}
                                                                 onChange={(e) => updateWeaponTexture({ offsetY: Number(e.target.value) })}
-                                                                style={{ width: 60 }}
+                                                                style={{ width: 80 }}
                                                             />
                                                             <Text size="1">{weaponDraft.spec.texture?.offsetY ?? 0}</Text>
                                                         </Flex>
                                                     </Box>
                                                     <Box>
-                                                        <Text size="1" color="gray">缩放</Text>
+                                                        <Text size="1" color="gray">缩放比例</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
                                                                 min={0.5}
-                                                                max={2}
+                                                                max={3}
                                                                 step={0.1}
                                                                 value={weaponDraft.spec.texture?.scale ?? 1}
                                                                 onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) })}
-                                                                style={{ width: 60 }}
+                                                                style={{ width: 80 }}
                                                             />
                                                             <Text size="1">{(weaponDraft.spec.texture?.scale ?? 1).toFixed(1)}x</Text>
                                                         </Flex>
                                                     </Box>
                                                 </Grid>
+
+                                                <Separator size="2" />
+
+                                                <Text size="1" weight="bold">抠图取色（透明化指定颜色）</Text>
+                                                <Flex align="center" gap="2">
+                                                    <Text size="1" color="gray">目标色:</Text>
+                                                    <input type="color" value={weaponKeyColor} onChange={(e) => setWeaponKeyColor(e.target.value)} style={{ width: 32, height: 24, cursor: "pointer" }} />
+                                                    <Text size="1">{weaponKeyColor}</Text>
+                                                    <Text size="1" color="gray">容差:</Text>
+                                                    <input type="range" min={0} max={50} value={weaponKeyTolerance} onChange={(e) => setWeaponKeyTolerance(Number(e.target.value))} style={{ width: 60 }} />
+                                                    <Text size="1">{weaponKeyTolerance}</Text>
+                                                </Flex>
                                             </Flex>
                                         )}
 
                                         <input
                                             ref={weaponTextureInputRef}
                                             type="file"
-                                            accept="image/png,image/jpeg,image/webp"
+                                            accept="image/png,image/jpeg,image/webp,image/gif"
                                             style={{ display: "none" }}
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                void uploadWeaponTexture(file);
+                                                void uploadWeaponTexture(file, weaponKeyColor !== "#000000" || weaponKeyTolerance > 0);
                                                 e.currentTarget.value = "";
                                         }}
                                     />
