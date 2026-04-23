@@ -71,6 +71,8 @@ interface UIState {
 	showHexagonArmor: boolean;
 	showShieldArc: boolean;           // 护盾辉光弧线显示
 	showFluxIndicators: boolean;      // 辐能/过载状态指示器显示
+	showShipTextures: boolean;        // 舰船贴图显示
+	showWeaponTextures: boolean;      // 武器贴图显示
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 
@@ -127,6 +129,8 @@ interface UIActions {
 	toggleHexagonArmor: () => void;
 	toggleShieldArc: () => void;
 	toggleFluxIndicators: () => void;
+	toggleShipTextures: () => void;
+	toggleWeaponTextures: () => void;
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
 
@@ -181,6 +185,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showHexagonArmor: false,
 	showShieldArc: true,              // 默认显示护盾弧线
 	showFluxIndicators: true,         // 默认显示辐能指示器
+	showShipTextures: true,           // 默认显示舰船贴图
+	showWeaponTextures: true,         // 默认显示武器贴图
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
 
@@ -245,6 +251,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleHexagonArmor: () => set((state) => ({ showHexagonArmor: !state.showHexagonArmor })),
 	toggleShieldArc: () => set((state) => ({ showShieldArc: !state.showShieldArc })),
 	toggleFluxIndicators: () => set((state) => ({ showFluxIndicators: !state.showFluxIndicators })),
+	toggleShipTextures: () => set((state) => ({ showShipTextures: !state.showShipTextures })),
+	toggleWeaponTextures: () => set((state) => ({ showWeaponTextures: !state.showWeaponTextures })),
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),

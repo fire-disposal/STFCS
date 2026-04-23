@@ -32,6 +32,7 @@ function createLayers(app: any): LayerRegistry {
     const grid = new Container();
     const cursor = new Container();
     const shipSprites = new Container();
+    const weaponSprites = new Container();
     const tacticalTokens = new Container();
     const effects = new Container();
     const weaponArcs = new Container();
@@ -50,6 +51,7 @@ function createLayers(app: any): LayerRegistry {
         grid,
         cursor,
         shipSprites,
+        weaponSprites,
         tacticalTokens,
         effects,
         weaponArcs,
@@ -79,6 +81,7 @@ function createLayers(app: any): LayerRegistry {
         grid,
         cursor,
         shipSprites,
+        weaponSprites,
         tacticalTokens,
         effects,
         weaponArcs,

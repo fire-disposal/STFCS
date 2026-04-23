@@ -46,6 +46,8 @@ import { useStarfieldRendering } from "../systems/StarfieldRenderer";
 import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
 import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
 import { useWeaponArcRendering } from "../entities/WeaponArcRenderer";
+import { useShieldArcRendering } from "../entities/ShieldArcRenderer";
+import { useFluxIndicatorRendering } from "../entities/FluxIndicatorRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 import { useTextureLoader } from "../systems/useTextureLoader";
@@ -64,7 +66,6 @@ interface GameCanvasProps {
 	onClick?: (x: number, y: number) => void;
 	movementPreview?: MovementPreviewState;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
-	showShipTextures?: boolean;
 }
 
 const useStarfield = () => {
@@ -109,7 +110,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	onClick,
 	movementPreview,
 	fetchAssets = noopFetchAssets,
-	showShipTextures = true,
 }) => {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
@@ -127,6 +127,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		showLabels,
 		showEffects,
 		showShipIcons,
+		showShipTextures,
+		showWeaponTextures,
 		selectedShipId,
 		setZoom,
 		setMapCursor,
@@ -200,6 +202,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	);
 
 	useArmorHexagonRendering(layerSystem.layers, ships);
+	useShieldArcRendering(layerSystem.layers, ships);
+	useFluxIndicatorRendering(layerSystem.layers, ships);
 	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview, {
 		show: showMovementRange,
 	});
@@ -212,7 +216,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
 		layerSystem.layers.shipSprites.visible = showShipTextures;
-	}, [layerSystem.layers, showEffects, showShipIcons, showShipTextures]);
+		layerSystem.layers.weaponSprites.visible = showWeaponTextures;
+	}, [layerSystem.layers, showEffects, showShipIcons, showShipTextures, showWeaponTextures]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;

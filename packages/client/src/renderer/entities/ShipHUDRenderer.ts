@@ -69,6 +69,7 @@ interface ShipHUDCache {
 		currentHp: number;
 		maxHp: number;
 		name: string;
+		displayName: string;
 		selected: boolean;
 	};
 }
@@ -175,6 +176,7 @@ export class ShipHUDManager {
 				currentHp: ship.runtime.hull,
 				maxHp: hullMax,
 				name: ship.metadata?.name || ship.$id,
+				displayName: this.getDisplayName(ship),
 				selected: isSelected,
 			},
 		});
@@ -223,9 +225,11 @@ export class ShipHUDManager {
 		}
 
 		const newName = ship.metadata?.name || ship.$id;
+		const newDisplayName = this.getDisplayName(ship);
 		const nameChanged = newName !== last.name;
+		const displayNameChanged = newDisplayName !== last.displayName;
 
-		if (nameChanged) {
+		if (displayNameChanged || nameChanged) {
 			cached.label.text = this.formatLabel(ship);
 		}
 
@@ -236,11 +240,16 @@ export class ShipHUDManager {
 			currentHp: ship.runtime.hull,
 			maxHp: hullMax,
 			name: newName,
+			displayName: newDisplayName,
 			selected: isSelected,
 		};
 	}
 
 	private formatLabel(ship: CombatToken): string {
+		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
+	}
+
+	private getDisplayName(ship: CombatToken): string {
 		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
 	}
 

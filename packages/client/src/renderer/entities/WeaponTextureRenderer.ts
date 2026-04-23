@@ -2,12 +2,12 @@
  * 武器贴图渲染 Hook
  *
  * 职责：
- * 1. 在 shipSprites 层渲染武器贴图精灵
+ * 1. 在 weaponSprites 层渲染武器贴图精灵
  * 2. 正确应用 mount.position, mount.facing, weapon.texture offset/scale
  * 3. 相对舰船位置计算（考虑舰船旋转）
  * 4. 缓存管理
  *
- * 渲染层：world.shipSprites (zIndex 6)
+ * 渲染层：world.weaponSprites (zIndex 16)
  */
 
 import { Sprite } from "pixi.js";
@@ -30,7 +30,7 @@ export function useWeaponTextureRendering(
 	const cacheRef = useRef<Map<string, WeaponTextureCacheItem>>(new Map());
 
 	useEffect(() => {
-		if (!layers?.shipSprites) return;
+		if (!layers?.weaponSprites) return;
 
 		const cache = cacheRef.current;
 		const currentKeys = new Set<string>();
@@ -60,14 +60,10 @@ export function useWeaponTextureRendering(
 				const weaponOffsetY = weapon.spec.texture.offsetY ?? 0;
 				const weaponScale = weapon.spec.texture.scale ?? 1;
 
-				// 贴图偏移坐标系与挂载点一致：
-				// weaponOffsetX 正 → 左舷 → 世界 -X
-				// weaponOffsetY 正 → 船头 → 世界 -Y
 				const headingRad = (ship.runtime.heading * Math.PI) / 180;
 				const mountWorldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
 				const mountWorldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
 				
-				// 武器贴图相对于挂载点的偏移（不考虑 heading，因为武器已跟随舰船旋转）
 				const worldX = mountWorldX - weaponOffsetX;
 				const worldY = mountWorldY - weaponOffsetY;
 
@@ -89,7 +85,7 @@ export function useWeaponTextureRendering(
 					sprite.rotation = totalRotation;
 					sprite.scale.set(weaponScale);
 
-					layers.shipSprites.addChild(sprite);
+					layers.weaponSprites.addChild(sprite);
 					cache.set(cacheKey, { sprite, shipId: ship.$id, mountId: mount.id });
 				}
 			}
@@ -97,7 +93,7 @@ export function useWeaponTextureRendering(
 
 		for (const [key, item] of cache) {
 			if (!currentKeys.has(key)) {
-				layers.shipSprites.removeChild(item.sprite);
+				layers.weaponSprites.removeChild(item.sprite);
 				item.sprite.destroy();
 				cache.delete(key);
 			}
@@ -106,10 +102,10 @@ export function useWeaponTextureRendering(
 
 	useEffect(() => {
 		return () => {
-			if (!layers?.shipSprites) return;
+			if (!layers?.weaponSprites) return;
 
 			for (const item of cacheRef.current.values()) {
-				layers.shipSprites.removeChild(item.sprite);
+				layers.weaponSprites.removeChild(item.sprite);
 				item.sprite.destroy();
 			}
 			cacheRef.current.clear();

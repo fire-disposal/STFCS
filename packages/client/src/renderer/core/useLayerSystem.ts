@@ -84,8 +84,10 @@ export interface LayerRegistry {
 	hexagonArmor: Container;
 	/** [zIndex 14] 辐能/过载状态指示器 */
 	fluxIndicators: Container;
-	/** [zIndex 15] 舰船贴图精灵层（最高层） */
+	/** [zIndex 15] 舰船贴图精灵层 */
 	shipSprites: Container;
+	/** [zIndex 16] 武器贴图精灵层（最高层） */
+	weaponSprites: Container;
 
 	// === HUD 层（独立于世界） ===
 	/** HUD 层根容器 - 固定在画布中心，无变换 */

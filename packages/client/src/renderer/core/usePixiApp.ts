@@ -211,6 +211,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			shipSpritesLayer.zIndex = 15;
 			shipSpritesLayer.eventMode = "none";
 
+			const weaponSpritesLayer = new Container();
+			weaponSpritesLayer.zIndex = 16;
+			weaponSpritesLayer.eventMode = "none";
+
 			world.addChild(
 				background,
 				starfieldNebula,
@@ -227,7 +231,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				shieldArcsLayer,
 				hexagonArmorLayer,
 				fluxIndicatorsLayer,
-				shipSpritesLayer
+				shipSpritesLayer,
+				weaponSpritesLayer
 			);
 
 			// === HUD 层（独立于世界，固定像素大小） ===
@@ -263,6 +268,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				grid,
 				cursor: cursorLayer,
 				shipSprites: shipSpritesLayer,
+				weaponSprites: weaponSpritesLayer,
 				tacticalTokens: tacticalTokensLayer,
 				effects,
 				weaponArcs: weaponArcsLayer,

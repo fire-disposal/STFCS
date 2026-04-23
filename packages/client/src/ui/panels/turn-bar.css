@@ -1,0 +1,275 @@
+/**
+ * TurnBar - 回合顶栏样式
+ */
+
+.turn-bar {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 0 16px;
+	height: 40px;
+	background: rgba(10, 20, 35, 0.95);
+	border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.turn-bar__left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.turn-bar__center {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	flex: 1;
+	justify-content: center;
+	padding: 0 20px;
+}
+
+.turn-bar__faction-group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.turn-bar__faction-label {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 2px 6px;
+	border-radius: 2px;
+	margin-right: 4px;
+}
+
+.turn-bar__faction-label--player {
+	color: #4a9eff;
+	background: rgba(74, 158, 255, 0.15);
+}
+
+.turn-bar__faction-label--enemy {
+	color: #ff6f8f;
+	background: rgba(255, 111, 143, 0.15);
+}
+
+.turn-bar__faction-label--neutral {
+	color: #9ca3af;
+	background: rgba(156, 163, 175, 0.15);
+}
+
+.turn-bar__right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.turn-bar__active-faction {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.turn-bar__active-faction--player {
+	color: #4a9eff;
+	background: rgba(74, 158, 255, 0.2);
+	border: 1px solid rgba(74, 158, 255, 0.4);
+}
+
+.turn-bar__active-faction--enemy {
+	color: #ff6f8f;
+	background: rgba(255, 111, 143, 0.2);
+	border: 1px solid rgba(255, 111, 143, 0.4);
+}
+
+.turn-bar__active-faction--neutral {
+	color: #9ca3af;
+	background: rgba(156, 163, 175, 0.2);
+	border: 1px solid rgba(156, 163, 175, 0.4);
+}
+
+.turn-bar__turn-counter {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 12px;
+	background: rgba(20, 40, 60, 0.6);
+	border: 1px solid rgba(74, 158, 255, 0.3);
+	border-radius: 4px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #cfe8ff;
+}
+
+.turn-bar__turn-label {
+	font-size: 10px;
+	color: #6b7280;
+	font-weight: 400;
+}
+
+.turn-bar__turn-number {
+	font-size: 16px;
+	font-weight: 700;
+	color: #4a9eff;
+	min-width: 24px;
+	text-align: center;
+}
+
+/* Mini avatar */
+.turn-avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 4px;
+	overflow: hidden;
+	position: relative;
+	cursor: default;
+	transition: all 0.15s ease;
+}
+
+.turn-avatar:hover {
+	transform: scale(1.1);
+}
+
+.turn-avatar__frame {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	border-radius: 4px;
+	box-sizing: border-box;
+}
+
+.turn-avatar__frame--active-player {
+	border: 2px solid rgba(87, 227, 141, 0.7);
+	box-shadow: 0 0 6px rgba(87, 227, 141, 0.4);
+}
+
+.turn-avatar__frame--active-enemy {
+	border: 2px solid rgba(255, 111, 143, 0.7);
+	box-shadow: 0 0 6px rgba(255, 111, 143, 0.4);
+}
+
+.turn-avatar__frame--waiting {
+	border: 2px solid rgba(128, 128, 128, 0.3);
+}
+
+.turn-avatar__frame--ready {
+	border: 2px solid rgba(74, 158, 255, 0.6);
+	box-shadow: 0 0 4px rgba(74, 158, 255, 0.3);
+}
+
+.turn-avatar__frame--not-ready {
+	border: 2px solid rgba(245, 158, 11, 0.5);
+}
+
+.turn-avatar__inner {
+	width: 22px;
+	height: 22px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(13, 40, 71, 0.5);
+	font-size: 14px;
+	font-weight: 600;
+	color: #cfe8ff;
+}
+
+.turn-avatar__crown {
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	width: 12px;
+	height: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #ff6f8f;
+}
+
+.turn-avatar__ready-dot {
+	position: absolute;
+	bottom: -2px;
+	right: -2px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #2ecc71;
+	border: 1px solid rgba(10, 20, 35, 0.8);
+}
+
+.turn-avatar__ready-dot--not-ready {
+	background: #6b7280;
+}
+
+/* Advance button */
+.turn-bar__advance-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 500;
+	border-radius: 4px;
+	transition: all 0.15s ease;
+}
+
+.turn-bar__advance-btn--active {
+	background: rgba(87, 227, 141, 0.2);
+	color: #2ecc71;
+	border: 1px solid rgba(87, 227, 141, 0.4);
+}
+
+.turn-bar__advance-btn--active:hover {
+	background: rgba(87, 227, 141, 0.3);
+	border-color: rgba(87, 227, 141, 0.6);
+}
+
+.turn-bar__advance-btn--disabled {
+	background: rgba(60, 70, 80, 0.3);
+	color: #6b7280;
+	border: 1px solid rgba(100, 100, 100, 0.3);
+	cursor: not-allowed;
+}
+
+/* Phase badge */
+.turn-bar__phase-badge {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
+}
+
+.turn-bar__phase-badge--deployment {
+	color: #9b59b6;
+	background: rgba(155, 89, 182, 0.2);
+	border: 1px solid rgba(155, 89, 182, 0.4);
+}
+
+.turn-bar__phase-badge--player-action {
+	color: #4a9eff;
+	background: rgba(74, 158, 255, 0.2);
+	border: 1px solid rgba(74, 158, 255, 0.4);
+}
+
+.turn-bar__phase-badge--dm-action {
+	color: #ff6f8f;
+	background: rgba(255, 111, 143, 0.2);
+	border: 1px solid rgba(255, 111, 143, 0.4);
+}
+
+.turn-bar__phase-badge--turn-end {
+	color: #f59e0b;
+	background: rgba(245, 158, 11, 0.2);
+	border: 1px solid rgba(245, 158, 11, 0.4);
+}

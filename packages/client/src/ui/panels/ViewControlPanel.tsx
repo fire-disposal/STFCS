@@ -18,17 +18,24 @@ import {
 	RotateCcw,
 	RotateCw,
 	Home,
+	Layers,
+	Bolt,
+	ShieldCheck,
 } from "lucide-react";
 import { Button, Flex, Box, Text, IconButton } from "@radix-ui/themes";
 import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
-type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "fx" | "icons" | "armor";
+type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "fx" | "icons" | "armor" | "textures" | "weaponTextures" | "shieldArc" | "flux";
 
 const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }> = [
 	{ key: "grid", icon: Grid3X3, label: "网格" },
 	{ key: "bg", icon: Image, label: "背景" },
+	{ key: "textures", icon: Layers, label: "舰船贴图" },
+	{ key: "weaponTextures", icon: Crosshair, label: "武器贴图" },
 	{ key: "arcs", icon: Crosshair, label: "武器弧" },
+	{ key: "shieldArc", icon: ShieldCheck, label: "护盾弧" },
+	{ key: "flux", icon: Bolt, label: "辐能" },
 	{ key: "move", icon: Navigation2, label: "移动范围" },
 	{ key: "labels", icon: Tag, label: "舰船标签" },
 	{ key: "fx", icon: Sparkles, label: "特效" },
@@ -49,6 +56,10 @@ export const ViewControlPanel: React.FC = () => {
 		showEffects,
 		showShipIcons,
 		showHexagonArmor,
+		showShipTextures,
+		showWeaponTextures,
+		showShieldArc,
+		showFluxIndicators,
 		setZoom,
 		setCameraPosition,
 		setViewRotation,
@@ -60,6 +71,10 @@ export const ViewControlPanel: React.FC = () => {
 		toggleEffects,
 		toggleShipIcons,
 		toggleHexagonArmor,
+		toggleShipTextures,
+		toggleWeaponTextures,
+		toggleShieldArc,
+		toggleFluxIndicators,
 	} = useUIStore();
 
 	const layerStates: Record<LayerKey, boolean> = {
@@ -71,6 +86,10 @@ export const ViewControlPanel: React.FC = () => {
 		fx: showEffects,
 		icons: showShipIcons,
 		armor: showHexagonArmor,
+		textures: showShipTextures,
+		weaponTextures: showWeaponTextures,
+		shieldArc: showShieldArc,
+		flux: showFluxIndicators,
 	};
 
 	const layerToggles: Record<LayerKey, () => void> = {
@@ -82,6 +101,10 @@ export const ViewControlPanel: React.FC = () => {
 		fx: toggleEffects,
 		icons: toggleShipIcons,
 		armor: toggleHexagonArmor,
+		textures: toggleShipTextures,
+		weaponTextures: toggleWeaponTextures,
+		shieldArc: toggleShieldArc,
+		flux: toggleFluxIndicators,
 	};
 
 	const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));

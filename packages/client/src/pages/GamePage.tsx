@@ -7,14 +7,12 @@ import type { TabConfig } from "@/ui/panels/BattlePanel";
 import {
 	Box,
 	Flex,
-	Card,
 	Text,
-	Badge,
 	Button,
 	Dialog,
 	IconButton,
 } from "@radix-ui/themes";
-import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket, FastForward } from "lucide-react";
+import { Crown, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
@@ -26,18 +24,11 @@ import RealityEditPanel from "@/ui/panels/RealityEditPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
+import TurnBar from "@/ui/panels/TurnBar";
 import { useGameAction } from "@/hooks/useGameAction";
-import RoomPlayerList from "@/ui/panels/RoomPlayerList";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
 import "@/ui/panels/room-player-list.css";
-
-const PHASE_NAMES: Record<string, string> = {
-	DEPLOYMENT: "部署",
-	PLAYER_ACTION: "玩家回合",
-	DM_ACTION: "DM回合",
-	TURN_END: "结算",
-};
 
 interface GamePageProps {
 	networkManager: SocketNetworkManager;
@@ -65,18 +56,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const tokens = useTokens(room);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
 	const { send } = useGameAction();
-
-	const handleRealityEdit = useCallback(async (shipId: string, runtimeData: Record<string, unknown>) => {
-		if (!room) return;
-		try {
-			for (const [path, value] of Object.entries(runtimeData)) {
-				await room.send("edit:token", { action: "modify", tokenId: shipId, path: `runtime/${path}`, value });
-			}
-			notify.success("舰船数据已提交修改");
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "修改失败");
-		}
-	}, [room]);
 
 	const handleAdvancePhase = useCallback(async () => {
 		const currentPhase = room?.state?.currentPhase;
@@ -136,7 +115,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			id: "reality-edit",
 			label: "现实修改",
 			icon: <Edit size={14} />,
-			component: <RealityEditPanel ship={selectedShip} onSubmit={handleRealityEdit} />,
+			component: <RealityEditPanel
+				ship={selectedShip}
+				players={room?.state?.players as Record<string, import("@vt/data").RoomPlayerState>}
+			/>,
 			enabled: Boolean(isHost),
 		},
 		{
@@ -167,7 +149,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ViewControlPanel />,
 			enabled: true,
 		},
-	], [selectedShip, handleRealityEdit, isHost, room, networkManager, cursorPosition, phase, turnCount, activeFaction]);
+	], [selectedShip, isHost, room, networkManager, cursorPosition, phase, turnCount, activeFaction]);
 
 	if (!room || !room.state || !networkManager.getCurrentRoomId()) {
 		return (
@@ -179,70 +161,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	}
 
 	const players = Object.values(room.state.players).filter((p) => p.connected);
-	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "blue"
-		: room.state.currentPhase === GamePhase.DM_ACTION ? "red"
-			: room.state.currentPhase === GamePhase.DEPLOYMENT ? "purple" : "amber";
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
-			<Card style={{ flexShrink: 0, height: "40px", borderRadius: 0, background: "rgba(10, 20, 35, 0.95)", borderBottom: "1px solid rgba(74, 158, 255, 0.2)" }}>
-				<Flex justify="between" align="center" height="100%" px="3">
-					<Flex align="center" gap="3">
-						<Badge color={phaseColor} variant="solid" style={{ fontSize: "12px" }}>
-							{room.state.currentPhase === GamePhase.DM_ACTION && <Crown size={12} style={{ marginRight: 4 }} />}
-							{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}
-						</Badge>
-						<Text size="2" color="gray">回合 {room.state.turnCount}</Text>
-						
-						{phase === "DEPLOYMENT" && (
-							<Button
-								size="1"
-								variant={isReady ? "solid" : "outline"}
-								color={isReady ? "green" : "gray"}
-								onClick={() => networkManager.setReady()}
-							>
-								{isReady ? "取消准备" : "准备"}
-							</Button>
-						)}
-						
-						{phase !== "DEPLOYMENT" && (
-							<Button
-								size="1"
-								variant="solid"
-								color="green"
-								disabled={!isHost}
-								onClick={handleAdvancePhase}
-							>
-								<FastForward size={12} />
-								{phase === "PLAYER_ACTION" && "结束玩家回合"}
-								{phase === "DM_ACTION" && "结束DM回合"}
-								{phase === "TURN_END" && "开始新回合"}
-							</Button>
-						)}
-					</Flex>
-
-					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
-						<RoomPlayerList
-							players={room.state.players}
-							currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
-							phase={room.state.currentPhase as GamePhase}
-							maxVisible={6}
-						/>
-					</Flex>
-
-					<Flex align="center" gap="2">
-						<IconButton variant="ghost" size="1" onClick={() => setShowPlayerRoster(true)}>
-							<Users size={14} />
-						</IconButton>
-						<IconButton variant="ghost" size="1" onClick={() => setShowSettings(true)}>
-							<Settings size={14} />
-						</IconButton>
-						<Button variant="ghost" size="1" color="red" onClick={onLeaveRoom}>
-							<LogOut size={14} />
-						</Button>
-					</Flex>
-				</Flex>
-			</Card>
+			<TurnBar
+				phase={room.state.currentPhase as GamePhase}
+				turnCount={room.state.turnCount}
+				activeFaction={room.state.activeFaction as import("@vt/data").Faction | undefined}
+				players={room.state.players as Record<string, import("@vt/data").RoomPlayerState>}
+				currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
+				isHost={isHost}
+				isReady={isReady}
+				onReadyToggle={() => networkManager.setReady()}
+				onAdvancePhase={handleAdvancePhase}
+			/>
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>

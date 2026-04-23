@@ -102,8 +102,8 @@ export function useShieldArcRendering(
 	options: ShieldArcOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ShieldArcCacheItem>>(new Map());
-	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
-	const show = options.show ?? showWeaponArcs;
+	const showShieldArc = useUIStore((state) => state.showShieldArc);
+	const show = options.show ?? showShieldArc;
 	const defaultRadius = options.shieldRadius ?? DEFAULT_SHIELD_RADIUS;
 	const defaultArc = options.shieldArc ?? DEFAULT_SHIELD_ARC;
 	const defaultMax = options.shieldMax ?? 100;

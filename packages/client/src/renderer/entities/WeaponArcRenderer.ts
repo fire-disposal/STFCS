@@ -41,6 +41,7 @@ interface WeaponArcCache {
 interface AimLineCache {
 	graphics: Graphics;
 	shipId: string;
+	mountId: string;
 }
 
 const ARC_COLOR = 0x4fc3ff;
@@ -157,18 +158,19 @@ export function useWeaponArcRendering(
 			const validTargets = calculateValidTargets(selectedShip, mount, ships);
 			if (validTargets.length > 0) {
 				const cacheKey = `${selectedShip.$id}:${mount.id}`;
-				const aimCached = aimLineCacheRef.current.get(cacheKey);
+				let aimCached = aimLineCacheRef.current.get(cacheKey);
 				if (!aimCached) {
 					const graphics = new Graphics();
-					graphics.position.set(worldX, worldY);
-					graphics.rotation = mountFacing;
 					layers.weaponArcs.addChild(graphics);
-					aimLineCacheRef.current.set(cacheKey, { graphics, shipId: selectedShip.$id });
-					drawAimLines(graphics, validTargets, ships);
-				} else {
-					aimCached.graphics.position.set(worldX, worldY);
-					aimCached.graphics.rotation = mountFacing;
-					drawAimLines(aimCached.graphics, validTargets, ships);
+					aimCached = { graphics, shipId: selectedShip.$id, mountId: mount.id };
+					aimLineCacheRef.current.set(cacheKey, aimCached);
+				}
+				drawAimLinesWorld(aimCached.graphics, worldX, worldY, validTargets, ships);
+			} else {
+				const cacheKey = `${selectedShip.$id}:${mount.id}`;
+				const aimCached = aimLineCacheRef.current.get(cacheKey);
+				if (aimCached) {
+					aimCached.graphics.clear();
 				}
 			}
 		}
@@ -351,8 +353,10 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	}
 }
 
-function drawAimLines(
+function drawAimLinesWorld(
 	graphics: Graphics,
+	mountWorldX: number,
+	mountWorldY: number,
 	validTargets: WeaponTargetInfo[],
 	ships: CombatToken[]
 ): void {
@@ -366,14 +370,8 @@ function drawAimLines(
 
 		const targetPos = targetShip.runtime.position;
 
-		const dx = targetPos.x - graphics.position.x;
-		const dy = targetPos.y - graphics.position.y;
-
-		const localDx = dx * Math.cos(-graphics.rotation) - dy * Math.sin(-graphics.rotation);
-		const localDy = dx * Math.sin(-graphics.rotation) + dy * Math.cos(-graphics.rotation);
-
-		graphics.moveTo(0, 0);
-		graphics.lineTo(localDx, localDy);
+		graphics.moveTo(mountWorldX, mountWorldY);
+		graphics.lineTo(targetPos.x, targetPos.y);
 		graphics.stroke({ color: AIM_LINE_COLOR, width: 2, alpha: 0.8 });
 	}
 }
