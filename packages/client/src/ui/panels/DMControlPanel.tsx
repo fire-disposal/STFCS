@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from "react";
-import { FastForward, Settings, ChevronDown, Users, UserX, Play, CheckCircle, XCircle } from "lucide-react";
+import { Settings, ChevronDown, Users, UserX } from "lucide-react";
 import { Button, Flex, Box, Text, Badge, DropdownMenu } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -42,24 +42,10 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 	const readyStats = useMemo(() => {
 		const total = playerList.filter(p => p.connected).length;
 		const ready = playerList.filter(p => p.connected && p.isReady).length;
-		return { total, ready, allReady: total > 0 && ready === total };
+		return { total, ready };
 	}, [playerList]);
 
 	if (!isHost) return null;
-
-	const handleStartGame = async () => {
-		if (!readyStats.allReady) {
-			notify.error("还有玩家未准备");
-			return;
-		}
-		networkManager.startGame();
-		notify.success("游戏已开始");
-	};
-
-	const handleForceEndTurn = async (faction?: "PLAYER" | "ENEMY" | "NEUTRAL") => {
-		const result = await send("edit:room", { action: "force_end_turn", faction } as any);
-		if (result) notify.success("回合已推进");
-	};
 
 	const handleSetPhase = async (newPhase: string) => {
 		const result = await send("edit:room", { action: "set_phase", phase: newPhase });
@@ -102,41 +88,14 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 
 			<Flex className="panel-section" align="center" gap="2">
 				<Text size="1" color="gray">准备</Text>
-				<Badge size="1" color={readyStats.allReady ? "green" : "amber"}>
+				<Badge size="1" color="blue">
 					{readyStats.ready}/{readyStats.total}
 				</Badge>
-				{readyStats.allReady ? <CheckCircle size={12} color="#2ecc71" /> : <XCircle size={12} color="#f59e0b" />}
 			</Flex>
 
 			<Box className="panel-divider" />
 
 			<Flex className="panel-section" align="center" gap="2">
-				{phase === "DEPLOYMENT" && (
-					<Button 
-						size="1" 
-						variant="solid" 
-						color="green"
-						onClick={handleStartGame}
-						disabled={!readyStats.allReady}
-					>
-						<Play size={12} /> 开始游戏
-					</Button>
-				)}
-
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						<Button size="1" variant="solid" color="green">
-							<FastForward size={12} /> 推进回合 <ChevronDown size={10} />
-						</Button>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content>
-						<DropdownMenu.Label>推进回合</DropdownMenu.Label>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						<Button size="1" variant="soft">
@@ -148,7 +107,6 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 						<DropdownMenu.Item onClick={() => handleSetPhase("DEPLOYMENT")}>部署阶段</DropdownMenu.Item>
 						<DropdownMenu.Item onClick={() => handleSetPhase("PLAYER_ACTION")}>玩家回合</DropdownMenu.Item>
 						<DropdownMenu.Item onClick={() => handleSetPhase("DM_ACTION")}>DM回合</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleSetPhase("TURN_END")}>结算阶段</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Label>设置回合</DropdownMenu.Label>
 						<DropdownMenu.Item onClick={() => handleSetTurn(turnCount + 1)}>+1</DropdownMenu.Item>

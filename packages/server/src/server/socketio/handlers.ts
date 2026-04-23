@@ -210,25 +210,25 @@ rpc.namespace("room", {
     switch (p.action) {
       case "ready":
         room.togglePlayerReady(ctx.playerId);
-        break;
+        return;
       case "start":
         ctx.requireHost();
         ctx.state.changeTurn(1);
         ctx.state.changePhase("PLAYER_ACTION");
-        break;
+        return;
       case "kick":
         ctx.requireHost();
         if (!p.targetId) throw err("需要 targetId", "TARGET_REQUIRED");
         room.leavePlayer(p.targetId);
         ctx.state.removePlayer(p.targetId);
-        break;
+        return;
       case "transfer_host":
         ctx.requireHost();
         if (!p.targetId) throw err("需要 targetId", "TARGET_REQUIRED");
         room.creatorId = p.targetId;
         ctx.socket.data.role = "PLAYER";
         ctx.state.changeHost(p.targetId);
-        break;
+        return;
     }
   },
   get_assets: async (payload: unknown, ctx) => {
