@@ -24,8 +24,9 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save } from "lucide-react";
+import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import AboutDialog from "@/ui/overlays/AboutDialog";
 
 interface LobbyPageProps {
 	networkManager: SocketNetworkManager;
@@ -62,6 +63,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 }) => {
 	const [showCustomizer, setShowCustomizer] = useState(false);
 	const [showProfile, setShowProfile] = useState(false);
+	const [showAbout, setShowAbout] = useState(false);
 	const [roomTab, setRoomTab] = useState("all");
 	const [nickname, setNickname] = useState(profile.nickname);
 	// 内部预览状态：如果是 Base64，则直接作为预览，如果是 "👤" 或 null，则为 null
@@ -175,6 +177,9 @@ const isOwnRoom = useCallback(
 							</Box>
 						</Flex>
 						<Flex gap="2" align="center" wrap="wrap">
+							<Button variant="soft" onClick={() => setShowAbout(true)} data-magnetic>
+								<Info size={16} /> 关于
+							</Button>
 							<Button variant="soft" onClick={() => setShowCustomizer(true)} data-magnetic>
 								<Wrench size={16} /> 舰船/武器工坊
 							</Button>
@@ -338,6 +343,11 @@ const isOwnRoom = useCallback(
 				open={showCustomizer}
 				onOpenChange={setShowCustomizer}
 				networkManager={networkManager}
+			/>
+
+			<AboutDialog
+				open={showAbout}
+				onOpenChange={setShowAbout}
 			/>
 		</div>
 	);
