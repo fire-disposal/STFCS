@@ -60,10 +60,16 @@ export function useWeaponTextureRendering(
 				const weaponOffsetY = weapon.spec.texture.offsetY ?? 0;
 				const weaponScale = weapon.spec.texture.scale ?? 1;
 
-				// 挂载点世界坐标（航海坐标系转换）
+				// 贴图偏移坐标系与挂载点一致：
+				// weaponOffsetX 正 → 左舷 → 世界 -X
+				// weaponOffsetY 正 → 船头 → 世界 -Y
 				const headingRad = (ship.runtime.heading * Math.PI) / 180;
-				const worldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad) + weaponOffsetX;
-				const worldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad) + weaponOffsetY;
+				const mountWorldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
+				const mountWorldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
+				
+				// 武器贴图相对于挂载点的偏移（不考虑 heading，因为武器已跟随舰船旋转）
+				const worldX = mountWorldX - weaponOffsetX;
+				const worldY = mountWorldY - weaponOffsetY;
 
 				const totalRotation = ((ship.runtime.heading + mountFacing) * Math.PI) / 180;
 

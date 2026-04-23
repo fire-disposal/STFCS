@@ -54,26 +54,27 @@ export function useShipTextureRendering(
 			const offsetY = ship.spec.texture?.offsetY ?? 0;
 			const scale = ship.spec.texture?.scale ?? 1;
 
+			// 贴图偏移坐标系与挂载点一致：
+			// offsetX 正 → 左舷 → 世界 -X
+			// offsetY 正 → 船头 → 世界 -Y
+			const headingRad = (ship.runtime.heading * Math.PI) / 180;
+			const worldX = ship.runtime.position.x - offsetX * Math.cos(headingRad) + offsetY * Math.sin(headingRad);
+			const worldY = ship.runtime.position.y - offsetX * Math.sin(headingRad) - offsetY * Math.cos(headingRad);
+
 			const cached = cache.get(ship.$id);
 
 			if (cached) {
 				if (cached.sprite.texture !== texture) {
 					cached.sprite.texture = texture;
 				}
-				cached.sprite.position.set(
-					ship.runtime.position.x + offsetX,
-					ship.runtime.position.y + offsetY
-				);
-				cached.sprite.rotation = (ship.runtime.heading * Math.PI) / 180;
+				cached.sprite.position.set(worldX, worldY);
+				cached.sprite.rotation = headingRad;
 				cached.sprite.scale.set(scale);
 			} else {
 				const sprite = new Sprite(texture);
 				sprite.anchor.set(0.5);
-				sprite.position.set(
-					ship.runtime.position.x + offsetX,
-					ship.runtime.position.y + offsetY
-				);
-				sprite.rotation = (ship.runtime.heading * Math.PI) / 180;
+				sprite.position.set(worldX, worldY);
+				sprite.rotation = headingRad;
 				sprite.scale.set(scale);
 
 				layers.shipSprites.addChild(sprite);
