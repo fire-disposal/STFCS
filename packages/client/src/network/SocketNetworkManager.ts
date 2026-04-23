@@ -186,10 +186,13 @@ export class SocketNetworkManager {
 
 	async joinRoom(roomId: string): Promise<RoomJoinResult> {
 		try {
+			logger.info("joinRoom start", { roomId });
 			this.currentRoomId = roomId;
 			await this.request("room:join", { roomId });
+			logger.info("joinRoom request success", { roomId });
 			return { success: true, roomId };
 		} catch (error) {
+			logger.error("joinRoom failed", { error });
 			this.currentRoomId = null;
 			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
@@ -197,6 +200,7 @@ export class SocketNetworkManager {
 
 	leaveRoom(): void {
 		if (this.currentRoomId) {
+			logger.info("leaveRoom", { roomId: this.currentRoomId });
 			this.socket?.emit("request", { event: "room:leave", requestId: crypto.randomUUID(), payload: {} });
 			this.currentRoomId = null;
 			this.setGameState(null);
@@ -247,7 +251,6 @@ export class SocketNetworkManager {
 
 	subscribeState(listener: StateChangeListener): () => void {
 		this.stateListeners.add(listener);
-		listener(this.gameState);
 		return () => this.stateListeners.delete(listener);
 	}
 
@@ -269,6 +272,7 @@ export class SocketNetworkManager {
 
 	private setGameState(state: GameRoomState | null): void {
 		this.gameState = state;
+		logger.info("setGameState", { roomId: state?.roomId ?? "null" });
 		this.stateListeners.forEach(listener => listener(state));
 	}
 
@@ -276,7 +280,7 @@ export class SocketNetworkManager {
 		if (!this.socket) return;
 
 		this.socket.on("disconnect", () => {
-			logger.warn("Disconnected");
+			logger.warn("Disconnected from server");
 			this.currentRoomId = null;
 			this.setGameState(null);
 		});
@@ -294,7 +298,7 @@ export class SocketNetworkManager {
 		});
 
 		this.socket.on("sync:full", (state: GameRoomState) => {
-			logger.info("sync:full received", { roomId: state.roomId });
+			logger.info("sync:full received", { roomId: state.roomId, phase: state.phase });
 			this.currentRoomId = state.roomId;
 			this.setGameState(state);
 		});

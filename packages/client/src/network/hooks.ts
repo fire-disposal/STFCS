@@ -13,6 +13,8 @@ import type { CombatToken } from "@vt/data";
 import { Faction as FactionEnum } from "@vt/data";
 import { setGameRoomRef } from "@/state/stores/uiStore";
 
+const log = (...args: unknown[]) => console.log("[useSocketRoom]", ...args);
+
 export interface RoomInfo {
 	roomId: string;
 	name: string;
@@ -82,18 +84,33 @@ export function useSocketRoom(
 	nmRef.current = networkManager;
 	const onLeaveRef = useRef(onLeaveRoom);
 	onLeaveRef.current = onLeaveRoom;
+	const hadStateRef = useRef(false);
 
 	useEffect(() => {
 		const nm = nmRef.current;
-		if (!nm?.isConnected()) return;
+		if (!nm?.isConnected()) {
+			log("not connected, skipping");
+			setRoomState(null);
+			return;
+		}
+
+		log("subscribing to state changes");
 
 		const unsubscribe = nm.subscribeState((gameState) => {
+			log("state update received", { hasState: !!gameState, roomId: gameState?.roomId, hadState: hadStateRef.current });
+
 			if (!gameState) {
+				if (hadStateRef.current && onLeaveRef.current) {
+					log("state lost, triggering onLeaveRoom");
+					hadStateRef.current = false;
+					onLeaveRef.current();
+				}
 				setRoomState(null);
-				if (onLeaveRef.current) onLeaveRef.current();
 				return;
 			}
 
+			hadStateRef.current = true;
+			log("setting roomState", { roomId: gameState.roomId });
 			setRoomState({
 				roomId: gameState.roomId,
 				playerId: nm.getPlayerId(),
@@ -107,8 +124,30 @@ export function useSocketRoom(
 			});
 		});
 
-		return unsubscribe;
-	}, []);
+		const existingState = nm.getGameState();
+		if (existingState) {
+			log("found existing state", { roomId: existingState.roomId });
+			hadStateRef.current = true;
+			setRoomState({
+				roomId: existingState.roomId,
+				playerId: nm.getPlayerId(),
+				playerName: nm.getPlayerName(),
+				isConnected: true,
+				currentPhase: existingState.phase,
+				turnCount: existingState.turnCount,
+				activeFaction: existingState.activeFaction ?? FactionEnum.PLAYER,
+				tokens: existingState.tokens,
+				players: existingState.players as any,
+			});
+		} else {
+			log("no existing state, waiting for sync:full");
+		}
+
+		return () => {
+			log("unsubscribing");
+			unsubscribe();
+		};
+	}, [networkManager, onLeaveRoom]);
 
 	const send = useCallback(
 		async <E extends keyof any>(event: E, payload: any): Promise<any> => {

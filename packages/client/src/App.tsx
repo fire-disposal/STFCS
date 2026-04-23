@@ -209,7 +209,7 @@ setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
 					/>
 				)}
 
-				{appState === "game" && networkManager.getCurrentRoomId() && (
+				{appState === "game" && (
 					<GamePage
 						networkManager={networkManager}
 						onLeaveRoom={handleBackToLobby}
