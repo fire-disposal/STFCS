@@ -28,7 +28,7 @@ RUN pnpm run build
 # Final runtime stage
 FROM base AS runner
 ENV NODE_ENV=production
-ENV PORT=2567
+ENV PORT=3001
 
 # 复制 deps 阶段的完整依赖基础结构（包含各个 package 的 node_modules 和 package.json）
 # 这能完美保持 pnpm 的符号链接结构
@@ -45,6 +45,6 @@ COPY --from=builder /app/packages/data/dist /app/packages/data/dist
 COPY --from=builder /app/packages/client/dist /app/packages/server/dist/public
 
 WORKDIR /app/packages/server
-EXPOSE 2567
+EXPOSE 3001
 
 CMD ["node", "dist/index.js"]

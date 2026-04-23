@@ -11,18 +11,18 @@ services:
     container_name: stfcs-app
     restart: unless-stopped
     ports:
-      - "2567:2567"  # HTTP & WebSocket & Static Assets
+      - "2567:3001"  # Host 2567 -> App 3001
     environment:
       - NODE_ENV=production
-      - PORT=2567
-      - CORS_ORIGINS=https://stfcs.205716.xyz
+      - PORT=3001
+      - CORS_ORIGINS=*
       - LOG_LEVEL=info
     networks:
       - stfcs-network
     volumes:
       - /srv/stfcs/storage:/app/storage
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:2567/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
       interval: 30s
       timeout: 3s
       retries: 3
