@@ -45,7 +45,13 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
+	const snapRadius = useUIStore((state) => state.snapRadius);
+	const snapToShips = useUIStore((state) => state.snapToShips);
+	const snapToMounts = useUIStore((state) => state.snapToMounts);
 	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
+	const setSnapRadius = useUIStore((state) => state.setSnapRadius);
+	const toggleSnapToShips = useUIStore((state) => state.toggleSnapToShips);
+	const toggleSnapToMounts = useUIStore((state) => state.toggleSnapToMounts);
 
 	const tokens = useTokens(room);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
@@ -226,15 +232,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Dialog.Content>
 			</Dialog.Root>
 
-			<Dialog.Root open={showSettings} onOpenChange={setShowSettings}>
-				<Dialog.Content style={{ maxWidth: 360 }}>
+<Dialog.Root open={showSettings} onOpenChange={setShowSettings}>
+				<Dialog.Content style={{ maxWidth: 400 }}>
 					<Dialog.Title>
 						<Flex align="center" gap="2">
 							<Settings size={16} /> 设置
 						</Flex>
 					</Dialog.Title>
 					<Flex direction="column" gap="3">
-<Flex align="center" justify="between">
+						<Text size="1" weight="bold" color="gray">血条显示</Text>
+						<Flex align="center" justify="between">
 							<Text size="2">血条单位HP</Text>
 							<TextField.Root
 								size="1"
@@ -244,6 +251,42 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							/>
 						</Flex>
 						<Text size="1" color="gray">每个 | 符号代表的HP数量</Text>
+
+						<Box style={{ height: 1, background: "rgba(74, 158, 255, 0.2)", marginTop: 8, marginBottom: 8 }} />
+
+						<Text size="1" weight="bold" color="gray">磁性吸附</Text>
+						<Flex align="center" justify="between">
+							<Text size="2">吸附舰船</Text>
+							<Button
+								size="1"
+								variant={snapToShips ? "solid" : "outline"}
+								color={snapToShips ? "blue" : "gray"}
+								onClick={toggleSnapToShips}
+							>
+								{snapToShips ? "开启" : "关闭"}
+							</Button>
+						</Flex>
+						<Flex align="center" justify="between">
+							<Text size="2">吸附挂载点</Text>
+							<Button
+								size="1"
+								variant={snapToMounts ? "solid" : "outline"}
+								color={snapToMounts ? "blue" : "gray"}
+								onClick={toggleSnapToMounts}
+							>
+								{snapToMounts ? "开启" : "关闭"}
+							</Button>
+						</Flex>
+						<Flex align="center" justify="between">
+							<Text size="2">吸附半径</Text>
+							<TextField.Root
+								size="1"
+								value={snapRadius.toString()}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSnapRadius(Number(e.target.value) || 50)}
+								style={{ width: 60 }}
+							/>
+						</Flex>
+						<Text size="1" color="gray">光标靠近目标时的吸附范围（像素）</Text>
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>
