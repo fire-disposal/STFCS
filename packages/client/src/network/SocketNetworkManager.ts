@@ -50,6 +50,7 @@ export interface PlayerLoadoutResult {
 }
 
 interface InternalGameState {
+	roomId: string;
 	phase?: string;
 	turnCount?: number;
 	activeFaction?: string;
@@ -353,7 +354,9 @@ export class SocketNetworkManager {
 		this.socket.on("response", (data: WsResponse) => this.handleResponse(data));
 
 		this.socket.on("sync:full", (state: GameRoomState) => {
+			this.currentRoomId = state.roomId;
 			this.gameState = {
+				roomId: state.roomId,
 				phase: state.phase,
 				turnCount: state.turnCount,
 				activeFaction: state.activeFaction,

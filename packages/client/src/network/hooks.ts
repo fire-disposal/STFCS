@@ -97,8 +97,11 @@ export function useSocketRoom(
 
 		const handleStateFull = (state: unknown) => {
 			const s = state as Record<string, unknown>;
+			const roomId = (s.roomId as string) || nm.getCurrentRoomId();
+			if (!roomId) return;
+			
 			const newState: RoomState = {
-				roomId: nm.getCurrentRoomId(),
+				roomId,
 				playerId: nm.getPlayerId(),
 				playerName: nm.getPlayerName(),
 				isConnected: true,
