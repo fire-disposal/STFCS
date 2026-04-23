@@ -1,7 +1,10 @@
 /**
  * SocketNetworkManager - Socket.IO 连接管理
- *
- * 完全基于 @vt/data 的 WsEventDefinitions，使用泛型自动推导类型
+ * 
+ * 设计原则：
+ * 1. 状态驱动：gameState 变化自动触发 React 更新
+ * 2. 简单直接：joinRoom 只发送请求，sync:full 自动同步
+ * 3. 利用 Zustand：前端 hooks 直接订阅 gameState
  */
 
 import { io, Socket } from "socket.io-client";
@@ -32,11 +35,6 @@ export interface AuthResult {
 	error?: string;
 }
 
-export interface RoomCreateOptions {
-	roomName: string;
-	maxPlayers?: number;
-}
-
 export interface RoomJoinResult {
 	success: boolean;
 	roomId?: string;
@@ -49,14 +47,7 @@ export interface PlayerLoadoutResult {
 	error?: string;
 }
 
-interface InternalGameState {
-	roomId: string;
-	phase?: string;
-	turnCount?: number;
-	activeFaction?: string;
-	tokens?: Record<string, CombatToken>;
-	players?: Record<string, unknown>;
-}
+type StateChangeListener = (state: GameRoomState | null) => void;
 
 export class SocketNetworkManager {
 	private socket: Socket | null = null;
@@ -64,9 +55,9 @@ export class SocketNetworkManager {
 	private playerId: string | null = null;
 	private playerName: string | null = null;
 	private currentRoomId: string | null = null;
-	private gameState: InternalGameState | null = null;
-	private listeners: Map<string, Set<(data: unknown) => void>> = new Map();
+	private gameState: GameRoomState | null = null;
 	private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timeout: ReturnType<typeof setTimeout> }> = new Map();
+	private stateListeners: Set<StateChangeListener> = new Set();
 
 	constructor(serverUrl: string) {
 		this.serverUrl = serverUrl;
@@ -86,7 +77,7 @@ export class SocketNetworkManager {
 
 		return new Promise((resolve) => {
 			this.socket!.once("connect", () => {
-				logger.info("Socket.IO connected", { socketId: this.socket!.id });
+				logger.info("Connected", { socketId: this.socket!.id });
 				resolve(true);
 			});
 			this.socket!.once("connect_error", (err) => {
@@ -108,7 +99,7 @@ export class SocketNetworkManager {
 		return new Promise<WsResponseData<E>>((resolve, reject) => {
 			const timeout = setTimeout(() => {
 				this.pendingRequests.delete(requestId);
-				reject(new Error(`Request timeout: ${event}`));
+				reject(new Error(`Timeout: ${event}`));
 			}, timeoutMs);
 
 			this.pendingRequests.set(requestId, {
@@ -147,69 +138,60 @@ export class SocketNetworkManager {
 	}
 
 	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
-		if (!this.socket?.connected) return { success: false, error: "Not connected" };
-
 		try {
 			const data = await this.request("profile:get", {});
 			return { success: true, profile: data.profile };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Profile fetch failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
 	async updateProfile(profile: { nickname?: string; avatar?: string }): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
-		if (!this.socket?.connected) return { success: false, error: "Not connected" };
-
 		try {
-			const data = await this.request("profile:update", { nickname: profile.nickname, avatar: profile.avatar });
+			const data = await this.request("profile:update", profile);
 			return { success: true, profile: data.profile };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Profile update failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
 	async getLoadout(): Promise<PlayerLoadoutResult> {
-		if (!this.socket?.connected) return { success: false, error: "Not connected" };
-
 		try {
 			const [tokenRes, weaponRes] = await Promise.all([
 				this.request("customize:token", { action: "list" }),
 				this.request("customize:weapon", { action: "list" }),
 			]);
 
-			const ships = (tokenRes as { ships?: CombatToken[] }).ships ?? [];
-			const weapons = (weaponRes as { weapons?: WeaponJSON[] }).weapons ?? [];
-
-			return { success: true, loadout: { ships, weapons } };
+			return {
+				success: true,
+				loadout: {
+					ships: (tokenRes as any).ships ?? [],
+					weapons: (weaponRes as any).weapons ?? [],
+				},
+			};
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Loadout fetch failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
-	async createRoom(options: RoomCreateOptions): Promise<RoomJoinResult> {
-		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
-
+	async createRoom(options: { roomName: string; maxPlayers?: number }): Promise<RoomJoinResult> {
 		try {
-			const data = await this.request("room:create", { name: options.roomName, maxPlayers: options.maxPlayers ?? 4 }, 10000);
+			const data = await this.request("room:create", { name: options.roomName, maxPlayers: options.maxPlayers ?? 4 });
 			logger.info("Room created", { roomId: data.roomId });
 			return { success: true, roomId: data.roomId };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Room creation failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
 	async joinRoom(roomId: string): Promise<RoomJoinResult> {
-		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
-
-		this.currentRoomId = roomId;
-		this.gameState = null;
-
 		try {
-			const data = await this.request("room:join", { roomId });
-			return { success: true, roomId: data.roomId };
+			this.currentRoomId = roomId;
+			await this.request("room:join", { roomId });
+			return { success: true, roomId };
 		} catch (error) {
 			this.currentRoomId = null;
-			return { success: false, error: error instanceof Error ? error.message : "Join failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
@@ -217,7 +199,7 @@ export class SocketNetworkManager {
 		if (this.currentRoomId) {
 			this.socket?.emit("request", { event: "room:leave", requestId: crypto.randomUUID(), payload: {} });
 			this.currentRoomId = null;
-			this.gameState = null;
+			this.setGameState(null);
 		}
 	}
 
@@ -238,51 +220,13 @@ export class SocketNetworkManager {
 	}
 
 	async deleteRoom(roomId: string): Promise<{ success: boolean; error?: string }> {
-		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
-
 		try {
 			await this.request("room:delete", { roomId });
 			this.currentRoomId = null;
-			this.gameState = null;
+			this.setGameState(null);
 			return { success: true };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Delete failed" };
-		}
-	}
-
-	async forceEndTurn(faction?: "PLAYER" | "ENEMY" | "NEUTRAL"): Promise<{ success: boolean; error?: string }> {
-		try {
-			await this.request("edit:room", { action: "force_end_turn", faction });
-			return { success: true };
-		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
-		}
-	}
-
-	async setPhase(phase: string): Promise<{ success: boolean; error?: string }> {
-		try {
-			await this.request("edit:room", { action: "set_phase", phase });
-			return { success: true };
-		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
-		}
-	}
-
-	async setTurn(turn: number): Promise<{ success: boolean; error?: string }> {
-		try {
-			await this.request("edit:room", { action: "set_turn", turn });
-			return { success: true };
-		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "操作失败" };
-		}
-	}
-
-	async sendGameAction(payload: WsPayload<"game:action">): Promise<{ success: boolean; error?: string }> {
-		try {
-			await this.request("game:action", payload);
-			return { success: true };
-		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : "Action failed" };
+			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
 	}
 
@@ -290,198 +234,121 @@ export class SocketNetworkManager {
 		return this.request(event, payload);
 	}
 
-	getPlayerId(): string | null {
-		return this.playerId;
-	}
-
-	getPlayerName(): string | null {
-		return this.playerName;
-	}
-
-	getCurrentRoomId(): string | null {
-		return this.currentRoomId;
-	}
-
-	getGameState(): InternalGameState | null {
-		return this.gameState;
-	}
-
-	isConnected(): boolean {
-		return this.socket?.connected ?? false;
-	}
-
-	getSocket(): Socket | null {
-		return this.socket;
-	}
-
-	on(event: string, handler: (data: unknown) => void): void {
-		if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-		this.listeners.get(event)!.add(handler);
-		this.socket?.on(event, handler);
-	}
-
-	off(event: string, handler?: (data: unknown) => void): void {
-		if (handler) {
-			this.listeners.get(event)?.delete(handler);
-			this.socket?.off(event, handler);
-		} else {
-			this.listeners.get(event)?.clear();
-			this.socket?.off(event);
-		}
-	}
-
-	emit(event: string, data: unknown): void {
-		this.listeners.get(event)?.forEach((h) => h(data));
-	}
-
 	buildInviteLink(roomId: string): string {
 		return `${window.location.origin}/join/${roomId}`;
 	}
 
-	private setupEventHandlers(): void {
-		if (!this.socket) return;
+	getPlayerId(): string | null { return this.playerId; }
+	getPlayerName(): string | null { return this.playerName; }
+	getCurrentRoomId(): string | null { return this.currentRoomId; }
+	getGameState(): GameRoomState | null { return this.gameState; }
+	getSocket(): Socket | null { return this.socket; }
+	isConnected(): boolean { return this.socket?.connected ?? false; }
 
-		this.socket.on("disconnect", (reason) => {
-			logger.warn("Disconnected", { reason });
-			this.emit("disconnect", { reason });
-		});
-
-		this.socket.on("reconnect", (attemptNumber) => {
-			logger.info("Reconnected", { attemptNumber });
-			this.emit("reconnect", { attemptNumber });
-		});
-
-		this.socket.on("response", (data: WsResponse) => this.handleResponse(data));
-
-		this.socket.on("sync:full", (state: GameRoomState) => {
-			this.currentRoomId = state.roomId;
-			this.gameState = {
-				roomId: state.roomId,
-				phase: state.phase,
-				turnCount: state.turnCount,
-				activeFaction: state.activeFaction,
-				tokens: state.tokens,
-				players: state.players,
-			};
-			this.emit("sync:full", state);
-			this.emit("state:full", state);
-		});
-
-		this.socket.on("state:patch", (data: StatePatchPayload) => {
-			if (this.gameState) this.applyPatches(data.patches);
-			this.emit("state:patch", data);
-		});
-
-		this.socket.on("battle:log", (data: { log: unknown }) => {
-			this.emit("battle:log", data);
-		});
-
-		this.socket.on("error", (data: { code: string; message: string }) => {
-			logger.error("Server error", data);
-			this.emit("error", data);
-		});
-	}
-
-	private handleResponse(data: WsResponse): void {
-		const pending = this.pendingRequests.get(data.requestId);
-		if (!pending) return;
-
-		clearTimeout(pending.timeout);
-		this.pendingRequests.delete(data.requestId);
-
-		if (data.success) {
-			pending.resolve(data.data);
-		} else {
-			pending.reject(new Error(data.error?.message ?? "Unknown error"));
-		}
-	}
-
-	private applyPatches(patches: StatePatch[]): void {
-		for (const patch of patches) {
-			if (!this.gameState) continue;
-
-			const path = patch.path;
-			if (path.length === 0) continue;
-
-			const [rootKey, ...restPath] = path;
-
-			if (rootKey === "tokens") {
-				if (restPath.length === 0) {
-					if (patch.op === "add" && patch.value) {
-						this.gameState.tokens ??= {};
-						this.gameState.tokens[patch.value.$id as string] = patch.value as CombatToken;
-					}
-				} else {
-					const tokenId = String(restPath[0]);
-					if (patch.op === "remove") {
-						if (this.gameState.tokens) delete this.gameState.tokens[tokenId];
-					} else if (patch.op === "add" || patch.op === "replace") {
-						this.gameState.tokens ??= {};
-						if (!this.gameState.tokens[tokenId] && patch.op === "add") {
-							this.gameState.tokens[tokenId] = patch.value as CombatToken;
-						} else if (this.gameState.tokens[tokenId]) {
-							this.applyPatchToObject(this.gameState.tokens[tokenId], restPath.slice(1), patch);
-						}
-					}
-				}
-			} else if (rootKey === "players") {
-				if (restPath.length === 0) {
-					if (patch.op === "add" && patch.value) {
-						this.gameState.players ??= {};
-						const player = patch.value as { sessionId: string };
-						this.gameState.players[player.sessionId] = patch.value;
-					}
-				} else {
-					const playerId = String(restPath[0]);
-					if (patch.op === "remove") {
-						if (this.gameState.players) delete this.gameState.players[playerId];
-					} else if (this.gameState.players?.[playerId]) {
-						this.applyPatchToObject(this.gameState.players[playerId], restPath.slice(1), patch);
-					}
-				}
-			} else if (rootKey === "phase" && patch.op === "replace") {
-				this.gameState.phase = patch.value as string;
-			} else if (rootKey === "turnCount" && patch.op === "replace") {
-				this.gameState.turnCount = patch.value as number;
-			} else if (rootKey === "activeFaction" && patch.op === "replace") {
-				this.gameState.activeFaction = patch.value as string;
-			}
-		}
-	}
-
-	private applyPatchToObject(obj: unknown, path: (string | number)[], patch: StatePatch): void {
-		if (path.length === 0) return;
-		if (!obj || typeof obj !== "object") return;
-
-		const target = obj as Record<string | number, unknown>;
-		const [key, ...rest] = path;
-
-		if (rest.length === 0) {
-			if (patch.op === "remove") {
-				delete target[key];
-			} else {
-				target[key] = patch.value;
-			}
-		} else {
-			if (!target[key]) target[key] = typeof rest[0] === "number" ? [] : {};
-			this.applyPatchToObject(target[key], rest, patch);
-		}
+	subscribeState(listener: StateChangeListener): () => void {
+		this.stateListeners.add(listener);
+		listener(this.gameState);
+		return () => this.stateListeners.delete(listener);
 	}
 
 	disconnect(): void {
 		if (this.socket) {
-			for (const pending of this.pendingRequests.values()) {
-				clearTimeout(pending.timeout);
-				pending.reject(new Error("Disconnected"));
-			}
+			this.pendingRequests.forEach(p => {
+				clearTimeout(p.timeout);
+				p.reject(new Error("Disconnected"));
+			});
 			this.pendingRequests.clear();
 			this.socket.disconnect();
 			this.socket = null;
 			this.playerId = null;
 			this.playerName = null;
 			this.currentRoomId = null;
-			this.gameState = null;
-			this.listeners.clear();
+			this.setGameState(null);
+		}
+	}
+
+	private setGameState(state: GameRoomState | null): void {
+		this.gameState = state;
+		this.stateListeners.forEach(listener => listener(state));
+	}
+
+	private setupEventHandlers(): void {
+		if (!this.socket) return;
+
+		this.socket.on("disconnect", () => {
+			logger.warn("Disconnected");
+			this.currentRoomId = null;
+			this.setGameState(null);
+		});
+
+		this.socket.on("response", (data: WsResponse) => {
+			const pending = this.pendingRequests.get(data.requestId);
+			if (!pending) return;
+			clearTimeout(pending.timeout);
+			this.pendingRequests.delete(data.requestId);
+			if (data.success) {
+				pending.resolve(data.data);
+			} else {
+				pending.reject(new Error(data.error?.message ?? "Error"));
+			}
+		});
+
+		this.socket.on("sync:full", (state: GameRoomState) => {
+			logger.info("sync:full received", { roomId: state.roomId });
+			this.currentRoomId = state.roomId;
+			this.setGameState(state);
+		});
+
+		this.socket.on("state:patch", (data: StatePatchPayload) => {
+			if (!this.gameState) return;
+			this.applyPatches(data.patches);
+			this.setGameState(this.gameState);
+		});
+	}
+
+	private applyPatches(patches: StatePatch[]): void {
+		if (!this.gameState) return;
+
+		for (const patch of patches) {
+			if (patch.path.length === 0) continue;
+			const [root, ...rest] = patch.path;
+
+			if (root === "tokens") {
+				if (rest.length === 0 && patch.op === "add" && patch.value) {
+					this.gameState.tokens[(patch.value as CombatToken).$id] = patch.value as CombatToken;
+				} else if (rest.length >= 1) {
+					const id = String(rest[0]);
+					if (patch.op === "remove") delete this.gameState.tokens[id];
+					else if (rest.length === 1) this.gameState.tokens[id] = patch.value as CombatToken;
+					else if (this.gameState.tokens[id]) this.patchObject(this.gameState.tokens[id], rest.slice(1), patch);
+				}
+			} else if (root === "players") {
+				if (rest.length === 0 && patch.op === "add" && patch.value) {
+					this.gameState.players[(patch.value as any).sessionId] = patch.value as any;
+				} else if (rest.length >= 1) {
+					const id = String(rest[0]);
+					if (patch.op === "remove") delete this.gameState.players[id];
+					else if (this.gameState.players[id]) this.patchObject(this.gameState.players[id], rest.slice(1), patch);
+				}
+			} else if (root === "phase" && patch.op === "replace") {
+				this.gameState.phase = patch.value as any;
+			} else if (root === "turnCount" && patch.op === "replace") {
+				this.gameState.turnCount = patch.value as number;
+			} else if (root === "activeFaction" && patch.op === "replace") {
+				this.gameState.activeFaction = patch.value as any;
+			}
+		}
+	}
+
+	private patchObject(obj: any, path: (string | number)[], patch: StatePatch): void {
+		if (path.length === 0) return;
+		const [key, ...rest] = path;
+		if (rest.length === 0) {
+			if (patch.op === "remove") delete obj[key];
+			else obj[key] = patch.value;
+		} else {
+			if (!obj[key]) obj[key] = {};
+			this.patchObject(obj[key], rest, patch);
 		}
 	}
 }
