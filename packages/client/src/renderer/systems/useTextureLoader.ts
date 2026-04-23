@@ -35,26 +35,34 @@ export function useTextureLoader(options: UseTextureLoaderOptions): TextureCache
 		const toLoad = ids.filter((id) => !cacheRef.current.has(id));
 		if (toLoad.length === 0) return;
 
+		console.log("[useTextureLoader] Loading textures:", toLoad);
+
 		try {
 			const results = await fetchAssets(toLoad, true);
+			console.log("[useTextureLoader] Results:", results.length, results.map(r => ({ id: r.assetId, hasData: !!r.data, mimeType: r.info?.mimeType })));
 
 			for (const result of results) {
 				if (!result.data || !result.info?.mimeType) {
+					console.warn("[useTextureLoader] No data or mimeType for:", result.assetId);
 					cacheRef.current.set(result.assetId, null);
 					continue;
 				}
 
 				try {
 					const dataUrl = `data:${result.info.mimeType};base64,${result.data}`;
+					console.log("[useTextureLoader] Loading texture from dataUrl, length:", result.data.length);
 					const texture = await Assets.load({ src: dataUrl, alias: result.assetId });
+					console.log("[useTextureLoader] Texture loaded:", result.assetId, texture ? "success" : "failed");
 					cacheRef.current.set(result.assetId, texture);
-				} catch {
+				} catch (err) {
+					console.error("[useTextureLoader] Failed to load texture:", result.assetId, err);
 					cacheRef.current.set(result.assetId, null);
 				}
 			}
 
 			for (const id of toLoad) {
 				if (!results.some((r) => r.assetId === id)) {
+					console.warn("[useTextureLoader] Missing result for:", id);
 					cacheRef.current.set(id, null);
 				}
 			}
@@ -70,6 +78,7 @@ export function useTextureLoader(options: UseTextureLoaderOptions): TextureCache
 	}, [fetchAssets]);
 
 	useEffect(() => {
+		console.log("[useTextureLoader] assetIds changed:", assetIds);
 		loadTextures(assetIds);
 	}, [assetIds.join(","), loadTextures]);
 

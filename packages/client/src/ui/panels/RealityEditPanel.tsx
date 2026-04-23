@@ -31,25 +31,26 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 	const playerList = Object.values(players).filter((p) => p.connected);
 
 	useEffect(() => {
-		if (!ship) return;
-		setHull(ship.runtime?.hull ?? 0);
-		setHeading(ship.runtime?.heading ?? 0);
-		setFluxSoft(ship.runtime?.fluxSoft ?? 0);
-		setFluxHard(ship.runtime?.fluxHard ?? 0);
-		setOverloaded(ship.runtime?.overloaded ?? false);
-		setShieldActive(ship.runtime?.shield?.active ?? false);
+		if (!ship?.runtime) return;
+		setHull(ship.runtime.hull ?? 0);
+		setHeading(ship.runtime.heading ?? 0);
+		setFluxSoft(ship.runtime.fluxSoft ?? 0);
+		setFluxHard(ship.runtime.fluxHard ?? 0);
+		setOverloaded(ship.runtime.overloaded ?? false);
+		setShieldActive(ship.runtime.shield?.active ?? false);
 		setSelectedOwnerId(ship.metadata?.owner ?? null);
-	}, [ship]);
+	}, [ship?.runtime, ship?.metadata?.owner]);
 
 	const handleReset = () => {
-		if (!ship) return;
-		setHull(ship.runtime?.hull ?? 0);
-		setHeading(ship.runtime?.heading ?? 0);
-		setFluxSoft(ship.runtime?.fluxSoft ?? 0);
-		setFluxHard(ship.runtime?.fluxHard ?? 0);
-		setOverloaded(ship.runtime?.overloaded ?? false);
-		setShieldActive(ship.runtime?.shield?.active ?? false);
+		if (!ship?.runtime) return;
+		setHull(ship.runtime.hull ?? 0);
+		setHeading(ship.runtime.heading ?? 0);
+		setFluxSoft(ship.runtime.fluxSoft ?? 0);
+		setFluxHard(ship.runtime.fluxHard ?? 0);
+		setOverloaded(ship.runtime.overloaded ?? false);
+		setShieldActive(ship.runtime.shield?.active ?? false);
 		setSelectedOwnerId(ship.metadata?.owner ?? null);
+		setEditMode(false);
 	};
 
 	const handleSave = async () => {

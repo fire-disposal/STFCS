@@ -9,7 +9,6 @@ import {
 	Crosshair,
 	Navigation2,
 	Tag,
-	Sparkles,
 	Monitor,
 	Shield,
 	ZoomIn,
@@ -26,21 +25,20 @@ import { Button, Flex, Box, Text, IconButton } from "@radix-ui/themes";
 import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
-type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "fx" | "icons" | "armor" | "textures" | "weaponTextures" | "shieldArc" | "flux";
+type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "icons" | "armor" | "textures" | "weaponTextures" | "shieldArc" | "flux";
 
 const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }> = [
 	{ key: "grid", icon: Grid3X3, label: "网格" },
-	{ key: "bg", icon: Image, label: "背景" },
+	{ key: "bg", icon: Image, label: "星空" },
 	{ key: "textures", icon: Layers, label: "舰船贴图" },
 	{ key: "weaponTextures", icon: Crosshair, label: "武器贴图" },
 	{ key: "arcs", icon: Crosshair, label: "武器弧" },
 	{ key: "shieldArc", icon: ShieldCheck, label: "护盾弧" },
 	{ key: "flux", icon: Bolt, label: "辐能" },
 	{ key: "move", icon: Navigation2, label: "移动范围" },
-	{ key: "labels", icon: Tag, label: "舰船标签" },
-	{ key: "fx", icon: Sparkles, label: "特效" },
+	{ key: "labels", icon: Tag, label: "标签" },
 	{ key: "icons", icon: Monitor, label: "舰船图标" },
-	{ key: "armor", icon: Shield, label: "护甲六边形" },
+	{ key: "armor", icon: Shield, label: "护甲" },
 ];
 
 export const ViewControlPanel: React.FC = () => {
@@ -53,7 +51,6 @@ export const ViewControlPanel: React.FC = () => {
 		showWeaponArcs,
 		showMovementRange,
 		showLabels,
-		showEffects,
 		showShipIcons,
 		showHexagonArmor,
 		showShipTextures,
@@ -68,7 +65,6 @@ export const ViewControlPanel: React.FC = () => {
 		toggleWeaponArcs,
 		toggleMovementRange,
 		toggleLabels,
-		toggleEffects,
 		toggleShipIcons,
 		toggleHexagonArmor,
 		toggleShipTextures,
@@ -83,7 +79,6 @@ export const ViewControlPanel: React.FC = () => {
 		arcs: showWeaponArcs,
 		move: showMovementRange,
 		labels: showLabels,
-		fx: showEffects,
 		icons: showShipIcons,
 		armor: showHexagonArmor,
 		textures: showShipTextures,
@@ -98,7 +93,6 @@ export const ViewControlPanel: React.FC = () => {
 		arcs: toggleWeaponArcs,
 		move: toggleMovementRange,
 		labels: toggleLabels,
-		fx: toggleEffects,
 		icons: toggleShipIcons,
 		armor: toggleHexagonArmor,
 		textures: toggleShipTextures,

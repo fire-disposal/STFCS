@@ -45,18 +45,21 @@ export function useShipTextureRendering(
 			if (!ship.runtime?.position) continue;
 
 			const assetId = ship.spec.texture?.assetId;
-			if (!assetId) continue;
+			if (!assetId) {
+				console.log("[ShipTextureRenderer] No assetId for ship:", ship.$id);
+				continue;
+			}
 
 			const texture = textureCache.get(assetId);
-			if (!texture) continue;
+			if (!texture) {
+				console.log("[ShipTextureRenderer] Texture not loaded for:", assetId, "cache keys:", Array.from(textureCache.keys()));
+				continue;
+			}
 
 			const offsetX = ship.spec.texture?.offsetX ?? 0;
 			const offsetY = ship.spec.texture?.offsetY ?? 0;
 			const scale = ship.spec.texture?.scale ?? 1;
 
-			// 贴图偏移坐标系与挂载点一致：
-			// offsetX 正 → 左舷 → 世界 -X
-			// offsetY 正 → 船头 → 世界 -Y
 			const headingRad = (ship.runtime.heading * Math.PI) / 180;
 			const worldX = ship.runtime.position.x - offsetX * Math.cos(headingRad) + offsetY * Math.sin(headingRad);
 			const worldY = ship.runtime.position.y - offsetX * Math.sin(headingRad) - offsetY * Math.cos(headingRad);
@@ -71,6 +74,7 @@ export function useShipTextureRendering(
 				cached.sprite.rotation = headingRad;
 				cached.sprite.scale.set(scale);
 			} else {
+				console.log("[ShipTextureRenderer] Creating sprite for:", ship.$id, "at", worldX, worldY);
 				const sprite = new Sprite(texture);
 				sprite.anchor.set(0.5);
 				sprite.position.set(worldX, worldY);
