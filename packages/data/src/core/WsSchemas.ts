@@ -104,11 +104,12 @@ export const ProfileUpdateDef = {
 const RoomInfoSchema = z.object({
   roomId: z.string(),
   name: z.string(),
+  ownerId: z.string(),
+  ownerName: z.string(),
   playerCount: z.number(),
   maxPlayers: z.number(),
   phase: z.string(),
   turnCount: z.number(),
-  ownerName: z.string(),
   createdAt: z.number(),
 })
 export type RoomInfo = z.infer<typeof RoomInfoSchema>
@@ -123,6 +124,7 @@ export const RoomCreateDef = {
   response: z.object({
     roomId: z.string(),
     roomName: z.string(),
+    ownerId: z.string(),
     isHost: z.boolean(),
   }),
 } as const satisfies WsEventDef<any, any>
@@ -137,6 +139,7 @@ export const RoomJoinDef = {
   response: z.object({
     roomId: z.string(),
     roomName: z.string(),
+    ownerId: z.string(),
     isHost: z.boolean(),
     role: z.enum(["HOST", "PLAYER"]).nullable(),
   }),

@@ -110,19 +110,31 @@ rpc.namespace("room", {
     room.joinPlayer(ctx.socket.id, ctx.playerId, ctx.playerName);
     ctx.state.broadcastFull();
     
-    ctx.io.emit("room:list_updated", { action: "created", room: { roomId: room.id, name: room.name, playerCount: room.getPlayerCount(), maxPlayers: room.maxPlayers, phase: "WAITING", ownerName: ctx.playerName } });
+    ctx.io.emit("room:list_updated", { 
+      action: "created", 
+      room: { 
+        roomId: room.id, 
+        name: room.name, 
+        ownerId: ctx.playerId,
+        ownerName: ctx.playerName,
+        playerCount: room.getPlayerCount(), 
+        maxPlayers: room.maxPlayers, 
+        phase: "WAITING",
+      } 
+    });
     
-    return { roomId: room.id, roomName: room.name, isHost: true };
+    return { roomId: room.id, roomName: room.name, ownerId: ctx.playerId, isHost: true };
   },
   list: async (_, ctx) => {
     const rooms = ctx.roomManager.getAllRooms().map((r: any) => ({
       roomId: r.id,
       name: r.name,
+      ownerId: r.creatorId,
+      ownerName: r.creatorName ?? "未知",
       playerCount: r.playerCount,
       maxPlayers: r.maxPlayers,
       phase: r.phase,
       turnCount: r.gameState?.turnCount ?? 0,
-      ownerName: r.creatorName ?? "未知",
       createdAt: r.createdAt,
     }));
     return { rooms };
@@ -138,13 +150,25 @@ rpc.namespace("room", {
     
     ctx.socket.join(p.roomId);
     ctx.socket.data.roomId = p.roomId;
-    const role = room.creatorId === ctx.playerId ? "HOST" : "PLAYER";
+    const isHost = room.creatorId === ctx.playerId;
+    const role = isHost ? "HOST" : "PLAYER";
     ctx.socket.data.role = role;
     ctx.state.broadcastFull();
     
-    ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: p.roomId, name: room.name, playerCount: room.getPlayerCount(), maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+    ctx.io.emit("room:list_updated", { 
+      action: "updated", 
+      room: { 
+        roomId: p.roomId, 
+        name: room.name, 
+        ownerId: room.creatorId,
+        ownerName: room.creatorName,
+        playerCount: room.getPlayerCount(), 
+        maxPlayers: room.maxPlayers, 
+        phase: room.phase,
+      } 
+    });
     
-    return { roomId: p.roomId, roomName: room.name, isHost: role === "HOST", role };
+    return { roomId: p.roomId, roomName: room.name, ownerId: room.creatorId, isHost, role };
   },
 leave: async (_, ctx) => {
     ctx.requireRoom();
@@ -157,12 +181,23 @@ leave: async (_, ctx) => {
     ctx.socket.data.role = undefined;
     
     if (room) {
-        const playerCountAfter = room.getPlayerCount();
-        ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+      const playerCountAfter = room.getPlayerCount();
+      ctx.io.emit("room:list_updated", { 
+        action: "updated", 
+        room: { 
+          roomId: ctx.roomId, 
+          name: room.name, 
+          ownerId: room.creatorId,
+          ownerName: room.creatorName,
+          playerCount: playerCountAfter, 
+          maxPlayers: room.maxPlayers, 
+          phase: room.phase,
+        } 
+      });
     }
     
     if (!leaveSuccess) {
-        console.warn(`leaveRoom returned false for player ${ctx.playerId} in room ${ctx.roomId}`);
+      console.warn(`leaveRoom returned false for player ${ctx.playerId} in room ${ctx.roomId}`);
     }
   },
   action: async (payload: unknown, ctx) => {
