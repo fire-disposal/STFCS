@@ -88,7 +88,12 @@ export function useShipRendering(
 	contextRef.current = context;
 
 	useEffect(() => {
-		if (!layers) return;
+		if (!layers) {
+			console.log("[useShipRendering] no layers, skip render");
+			return;
+		}
+
+		console.log("[useShipRendering] layers ready, ships:", ships.length, "withPosition:", ships.filter(s => s.runtime?.position).length);
 
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.$id));
@@ -116,7 +121,7 @@ export function useShipRendering(
 			}
 		}
 
-		layers.shipSprites.visible = true;
+		layers.tacticalTokens.visible = true;
 	}, [layers, ships, selectedShipId]);
 
 	useEffect(() => {

@@ -160,6 +160,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useEffect(() => {
 		if (!layerSystem.layers) return;
+		layerSystem.layers.tacticalTokens.visible = true;
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
 	}, [layerSystem.layers, showEffects, showShipIcons]);
