@@ -1,0 +1,129 @@
+/**
+ * TopBar - 游戏顶栏样式
+ */
+
+.top-bar {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 0 12px;
+	height: 32px;
+	background: rgba(10, 20, 35, 0.95);
+	border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.top-bar__left {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.top-bar__center {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	min-width: 0;
+}
+
+.top-bar__right {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.top-bar__avatars {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.top-bar__avatar-group {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.top-bar__btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	background: transparent;
+	border: 1px solid rgba(74, 158, 255, 0.2);
+	border-radius: 4px;
+	color: #8ba4c7;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.top-bar__btn:hover {
+	background: rgba(74, 158, 255, 0.1);
+	border-color: rgba(74, 158, 255, 0.4);
+	color: #cfe8ff;
+}
+
+.top-bar__btn--danger:hover {
+	background: rgba(255, 93, 126, 0.1);
+	border-color: rgba(255, 93, 126, 0.4);
+	color: #ff6f8f;
+}
+
+/* Player avatar */
+.player-avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 3px;
+	position: relative;
+	cursor: default;
+	transition: all 0.15s ease;
+}
+
+.player-avatar:hover {
+	transform: scale(1.08);
+}
+
+.player-avatar--ready {
+	border: 2px solid rgba(87, 227, 141, 0.6);
+	box-shadow: 0 0 4px rgba(87, 227, 141, 0.3);
+}
+
+.player-avatar--waiting {
+	border: 2px solid rgba(128, 128, 128, 0.3);
+}
+
+.player-avatar--active {
+	border: 2px solid rgba(255, 111, 143, 0.6);
+	box-shadow: 0 0 4px rgba(255, 111, 143, 0.3);
+}
+
+.player-avatar__inner {
+	width: 18px;
+	height: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(13, 40, 71, 0.5);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.player-avatar__dot {
+	position: absolute;
+	bottom: -1px;
+	right: -1px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #2ecc71;
+	border: 1px solid rgba(10, 20, 35, 0.8);
+}
+
+.player-avatar__dot--not-ready {
+	background: #6b7280;
+}

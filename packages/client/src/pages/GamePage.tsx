@@ -24,7 +24,7 @@ import RealityEditPanel from "@/ui/panels/RealityEditPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
-import TurnBar from "@/ui/panels/TurnBar";
+import TopBar from "@/ui/panels/TopBar";
 import { useGameAction } from "@/hooks/useGameAction";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -164,7 +164,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
-			<TurnBar
+			<TopBar
 				phase={room.state.currentPhase as GamePhase}
 				turnCount={room.state.turnCount}
 				activeFaction={room.state.activeFaction as import("@vt/data").Faction | undefined}
@@ -172,8 +172,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
 				isHost={isHost}
 				isReady={isReady}
+				inRoom={true}
 				onReadyToggle={() => networkManager.setReady()}
 				onAdvancePhase={handleAdvancePhase}
+				onSettings={() => setShowSettings(true)}
+				onLeave={onLeaveRoom}
 			/>
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
