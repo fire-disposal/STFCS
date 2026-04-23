@@ -75,7 +75,7 @@ export function createCombatToken(
 		hasFired: false,
 		faction: faction ?? FactionEnum.NEUTRAL,
 		...(ownerId !== undefined ? { ownerId } : {}),
-		...(spec.shield ? { shield: { active: false, value: spec.shield.radius } } : {}),
+		...(spec.shield ? { shield: { active: false, value: spec.shield.radius, direction: 0 } } : {}),
 	};
 
 	return {
