@@ -31,9 +31,23 @@
 	border-color: rgba(74, 158, 255, 0.3);
 }
 
-.room-player-item--self {
-	border-color: rgba(74, 158, 255, 0.6);
-	background: rgba(26, 50, 80, 0.7);
+.room-player-item--border-red {
+	border: 2px solid rgba(255, 93, 126, 0.6);
+	box-shadow: 0 0 4px rgba(255, 93, 126, 0.3);
+}
+
+.room-player-item--border-blue {
+	border: 2px solid rgba(74, 158, 255, 0.6);
+	box-shadow: 0 0 4px rgba(74, 158, 255, 0.3);
+}
+
+.room-player-item--border-green {
+	border: 2px solid rgba(87, 227, 141, 0.6);
+	box-shadow: 0 0 4px rgba(87, 227, 141, 0.3);
+}
+
+.room-player-item--border-gray {
+	border: 2px solid rgba(128, 128, 128, 0.4);
 }
 
 .room-player-item--self:hover {

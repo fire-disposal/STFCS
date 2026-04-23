@@ -225,6 +225,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						<RoomPlayerList
 							players={room.state.players}
 							currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
+							phase={room.state.currentPhase as GamePhase}
 							maxVisible={6}
 						/>
 					</Flex>
