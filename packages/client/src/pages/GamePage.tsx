@@ -42,6 +42,14 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const socket = networkManager.getSocket();
 	const assetSocket = useAssetSocket(socket);
 
+	React.useEffect(() => {
+		if (!socket) return;
+		socket.on("response", assetSocket.handleResponse);
+		return () => {
+			socket.off("response", assetSocket.handleResponse);
+		};
+	}, [socket, assetSocket.handleResponse]);
+
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
