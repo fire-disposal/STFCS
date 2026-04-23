@@ -40,6 +40,7 @@ interface WeaponArcCache {
 
 interface AimLineCache {
 	graphics: Graphics;
+	shipId: string;
 	lastTargets?: WeaponTargetInfo[];
 }
 
@@ -119,11 +120,11 @@ export function useWeaponArcRendering(
 			}
 		}
 
-		for (const [mountId, cache] of aimLineCacheRef.current) {
-			if (!currentMountIds.has(mountId)) {
+		for (const [key, cache] of aimLineCacheRef.current) {
+			if (cache.shipId !== selectedShip.$id) {
 				layers.weaponArcs.removeChild(cache.graphics);
 				cache.graphics.destroy();
-				aimLineCacheRef.current.delete(mountId);
+				aimLineCacheRef.current.delete(key);
 			}
 		}
 
@@ -174,13 +175,14 @@ export function useWeaponArcRendering(
 				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH - (mountPos.y ?? 0) * sinH;
 				const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH + (mountPos.y ?? 0) * cosH;
 
-				const aimCached = aimLineCacheRef.current.get(weapon.mountId);
+				const cacheKey = `${selectedShip.$id}:${weapon.mountId}`;
+				const aimCached = aimLineCacheRef.current.get(cacheKey);
 				if (!aimCached) {
 					const graphics = new Graphics();
 					graphics.position.set(worldX, worldY);
 					graphics.rotation = mountFacing;
 					layers.weaponArcs.addChild(graphics);
-					aimLineCacheRef.current.set(weapon.mountId, { graphics });
+					aimLineCacheRef.current.set(cacheKey, { graphics, shipId: selectedShip.$id });
 					drawAimLines(graphics, weapon, ships);
 				} else {
 					aimCached.graphics.position.set(worldX, worldY);
