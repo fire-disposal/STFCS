@@ -346,7 +346,16 @@ export class MutativeStateManager {
 	changePhase(phase: GamePhase): void {
 		this.mutateAndBroadcast((draft) => {
 			draft.phase = phase
+			draft.activeFaction = this.getFactionForPhase(phase)
 		})
+	}
+
+	private getFactionForPhase(phase: GamePhase): Faction | undefined {
+		switch (phase) {
+			case "PLAYER_ACTION": return "PLAYER"
+			case "DM_ACTION": return "ENEMY"
+			default: return undefined
+		}
 	}
 
 	changeTurn(turn: number): void {

@@ -72,6 +72,24 @@ export const ArmorQuadrantSchema = z.enum(["RF", "RR", "RB", "LB", "LL", "LF"]);
 export const ArmorQuadrant = ArmorQuadrantSchema.enum;
 export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
 
+/**
+ * 游戏阶段（GamePhase）- 顶层状态
+ * 
+ * Phase ↔ activeFaction 对应规则：
+ * - DEPLOYMENT: activeFaction = undefined（部署阶段不区分派系）
+ * - PLAYER_ACTION: activeFaction = "PLAYER"（玩家行动阶段）
+ * - DM_ACTION: activeFaction = "ENEMY"（DM/敌人行动阶段）
+ * - TURN_END: activeFaction = undefined（结算阶段不区分派系）
+ * 
+ * Phase 转换流程：
+ * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后，游戏开始）
+ * 2. PLAYER_ACTION → DM_ACTION（玩家回合结束）
+ * 3. DM_ACTION → TURN_END（DM回合结束，进入结算）
+ * 4. TURN_END → PLAYER_ACTION（结算完成，新回合开始，turnCount++）
+ * 
+ * 注意：phase 和 activeFaction 存在固定对应关系，
+ * 修改 phase 时应同步更新 activeFaction。
+ */
 export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION", "DM_ACTION", "TURN_END"]);
 export const GamePhase = GamePhaseSchema.enum;
 export type GamePhase = z.infer<typeof GamePhaseSchema>;
@@ -507,6 +525,16 @@ export const RoomPlayerStateSchema = z.object({
 });
 export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 
+/**
+ * 游戏房间状态
+ * 
+ * 重要：phase 和 activeFaction 存在固定对应关系
+ * 修改 phase 时必须同步更新 activeFaction：
+ * - phase="DEPLOYMENT" → activeFaction=undefined
+ * - phase="PLAYER_ACTION" → activeFaction="PLAYER"
+ * - phase="DM_ACTION" → activeFaction="ENEMY"
+ * - phase="TURN_END" → activeFaction=undefined
+ */
 export const GameRoomStateSchema = z.object({
 	roomId: z.string(),
 	name: z.string().optional(),

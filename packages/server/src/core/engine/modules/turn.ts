@@ -130,10 +130,16 @@ export function validateEndTurn(state: any, playerId: string): { valid: boolean;
 
 /**
  * 计算回合阶段
+ * 
+ * 注意：gamePhase 由 state.phase 直接控制，不应根据 turn 数推导。
+ * 此函数主要用于根据 activeFaction 确定显示用的 gamePhase，
+ * 实际状态应使用 state.phase。
+ * 
+ * @deprecated 建议直接使用 state.phase 获取当前阶段
  */
 export function calculateTurnPhase(
-  turn: number,
-  activeFaction: string,
+  _turn: number,
+  activeFaction: string | undefined,
   factionTurnPhase?: string
 ): {
   gamePhase: "DEPLOYMENT" | "PLAYER_ACTION" | "DM_ACTION" | "TURN_END";
@@ -142,9 +148,7 @@ export function calculateTurnPhase(
   let gamePhase: "DEPLOYMENT" | "PLAYER_ACTION" | "DM_ACTION" | "TURN_END";
   let factionPhase: "MOVEMENT" | "COMBAT" | "END" = factionTurnPhase as any || "MOVEMENT";
 
-  if (turn === 1 && activeFaction === "PLAYER") {
-    gamePhase = "DEPLOYMENT";
-  } else if (activeFaction === "PLAYER") {
+  if (activeFaction === "PLAYER") {
     gamePhase = "PLAYER_ACTION";
   } else if (activeFaction === "ENEMY") {
     gamePhase = "DM_ACTION";
@@ -160,17 +164,14 @@ export function calculateTurnPhase(
  */
 export function getTurnInfo(state: any): {
   turn: number;
-  activeFaction: string;
+  activeFaction: string | undefined;
   gamePhase: string;
   factionPhase: string;
   playerShips: number;
   enemyShips: number;
 } {
-  const { gamePhase, factionPhase } = calculateTurnPhase(
-    state.turn,
-    state.activeFaction,
-    state.factionTurnPhase
-  );
+  const gamePhase = state.phase ?? calculateTurnPhase(state.turn, state.activeFaction, state.factionTurnPhase).gamePhase;
+  const factionPhase = state.factionTurnPhase ?? "MOVEMENT";
 
   const aliveShips = Array.from(state.tokens.values()).filter(
     (ship: any) => !ship.runtime.destroyed

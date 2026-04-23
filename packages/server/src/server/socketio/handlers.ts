@@ -210,7 +210,7 @@ rpc.namespace("room", {
         break;
       case "start":
         ctx.requireHost();
-        room.startGame();
+        ctx.state.changeTurn(1);
         ctx.state.changePhase("PLAYER_ACTION");
         break;
       case "kick":
@@ -865,10 +865,37 @@ rpc.namespace("edit", {
       }
       case "force_end_turn": {
         const room = ctx.room!;
-        room.nextTurn();
-        const state = room.getStateManager().getState();
-        ctx.state.changeTurn(state.turnCount);
-        if (p.faction) ctx.state.changeFaction(p.faction);
+        const currentPhase = room.getStateManager().getState().phase;
+        
+        let nextPhase: typeof currentPhase;
+        let incrementTurn = false;
+        
+        switch (currentPhase) {
+          case "PLAYER_ACTION":
+            nextPhase = "DM_ACTION";
+            break;
+          case "DM_ACTION":
+            nextPhase = "TURN_END";
+            break;
+          case "TURN_END":
+            nextPhase = "PLAYER_ACTION";
+            incrementTurn = true;
+            break;
+          default:
+            nextPhase = "PLAYER_ACTION";
+        }
+        
+        ctx.state.changePhase(nextPhase);
+        
+        if (incrementTurn) {
+          const newTurn = room.getStateManager().getState().turnCount + 1;
+          ctx.state.changeTurn(newTurn);
+          room.processTurnEndLogic();
+        }
+        
+        if (p.faction) {
+          ctx.state.changeFaction(p.faction);
+        }
         return;
       }
       case "set_phase": {

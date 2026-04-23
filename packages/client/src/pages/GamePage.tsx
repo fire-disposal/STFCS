@@ -90,7 +90,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const isReady = currentPlayer?.isReady ?? false;
 	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
 	const turnCount = room?.state?.turnCount ?? 1;
-	const activeFaction = room?.state?.activeFaction ?? "PLAYER";
+	const activeFaction = room?.state?.activeFaction ?? undefined;
 	const cursorPosition = useMemo(() =>
 		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
 		[mapCursor]

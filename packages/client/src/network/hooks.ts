@@ -10,7 +10,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
 import type { CombatToken } from "@vt/data";
-import { Faction as FactionEnum } from "@vt/data";
 import { setGameRoomRef } from "@/state/stores/uiStore";
 
 const log = (...args: unknown[]) => console.log("[useSocketRoom]", ...args);
@@ -34,7 +33,7 @@ export interface RoomState {
 	isConnected: boolean;
 	currentPhase: string;
 	turnCount: number;
-	activeFaction: string;
+	activeFaction: string | undefined;
 	tokens: Record<string, CombatToken>;
 	players: Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
 }
@@ -118,7 +117,7 @@ export function useSocketRoom(
 				isConnected: true,
 				currentPhase: gameState.phase,
 				turnCount: gameState.turnCount,
-				activeFaction: gameState.activeFaction ?? FactionEnum.PLAYER,
+				activeFaction: gameState.activeFaction,
 				tokens: { ...gameState.tokens },
 				players: { ...gameState.players } as any,
 			});
@@ -135,7 +134,7 @@ export function useSocketRoom(
 				isConnected: true,
 				currentPhase: existingState.phase,
 				turnCount: existingState.turnCount,
-				activeFaction: existingState.activeFaction ?? FactionEnum.PLAYER,
+				activeFaction: existingState.activeFaction,
 				tokens: existingState.tokens,
 				players: existingState.players as any,
 			});

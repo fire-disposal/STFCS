@@ -17,7 +17,7 @@ interface DMControlPanelProps {
 	isHost: boolean;
 	phase: string;
 	turnCount: number;
-	activeFaction: string;
+	activeFaction: string | undefined;
 }
 
 export const DMControlPanel: React.FC<DMControlPanelProps> = ({
@@ -90,8 +90,12 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 				<Badge size="1">{turnCount}</Badge>
 				<Text size="1" color="gray">阶段</Text>
 				<Badge size="1" color="blue">{phase}</Badge>
-				<Text size="1" color="gray">阵营</Text>
-				<Badge size="1" color={activeFaction === "PLAYER" ? "green" : "red"}>{activeFaction}</Badge>
+				{activeFaction && (
+					<>
+						<Text size="1" color="gray">阵营</Text>
+						<Badge size="1" color={activeFaction === "PLAYER" ? "green" : "red"}>{activeFaction}</Badge>
+					</>
+				)}
 			</Flex>
 
 			<Box className="panel-divider" />

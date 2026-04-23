@@ -161,6 +161,7 @@ export class Room {
 	}
 
 	startGame(): void {
+		this.stateManager.changeTurn(1);
 		this.stateManager.changePhase("PLAYER_ACTION");
 		this.logger.info("Game started");
 
@@ -170,22 +171,63 @@ export class Room {
 		});
 	}
 
-	nextTurn(): void {
-		const state = this.stateManager.getState();
-		const newTurn = state.turnCount + 1;
+	advancePhase(): void {
+		const currentPhase = this.stateManager.getState().phase;
+		
+		let nextPhase: typeof currentPhase;
+		let incrementTurn = false;
+		
+		switch (currentPhase) {
+			case "PLAYER_ACTION":
+				nextPhase = "DM_ACTION";
+				break;
+			case "DM_ACTION":
+				nextPhase = "TURN_END";
+				break;
+			case "TURN_END":
+				nextPhase = "PLAYER_ACTION";
+				incrementTurn = true;
+				break;
+			default:
+				nextPhase = "PLAYER_ACTION";
+		}
+		
+		this.stateManager.changePhase(nextPhase);
+		
+		if (incrementTurn) {
+			this.processTurnEndLogic();
+			const newTurn = this.stateManager.getState().turnCount + 1;
+			this.stateManager.changeTurn(newTurn);
+		}
 
-		this.processTurnEndLogic();
-
-		this.stateManager.changeTurn(newTurn);
 		const newState = this.stateManager.getState();
-
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
-			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, changedAt: Date.now() },
+			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
 		});
 	}
 
-	private processTurnEndLogic(): void {
+	nextTurn(): void {
+		const currentPhase = this.stateManager.getState().phase;
+		
+		if (currentPhase !== "TURN_END") {
+			this.stateManager.changePhase("TURN_END");
+		}
+		
+		this.processTurnEndLogic();
+		
+		const newTurn = this.stateManager.getState().turnCount + 1;
+		this.stateManager.changeTurn(newTurn);
+		this.stateManager.changePhase("PLAYER_ACTION");
+		
+		const newState = this.stateManager.getState();
+		this.callbacks.broadcast({
+			type: "TURN_CHANGED",
+			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
+		});
+	}
+
+	processTurnEndLogic(): void {
 		const state = this.stateManager.getState();
 
 		for (const tokenId of Object.keys(state.tokens)) {
