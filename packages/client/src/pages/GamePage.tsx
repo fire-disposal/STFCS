@@ -79,10 +79,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		}
 	}, [room]);
 
-	const handleForceEndTurn = useCallback(async (faction?: "PLAYER" | "ENEMY" | "NEUTRAL") => {
-		const result = await send("edit:room", { action: "force_end_turn", faction } as any);
-		if (result) notify.success("回合已推进");
-	}, [send]);
+	const handleAdvancePhase = useCallback(async () => {
+		const phase = room?.state?.currentPhase;
+		if (!phase) return;
+
+		if (phase === "PLAYER_ACTION") {
+			await send("edit:room", { action: "set_phase", phase: "DM_ACTION" });
+		} else if (phase === "DM_ACTION") {
+			await send("edit:room", { action: "set_phase", phase: "TURN_END" });
+		} else if (phase === "TURN_END") {
+			const newTurn = (room?.state?.turnCount ?? 1) + 1;
+			await send("edit:room", { action: "set_turn", turn: newTurn });
+			await send("edit:room", { action: "set_phase", phase: "PLAYER_ACTION" });
+		}
+	}, [send, room?.state?.currentPhase, room?.state?.turnCount]);
 
 	const playerId = networkManager.getPlayerId();
 	const currentPlayer = playerId ? room?.state?.players[playerId] : undefined;
@@ -198,18 +208,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							</Button>
 						)}
 						
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
-								<Button size="1" variant="solid" color="green" disabled={!isHost}>
-									<FastForward size={12} /> 推进回合 <ChevronDown size={10} />
-								</Button>
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content>
-								<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
-								<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
-								<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
+						{phase !== "DEPLOYMENT" && (
+							<Button
+								size="1"
+								variant="solid"
+								color="green"
+								disabled={!isHost}
+								onClick={handleAdvancePhase}
+							>
+								<FastForward size={12} />
+								{phase === "PLAYER_ACTION" && "结束玩家回合"}
+								{phase === "DM_ACTION" && "结束DM回合"}
+								{phase === "TURN_END" && "开始新回合"}
+							</Button>
+						)}
 					</Flex>
 
 					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
