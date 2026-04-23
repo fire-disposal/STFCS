@@ -22,8 +22,8 @@
  */
 
 import { screenToWorld } from "@/utils/coordinateSystem";
-import type { ShipViewModel, ShipRenderOptions } from "../types";
-import type { WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
+import type { ShipRenderOptions } from "../types";
+import type { CombatToken, WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
 import { Faction } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -74,7 +74,7 @@ export interface ShipRenderContext {
 
 export function useShipRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	selectedShipId: string | null | undefined,
 	context: Partial<ShipRenderContext>,
 	options: ShipRenderOptions = {}
@@ -90,7 +90,7 @@ export function useShipRendering(
 		if (!layers) return;
 
 		const cache = cacheRef.current;
-		const currentIds = new Set(ships.map((s) => s.id));
+		const currentIds = new Set(ships.map((s) => s.$id));
 		const selectedId = selectedShipId ?? null;
 
 		for (const [id, item] of cache) {
@@ -103,8 +103,8 @@ export function useShipRendering(
 		for (const ship of ships) {
 			if (!ship.runtime?.position) continue;
 
-			const isSelected = ship.id === selectedId;
-			const cached = cache.get(ship.id);
+			const isSelected = ship.$id === selectedId;
+			const cached = cache.get(ship.$id);
 			if (!cached) {
 				createShipToken(layers, cache, ship, isSelected, optionsRef, contextRef);
 				continue;
@@ -127,7 +127,7 @@ export function useShipRendering(
 
 function shouldUpdate(
 	cached: ShipCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	isSelected: boolean
 ): boolean {
 	if (!cached.lastState || !ship.runtime?.position) return true;
@@ -153,7 +153,7 @@ function shouldUpdate(
 
 function updateShipToken(
 	cached: ShipCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	isSelected: boolean
 ): void {
 	if (!ship.runtime?.position) return;
@@ -187,7 +187,7 @@ function updateShipToken(
 function createShipToken(
 	layers: LayerRegistry,
 	cache: Map<string, ShipCacheItem>,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	isSelected: boolean,
 	optionsRef: React.MutableRefObject<ShipRenderOptions>,
 	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
@@ -223,8 +223,8 @@ function createShipToken(
 	root.addChild(weaponMarkers);
 
 	root.on("pointertap", () => {
-		optionsRef.current.storeSelectShip?.(ship.id);
-		optionsRef.current.onSelectShip?.(ship.id);
+		optionsRef.current.storeSelectShip?.(ship.$id);
+		optionsRef.current.onSelectShip?.(ship.$id);
 	});
 
 	root.on("pointermove", (e: FederatedPointerEvent) => {
@@ -254,7 +254,7 @@ function createShipToken(
 	layers.tacticalTokens.addChild(root);
 
 	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
-	cache.set(ship.id, {
+	cache.set(ship.$id, {
 		root,
 		tacticalToken,
 		hitbox,
@@ -409,7 +409,7 @@ function drawMountMarkers(
 
 function drawWeaponMarkers(
 	target: Graphics,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	isSelected: boolean
 ): void {
 	target.clear();

@@ -1,4 +1,6 @@
-import type { PlayerRole, WsEventName, WsPayload, WsResponseData } from "@vt/data";
+import { GamePhase } from "@vt/data";
+import type { GameRoomState, PlayerRole, WsEventName, WsPayload, WsResponseData } from "@vt/data";
+import type { SocketRoom } from "@/network";
 import { create } from "zustand";
 
 // 交互模式枚举
@@ -249,36 +251,23 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
  * 游戏状态引用存储
  * 用于在React组件外访问同步的游戏状态
  */
-interface GameStateRef {
-	state: any;
-	ships: Map<string, any>;
-	currentPhase: string;
+export interface GameStateRef {
+	state: GameRoomState | null;
+	currentPhase: GamePhase;
 	turnCount: number;
-	room: any | null;
+	room: SocketRoom | null;
 	actionSender: GameActionSender;
 }
 
 export const gameStateRef: GameStateRef = {
 	state: null,
-	ships: new Map(),
-	currentPhase: "DEPLOYMENT",
+	currentPhase: GamePhase.DEPLOYMENT,
 	turnCount: 1,
 	room: null,
 	actionSender: emptySender,
 };
 
-export function updateGameStateRef(state: any): void {
-	gameStateRef.state = state;
-	gameStateRef.currentPhase = state.phase;
-	gameStateRef.turnCount = state.turnCount;
-
-	gameStateRef.ships.clear();
-	for (const [key, ship] of (state.ships as unknown as Map<string, any>).entries()) {
-		gameStateRef.ships.set(key, ship);
-	}
-}
-
-export function setGameRoomRef(room: any): void {
+export function setGameRoomRef(room: SocketRoom | null): void {
 	gameStateRef.room = room;
 	if (room && room.send) {
 		gameStateRef.actionSender = {

@@ -19,7 +19,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipViewModel } from "../types";
+import type { CombatToken } from "@vt/data";
 import { Faction } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -98,7 +98,7 @@ export interface ShieldArcOptions {
 
 export function useShieldArcRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	options: ShieldArcOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ShieldArcCacheItem>>(new Map());
@@ -112,7 +112,7 @@ export function useShieldArcRendering(
 		if (!layers) return;
 
 		const cache = cacheRef.current;
-		const currentIds = new Set(ships.map((s) => s.id));
+		const currentIds = new Set(ships.map((s) => s.$id));
 
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
@@ -123,14 +123,14 @@ export function useShieldArcRendering(
 
 		for (const ship of ships) {
 			if (ship.runtime?.overloaded || !ship.runtime?.shield?.active) {
-				const cached = cache.get(ship.id);
+				const cached = cache.get(ship.$id);
 				if (cached) {
 					cached.graphics.clear();
 				}
 				continue;
 			}
 
-			const cached = cache.get(ship.id);
+			const cached = cache.get(ship.$id);
 			if (!cached) {
 				createShieldArc(layers, cache, ship, defaultRadius, defaultArc, defaultMax);
 				continue;
@@ -153,7 +153,7 @@ export function useShieldArcRendering(
 
 function shouldUpdateShield(
 	cached: ShieldArcCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	_defaultRadius: number,
 	_defaultMax: number
 ): boolean {
@@ -176,7 +176,7 @@ function shouldUpdateShield(
 function createShieldArc(
 	layers: LayerRegistry,
 	cache: Map<string, ShieldArcCacheItem>,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number
@@ -193,7 +193,7 @@ function createShieldArc(
 
 	layers.shieldArcs.addChild(root);
 
-	cache.set(ship.id, {
+	cache.set(ship.$id, {
 		root,
 		graphics,
 		lastState: {
@@ -209,7 +209,7 @@ function createShieldArc(
 
 function updateShieldArc(
 	cached: ShieldArcCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number
@@ -233,7 +233,7 @@ function updateShieldArc(
 
 function drawShieldArcForShip(
 	graphics: Graphics,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
 	defaultMax: number

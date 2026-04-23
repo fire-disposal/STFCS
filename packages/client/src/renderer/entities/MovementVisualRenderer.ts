@@ -22,8 +22,8 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipViewModel, MovementPreviewState, MoveMode } from "../types";
-import type { MovementState, MovementPhase } from "@vt/data";
+import type { MovementPreviewState, MoveMode } from "../types";
+import type { CombatToken, MovementState, MovementPhase } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -83,7 +83,7 @@ export interface MovementVisualOptions {
 
 export function useMovementVisualRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	selectedShipId: string | null,
 	preview?: MovementPreviewState,
 	options: MovementVisualOptions = {}
@@ -98,7 +98,7 @@ export function useMovementVisualRendering(
 		if (!layers) return;
 
 		const cache = cacheRef.current;
-		const selectedShip = ships.find((s) => s.id === selectedShipId);
+		const selectedShip = ships.find((s) => s.$id === selectedShipId);
 
 		for (const [id, item] of cache) {
 			if (id !== selectedShipId) {
@@ -108,7 +108,7 @@ export function useMovementVisualRendering(
 		}
 
 		if (selectedShip && selectedShip.runtime?.position) {
-			const cached = cache.get(selectedShip.id);
+			const cached = cache.get(selectedShip.$id);
 			if (!cached) {
 				createMovementGraphics(
 					layers,
@@ -142,7 +142,7 @@ export function useMovementVisualRendering(
 function createMovementGraphics(
 	layers: LayerRegistry,
 	cache: Map<string, MovementGraphicsCache>,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
@@ -168,7 +168,7 @@ function createMovementGraphics(
 		maxTurnRate
 	);
 
-	cache.set(ship.id, {
+	cache.set(ship.$id, {
 		root,
 		directionGraphics,
 		targetGraphics,
@@ -178,7 +178,7 @@ function createMovementGraphics(
 
 function updateMovementGraphics(
 	cached: MovementGraphicsCache,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
@@ -205,7 +205,7 @@ function updateMovementGraphics(
 }
 
 function buildStateSnapshot(
-	ship: ShipViewModel,
+	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
@@ -259,7 +259,7 @@ function needsRedraw(
 function drawMovementIndicators(
 	directionGraphics: Graphics,
 	targetGraphics: Graphics,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
 	maxTurnRate: number = DEFAULT_MAX_TURN_RATE

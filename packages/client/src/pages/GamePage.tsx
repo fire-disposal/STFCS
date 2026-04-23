@@ -1,5 +1,4 @@
 import { GamePhase } from "@vt/data";
-import type { ShipViewModel } from "@/renderer";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
 import { useSocketRoom, useTokens } from "@/network";
@@ -60,8 +59,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const toggleWeaponArcs = useUIStore((state) => state.toggleWeaponArcs);
 	const toggleMovementRange = useUIStore((state) => state.toggleMovementRange);
 
-	const tokens = useTokens(room) as unknown as ShipViewModel[];
-	const selectedShip = tokens.find((t) => t.id === selectedShipId) ?? null;
+	const tokens = useTokens(room);
+	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
 
 	const handleRealityEdit = useCallback(async (shipId: string, runtimeData: Record<string, unknown>) => {
 		if (!room) return;

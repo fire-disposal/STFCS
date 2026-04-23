@@ -24,7 +24,7 @@
  * - selected=false: 半透明（alpha=0.85）
  */
 
-import type { ShipViewModel } from "../types";
+import type { CombatToken } from "@vt/data";
 import { Text, TextStyle, Container } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 
@@ -100,12 +100,13 @@ export class ShipHUDManager {
 	}
 
 	update(
-		ships: ShipViewModel[],
+		ships: CombatToken[],
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
+		selectedShipId: string | null = null,
 		defaultHullMax: number = DEFAULT_HULL_MAX
 	): void {
-		const currentIds = new Set(ships.map((s) => s.id));
+		const currentIds = new Set(ships.map((s) => s.$id));
 
 		for (const [id, cached] of this.cache) {
 			if (!currentIds.has(id)) {
@@ -120,11 +121,12 @@ export class ShipHUDManager {
 		for (const ship of ships) {
 			if (!ship.runtime?.position) continue;
 
-			const cached = this.cache.get(ship.id);
+			const isSelected = ship.$id === selectedShipId;
+			const cached = this.cache.get(ship.$id);
 			if (!cached) {
-				this.createShipHUD(ship, camera, canvasSize, defaultHullMax);
+				this.createShipHUD(ship, isSelected, camera, canvasSize, defaultHullMax);
 			} else {
-				this.updateShipHUD(ship, cached, camera, canvasSize, defaultHullMax);
+				this.updateShipHUD(ship, isSelected, cached, camera, canvasSize, defaultHullMax);
 			}
 		}
 
@@ -132,7 +134,8 @@ export class ShipHUDManager {
 	}
 
 	private createShipHUD(
-		ship: ShipViewModel,
+		ship: CombatToken,
+		isSelected: boolean,
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
 		defaultHullMax: number
@@ -148,7 +151,6 @@ export class ShipHUDManager {
 
 		const hullMax = ship.spec.maxHitPoints ?? defaultHullMax;
 		const hpPercent = ship.runtime.hull / hullMax;
-		const isSelected = ship.selected ?? false;
 
 		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected);
 		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
@@ -163,7 +165,7 @@ export class ShipHUDManager {
 		this.hpBarLayer.addChild(hpBarContainer);
 		this.labelLayer.addChild(label);
 
-		this.cache.set(ship.id, {
+		this.cache.set(ship.$id, {
 			hpBarContainer,
 			label,
 			lastUpdate: {
@@ -172,14 +174,15 @@ export class ShipHUDManager {
 				hpPercent,
 				currentHp: ship.runtime.hull,
 				maxHp: hullMax,
-				name: ship.metadata?.name || ship.id,
+				name: ship.metadata?.name || ship.$id,
 				selected: isSelected,
 			},
 		});
 	}
 
 	private updateShipHUD(
-		ship: ShipViewModel,
+		ship: CombatToken,
+		isSelected: boolean,
 		cached: ShipHUDCache,
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
@@ -212,7 +215,6 @@ export class ShipHUDManager {
 		}
 
 		const hpPercent = ship.runtime.hull / hullMax;
-		const isSelected = ship.selected ?? false;
 		const hpChanged = ship.runtime.hull !== last.currentHp || hullMax !== last.maxHp;
 		const selectedChanged = isSelected !== last.selected;
 
@@ -220,7 +222,7 @@ export class ShipHUDManager {
 			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected);
 		}
 
-		const newName = ship.metadata?.name || ship.id;
+		const newName = ship.metadata?.name || ship.$id;
 		const nameChanged = newName !== last.name;
 
 		if (nameChanged) {
@@ -238,8 +240,8 @@ export class ShipHUDManager {
 		};
 	}
 
-	private formatLabel(ship: ShipViewModel): string {
-		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.id.slice(-6);
+	private formatLabel(ship: CombatToken): string {
+		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
 	}
 
 	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): Container {
@@ -361,9 +363,10 @@ export interface ShipHUDRenderOptions {
 
 export function useShipHUDRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	camera: { x: number; y: number; zoom: number; viewRotation: number },
 	canvasSize: { width: number; height: number },
+	selectedShipId: string | null = null,
 	options: ShipHUDRenderOptions = {}
 ) {
 	const managerRef = useRef<ShipHUDManager | null>(null);
@@ -389,6 +392,6 @@ export function useShipHUDRendering(
 		layers.shipBars.visible = options.showHpBars ?? true;
 		layers.shipNames.visible = options.showLabels ?? true;
 
-		managerRef.current.update(ships, camera, canvasSize, defaultHullMax);
-	}, [layers, ships, camera, canvasSize, options.showHpBars, options.showLabels, defaultHullMax]);
+		managerRef.current.update(ships, camera, canvasSize, selectedShipId, defaultHullMax);
+	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax]);
 }

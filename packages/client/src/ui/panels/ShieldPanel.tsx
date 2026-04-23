@@ -5,13 +5,13 @@
 
 import React from "react";
 import { Shield, Zap, Radio, AlertTriangle } from "lucide-react";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, Badge, Progress } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
 
 export interface ShieldPanelProps {
-	ship: ShipViewModel | null;
+	ship: CombatToken | null;
 	canControl: boolean;
 }
 
@@ -38,18 +38,18 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 	const handleToggleShield = async () => {
 		if (!canAct) return;
-		await sendShieldToggle(ship.id, !shieldActive);
+		await sendShieldToggle(ship.$id, !shieldActive);
 	};
 
 	const handleVent = async () => {
 		if (!canAct || fluxTotal === 0) return;
-		await sendVent(ship.id);
+		await sendVent(ship.$id);
 	};
 
 	return (
 		<Flex className="panel-row" gap="3">
 			<Flex className="panel-section" align="center" gap="2">
-				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.id.slice(-6)) : "请选择舰船"}</Text>
+				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.$id.slice(-6)) : "请选择舰船"}</Text>
 				{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
 				{venting && <Badge color="purple" size="1">散辐中</Badge>}
 			</Flex>

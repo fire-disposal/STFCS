@@ -288,7 +288,6 @@ export class SocketNetworkManager {
 
 	private setGameState(state: GameRoomState | null): void {
 		this.gameState = state;
-		logger.info("setGameState", { roomId: state?.roomId ?? "null" });
 		this.stateListeners.forEach(listener => listener(state));
 	}
 

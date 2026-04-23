@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { notify } from "@/ui/shared/Notification";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import type { WsEventName, WsPayload, WsResponseData } from "@vt/data";
 
 interface GameInteractionHook {
@@ -16,7 +16,7 @@ interface RoomLike {
 
 export function useGameInteraction(
 	room: RoomLike | null,
-	selectedShip: ShipViewModel | null
+	selectedShip: CombatToken | null
 ): GameInteractionHook {
 	const sendCommand = useCallback(async (command: string, payload: unknown) => {
 		if (!room) throw new Error("Not connected to room");
@@ -28,7 +28,7 @@ export function useGameInteraction(
 		try {
 			await sendCommand("game:action", {
 				action: "shield",
-				tokenId: selectedShip.id,
+				tokenId: selectedShip.$id,
 				active: !selectedShip.runtime?.shield?.active,
 			});
 		} catch (error) {
@@ -41,7 +41,7 @@ export function useGameInteraction(
 		try {
 			await sendCommand("game:action", {
 				action: "vent",
-				tokenId: selectedShip.id,
+				tokenId: selectedShip.$id,
 			});
 		} catch (error) {
 			notify.error("排气失败");

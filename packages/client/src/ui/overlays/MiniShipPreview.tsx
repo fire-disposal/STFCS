@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Rectangle } from "pixi.js";
 import { Faction } from "@vt/data";
-import type { InventoryToken } from "@vt/data";
-import type { LayerRegistry, ShipViewModel } from "@/renderer";
+import type { InventoryToken, CombatToken } from "@vt/data";
+import type { LayerRegistry } from "@/renderer";
 import { useLayerSystem, useShipRendering } from "@/renderer";
 import { useCanvasResize } from "@/renderer/core/useCanvasResize";
 
@@ -94,7 +94,7 @@ function createLayers(app: any): LayerRegistry {
     };
 }
 
-function toPreviewShip(token: InventoryToken): ShipViewModel {
+function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolean } {
     const spec = token.spec;
     const runtime = {
         position: { x: 0, y: 0 },
@@ -122,7 +122,6 @@ function toPreviewShip(token: InventoryToken): ShipViewModel {
         spec,
         runtime,
         metadata: token.metadata,
-        id: token.$id,
     };
 }
 

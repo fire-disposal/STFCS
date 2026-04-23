@@ -5,13 +5,13 @@
 
 import React, { useState } from "react";
 import { RotateCcw, RotateCw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, TextField } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
 
 export interface MovementPanelProps {
-	ship: ShipViewModel | null;
+	ship: CombatToken | null;
 	canControl: boolean;
 }
 
@@ -30,23 +30,23 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 
 	const handleMove = async (forwardDist: number, strafeDist: number) => {
 		if (!canAct) return;
-		await sendMove(ship.id, forwardDist, strafeDist);
+		await sendMove(ship.$id, forwardDist, strafeDist);
 	};
 
 	const handleRotate = async (angleDeg: number) => {
 		if (!canAct) return;
-		await sendRotate(ship.id, angleDeg);
+		await sendRotate(ship.$id, angleDeg);
 	};
 
 	const handleAdvancePhase = async () => {
 		if (!canAct) return;
-		await sendAdvancePhase(ship.id);
+		await sendAdvancePhase(ship.$id);
 	};
 
 	return (
 		<Flex className="panel-row" gap="3">
 			<Flex className="panel-section" align="center" gap="2">
-				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.id.slice(-6)) : "请选择舰船"}</Text>
+				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.$id.slice(-6)) : "请选择舰船"}</Text>
 				<Text size="1" color="gray">Phase: {phase}</Text>
 				{hasMoved && <Text size="1" color="amber">已移动</Text>}
 			</Flex>

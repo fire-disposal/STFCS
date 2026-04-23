@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Anchor, Shield, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import { Faction } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
 import type { SocketRoom } from "@/network";
@@ -13,7 +13,7 @@ import { notify } from "@/ui/shared/Notification";
 import "./battle-panel.css";
 
 export interface ShipInfoPanelProps {
-	ship: ShipViewModel | null;
+	ship: CombatToken | null;
 	room?: SocketRoom | null;
 }
 
@@ -23,7 +23,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 
 	const hasShip = ship && ship.runtime;
 
-	const displayName = hasShip ? (ship.runtime.displayName ?? ship.metadata?.name ?? ship.id.slice(-6)) : "未选择";
+	const displayName = hasShip ? (ship.runtime.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6)) : "未选择";
 	const faction = hasShip ? ship.runtime.faction : null;
 	const hull = hasShip ? ship.runtime.hull : 0;
 	const hullMax = hasShip ? (ship.spec.maxHitPoints ?? 100) : 100;
@@ -61,7 +61,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 		try {
 			await room.send("edit:token", {
 				action: "rename",
-				tokenId: ship.id,
+				tokenId: ship.$id,
 				displayName: editingName.trim(),
 			});
 			notify.success(`已更名为 ${editingName.trim()}`);
@@ -70,7 +70,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "更名失败");
 		}
-	}, [hasShip, room, ship?.id, editingName]);
+	}, [hasShip, room, ship?.$id, editingName]);
 
 	return (
 		<Flex className="panel-row" gap="3">

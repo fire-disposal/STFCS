@@ -1,5 +1,5 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipViewModel } from "../types";
+import type { CombatToken } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
@@ -48,7 +48,7 @@ const RANGE_COLOR = 0x3a8fdd;
 
 export function useWeaponArcRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	selectedShipId: string | null,
 	options: { show?: boolean } = {}
 ) {
@@ -60,7 +60,7 @@ export function useWeaponArcRendering(
 	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
 	const show = options.show ?? showWeaponArcs;
 
-	const selectedShip = ships.find((s) => s.id === selectedShipId) ?? null;
+	const selectedShip = ships.find((s) => s.$id === selectedShipId) ?? null;
 
 	const fetchTargets = useCallback(async (shipId: string) => {
 		const room = gameStateRef.room;
@@ -274,7 +274,7 @@ function drawRangeCircles(graphics: Graphics, maxRange: number, minRange: number
 function drawAimLines(
 	graphics: Graphics,
 	weapon: WeaponTargetingResult,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	mountWorldX: number,
 	mountWorldY: number,
 	mountFacing: number
@@ -288,7 +288,7 @@ function drawAimLines(
 	const AIM_LINE_COLOR = 0xff6b35;
 
 	for (const target of weapon.validTargets) {
-		const targetShip = ships.find((s) => s.id === target.targetId);
+		const targetShip = ships.find((s) => s.$id === target.targetId);
 		if (!targetShip?.runtime?.position) continue;
 
 		const targetPos = targetShip.runtime.position;

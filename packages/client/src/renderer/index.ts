@@ -29,7 +29,6 @@
  */
 
 export type {
-	ShipViewModel,
 	RenderContext,
 	MovementPreviewState,
 	MoveMode,

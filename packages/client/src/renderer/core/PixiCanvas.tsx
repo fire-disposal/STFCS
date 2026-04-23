@@ -26,7 +26,8 @@
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
 import { Application } from "@pixi/react";
-import type { ShipViewModel, MovementPreviewState } from "../types";
+import type { MovementPreviewState } from "../types";
+import type { CombatToken } from "@vt/data";
 import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
@@ -45,7 +46,7 @@ import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 
 interface GameCanvasProps {
-	ships: ShipViewModel[];
+	ships: CombatToken[];
 	onClick?: (x: number, y: number) => void;
 	movementPreview?: MovementPreviewState;
 }
@@ -96,13 +97,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const viewRotationRef = useRef(viewRotation);
 	viewRotationRef.current = viewRotation;
 
-	const shipsWithSelected = useMemo(() => {
-		return ships.map((ship) => ({
-			...ship,
-			selected: ship.id === selectedShipId,
-		}));
-	}, [ships, selectedShipId]);
-
 	const handlePanDelta = useCallback((deltaX: number, deltaY: number) => {
 		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
 		setCameraPosition(cameraPositionRef.current.x - worldDelta.x, cameraPositionRef.current.y - worldDelta.y);
@@ -135,7 +129,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useShipRendering(
 		layerSystem.layers,
-		shipsWithSelected,
+		ships,
 		selectedShipId,
 		{
 			zoom,
@@ -150,17 +144,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useShipHUDRendering(
 		layerSystem.layers,
-		shipsWithSelected,
+		ships,
 		{ x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation },
 		canvasSize,
+		selectedShipId ?? null,
 		{ showHpBars: showLabels, showLabels: showLabels }
 	);
 
-	useArmorHexagonRendering(layerSystem.layers, shipsWithSelected);
-	useMovementVisualRendering(layerSystem.layers, shipsWithSelected, selectedShipId ?? null, movementPreview, {
+	useArmorHexagonRendering(layerSystem.layers, ships);
+	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview, {
 		show: showMovementRange,
 	});
-	useWeaponArcRendering(layerSystem.layers, shipsWithSelected, selectedShipId ?? null);
+	useWeaponArcRendering(layerSystem.layers, ships, selectedShipId ?? null);
 	useGridRendering(layerSystem.layers, showGrid);
 
 	useEffect(() => {

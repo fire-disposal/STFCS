@@ -9,7 +9,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Crosshair, Bomb, CheckCircle, XCircle, Swords, Loader2 } from "lucide-react";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useTargets } from "@/hooks/useTargets";
@@ -52,7 +52,7 @@ interface WeaponTargetingData {
 }
 
 export interface WeaponPanelProps {
-	ship: ShipViewModel | null;
+	ship: CombatToken | null;
 	canControl: boolean;
 }
 
@@ -63,7 +63,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 	const [targetingData, setTargetingData] = useState<WeaponTargetingData | null>(null);
 
 	const { isAvailable, sendAttack, sendQuery } = useGameAction();
-	const allTargets = useTargets(ship?.id ?? null);
+	const allTargets = useTargets(ship?.$id ?? null);
 
 	const hasShip = ship && ship.runtime;
 	const canAct = canControl && hasShip && isAvailable;
@@ -127,7 +127,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 		const fetchTargeting = async () => {
 			setIsLoading(true);
 			try {
-				const result = await sendQuery("targets", ship!.id, selectedWeaponId);
+				const result = await sendQuery("targets", ship!.$id, selectedWeaponId);
 				if (result && result.weapons) {
 					const weaponData = result.weapons.find((w: any) => w.mountId === selectedWeaponId);
 					if (weaponData) {
@@ -204,7 +204,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 		if (!canAct || !selectedWeaponId || selectedTargetIds.length === 0) return;
 
 		try {
-			await sendAttack(ship!.id, [{
+			await sendAttack(ship!.$id, [{
 				mountId: selectedWeaponId,
 				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
 			}]);

@@ -17,7 +17,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipViewModel } from "../types";
+import type { CombatToken } from "@vt/data";
 import { FluxState } from "@vt/data";
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
@@ -108,7 +108,7 @@ function drawOverloadWarning(graphics: Graphics, size: number): void {
 	graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.5 });
 }
 
-function computeFluxState(ship: ShipViewModel): { percent: number; state: string } {
+function computeFluxState(ship: CombatToken): { percent: number; state: string } {
 	const fluxSoft = ship.runtime?.fluxSoft ?? 0;
 	const fluxHard = ship.runtime?.fluxHard ?? 0;
 	const capacity = ship.spec.fluxCapacity ?? 100;
@@ -145,7 +145,7 @@ export interface FluxIndicatorOptions {
 
 export function useFluxIndicatorRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	options: FluxIndicatorOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, FluxIndicatorCacheItem>>(new Map());
@@ -157,7 +157,7 @@ export function useFluxIndicatorRendering(
 		if (!layers) return;
 
 		const cache = cacheRef.current;
-		const currentIds = new Set(ships.map((s) => s.id));
+		const currentIds = new Set(ships.map((s) => s.$id));
 
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
@@ -167,7 +167,7 @@ export function useFluxIndicatorRendering(
 		}
 
 		for (const ship of ships) {
-			const cached = cache.get(ship.id);
+			const cached = cache.get(ship.$id);
 			if (!cached) {
 				createFluxIndicator(layers, cache, ship, defaultCapacity);
 				continue;
@@ -190,7 +190,7 @@ export function useFluxIndicatorRendering(
 
 function shouldUpdateFlux(
 	cached: FluxIndicatorCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	_defaultCapacity: number
 ): boolean {
 	if (!cached.lastState || !ship.runtime?.position) return true;
@@ -213,7 +213,7 @@ function shouldUpdateFlux(
 function createFluxIndicator(
 	layers: LayerRegistry,
 	cache: Map<string, FluxIndicatorCacheItem>,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	_defaultCapacity: number
 ): void {
 	if (!ship.runtime?.position) return;
@@ -247,7 +247,7 @@ function createFluxIndicator(
 
 	layers.fluxIndicators.addChild(root);
 
-	cache.set(ship.id, {
+	cache.set(ship.$id, {
 		root,
 		fluxRing,
 		overloadIcon,
@@ -266,7 +266,7 @@ function createFluxIndicator(
 
 function updateFluxIndicator(
 	cached: FluxIndicatorCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	_defaultCapacity: number
 ): void {
 	if (!ship.runtime?.position) return;

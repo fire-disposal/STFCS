@@ -10,7 +10,7 @@
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
-import type { ShipViewModel } from "../types";
+import type { CombatToken } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -60,7 +60,7 @@ export interface ArmorHexagonOptions {
 
 export function useArmorHexagonRendering(
 	layers: LayerRegistry | null,
-	ships: ShipViewModel[],
+	ships: CombatToken[],
 	options: ArmorHexagonOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ArmorHexagonCacheItem>>(new Map());
@@ -72,7 +72,7 @@ export function useArmorHexagonRendering(
 		if (!layers) return;
 
 		const cache = cacheRef.current;
-		const currentIds = new Set(ships.map((s) => s.id));
+		const currentIds = new Set(ships.map((s) => s.$id));
 
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
@@ -82,7 +82,7 @@ export function useArmorHexagonRendering(
 		}
 
 		for (const ship of ships) {
-			const cached = cache.get(ship.id);
+			const cached = cache.get(ship.$id);
 			if (!cached) {
 				createArmorHexagon(layers, cache, ship, armorMax);
 				continue;
@@ -103,7 +103,7 @@ export function useArmorHexagonRendering(
 	}, []);
 }
 
-function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: ShipViewModel): boolean {
+function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: CombatToken): boolean {
 	if (!cached.lastState || !ship.runtime?.position) return true;
 
 	const dx = Math.abs(ship.runtime.position.x - cached.lastState.x);
@@ -122,7 +122,7 @@ function shouldUpdateArmor(cached: ArmorHexagonCacheItem, ship: ShipViewModel): 
 function createArmorHexagon(
 	layers: LayerRegistry,
 	cache: Map<string, ArmorHexagonCacheItem>,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	armorMax: number
 ): void {
 	if (!ship.runtime?.position) return;
@@ -137,7 +137,7 @@ function createArmorHexagon(
 
 	layers.hexagonArmor.addChild(root);
 
-	cache.set(ship.id, {
+	cache.set(ship.$id, {
 		root,
 		graphics,
 		lastState: {
@@ -151,7 +151,7 @@ function createArmorHexagon(
 
 function updateArmorHexagon(
 	cached: ArmorHexagonCacheItem,
-	ship: ShipViewModel,
+	ship: CombatToken,
 	armorMax: number
 ): void {
 	if (!ship.runtime?.position) return;
@@ -169,7 +169,7 @@ function updateArmorHexagon(
 	};
 }
 
-function drawArmorHexagon(graphics: Graphics, ship: ShipViewModel, armorMax: number): void {
+function drawArmorHexagon(graphics: Graphics, ship: CombatToken, armorMax: number): void {
 	graphics.clear();
 
 	const radius = ARMOR_HEX_RADIUS;

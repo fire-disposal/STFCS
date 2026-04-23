@@ -1,9 +1,3 @@
-/**
- * Store 导出
- */
-
-export { useGameStore, type MovementPhaseValue } from "./gameStore";
-export { useUIStore } from "./uiStore";
-
-// 武器开火状态（仅 UI 意图，数据从 Schema 获取）
+export { type MovementPhaseValue, type CameraState, type PlayerCamera, DEFAULT_CAMERA } from "./gameStore";
+export { useUIStore, gameStateRef, setGameRoomRef, getGameActionSender } from "./uiStore";
 export { useFireModeStore } from "./fireModeStore";

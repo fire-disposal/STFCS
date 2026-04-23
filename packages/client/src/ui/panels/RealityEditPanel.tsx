@@ -5,12 +5,12 @@
 import React, { useEffect, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 import { Badge, Box, Button, Flex, Switch, Text, TextField } from "@radix-ui/themes";
-import type { ShipViewModel } from "@/renderer";
+import type { CombatToken } from "@vt/data";
 import type { TokenRuntime } from "@vt/data";
 import "./battle-panel.css";
 
 export interface RealityEditPanelProps {
-	ship: ShipViewModel | null;
+	ship: CombatToken | null;
 	onSubmit: (shipId: string, runtimeData: Partial<TokenRuntime>) => void;
 }
 
@@ -45,7 +45,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubm
 
 	const handleSave = () => {
 		if (!ship) return;
-		onSubmit(ship.id, {
+		onSubmit(ship.$id, {
 			hull,
 			heading,
 			fluxSoft,
@@ -68,7 +68,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubm
 	return (
 		<Flex className="panel-row" gap="3">
 			<Flex className="panel-section" align="center" gap="2">
-				<Text size="2" weight="bold">{ship.metadata?.name ?? ship.id.slice(-6)}</Text>
+				<Text size="2" weight="bold">{ship.metadata?.name ?? ship.$id.slice(-6)}</Text>
 				<Badge size="1" color={editMode ? "blue" : "gray"}>{editMode ? "编辑中" : "已锁定"}</Badge>
 			</Flex>
 

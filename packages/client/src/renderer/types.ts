@@ -2,17 +2,7 @@
  * 渲染层类型定义
  */
 
-import type { CombatToken, MovementPhase } from "@vt/data";
-
-export type ShipViewModel = CombatToken & {
-	id: string;
-	selected?: boolean;
-};
-
-export type TokenViewModel = CombatToken & {
-	id: string;
-	selected?: boolean;
-};
+import type { MovementPhase } from "@vt/data";
 
 export interface RenderContext {
 	zoom: number;

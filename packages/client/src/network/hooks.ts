@@ -193,8 +193,8 @@ export function useSocketRoom(
 	return socketRoom;
 }
 
-export function useTokens(room: SocketRoom | null): Array<CombatToken & { id: string }> {
-	const [tokens, setTokens] = useState<Array<CombatToken & { id: string }>>([]);
+export function useTokens(room: SocketRoom | null): CombatToken[] {
+	const [tokens, setTokens] = useState<CombatToken[]>([]);
 
 	useEffect(() => {
 		if (!room?.state?.tokens) {
@@ -202,9 +202,9 @@ export function useTokens(room: SocketRoom | null): Array<CombatToken & { id: st
 			return;
 		}
 
-		const arr: Array<CombatToken & { id: string }> = [];
-		for (const [id, token] of Object.entries(room.state.tokens)) {
-			arr.push({ ...token, id });
+		const arr: CombatToken[] = [];
+		for (const [, token] of Object.entries(room.state.tokens)) {
+			arr.push(token);
 		}
 		setTokens(arr);
 	}, [room?.state?.tokens]);

@@ -23,7 +23,7 @@ export const ReadyStatusFloat: React.FC<ReadyStatusFloatProps> = ({
 }) => {
 	const currentPlayer = useMemo(() => {
 		if (!playerId) return null;
-		return Object.values(players).find((p) => p.sessionId === playerId);
+		return players[playerId];
 	}, [players, playerId]);
 
 	const isReady = currentPlayer?.isReady ?? false;
