@@ -726,7 +726,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Text size="1" weight="bold">贴图位置调整</Text>
                                                 <Grid columns="3" gap="3">
                                                     <Box>
-                                                        <Text size="1" color="gray">X 偏移</Text>
+                                                        <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
@@ -740,7 +740,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         </Flex>
                                                     </Box>
                                                     <Box>
-                                                        <Text size="1" color="gray">Y 偏移</Text>
+                                                        <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
@@ -921,7 +921,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                                         <Grid columns="2" gap="2">
                                                             <Box>
-                                                                <Text size="1" color="gray">X 偏移</Text>
+                                                                <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
                                                                         type="range"
@@ -953,7 +953,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             </Box>
 
                                                             <Box>
-                                                                <Text size="1" color="gray">Y 偏移</Text>
+                                                                <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
                                                                         type="range"
@@ -1497,7 +1497,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Text size="1" weight="bold">贴图位置调整</Text>
                                                 <Grid columns="3" gap="3">
                                                     <Box>
-                                                        <Text size="1" color="gray">X 偏移</Text>
+                                                        <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
@@ -1511,7 +1511,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         </Flex>
                                                     </Box>
                                                     <Box>
-                                                        <Text size="1" color="gray">Y 偏移</Text>
+                                                        <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"

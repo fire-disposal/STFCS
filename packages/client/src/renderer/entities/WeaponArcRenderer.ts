@@ -41,10 +41,10 @@ interface WeaponArcCache {
 interface AimLineCache {
 	graphics: Graphics;
 	shipId: string;
-	lastTargets?: WeaponTargetInfo[];
 }
 
 const ARC_COLOR = 0x4fc3ff;
+const AIM_LINE_COLOR = 0xff6b35;
 
 export function useWeaponArcRendering(
 	layers: LayerRegistry | null,
@@ -132,14 +132,13 @@ export function useWeaponArcRendering(
 			const weapon = mount.weapon;
 			if (!weapon) continue;
 
-const mountPos = mount.position ?? { x: 0, y: 0 };
+			const mountPos = mount.position ?? { x: 0, y: 0 };
 			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
 			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 
-			const cosH = Math.cos(shipHeading * Math.PI / 180);
-			const sinH = Math.sin(shipHeading * Math.PI / 180);
-			const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH + (mountPos.y ?? 0) * sinH;
-			const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH - (mountPos.y ?? 0) * cosH;
+			const headingRad = shipHeading * Math.PI / 180;
+			const worldX = shipPosition.x - (mountPos.x ?? 0) * Math.cos(headingRad) + (mountPos.y ?? 0) * Math.sin(headingRad);
+			const worldY = shipPosition.y - (mountPos.x ?? 0) * Math.sin(headingRad) - (mountPos.y ?? 0) * Math.cos(headingRad);
 
 			const range = weapon.spec.range;
 			const minRange = weapon.spec.minRange ?? 0;
@@ -154,26 +153,10 @@ const mountPos = mount.position ?? { x: 0, y: 0 };
 
 			const finalCached = arcCacheRef.current.get(mount.id);
 			if (finalCached) finalCached.root.visible = true;
-		}
 
-		if (targetingDataRef.current && selectedShip) {
-			const shipPosition = selectedShip.runtime?.position;
-			const shipHeading = selectedShip.runtime?.heading ?? 0;
-			if (!shipPosition) return;
-
-			for (const weapon of targetingDataRef.current.weapons) {
-				const mount = mounts.find((m) => m.id === weapon.mountId);
-				if (!mount) continue;
-
-				const mountPos = mount.position ?? { x: 0, y: 0 };
-				const mountFacingNautical = shipHeading + (mount.facing ?? 0);
-				const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
-				const cosH = Math.cos(shipHeading * Math.PI / 180);
-				const sinH = Math.sin(shipHeading * Math.PI / 180);
-				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH + (mountPos.y ?? 0) * sinH;
-				const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH - (mountPos.y ?? 0) * cosH;
-
-				const cacheKey = `${selectedShip.$id}:${weapon.mountId}`;
+			const validTargets = calculateValidTargets(selectedShip, mount, ships);
+			if (validTargets.length > 0) {
+				const cacheKey = `${selectedShip.$id}:${mount.id}`;
 				const aimCached = aimLineCacheRef.current.get(cacheKey);
 				if (!aimCached) {
 					const graphics = new Graphics();
@@ -181,11 +164,11 @@ const mountPos = mount.position ?? { x: 0, y: 0 };
 					graphics.rotation = mountFacing;
 					layers.weaponArcs.addChild(graphics);
 					aimLineCacheRef.current.set(cacheKey, { graphics, shipId: selectedShip.$id });
-					drawAimLines(graphics, weapon, ships);
+					drawAimLines(graphics, validTargets, ships);
 				} else {
 					aimCached.graphics.position.set(worldX, worldY);
 					aimCached.graphics.rotation = mountFacing;
-					drawAimLines(aimCached.graphics, weapon, ships);
+					drawAimLines(aimCached.graphics, validTargets, ships);
 				}
 			}
 		}
@@ -199,6 +182,61 @@ const mountPos = mount.position ?? { x: 0, y: 0 };
 			aimLineCacheRef.current.clear();
 		};
 	}, []);
+}
+
+function calculateValidTargets(
+	attacker: CombatToken,
+	mount: { id: string; weapon?: any; position?: { x: number; y: number }; facing?: number; arc?: number },
+	allShips: CombatToken[]
+): WeaponTargetInfo[] {
+	const weapon = mount.weapon;
+	if (!weapon?.spec) return [];
+
+	const range = weapon.spec.range;
+	const minRange = weapon.spec.minRange ?? 0;
+	const arc = mount.arc ?? 360;
+	const mountFacing = mount.facing ?? 0;
+
+	const attackerPos = attacker.runtime?.position ?? { x: 0, y: 0 };
+	const attackerHeading = attacker.runtime?.heading ?? 0;
+
+	const results: WeaponTargetInfo[] = [];
+
+	for (const target of allShips) {
+		if (target.$id === attacker.$id) continue;
+		if (target.runtime?.destroyed) continue;
+		if (!target.runtime?.position) continue;
+
+		const targetPos = target.runtime.position;
+		const dist = Math.sqrt(
+			Math.pow(targetPos.x - attackerPos.x, 2) +
+			Math.pow(targetPos.y - attackerPos.y, 2)
+		);
+
+		const inRange = dist >= minRange && dist <= range;
+
+		let inArc = true;
+		if (arc < 360) {
+			const targetAngle = Math.atan2(targetPos.y - attackerPos.y, targetPos.x - attackerPos.x) * 180 / Math.PI;
+			const relativeAngle = normalizeAngle(targetAngle - attackerHeading - mountFacing);
+			inArc = Math.abs(relativeAngle) <= arc / 2;
+		}
+
+		if (inRange && inArc) {
+			results.push({
+				targetId: target.$id,
+				distance: Math.round(dist * 100) / 100,
+				inRange,
+				inArc,
+			});
+		}
+	}
+
+	return results;
+}
+
+function normalizeAngle(angle: number): number {
+	return ((angle + 180) % 360) - 180;
 }
 
 function shouldUpdateArc(cached: WeaponArcCache, range: number, minRange: number, arc: number, mountFacing: number): boolean {
@@ -315,20 +353,14 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 
 function drawAimLines(
 	graphics: Graphics,
-	weapon: WeaponTargetingResult,
+	validTargets: WeaponTargetInfo[],
 	ships: CombatToken[]
 ): void {
 	graphics.clear();
 
-	if (!weapon.validTargets || weapon.validTargets.length === 0) {
-		return;
-	}
+	if (validTargets.length === 0) return;
 
-	const AIM_LINE_COLOR = 0xff6b35;
-
-	for (const target of weapon.validTargets) {
-		if (!target.inRange || !target.inArc) continue;
-
+	for (const target of validTargets) {
 		const targetShip = ships.find((s) => s.$id === target.targetId);
 		if (!targetShip?.runtime?.position) continue;
 

@@ -183,6 +183,18 @@ function calculateWeaponTargets(
 	const minRange = weaponSpec.minRange || 0;
 	const mountFacing = mount.facing || 0;
 
+	// 挂载点偏移坐标系定义：
+	// X轴：左舷为正（heading=0时指向屏幕左侧 -X）
+	// Y轴：船头为正（heading=0时指向屏幕上方 -Y）
+	const mountOffset = mount.position || { x: 0, y: 0 };
+	const headingRad = (attacker.runtime?.heading || 0) * Math.PI / 180;
+	
+	// 挂载点世界坐标
+	const attackerPos = attacker.runtime?.position || { x: 0, y: 0 };
+	const mountWorldX = attackerPos.x - mountOffset.x * Math.cos(headingRad) + mountOffset.y * Math.sin(headingRad);
+	const mountWorldY = attackerPos.y - mountOffset.x * Math.sin(headingRad) - mountOffset.y * Math.cos(headingRad);
+	const mountWorldPos = { x: mountWorldX, y: mountWorldY };
+
 	// 射界直接使用 mount.arc（度）。360 = 全向炮塔，20 = 固定挂载
 	const arc = mount.arc;
 
@@ -258,7 +270,7 @@ function calculateWeaponTargets(
 		// 跳过已摧毁目标
 		if (target.runtime?.destroyed) continue;
 
-		const dist = distance(attacker.runtime?.position ?? { x: 0, y: 0 }, target.runtime?.position ?? { x: 0, y: 0 });
+		const dist = distance(mountWorldPos, target.runtime?.position ?? { x: 0, y: 0 });
 
 		// 检查射程
 		const inRange = dist >= minRange && dist <= effectiveRange;
@@ -266,9 +278,9 @@ function calculateWeaponTargets(
 		// 检查射界（arc < 360 时需要检查）
 		let inArc = true;
 		if (arc < 360) {
-			// 计算目标相对攻击者的角度
+			// 计算目标相对挂载点的角度
 			const targetAngle = angleBetween(
-				attacker.runtime?.position ?? { x: 0, y: 0 },
+				mountWorldPos,
 				target.runtime?.position ?? { x: 0, y: 0 }
 			);
 			const heading = attacker.runtime?.heading || 0;
@@ -278,7 +290,7 @@ function calculateWeaponTargets(
 
 		// 计算命中角度和护甲象限
 		const hitAngle = angleBetween(
-			attacker.runtime?.position ?? { x: 0, y: 0 },
+			mountWorldPos,
 			target.runtime?.position ?? { x: 0, y: 0 }
 		);
 		const relativeAngle = ((hitAngle - (target.runtime?.heading || 0) + 360) % 360);
