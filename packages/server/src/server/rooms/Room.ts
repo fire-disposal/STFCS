@@ -182,7 +182,8 @@ export class Room {
 				nextPhase = "DM_ACTION";
 				break;
 			case "DM_ACTION":
-				nextPhase = "TURN_END";
+				nextPhase = "PLAYER_ACTION";
+				incrementTurn = true;
 				break;
 			case "TURN_END":
 				nextPhase = "PLAYER_ACTION";

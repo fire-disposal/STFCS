@@ -65,11 +65,9 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 			case GamePhase.DEPLOYMENT:
 				return "开始";
 			case GamePhase.PLAYER_ACTION:
-				return "结束";
+				return "推进";
 			case GamePhase.DM_ACTION:
-				return "结束";
-			case GamePhase.TURN_END:
-				return "新回合";
+				return "结算";
 			default:
 				return "推进";
 		}

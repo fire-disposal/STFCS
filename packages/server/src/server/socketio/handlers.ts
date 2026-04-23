@@ -878,7 +878,8 @@ rpc.namespace("edit", {
             nextPhase = "DM_ACTION";
             break;
           case "DM_ACTION":
-            nextPhase = "TURN_END";
+            nextPhase = "PLAYER_ACTION";
+            incrementTurn = true;
             break;
           case "TURN_END":
             nextPhase = "PLAYER_ACTION";
@@ -896,9 +897,6 @@ rpc.namespace("edit", {
           room.processTurnEndLogic();
         }
         
-        if (p.faction) {
-          ctx.state.changeFaction(p.faction);
-        }
         return;
       }
       case "set_phase": {

@@ -61,11 +61,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		const currentPhase = room?.state?.currentPhase;
 		if (!currentPhase) return;
 
-		if (currentPhase === "PLAYER_ACTION") {
+		if (currentPhase === "DEPLOYMENT") {
+			await send("room:action", { action: "start" });
+		} else if (currentPhase === "PLAYER_ACTION") {
 			await send("edit:room", { action: "set_phase", phase: "DM_ACTION" });
 		} else if (currentPhase === "DM_ACTION") {
-			await send("edit:room", { action: "set_phase", phase: "TURN_END" });
-		} else if (currentPhase === "TURN_END") {
 			await send("edit:room", { action: "force_end_turn" });
 		}
 	}, [send, room?.state?.currentPhase]);
