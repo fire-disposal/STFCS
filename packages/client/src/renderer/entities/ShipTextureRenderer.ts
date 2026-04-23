@@ -60,7 +60,15 @@ export function useShipTextureRendering(
 			const offsetY = ship.spec.texture?.offsetY ?? 0;
 			const scale = ship.spec.texture?.scale ?? 1;
 
-			const headingRad = (ship.runtime.heading * Math.PI) / 180;
+			// 航海角度：0°=船头向上，顺时针增加
+			// PixiJS rotation：正角度逆时针旋转
+			// 所以 sprite.rotation = -heading（负数使其顺时针旋转）
+			const headingRad = (-ship.runtime.heading * Math.PI) / 180;
+			
+			// 贴图偏移坐标系（同挂载点坐标系）：
+			// X轴：左舷为正（heading=0时指向屏幕左侧）
+			// Y轴：船头为正（heading=0时指向屏幕上方）
+			// 偏移需要根据舰船朝向旋转到世界坐标系
 			const worldX = ship.runtime.position.x - offsetX * Math.cos(headingRad) + offsetY * Math.sin(headingRad);
 			const worldY = ship.runtime.position.y - offsetX * Math.sin(headingRad) - offsetY * Math.cos(headingRad);
 

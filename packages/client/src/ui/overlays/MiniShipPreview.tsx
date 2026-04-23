@@ -144,9 +144,9 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
     }, [token]);
 
     const texture = token?.spec.texture;
-    const textureScale = texture?.scale ?? 1;
-    const textureOffsetX = texture?.offsetX ?? 0;
-    const textureOffsetY = texture?.offsetY ?? 0;
+    const textureScale = (texture?.scale ?? 1) * zoom;
+    const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
+    const textureOffsetY = (texture?.offsetY ?? 0) * zoom;
     const textureStyle = useMemo(() => {
         return {
             transform: `translate(${textureOffsetX}px, ${textureOffsetY}px) scale(${textureScale})`,

@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { Shield, Zap, Radio, AlertTriangle, RotateCw } from "lucide-react";
 import type { CombatToken } from "@vt/data";
-import { Button, Flex, Box, Text, Badge, Progress, TextField } from "@radix-ui/themes";
+import { Button, Flex, Box, Text, Badge, TextField } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
 
@@ -21,9 +21,6 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const hasShip = ship && ship.runtime;
 
 	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
-	const shieldVal = hasShip ? (ship.runtime.shield?.value ?? 0) : 0;
-	const shieldMax = hasShip ? (ship.spec.shield?.upkeep ?? 100) : 100;
-	const shieldPct = hasShip ? Math.min(100, (shieldVal / shieldMax) * 100) : 0;
 	const shieldDirection = hasShip ? (ship.runtime.shield?.direction ?? 0) : 0;
 	const [directionInput, setDirectionInput] = useState(shieldDirection);
 
@@ -31,7 +28,6 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const fluxHard = hasShip ? (ship.runtime.fluxHard ?? 0) : 0;
 	const fluxTotal = fluxSoft + fluxHard;
 	const fluxMax = hasShip ? (ship.spec.fluxCapacity ?? 100) : 100;
-	const fluxPct = hasShip ? Math.min(100, (fluxTotal / fluxMax) * 100) : 0;
 
 	const overloaded = hasShip ? ship.runtime.overloaded : false;
 	const venting = hasShip ? ship.runtime.venting : false;
@@ -68,8 +64,6 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 			<Flex className="panel-section" align="center" gap="2">
 				<Shield size={14} />
 				<Text size="1" className="panel-section__label">护盾</Text>
-				<Progress value={shieldPct} color="blue" style={{ width: 80 }} />
-				<Text size="1" className="panel-section__value">{hasShip ? `${shieldVal}/${shieldMax}` : "NA"}</Text>
 				<Badge size="1" color={shieldActive ? "blue" : "gray"}>{shieldActive ? "ON" : "OFF"}</Badge>
 			</Flex>
 
@@ -106,7 +100,6 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 			<Flex className="panel-section" align="center" gap="2">
 				<Radio size={14} />
 				<Text size="1" className="panel-section__label">软辐能</Text>
-				<Progress value={fluxPct} color="purple" style={{ width: 80 }} />
 				<Text size="1" className="panel-section__value">{hasShip ? `${fluxSoft}/${fluxMax}` : "NA"}</Text>
 			</Flex>
 
