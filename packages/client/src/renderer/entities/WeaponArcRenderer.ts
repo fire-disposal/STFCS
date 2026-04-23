@@ -132,16 +132,14 @@ export function useWeaponArcRendering(
 			const weapon = mount.weapon;
 			if (!weapon) continue;
 
-			const mountPos = mount.position ?? { x: 0, y: 0 };
+const mountPos = mount.position ?? { x: 0, y: 0 };
 			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
 			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 
-			const offsetX = mountPos.x;
-			const offsetY = mountPos.y;
 			const cosH = Math.cos(shipHeading * Math.PI / 180);
 			const sinH = Math.sin(shipHeading * Math.PI / 180);
-			const worldX = shipPosition.x + offsetX * cosH - offsetY * sinH;
-			const worldY = shipPosition.y + offsetX * sinH + offsetY * cosH;
+			const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH + (mountPos.y ?? 0) * sinH;
+			const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH - (mountPos.y ?? 0) * cosH;
 
 			const range = weapon.spec.range;
 			const minRange = weapon.spec.minRange ?? 0;
@@ -172,8 +170,8 @@ export function useWeaponArcRendering(
 				const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 				const cosH = Math.cos(shipHeading * Math.PI / 180);
 				const sinH = Math.sin(shipHeading * Math.PI / 180);
-				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH - (mountPos.y ?? 0) * sinH;
-				const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH + (mountPos.y ?? 0) * cosH;
+				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH + (mountPos.y ?? 0) * sinH;
+				const worldY = shipPosition.y + (mountPos.x ?? 0) * sinH - (mountPos.y ?? 0) * cosH;
 
 				const cacheKey = `${selectedShip.$id}:${weapon.mountId}`;
 				const aimCached = aimLineCacheRef.current.get(cacheKey);
