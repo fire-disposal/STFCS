@@ -4,6 +4,7 @@ import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
 import { useSocketRoom, useTokens } from "@/network";
 import { notify } from "@/ui/shared/Notification";
+import type { TabConfig } from "@/ui/panels/BattlePanel";
 import {
 	Box,
 	Flex,
@@ -16,7 +17,7 @@ import {
 	IconButton,
 } from "@radix-ui/themes";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
@@ -48,11 +49,19 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
+	const showGrid = useUIStore((state) => state.showGrid);
+	const showBackground = useUIStore((state) => state.showBackground);
+	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
+	const showMovementRange = useUIStore((state) => state.showMovementRange);
+	const toggleGrid = useUIStore((state) => state.toggleGrid);
+	const toggleBackground = useUIStore((state) => state.toggleBackground);
+	const toggleWeaponArcs = useUIStore((state) => state.toggleWeaponArcs);
+	const toggleMovementRange = useUIStore((state) => state.toggleMovementRange);
 
 	const tokens = useTokens(room) as unknown as ShipViewModel[];
 	const selectedShip = tokens.find((t) => t.id === selectedShipId) ?? null;
 
-	const handleRealityEdit = async (shipId: string, runtimeData: Record<string, unknown>) => {
+	const handleRealityEdit = useCallback(async (shipId: string, runtimeData: Record<string, unknown>) => {
 		if (!room) return;
 		try {
 			for (const [path, value] of Object.entries(runtimeData)) {
@@ -62,7 +71,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "修改失败");
 		}
-	};
+	}, [room]);
 
 	const playerKeys = room?.state?.players ? Object.keys(room.state.players) : [];
 	const currentPlayerKey = playerKeys.find((k) => {
@@ -74,6 +83,76 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
 	const turnCount = room?.state?.turnCount ?? 1;
 	const activeFaction = room?.state?.activeFaction ?? "PLAYER";
+	const cursorPosition = useMemo(() => 
+		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
+		[mapCursor]
+	);
+
+	const tabs: TabConfig[] = useMemo(() => [
+		{
+			id: "ship-info",
+			label: "舰船信息",
+			icon: <Info size={14} />,
+			component: <ShipInfoPanel ship={selectedShip} />,
+			enabled: true,
+		},
+		{
+			id: "movement",
+			label: "移动控制",
+			icon: <Move size={14} />,
+			component: <MovementPanel ship={selectedShip} canControl={true} />,
+			enabled: true,
+		},
+		{
+			id: "weapon",
+			label: "武器火控",
+			icon: <Crosshair size={14} />,
+			component: <WeaponPanel ship={selectedShip} canControl={true} />,
+			enabled: true,
+		},
+		{
+			id: "shield",
+			label: "护盾管理",
+			icon: <Shield size={14} />,
+			component: <ShieldPanel ship={selectedShip} canControl={true} />,
+			enabled: true,
+		},
+		{
+			id: "reality-edit",
+			label: "现实修改",
+			icon: <Edit size={14} />,
+			component: <RealityEditPanel ship={selectedShip} onSubmit={handleRealityEdit} />,
+			enabled: Boolean(isHost),
+		},
+		{
+			id: "ship-preset",
+			label: "舰船预设",
+			icon: <Rocket size={14} />,
+			component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={cursorPosition} />,
+			enabled: true,
+		},
+		{
+			id: "dm-control",
+			label: "DM控制",
+			icon: <Crown size={14} />,
+			component: <DMControlPanel
+				networkManager={networkManager}
+				players={room?.state?.players ?? {}}
+				isHost={Boolean(isHost)}
+				phase={phase}
+				turnCount={turnCount}
+				activeFaction={activeFaction}
+			/>,
+			enabled: Boolean(isHost),
+		},
+		{
+			id: "view-control",
+			label: "视图控制",
+			icon: <Eye size={14} />,
+			component: <ViewControlPanel />,
+			enabled: true,
+		},
+	], [selectedShip, handleRealityEdit, isHost, room, networkManager, cursorPosition, phase, turnCount, activeFaction]);
 
 	if (!room || !room.state) {
 		return (
@@ -90,7 +169,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
-			{/* Header */}
 			<Card style={{ flexShrink: 0, height: "40px", borderRadius: 0, background: "rgba(10, 20, 35, 0.95)", borderBottom: "1px solid rgba(74, 158, 255, 0.2)" }}>
 				<Flex justify="between" align="center" height="100%" px="3">
 					<Flex align="center" gap="3">
@@ -125,10 +203,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Flex>
 			</Card>
 
-			{/* Main */}
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-					{/* Ready Status Float - 部署阶段显示，在 Pixi 容器内 */}
 					<ReadyStatusFloat
 						networkManager={networkManager}
 						players={room.state.players}
@@ -139,77 +215,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Box>
 			</Box>
 
-			{/* Battle Panel */}
-			<BattlePanel
-				tabs={[
-					{
-						id: "ship-info",
-						label: "舰船信息",
-						icon: <Info size={14} />,
-						component: <ShipInfoPanel ship={selectedShip} />,
-						enabled: true,
-					},
-					{
-						id: "movement",
-						label: "移动控制",
-						icon: <Move size={14} />,
-						component: <MovementPanel ship={selectedShip} canControl={true} />,
-						enabled: true,
-					},
-					{
-						id: "weapon",
-						label: "武器火控",
-						icon: <Crosshair size={14} />,
-						component: <WeaponPanel ship={selectedShip} canControl={true} />,
-						enabled: true,
-					},
-					{
-						id: "shield",
-						label: "护盾管理",
-						icon: <Shield size={14} />,
-						component: <ShieldPanel ship={selectedShip} canControl={true} />,
-						enabled: true,
-					},
-					{
-						id: "reality-edit",
-						label: "现实修改",
-						icon: <Edit size={14} />,
-						component: <RealityEditPanel ship={selectedShip} onSubmit={handleRealityEdit} />,
-						enabled: Boolean(isHost),
-					},
-					{
-						id: "ship-preset",
-						label: "舰船预设",
-						icon: <Rocket size={14} />,
-						component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 }} />,
-						enabled: true,
-					},
-					{
-						id: "dm-control",
-						label: "DM控制",
-						icon: <Crown size={14} />,
-						component: <DMControlPanel
-							networkManager={networkManager}
-							players={room.state.players}
-							isHost={Boolean(isHost)}
-							phase={phase}
-							turnCount={turnCount}
-							activeFaction={activeFaction}
-						/>,
-						enabled: Boolean(isHost),
-					},
-					{
-						id: "view-control",
-						label: "视图控制",
-						icon: <Eye size={14} />,
-						component: <ViewControlPanel />,
-						enabled: true,
-					},
-				]}
-				defaultActiveTab="ship-info"
-			/>
+			<BattlePanel tabs={tabs} defaultActiveTab="ship-info" />
 
-			{/* Player Roster Modal */}
 			<Dialog.Root open={showPlayerRoster} onOpenChange={setShowPlayerRoster}>
 				<Dialog.Content style={{ maxWidth: 400 }}>
 					<Dialog.Title>
@@ -246,7 +253,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Dialog.Content>
 			</Dialog.Root>
 
-			{/* Settings Modal */}
 			<Dialog.Root open={showSettings} onOpenChange={setShowSettings}>
 				<Dialog.Content style={{ maxWidth: 360 }}>
 					<Dialog.Title>
@@ -258,41 +264,41 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						<Flex align="center" justify="between">
 							<Text size="2">显示网格</Text>
 							<IconButton
-								variant={useUIStore.getState().showGrid ? "solid" : "soft"}
-								color={useUIStore.getState().showGrid ? "blue" : "gray"}
-								onClick={() => useUIStore.getState().toggleGrid()}
+								variant={showGrid ? "solid" : "soft"}
+								color={showGrid ? "blue" : "gray"}
+								onClick={toggleGrid}
 							>
-								{useUIStore.getState().showGrid ? <CheckCircle size={14} /> : <XCircle size={14} />}
+								{showGrid ? <CheckCircle size={14} /> : <XCircle size={14} />}
 							</IconButton>
 						</Flex>
 						<Flex align="center" justify="between">
 							<Text size="2">显示背景</Text>
 							<IconButton
-								variant={useUIStore.getState().showBackground ? "solid" : "soft"}
-								color={useUIStore.getState().showBackground ? "blue" : "gray"}
-								onClick={() => useUIStore.getState().toggleBackground()}
+								variant={showBackground ? "solid" : "soft"}
+								color={showBackground ? "blue" : "gray"}
+								onClick={toggleBackground}
 							>
-								{useUIStore.getState().showBackground ? <CheckCircle size={14} /> : <XCircle size={14} />}
+								{showBackground ? <CheckCircle size={14} /> : <XCircle size={14} />}
 							</IconButton>
 						</Flex>
 						<Flex align="center" justify="between">
 							<Text size="2">显示武器弧</Text>
 							<IconButton
-								variant={useUIStore.getState().showWeaponArcs ? "solid" : "soft"}
-								color={useUIStore.getState().showWeaponArcs ? "blue" : "gray"}
-								onClick={() => useUIStore.getState().toggleWeaponArcs()}
+								variant={showWeaponArcs ? "solid" : "soft"}
+								color={showWeaponArcs ? "blue" : "gray"}
+								onClick={toggleWeaponArcs}
 							>
-								{useUIStore.getState().showWeaponArcs ? <CheckCircle size={14} /> : <XCircle size={14} />}
+								{showWeaponArcs ? <CheckCircle size={14} /> : <XCircle size={14} />}
 							</IconButton>
 						</Flex>
 						<Flex align="center" justify="between">
 							<Text size="2">显示移动范围</Text>
 							<IconButton
-								variant={useUIStore.getState().showMovementRange ? "solid" : "soft"}
-								color={useUIStore.getState().showMovementRange ? "blue" : "gray"}
-								onClick={() => useUIStore.getState().toggleMovementRange()}
+								variant={showMovementRange ? "solid" : "soft"}
+								color={showMovementRange ? "blue" : "gray"}
+								onClick={toggleMovementRange}
 							>
-								{useUIStore.getState().showMovementRange ? <CheckCircle size={14} /> : <XCircle size={14} />}
+								{showMovementRange ? <CheckCircle size={14} /> : <XCircle size={14} />}
 							</IconButton>
 						</Flex>
 					</Flex>

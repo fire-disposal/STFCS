@@ -534,7 +534,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">贴图</Text>
-                                            <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()}>
+                                            <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
                                                 <Upload size={12} /> 上传图片
                                             </Button>
                                         </Flex>
@@ -836,7 +836,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     )}
 
                                     <Flex justify="end" mt="2">
-                                        <Button onClick={() => void saveShip()}><Save size={14} /> 保存</Button>
+                                        <Button onClick={() => void saveShip()} data-magnetic><Save size={14} /> 保存</Button>
                                     </Flex>
                                 </Card>
 
@@ -932,7 +932,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">武器预览</Text>
-                                            <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()}>
+                                            <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
                                                 <Upload size={12} /> 上传图片
                                             </Button>
                                         </Flex>
@@ -1046,7 +1046,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Button variant="ghost" onClick={() => navigator.clipboard.writeText(weaponRawJson)}><Copy size={12} /></Button>
                                     </Flex>
                                     <Flex justify="end" mt="2">
-                                        <Button onClick={() => void saveWeapon()}><Save size={14} /> 保存</Button>
+                                        <Button onClick={() => void saveWeapon()} data-magnetic><Save size={14} /> 保存</Button>
                                     </Flex>
                                 </Card>
 

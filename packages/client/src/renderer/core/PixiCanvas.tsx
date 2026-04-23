@@ -174,9 +174,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const updateHitAreasRef = useRef(layerSystem.updateHitAreas);
 	updateHitAreasRef.current = layerSystem.updateHitAreas;
 
-	const canvasWidth = canvasSize.width;
-	const canvasHeight = canvasSize.height;
-
 	useEffect(() => {
 		camera.cameraRef.current = { x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation };
 		updateWorldTransformsRef.current(
@@ -187,8 +184,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 			viewRotation,
 			showBackground
 		);
+	}, [camera, cameraPosition.x, cameraPosition.y, zoom, viewRotation, showBackground, canvasSize]);
+
+	useEffect(() => {
 		updateHitAreasRef.current(canvasSize);
-	}, [camera, cameraPosition.x, cameraPosition.y, zoom, viewRotation, canvasWidth, canvasHeight, showBackground]);
+	}, [canvasSize]);
 
 	return (
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container">
