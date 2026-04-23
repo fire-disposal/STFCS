@@ -144,9 +144,9 @@ async function fetchAssetData(assetId: string): Promise<string> {
 		});
 
 		socket.emit("request", {
-			event: "asset:batch_get",
+			event: "asset:action",
 			requestId,
-			payload: { assetIds: [assetId], includeData: true },
+			payload: { action: "batch_get", assetIds: [assetId], includeData: true },
 		});
 	});
 }
