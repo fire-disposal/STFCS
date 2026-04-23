@@ -1,91 +1,52 @@
-## 舰船贴图渲染系统 ✅ 已实现
+## 舰船渲染问题修复 ✅
 
-### 架构设计
+### 修复内容
 
-```
-贴图渲染管线：
-├── collectAssetIds(ships) → 收集所有 assetId
-├── useTextureLoader(assetIds, fetchAssets) → TextureCache
-│   └── Assets.load(dataUrl) → PixiJS Texture
-├── useShipTextureRendering(layers, ships, textureCache)
-│   └── shipSprites 层渲染舰船贴图 Sprite
-└── useWeaponTextureRendering(layers, ships, textureCache)
-    └── shipSprites 层渲染武器贴图 Sprite
-```
+**1. 状态更新时机**
+- `useTokens` 添加 `Object.keys(tokens).join(",")` 作为依赖
+- `useSocketRoom` 使用 `{ ...gameState.tokens }` 创建新引用
+- 部署舰船后立即触发渲染
 
-### 新增文件
-
-| 文件 | 功能 |
-|------|------|
-| `useTextureLoader.ts` | 预加载贴图到 PixiJS Texture 缓存 |
-| `ShipTextureRenderer.ts` | 舰船贴图精灵渲染 |
-| `WeaponTextureRenderer.ts` | 武器贴图精灵渲染 |
-
-### Texture Schema 应用
-
+**2. 部署继承游标朝向**
 ```typescript
-interface Texture {
-  assetId?: string;   // 贴图资产ID
-  offsetX?: number;   // X偏移（世界坐标）
-  offsetY?: number;   // Y偏移
-  scale?: number;     // 缩放比例
-}
-
-// 舰船贴图
-sprite.position.set(
-  ship.runtime.position.x + offsetX,
-  ship.runtime.position.y + offsetY
-);
-sprite.rotation = heading * Math.PI / 180;
-sprite.scale.set(scale ?? 1);
-
-// 武器贴图（考虑舰船旋转）
-const cos = Math.cos(shipHeadingRad);
-const sin = Math.sin(shipHeadingRad);
-const rotatedMountX = mountOffsetX * cos - mountOffsetY * sin;
-const rotatedMountY = mountOffsetX * sin + mountOffsetY * cos;
-sprite.position.set(
-  shipPos.x + rotatedMountX + weaponOffsetX,
-  shipPos.y + rotatedMountY + weaponOffsetY
-);
-sprite.rotation = (shipHeading + mountFacing) * Math.PI / 180;
-```
-
-### 渲染层
-
-| 层 | zIndex | 内容 |
-|----|--------|------|
-| shipSprites | 6 | 舰船/武器贴图精灵 |
-| tacticalTokens | 7 | 舰船战术标记（菱形箭头） |
-
-### Props
-
-```typescript
-interface GameCanvasProps {
-  ships: CombatToken[];
-  fetchAssets?: (assetIds, includeData) => Promise<AssetBatchGetResult[]>;
-  showShipTextures?: boolean;  // 贴图开关
+const cursorHeading = mapCursor?.r ?? 0;
+runtime: {
+  position: cursorPosition,
+  heading: cursorHeading,  // 继承游标朝向
+  ...
 }
 ```
 
-### GamePage 整合
-
-```typescript
-<PixiCanvas
-  ships={tokens}
-  fetchAssets={assetSocket.batchGet}
-/>
+**3. 图层顺序调整**
 ```
+世界层 zIndex 排序：
+├── 0-5: 背景/星空/网格/游标
+├── 7: tacticalTokens (战术标记 - 菱形箭头)
+├── 8-14: effects/weaponArcs/movement/shield/armor/flux
+└── 15: shipSprites (贴图精灵 - 最高层)
+```
+
+贴图在战术标记之上，确保视觉效果正确。
 
 ---
 
-## 其他已完成
+## 完整修复清单
 
-### 舰船渲染图层修复 ✅
-- tacticalTokens.visible 设置正确
+| 提交 | 内容 |
+|------|------|
+| bb5b796 | 废弃 ShipViewModel，统一 CombatToken |
+| 482545e | 重构挂点管理UI |
+| 1250123 | 挂点预览实时更新 |
+| 656967d | 图层可见性修复 |
+| e46c6e8 | 舰船贴图渲染系统 |
+| 847ad99 | 移除调试日志 |
+| 本次 | 状态更新时机 + 图层顺序 + 朝向继承 |
 
-### 挂点管理重构 ✅
-- 横向卡片布局，实时预览
+---
 
-### 准备按钮修复 ✅
-- sessionId/playerId 匹配
+## 待测试验证
+
+启动 `pnpm dev` 测试：
+1. 部署舰船观察是否立即渲染
+2. 验证朝向继承游标旋转
+3. 确认战术标记和贴图分层正确

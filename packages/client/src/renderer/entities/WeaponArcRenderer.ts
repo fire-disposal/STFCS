@@ -152,11 +152,15 @@ export function useWeaponArcRendering(
 				const aimCached = aimLineCacheRef.current.get(weapon.mountId);
 				if (!aimCached) {
 					const graphics = new Graphics();
+					graphics.position.set(worldX, worldY);
+					graphics.rotation = mountFacing;
 					layers.weaponArcs.addChild(graphics);
 					aimLineCacheRef.current.set(weapon.mountId, { graphics });
-					drawAimLines(graphics, weapon, ships, worldX, worldY, mountFacing);
+					drawAimLines(graphics, weapon, ships);
 				} else {
-					drawAimLines(aimCached.graphics, weapon, ships, worldX, worldY, mountFacing);
+					aimCached.graphics.position.set(worldX, worldY);
+					aimCached.graphics.rotation = mountFacing;
+					drawAimLines(aimCached.graphics, weapon, ships);
 				}
 			}
 		}
@@ -274,10 +278,7 @@ function drawRangeCircles(graphics: Graphics, maxRange: number, minRange: number
 function drawAimLines(
 	graphics: Graphics,
 	weapon: WeaponTargetingResult,
-	ships: CombatToken[],
-	mountWorldX: number,
-	mountWorldY: number,
-	mountFacing: number
+	ships: CombatToken[]
 ): void {
 	graphics.clear();
 
@@ -293,15 +294,16 @@ function drawAimLines(
 
 		const targetPos = targetShip.runtime.position;
 
-		const dx = targetPos.x - mountWorldX;
-		const dy = targetPos.y - mountWorldY;
+		const dx = targetPos.x - graphics.position.x;
+		const dy = targetPos.y - graphics.position.y;
 
 		const color = target.inRange && target.inArc ? AIM_LINE_COLOR : 0xff5d7e;
 		const alpha = target.inRange && target.inArc ? 0.8 : 0.3;
 
+		const localDx = dx * Math.cos(-graphics.rotation) - dy * Math.sin(-graphics.rotation);
+		const localDy = dx * Math.sin(-graphics.rotation) + dy * Math.cos(-graphics.rotation);
+
 		graphics.moveTo(0, 0);
-		const localDx = dx * Math.cos(-mountFacing) - dy * Math.sin(-mountFacing);
-		const localDy = dx * Math.sin(-mountFacing) + dy * Math.cos(-mountFacing);
 		graphics.lineTo(localDx, localDy);
 		graphics.stroke({ color, width: 2, alpha });
 	}
