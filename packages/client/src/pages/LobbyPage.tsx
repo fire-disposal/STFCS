@@ -89,10 +89,10 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 		[rooms]
 	);
 
-	const isOwnRoom = useCallback(
-		(room: RoomInfo) => playerId !== null && room.ownerName === profile.nickname,
-		[playerId, profile.nickname]
-	);
+const isOwnRoom = useCallback(
+    (room: RoomInfo) => playerId !== null && room.ownerId === playerId,
+    [playerId]
+  );
 
 	const visibleRooms = useMemo(() => {
 		if (roomTab === "joinable") {

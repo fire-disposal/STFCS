@@ -28,10 +28,10 @@ const App: React.FC = () => {
 		refreshKey
 	);
 
-	const myRoom = useMemo(() => {
-		if (!rooms.length) return null;
-		return rooms.find((r) => r.ownerName === userProfile.nickname) ?? null;
-	}, [userProfile.nickname, rooms]);
+const myRoom = useMemo(() => {
+    if (!rooms.length || !playerId) return null;
+    return rooms.find((r) => r.ownerId === playerId) ?? null;
+  }, [playerId, rooms]);
 
 	useEffect(() => {
 		const manager = new SocketNetworkManager(DEFAULT_WS_URL);
