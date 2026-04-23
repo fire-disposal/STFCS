@@ -36,24 +36,24 @@ function drawWeaponAlignmentGuide(g: Graphics, size: number, damageType: string,
 
     const arrowLen = halfSize * 0.7;
     g.moveTo(0, 0);
-    g.lineTo(arrowLen, 0);
+    g.lineTo(0, -arrowLen);
     g.stroke({ color, width: 2.5 * zoom, alpha: 0.9 });
 
-    const arrowTip = arrowLen;
+    const arrowTip = -arrowLen;
     const arrowW = 6 * zoom;
     g.poly([
-        arrowTip, 0,
-        arrowTip - arrowW, -arrowW * 0.67,
-        arrowTip - arrowW, arrowW * 0.67,
+        0, arrowTip,
+        -arrowW * 0.67, arrowTip + arrowW,
+        arrowW * 0.67, arrowTip + arrowW,
     ]);
     g.fill({ color, alpha: 0.8 });
 }
 
-export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({ 
-    weapon, 
-    texturePreviewUrl, 
-    zoom, 
-    onZoomChange 
+export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
+    weapon,
+    texturePreviewUrl,
+    zoom,
+    onZoomChange
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const graphicsRef = useRef<Graphics | null>(null);
@@ -144,24 +144,6 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
                     </div>
                 )}
 
-                {!texturePreviewUrl && weapon && (
-                    <div style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#6b7280",
-                        fontSize: 10,
-                        textAlign: "center",
-                        pointerEvents: "none",
-                    }}>
-                        <div style={{ fontSize: 12, fontWeight: "bold" }}>{weapon.spec.size}</div>
-                        <div>{weapon.spec.damageType}</div>
-                    </div>
-                )}
-
-                <div className="customizer-preview-crosshair" />
             </div>
 
             <input

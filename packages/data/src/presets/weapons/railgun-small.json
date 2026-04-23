@@ -12,7 +12,7 @@
 		"projectilesPerShot": 1,
 		"range": 400,
 		"minRange": 50,
-		"cooldown": 0.5,
+		"cooldown": 0,
 		"fluxCostPerShot": 5,
 		"tags": ["BALLISTIC", "ANTI_SHIP"]
 	}

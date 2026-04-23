@@ -12,7 +12,7 @@
 		"projectilesPerShot": 1,
 		"range": 1000,
 		"minRange": 200,
-		"cooldown": 5.0,
+		"cooldown": 0,
 		"fluxCostPerShot": 100,
 		"tags": ["GUIDED", "HE", "ANTI_SHIP"]
 	}

@@ -31,6 +31,7 @@ import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
 import MiniShipPreview from "./MiniShipPreview";
 import MiniWeaponPreview from "./MiniWeaponPreview";
+import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
 import "./ship-customization-modal.css";
 
 interface LoadoutCustomizerDialogProps {
@@ -126,6 +127,45 @@ async function convertToPng(sourceFile: File, applyKeyColor?: { color: string; t
     return new File([blob], `${baseName}${suffix}.png`, { type: "image/png" });
 }
 
+async function applyColorKeyToDataUrl(sourceDataUrl: string, applyKeyColor?: { color: string; tolerance: number }): Promise<string> {
+    if (!applyKeyColor || applyKeyColor.tolerance <= 0) return sourceDataUrl;
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("图片解码失败"));
+        el.src = sourceDataUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return sourceDataUrl;
+
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const { data } = imageData;
+
+    const hex = applyKeyColor.color.replace("#", "");
+    const targetR = Number.parseInt(hex.slice(0, 2), 16);
+    const targetG = Number.parseInt(hex.slice(2, 4), 16);
+    const targetB = Number.parseInt(hex.slice(4, 6), 16);
+
+    for (let i = 0; i < data.length; i += 4) {
+        const dr = Math.abs(data[i] - targetR);
+        const dg = Math.abs(data[i + 1] - targetG);
+        const db = Math.abs(data[i + 2] - targetB);
+        if (dr <= applyKeyColor.tolerance && dg <= applyKeyColor.tolerance && db <= applyKeyColor.tolerance) {
+            data[i + 3] = 0;
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL("image/png");
+}
+
 interface CustomizeTokenListResponse {
     ships: InventoryToken[];
 }
@@ -162,6 +202,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [shipRawJson, setShipRawJson] = useState("");
     const [weaponRawJson, setWeaponRawJson] = useState("");
     const [editorTab, setEditorTab] = useState<"form" | "json">("form");
+    const [weaponEditorTab, setWeaponEditorTab] = useState<"form" | "json">("form");
 
     const [shipPreviewZoom, setShipPreviewZoom] = useState(1);
     const [weaponPreviewZoom, setWeaponPreviewZoom] = useState(1);
@@ -169,15 +210,17 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [weaponTexturePreviewUrl, setWeaponTexturePreviewUrl] = useState<string | null>(null);
 
     const [keyColor, setKeyColor] = useState("#000000");
-    const [keyTolerance, setKeyTolerance] = useState(12);
+    const [keyTolerance, setKeyTolerance] = useState(0);
     const [weaponKeyColor, setWeaponKeyColor] = useState("#000000");
-    const [weaponKeyTolerance, setWeaponKeyTolerance] = useState(12);
+    const [weaponKeyTolerance, setWeaponKeyTolerance] = useState(0);
+    const [shipColorKeyPreviewUrl, setShipColorKeyPreviewUrl] = useState<string | null>(null);
+    const [weaponColorKeyPreviewUrl, setWeaponColorKeyPreviewUrl] = useState<string | null>(null);
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
     const shipBuildsRef = useRef<InventoryToken[]>([]);
     const weaponBuildsRef = useRef<WeaponJSON[]>([]);
-    
+
     shipBuildsRef.current = shipBuilds;
     weaponBuildsRef.current = weaponBuilds;
 
@@ -330,6 +373,54 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         });
     }, [updateWeaponDraft]);
 
+    const createShipBuild = useCallback(async () => {
+        const base = shipPresets[0] ?? shipBuilds[0];
+        if (!base) {
+            notify.error("暂无可用模板，无法新增舰船");
+            return;
+        }
+
+        const nextName = `新舰船 ${shipBuilds.length + 1}`;
+        const token = ensureShipDefaults(clone(base));
+        token.metadata = { ...(token.metadata ?? { name: nextName }), name: nextName };
+
+        try {
+            const res = await networkManager.send("customize:token", {
+                action: "upsert",
+                token,
+            }) as { ship?: InventoryToken };
+            notify.success("已新增舰船");
+            await reloadData();
+            if (res.ship?.$id) setSelectedShipBuildId(res.ship.$id);
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "新增失败");
+        }
+    }, [networkManager, reloadData, shipBuilds, shipPresets]);
+
+    const createWeaponBuild = useCallback(async () => {
+        const base = weaponPresets[0] ?? weaponBuilds[0];
+        if (!base) {
+            notify.error("暂无可用模板，无法新增武器");
+            return;
+        }
+
+        const nextName = `新武器 ${weaponBuilds.length + 1}`;
+        const weapon = ensureWeaponDefaults(clone(base));
+        weapon.metadata = { ...(weapon.metadata ?? { name: nextName }), name: nextName };
+
+        try {
+            const res = await networkManager.send("customize:weapon", {
+                action: "upsert",
+                weapon,
+            }) as { weapon?: WeaponJSON };
+            notify.success("已新增武器");
+            await reloadData();
+            if (res.weapon?.$id) setSelectedWeaponBuildId(res.weapon.$id);
+        } catch (error) {
+            notify.error(error instanceof Error ? error.message : "新增失败");
+        }
+    }, [networkManager, reloadData, weaponBuilds, weaponPresets]);
+
     const validateShipRaw = useCallback(() => {
         try {
             const parsed = JSON.parse(shipRawJson) as InventoryToken;
@@ -464,6 +555,54 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [assetSocket, weaponKeyColor, weaponKeyTolerance, updateWeaponTexture, loadWeaponTexturePreview]);
 
+    useEffect(() => {
+        let disposed = false;
+
+        const run = async () => {
+            if (!texturePreviewUrl) {
+                setShipColorKeyPreviewUrl(null);
+                return;
+            }
+            if (!(keyColor !== "#000000" || keyTolerance > 0)) {
+                setShipColorKeyPreviewUrl(texturePreviewUrl);
+                return;
+            }
+            try {
+                const next = await applyColorKeyToDataUrl(texturePreviewUrl, { color: keyColor, tolerance: keyTolerance });
+                if (!disposed) setShipColorKeyPreviewUrl(next);
+            } catch {
+                if (!disposed) setShipColorKeyPreviewUrl(texturePreviewUrl);
+            }
+        };
+
+        void run();
+        return () => { disposed = true; };
+    }, [texturePreviewUrl, keyColor, keyTolerance]);
+
+    useEffect(() => {
+        let disposed = false;
+
+        const run = async () => {
+            if (!weaponTexturePreviewUrl) {
+                setWeaponColorKeyPreviewUrl(null);
+                return;
+            }
+            if (!(weaponKeyColor !== "#000000" || weaponKeyTolerance > 0)) {
+                setWeaponColorKeyPreviewUrl(weaponTexturePreviewUrl);
+                return;
+            }
+            try {
+                const next = await applyColorKeyToDataUrl(weaponTexturePreviewUrl, { color: weaponKeyColor, tolerance: weaponKeyTolerance });
+                if (!disposed) setWeaponColorKeyPreviewUrl(next);
+            } catch {
+                if (!disposed) setWeaponColorKeyPreviewUrl(weaponTexturePreviewUrl);
+            }
+        };
+
+        void run();
+        return () => { disposed = true; };
+    }, [weaponTexturePreviewUrl, weaponKeyColor, weaponKeyTolerance]);
+
     if (loadError) {
         return (
             <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -500,38 +639,73 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                     </Tabs.List>
 
                     {activeTopTab === "ship" && (
-                        <Grid columns="2" gap="4">
-                            <Flex direction="column" gap="3">
-                                <Card>
-                                    <Flex justify="between" align="center" mb="2">
-                                        <Text weight="bold">舰船</Text>
-                                        <Flex gap="2" align="center">
-                                            <Select.Root value={selectedShipBuildId ?? ""} onValueChange={setSelectedShipBuildId}>
-                                                <Select.Trigger style={{ width: 200 }} />
-                                                <Select.Content>
-                                                    {shipBuilds.map((item) => (
-                                                        <Select.Item key={item.$id} value={item.$id}>
+                        <Grid columns="260px 1fr" gap="4">
+                            <Card>
+                                <Flex justify="between" align="center" mb="2">
+                                    <Text weight="bold">舰船存档</Text>
+                                    <Button size="1" variant="soft" onClick={() => void createShipBuild()} data-magnetic>
+                                        <Plus size={12} /> 新增
+                                    </Button>
+                                </Flex>
+                                <Box style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
+                                    <Flex direction="column" gap="2">
+                                        {shipBuilds.map((item) => {
+                                            const selected = selectedShipBuildId === item.$id;
+                                            return (
+                                                <Flex
+                                                    key={item.$id}
+                                                    align="center"
+                                                    justify="between"
+                                                    gap="2"
+                                                    onClick={() => setSelectedShipBuildId(item.$id)}
+                                                    style={{
+                                                        padding: "8px 10px",
+                                                        borderRadius: 6,
+                                                        border: selected ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
+                                                        background: selected ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    <Box style={{ minWidth: 0, flex: 1 }}>
+                                                        <Text size="2" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                                             {item.metadata?.name ?? shortId(item.$id)}
-                                                        </Select.Item>
-                                                    ))}
-                                                </Select.Content>
-                                            </Select.Root>
-                                            {selectedShipBuildId && (
-                                                <Button size="1" variant="ghost" color="red" onClick={() => void deleteShip(selectedShipBuildId)}>
-                                                    <Trash2 size={12} />
-                                                </Button>
-                                            )}
-                                        </Flex>
+                                                        </Text>
+                                                        <Text size="1" color="gray">{item.spec.size}/{item.spec.class}</Text>
+                                                    </Box>
+                                                    <Button
+                                                        size="1"
+                                                        variant="ghost"
+                                                        color="red"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            void deleteShip(item.$id);
+                                                        }}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </Button>
+                                                </Flex>
+                                            );
+                                        })}
+                                        {shipBuilds.length === 0 && <Text color="gray" size="1">暂无舰船存档</Text>}
                                     </Flex>
-                                    <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={texturePreviewUrl} />
-                                    <Flex justify="center" gap="2" mt="1">
-                                        <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
-                                        <Text size="1">{shipPreviewZoom.toFixed(2)}x</Text>
-                                        <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.min(4, shipPreviewZoom + 0.25))}>+</Button>
-                                    </Flex>
-                                </Card>
+                                </Box>
+                            </Card>
 
-<Card>
+                            <Grid columns="2" gap="4">
+                                <Flex direction="column" gap="3">
+                                    <Card>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">舰船</Text>
+                                        </Flex>
+                                        <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={shipColorKeyPreviewUrl} />
+                                        <Flex justify="center" gap="2" mt="1">
+                                            <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
+                                            <Text size="1">{shipPreviewZoom.toFixed(2)}x</Text>
+                                            <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.min(4, shipPreviewZoom + 0.25))}>+</Button>
+                                        </Flex>
+                                    </Card>
+
+                                    <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">贴图</Text>
                                             <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
@@ -540,9 +714,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         </Flex>
 
                                         <Flex direction="column" gap="2">
-                                            {texturePreviewUrl && (
+                                            {shipColorKeyPreviewUrl && (
                                                 <Box style={{ width: 120, height: 120, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden" }}>
-                                                    <img src={texturePreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                                                    <img src={shipColorKeyPreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                                                 </Box>
                                             )}
 
@@ -599,17 +773,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                             <Separator size="2" />
 
-                                            <Flex direction="column" gap="2">
-                                                <Text size="1" weight="bold">抠图取色（透明化指定颜色）</Text>
-                                                <Flex align="center" gap="2">
-                                                    <Text size="1" color="gray">目标色:</Text>
-                                                    <input type="color" value={keyColor} onChange={(e) => setKeyColor(e.target.value)} style={{ width: 32, height: 24, cursor: "pointer" }} />
-                                                    <Text size="1">{keyColor}</Text>
-                                                    <Text size="1" color="gray">容差:</Text>
-                                                    <input type="range" min={0} max={50} value={keyTolerance} onChange={(e) => setKeyTolerance(Number(e.target.value))} style={{ width: 60 }} />
-                                                    <Text size="1">{keyTolerance}</Text>
-                                                </Flex>
-                                            </Flex>
+                                            <ColorKeyPickerPanel
+                                                color={keyColor}
+                                                tolerance={keyTolerance}
+                                                onColorChange={setKeyColor}
+                                                onToleranceChange={setKeyTolerance}
+                                                previewImageUrl={texturePreviewUrl}
+                                            />
                                         </Flex>
 
                                         <input
@@ -626,310 +796,610 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         />
                                     </Card>
 
-                                <Card>
-                                    <Text weight="bold" mb="2">挂点武器</Text>
-                                    {shipDraft?.spec.mounts?.length ? (
-                                        <Flex direction="column" gap="2">
-                                            <Select.Root value={mountSelection} onValueChange={setMountSelection}>
-                                                <Select.Trigger />
-                                                <Select.Content>
-                                                    {shipDraft.spec.mounts.map((mount) => (
-                                                        <Select.Item key={mount.id} value={mount.id}>
-                                                            {mount.displayName ?? mount.id} ({mount.size})
-                                                        </Select.Item>
-                                                    ))}
-                                                </Select.Content>
-                                            </Select.Root>
+                                    <Card>
+                                        <Text weight="bold" mb="2">挂点武器</Text>
+                                        {shipDraft?.spec.mounts?.length ? (
+                                            <Flex direction="column" gap="2">
+                                                <Select.Root value={mountSelection} onValueChange={setMountSelection}>
+                                                    <Select.Trigger />
+                                                    <Select.Content>
+                                                        {shipDraft.spec.mounts.map((mount) => (
+                                                            <Select.Item key={mount.id} value={mount.id}>
+                                                                {mount.displayName ?? mount.id} ({mount.size})
+                                                            </Select.Item>
+                                                        ))}
+                                                    </Select.Content>
+                                                </Select.Root>
 
-                                            {selectedMount && (
-                                                <Flex align="center" gap="2">
-                                                    <Text size="1">武器:</Text>
-                                                    <Select.Root
-                                                        value={selectedMount.weapon?.$id ?? ""}
-                                                        onValueChange={(v) => {
-                                                            if (!v) return;
-                                                            const matched = weaponBuilds.find((item) => item.$id === v);
-                                                            if (!matched) return;
-                                                            if (!isWeaponSizeCompatible(selectedMount.size, matched.spec.size)) {
-                                                                notify.error("尺寸不兼容");
-                                                                return;
-                                                            }
-                                                            updateShipDraft((draft) => {
-                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
-                                                                if (mount) mount.weapon = matched;
-                                                            });
-                                                            notify.success("已挂载");
-                                                        }}
-                                                    >
-                                                        <Select.Trigger placeholder="选择武器..." />
-                                                        <Select.Content>
-                                                            {compatibleWeapons.map((item) => (
-                                                                <Select.Item key={item.$id} value={item.$id}>
-                                                                    {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
-                                                                </Select.Item>
-                                                            ))}
-                                                        </Select.Content>
-                                                    </Select.Root>
-                                                    {selectedMount.weapon && (
-                                                        <Button size="1" variant="ghost" color="red" onClick={() => {
-                                                            updateShipDraft((draft) => {
-                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
-                                                                if (mount) mount.weapon = undefined;
-                                                            });
-                                                        }}>卸载</Button>
-                                                    )}
-                                                </Flex>
-                                            )}
-                                        </Flex>
-                                    ) : (
-                                        <Text color="gray">无挂点</Text>
-                                    )}
-                                </Card>
-                            </Flex>
-
-                            <Flex direction="column" gap="3">
-                                <Card>
-                                    <Flex justify="between" align="center" mb="2">
-                                        <Text weight="bold">属性编辑</Text>
-                                        <Tabs.Root value={editorTab} onValueChange={(v) => setEditorTab(v as "form" | "json")}>
-                                            <Tabs.List>
-                                                <Tabs.Trigger value="form">表单</Tabs.Trigger>
-                                                <Tabs.Trigger value="json">JSON</Tabs.Trigger>
-                                            </Tabs.List>
-                                        </Tabs.Root>
-                                    </Flex>
-
-                                    {editorTab === "form" && shipDraft && (
-                                        <Flex direction="column" gap="3">
-                                            <Box>
-                                                <Text size="1" weight="bold" mb="1">基本信息</Text>
-                                                <Grid columns="2" gap="2">
-                                                    <Box>
-                                                        <Text size="1" color="gray">名称</Text>
-                                                        <TextField.Root
-                                                            value={shipDraft.metadata?.name ?? ""}
-                                                            onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, name: e.target.value }; })}
-                                                        />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">描述</Text>
-                                                        <TextField.Root
-                                                            value={shipDraft.metadata?.description ?? ""}
-                                                            onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, description: e.target.value }; })}
-                                                        />
-                                                    </Box>
-                                                </Grid>
-                                            </Box>
-
-                                            <Box>
-                                                <Text size="1" weight="bold" mb="1">舰船规格</Text>
-                                                <Grid columns="4" gap="2">
-                                                    <Box>
-                                                        <Text size="1" color="gray">船体大小</Text>
-                                                        <Select.Root value={shipDraft.spec.size} onValueChange={(v) => updateShipDraft((d) => { d.spec.size = v as HullSize; })}>
-                                                            <Select.Trigger />
-                                                            <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                {selectedMount && (
+                                                    <Flex align="center" gap="2">
+                                                        <Text size="1">武器:</Text>
+                                                        <Select.Root
+                                                            value={selectedMount.weapon?.$id ?? ""}
+                                                            onValueChange={(v) => {
+                                                                if (!v) return;
+                                                                const matched = weaponBuilds.find((item) => item.$id === v);
+                                                                if (!matched) return;
+                                                                if (!isWeaponSizeCompatible(selectedMount.size, matched.spec.size)) {
+                                                                    notify.error("尺寸不兼容");
+                                                                    return;
+                                                                }
+                                                                updateShipDraft((draft) => {
+                                                                    const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                    if (mount) mount.weapon = matched;
+                                                                });
+                                                                notify.success("已挂载");
+                                                            }}
+                                                        >
+                                                            <Select.Trigger placeholder="选择武器..." />
+                                                            <Select.Content>
+                                                                {compatibleWeapons.map((item) => (
+                                                                    <Select.Item key={item.$id} value={item.$id}>
+                                                                        {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
+                                                                    </Select.Item>
+                                                                ))}
+                                                            </Select.Content>
                                                         </Select.Root>
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">舰船类型</Text>
-                                                        <Select.Root value={shipDraft.spec.class} onValueChange={(v) => updateShipDraft((d) => { d.spec.class = v as ShipClass; })}>
-                                                            <Select.Trigger />
-                                                            <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                        </Select.Root>
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">宽度 (像素)</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.spec.width = Number(e.target.value) || 40; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">长度 (像素)</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.spec.length = Number(e.target.value) || 60; })} />
-                                                    </Box>
-                                                </Grid>
-                                            </Box>
-
-                                            <Box>
-                                                <Text size="1" weight="bold" mb="1">防御属性</Text>
-                                                <Grid columns="4" gap="2">
-                                                    <Box>
-                                                        <Text size="1" color="gray">船体耐久</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.spec.maxHitPoints = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">护甲/象限</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.armorMaxPerQuadrant ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.armorMaxPerQuadrant = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">辐能容量</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxCapacity = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">辐能散耗</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxDissipation = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                </Grid>
-                                            </Box>
-
-                                            <Box>
-                                                <Text size="1" weight="bold" mb="1">机动属性</Text>
-                                                <Grid columns="3" gap="2">
-                                                    <Box>
-                                                        <Text size="1" color="gray">最大速度</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxSpeed ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxSpeed = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">转向速度</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.maxTurnRate ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxTurnRate = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">射程系数</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.rangeModifier ?? 1)} onChange={(e) => updateShipDraft((d) => { d.spec.rangeModifier = Number(e.target.value) || 1; })} />
-                                                    </Box>
-                                                </Grid>
-                                            </Box>
-
-                                            <Separator size="2" />
-
-                                            <Flex gap="2" align="center">
-                                                <ShieldCheck size={14} />
-                                                <Text size="1" weight="bold">护盾系统</Text>
-                                                <Button size="1" variant="soft" onClick={() => updateShipDraft((d) => {
-                                                    d.spec.shield = d.spec.shield ? undefined : { arc: 360, radius: 50, efficiency: 1, upkeep: 0 };
-                                                })}>
-                                                    {shipDraft.spec.shield ? "禁用护盾" : "启用护盾"}
-                                                </Button>
-                                                {shipDraft.spec.shield && <Badge size="1">{shipDraft.spec.shield.arc >= 360 ? "全向" : "定向"}</Badge>}
+                                                        {selectedMount.weapon && (
+                                                            <Button size="1" variant="ghost" color="red" onClick={() => {
+                                                                updateShipDraft((draft) => {
+                                                                    const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                    if (mount) mount.weapon = undefined;
+                                                                });
+                                                            }}>卸载</Button>
+                                                        )}
+                                                    </Flex>
+                                                )}
                                             </Flex>
+                                        ) : (
+                                            <Text color="gray">无挂点</Text>
+                                        )}
+                                    </Card>
+                                </Flex>
 
-                                            {shipDraft.spec.shield && (
-                                                <Grid columns="4" gap="2">
-                                                    <Box>
-                                                        <Text size="1" color="gray">覆盖角度</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.arc = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">护盾半径</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.radius = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">伤害效率</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.efficiency = Number(e.target.value) || 1; })} />
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">维持消耗</Text>
-                                                        <TextField.Root type="number" value={String(shipDraft.spec.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.upkeep = Number(e.target.value) || 0; })} />
-                                                    </Box>
-                                                </Grid>
-                                            )}
+                                <Flex direction="column" gap="3">
+                                    <Card>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">属性编辑</Text>
+                                            <Tabs.Root value={editorTab} onValueChange={(v) => setEditorTab(v as "form" | "json")}>
+                                                <Tabs.List>
+                                                    <Tabs.Trigger value="form">表单</Tabs.Trigger>
+                                                    <Tabs.Trigger value="json">JSON</Tabs.Trigger>
+                                                </Tabs.List>
+                                            </Tabs.Root>
                                         </Flex>
-                                    )}
 
-                                    {editorTab === "json" && (
-                                        <Flex direction="column" gap="2">
-                                            <TextArea rows={20} value={shipRawJson} onChange={(e) => setShipRawJson(e.target.value)} />
-                                            <Flex gap="2">
-                                                <Button variant="soft" onClick={validateShipRaw}>校验</Button>
-                                                <Button variant="ghost" onClick={() => navigator.clipboard.writeText(shipRawJson)}><Copy size={12} /></Button>
-                                            </Flex>
-                                        </Flex>
-                                    )}
-
-                                    <Flex justify="end" mt="2">
-                                        <Button onClick={() => void saveShip()} data-magnetic><Save size={14} /> 保存</Button>
-                                    </Flex>
-                                </Card>
-
-                                <Card>
-                                    <Text weight="bold" mb="2">预设模板</Text>
-                                    <Flex direction="column" gap="1">
-                                        {shipPresets.map((preset) => (
-                                            <Flex key={preset.$id} justify="between" align="center">
+                                        {editorTab === "form" && shipDraft && (
+                                            <Flex direction="column" gap="3">
                                                 <Box>
-                                                    <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
-                                                    <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.class}</Text>
+                                                    <Text size="1" weight="bold" mb="1">基本信息</Text>
+                                                    <Grid columns="2" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">名称</Text>
+                                                            <TextField.Root
+                                                                value={shipDraft.metadata?.name ?? ""}
+                                                                onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, name: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">描述</Text>
+                                                            <TextField.Root
+                                                                value={shipDraft.metadata?.description ?? ""}
+                                                                onChange={(e) => updateShipDraft((d) => { d.metadata = { ...d.metadata!, description: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                    </Grid>
                                                 </Box>
-                                                <Button size="1" variant="ghost" onClick={() => void copyShipPreset(preset.$id)}><Plus size={12} /></Button>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">舰船规格</Text>
+                                                    <Grid columns="4" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">船体大小</Text>
+                                                            <Select.Root value={shipDraft.spec.size} onValueChange={(v) => updateShipDraft((d) => { d.spec.size = v as HullSize; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(HullSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">舰船类型</Text>
+                                                            <Select.Root value={shipDraft.spec.class} onValueChange={(v) => updateShipDraft((d) => { d.spec.class = v as ShipClass; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(ShipClass).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">宽度 (像素)</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.width ?? 40)} onChange={(e) => updateShipDraft((d) => { d.spec.width = Number(e.target.value) || 40; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">长度 (像素)</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.length ?? 60)} onChange={(e) => updateShipDraft((d) => { d.spec.length = Number(e.target.value) || 60; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">防御属性</Text>
+                                                    <Grid columns="4" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">船体耐久</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.maxHitPoints)} onChange={(e) => updateShipDraft((d) => { d.spec.maxHitPoints = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">护甲/象限</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.armorMaxPerQuadrant ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.armorMaxPerQuadrant = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">辐能容量</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.fluxCapacity ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxCapacity = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">辐能散耗</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.fluxDissipation ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.fluxDissipation = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">机动属性</Text>
+                                                    <Grid columns="3" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">最大速度</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.maxSpeed ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxSpeed = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">转向速度</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.maxTurnRate ?? 0)} onChange={(e) => updateShipDraft((d) => { d.spec.maxTurnRate = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">射程系数</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.rangeModifier ?? 1)} onChange={(e) => updateShipDraft((d) => { d.spec.rangeModifier = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Separator size="2" />
+
+                                                <Flex gap="2" align="center">
+                                                    <ShieldCheck size={14} />
+                                                    <Text size="1" weight="bold">护盾系统</Text>
+                                                    <Button size="1" variant="soft" onClick={() => updateShipDraft((d) => {
+                                                        d.spec.shield = d.spec.shield ? undefined : { arc: 360, radius: 50, efficiency: 1, upkeep: 0 };
+                                                    })}>
+                                                        {shipDraft.spec.shield ? "禁用护盾" : "启用护盾"}
+                                                    </Button>
+                                                    {shipDraft.spec.shield && <Badge size="1">{shipDraft.spec.shield.arc >= 360 ? "全向" : "定向"}</Badge>}
+                                                </Flex>
+
+                                                {shipDraft.spec.shield && (
+                                                    <Grid columns="4" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">覆盖角度</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.arc)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.arc = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">护盾半径</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.radius)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.radius = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">伤害效率</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.efficiency ?? 1)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.efficiency = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">维持消耗</Text>
+                                                            <TextField.Root type="number" value={String(shipDraft.spec.shield.upkeep ?? 0)} onChange={(e) => updateShipDraft((d) => { if (d.spec.shield) d.spec.shield.upkeep = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                )}
+
+                                                <Separator size="2" />
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">挂点配置（位置 / 朝向 / 装载）</Text>
+                                                    {shipDraft.spec.mounts?.length ? (
+                                                        <Flex direction="column" gap="3">
+                                                            {shipDraft.spec.mounts.map((mount) => {
+                                                                const mountWeapons = weaponBuilds.filter((item) => isWeaponSizeCompatible(mount.size, item.spec.size));
+                                                                return (
+                                                                    <Card key={mount.id} variant="surface">
+                                                                        <Flex justify="between" align="center" mb="2" wrap="wrap" gap="2">
+                                                                            <Text size="2" weight="bold">{mount.displayName ?? mount.id}</Text>
+                                                                            <Badge size="1">{mount.size}</Badge>
+                                                                        </Flex>
+
+                                                                        <Grid columns="2" gap="2">
+                                                                            <Box>
+                                                                                <Text size="1" color="gray">X 偏移</Text>
+                                                                                <Flex align="center" gap="2">
+                                                                                    <input
+                                                                                        type="range"
+                                                                                        min={-500}
+                                                                                        max={500}
+                                                                                        value={mount.position?.x ?? 0}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value);
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), x: value };
+                                                                                            });
+                                                                                        }}
+                                                                                        style={{ width: 120 }}
+                                                                                    />
+                                                                                    <TextField.Root
+                                                                                        type="number"
+                                                                                        value={String(mount.position?.x ?? 0)}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value) || 0;
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), x: value };
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                </Flex>
+                                                                            </Box>
+
+                                                                            <Box>
+                                                                                <Text size="1" color="gray">Y 偏移</Text>
+                                                                                <Flex align="center" gap="2">
+                                                                                    <input
+                                                                                        type="range"
+                                                                                        min={-500}
+                                                                                        max={500}
+                                                                                        value={mount.position?.y ?? 0}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value);
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), y: value };
+                                                                                            });
+                                                                                        }}
+                                                                                        style={{ width: 120 }}
+                                                                                    />
+                                                                                    <TextField.Root
+                                                                                        type="number"
+                                                                                        value={String(mount.position?.y ?? 0)}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value) || 0;
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), y: value };
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                </Flex>
+                                                                            </Box>
+
+                                                                            <Box>
+                                                                                <Text size="1" color="gray">朝向角度</Text>
+                                                                                <Flex align="center" gap="2">
+                                                                                    <input
+                                                                                        type="range"
+                                                                                        min={-180}
+                                                                                        max={180}
+                                                                                        value={mount.facing ?? 0}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value);
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.facing = value;
+                                                                                            });
+                                                                                        }}
+                                                                                        style={{ width: 120 }}
+                                                                                    />
+                                                                                    <TextField.Root
+                                                                                        type="number"
+                                                                                        value={String(mount.facing ?? 0)}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value) || 0;
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.facing = value;
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                </Flex>
+                                                                            </Box>
+
+                                                                            <Box>
+                                                                                <Text size="1" color="gray">射界角度</Text>
+                                                                                <Flex align="center" gap="2">
+                                                                                    <input
+                                                                                        type="range"
+                                                                                        min={0}
+                                                                                        max={360}
+                                                                                        value={mount.arc ?? 360}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value);
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.arc = value;
+                                                                                            });
+                                                                                        }}
+                                                                                        style={{ width: 120 }}
+                                                                                    />
+                                                                                    <TextField.Root
+                                                                                        type="number"
+                                                                                        value={String(mount.arc ?? 360)}
+                                                                                        onChange={(e) => {
+                                                                                            const value = Number(e.target.value) || 0;
+                                                                                            updateShipDraft((d) => {
+                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                                if (!m) return;
+                                                                                                m.arc = value;
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                </Flex>
+                                                                            </Box>
+                                                                        </Grid>
+
+                                                                        <Box mt="2">
+                                                                            <Text size="1" color="gray">装载武器</Text>
+                                                                            <Select.Root
+                                                                                value={mount.weapon?.$id ?? "__NONE__"}
+                                                                                onValueChange={(v) => {
+                                                                                    updateShipDraft((d) => {
+                                                                                        const m = d.spec.mounts?.find((it) => it.id === mount.id);
+                                                                                        if (!m) return;
+                                                                                        if (v === "__NONE__") {
+                                                                                            m.weapon = undefined;
+                                                                                            return;
+                                                                                        }
+                                                                                        const matched = weaponBuilds.find((item) => item.$id === v);
+                                                                                        if (matched && isWeaponSizeCompatible(m.size, matched.spec.size)) {
+                                                                                            m.weapon = matched;
+                                                                                        }
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                <Select.Trigger />
+                                                                                <Select.Content>
+                                                                                    <Select.Item value="__NONE__">不装载</Select.Item>
+                                                                                    {mountWeapons.map((item) => (
+                                                                                        <Select.Item key={item.$id} value={item.$id}>
+                                                                                            {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
+                                                                                        </Select.Item>
+                                                                                    ))}
+                                                                                </Select.Content>
+                                                                            </Select.Root>
+                                                                        </Box>
+                                                                    </Card>
+                                                                );
+                                                            })}
+
+                                                            <Box>
+                                                                <Text size="1" color="gray" mb="1">挂点配置 JSON 预览</Text>
+                                                                <TextArea
+                                                                    rows={8}
+                                                                    value={JSON.stringify(shipDraft.spec.mounts ?? [], null, 2)}
+                                                                    readOnly
+                                                                />
+                                                            </Box>
+                                                        </Flex>
+                                                    ) : (
+                                                        <Text color="gray" size="1">该舰船暂无挂点配置</Text>
+                                                    )}
+                                                </Box>
                                             </Flex>
-                                        ))}
-                                    </Flex>
-                                </Card>
-                            </Flex>
+                                        )}
+
+                                        {editorTab === "json" && (
+                                            <Flex direction="column" gap="2">
+                                                <TextArea rows={20} value={shipRawJson} onChange={(e) => setShipRawJson(e.target.value)} />
+                                                <Flex gap="2">
+                                                    <Button variant="soft" onClick={validateShipRaw}>校验</Button>
+                                                    <Button variant="ghost" onClick={() => navigator.clipboard.writeText(shipRawJson)}><Copy size={12} /></Button>
+                                                </Flex>
+                                            </Flex>
+                                        )}
+
+                                        <Flex justify="end" mt="2">
+                                            <Button onClick={() => void saveShip()} data-magnetic><Save size={14} /> 保存</Button>
+                                        </Flex>
+                                    </Card>
+
+                                    <Card>
+                                        <Text weight="bold" mb="2">预设模板</Text>
+                                        <Flex direction="column" gap="1">
+                                            {shipPresets.map((preset) => (
+                                                <Flex key={preset.$id} justify="between" align="center">
+                                                    <Box>
+                                                        <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
+                                                        <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.class}</Text>
+                                                    </Box>
+                                                    <Button size="1" variant="ghost" onClick={() => void copyShipPreset(preset.$id)}><Plus size={12} /></Button>
+                                                </Flex>
+                                            ))}
+                                        </Flex>
+                                    </Card>
+                                </Flex>
+                            </Grid>
                         </Grid>
                     )}
 
                     {activeTopTab === "weapon" && (
-                        <Grid columns="2" gap="4">
-                            <Flex direction="column" gap="3">
-                                <Card>
-                                    <Flex justify="between" align="center" mb="2">
-                                        <Text weight="bold">武器</Text>
-                                        <Flex gap="2" align="center">
-                                            <Select.Root value={selectedWeaponBuildId ?? ""} onValueChange={setSelectedWeaponBuildId}>
-                                                <Select.Trigger style={{ width: 200 }} />
-                                                <Select.Content>
-                                                    {weaponBuilds.map((item) => (
-                                                        <Select.Item key={item.$id} value={item.$id}>
+                        <Grid columns="260px 1fr" gap="4">
+                            <Card>
+                                <Flex justify="between" align="center" mb="2">
+                                    <Text weight="bold">武器存档</Text>
+                                    <Button size="1" variant="soft" onClick={() => void createWeaponBuild()} data-magnetic>
+                                        <Plus size={12} /> 新增
+                                    </Button>
+                                </Flex>
+                                <Box style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
+                                    <Flex direction="column" gap="2">
+                                        {weaponBuilds.map((item) => {
+                                            const selected = selectedWeaponBuildId === item.$id;
+                                            return (
+                                                <Flex
+                                                    key={item.$id}
+                                                    align="center"
+                                                    justify="between"
+                                                    gap="2"
+                                                    onClick={() => setSelectedWeaponBuildId(item.$id)}
+                                                    style={{
+                                                        padding: "8px 10px",
+                                                        borderRadius: 6,
+                                                        border: selected ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
+                                                        background: selected ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    <Box style={{ minWidth: 0, flex: 1 }}>
+                                                        <Text size="2" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                                             {item.metadata?.name ?? shortId(item.$id)}
-                                                        </Select.Item>
-                                                    ))}
-                                                </Select.Content>
-                                            </Select.Root>
-                                            {selectedWeaponBuildId && (
-                                                <Button size="1" variant="ghost" color="red" onClick={() => void deleteWeapon(selectedWeaponBuildId)}>
-                                                    <Trash2 size={12} />
-                                                </Button>
-                                            )}
-                                        </Flex>
+                                                        </Text>
+                                                        <Text size="1" color="gray">{item.spec.size}/{item.spec.damageType}</Text>
+                                                    </Box>
+                                                    <Button
+                                                        size="1"
+                                                        variant="ghost"
+                                                        color="red"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            void deleteWeapon(item.$id);
+                                                        }}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </Button>
+                                                </Flex>
+                                            );
+                                        })}
+                                        {weaponBuilds.length === 0 && <Text color="gray" size="1">暂无武器存档</Text>}
                                     </Flex>
+                                </Box>
+                            </Card>
 
-                                    {weaponDraft && (
-                                        <Flex direction="column" gap="2">
-                                            <TextField.Root
-                                                value={weaponDraft.metadata?.name ?? ""}
-                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { name: e.target.value }; })}
-                                                placeholder="名称"
-                                            />
-                                            <Grid columns="3" gap="2">
-                                                <Select.Root value={weaponDraft.spec.size} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.size = v as WeaponSlotSize; })}>
-                                                    <Select.Trigger placeholder="尺寸" />
-                                                    <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                </Select.Root>
-                                                <Select.Root value={weaponDraft.spec.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.damageType = v as DamageType; })}>
-                                                    <Select.Trigger placeholder="伤害类型" />
-                                                    <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                </Select.Root>
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.damage)} onChange={(e) => updateWeaponDraft((d) => { d.spec.damage = Number(e.target.value) || 0; })} placeholder="伤害" />
-                                            </Grid>
-                                            <Grid columns="4" gap="2">
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.range)} onChange={(e) => updateWeaponDraft((d) => { d.spec.range = Number(e.target.value) || 0; })} placeholder="射程" />
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.minRange = Number(e.target.value) || 0; })} placeholder="最小射程" />
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.cooldown = Number(e.target.value) || 0; })} placeholder="冷却" />
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.spec.fluxCostPerShot = Number(e.target.value) || 0; })} placeholder="辐能/发" />
-                                            </Grid>
-                                            <Grid columns="3" gap="2">
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.projectilesPerShot ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.projectilesPerShot = Number(e.target.value) || 1; })} placeholder="弹丸/发" />
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.burstCount ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.burstCount = Number(e.target.value) || 1; })} placeholder="连射" />
-                                                <TextField.Root type="number" value={String(weaponDraft.spec.opCost ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.opCost = Number(e.target.value) || 0; })} placeholder="OP成本" />
-                                            </Grid>
-                                            <Flex gap="1" align="center">
-                                                {(weaponDraft.spec.tags ?? []).map((tag) => (
-                                                    <Badge key={tag} size="1">{tag}</Badge>
-                                                ))}
-                                                <Select.Root onValueChange={(v) => {
-                                                    if (v && !weaponDraft.spec.tags?.includes(v as WeaponTag)) {
-                                                        updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v as WeaponTag]; });
-                                                    }
-                                                }}>
-                                                    <Select.Trigger placeholder="添加标签" />
-                                                    <Select.Content>{Object.values(WeaponTag).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                </Select.Root>
-                                            </Flex>
+                            <Grid columns="2" gap="4">
+                                <Flex direction="column" gap="3">
+                                    <Card style={{ display: "none" }}>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">武器</Text>
                                         </Flex>
-                                    )}
-                                </Card>
 
-<Card>
+                                        {weaponDraft && (
+                                            <Flex direction="column" gap="3">
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">基本信息</Text>
+                                                    <Grid columns="2" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">名称</Text>
+                                                            <TextField.Root
+                                                                value={weaponDraft.metadata?.name ?? ""}
+                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), name: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">描述</Text>
+                                                            <TextField.Root
+                                                                value={weaponDraft.metadata?.description ?? ""}
+                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), description: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">武器规格</Text>
+                                                    <Grid columns="3" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">槽位尺寸</Text>
+                                                            <Select.Root value={weaponDraft.spec.size} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.size = v as WeaponSlotSize; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">伤害类型</Text>
+                                                            <Select.Root value={weaponDraft.spec.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.damageType = v as DamageType; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">基础伤害</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.damage)} onChange={(e) => updateWeaponDraft((d) => { d.spec.damage = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">射击参数</Text>
+                                                    <Grid columns="4" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">最大射程</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.range)} onChange={(e) => updateWeaponDraft((d) => { d.spec.range = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">最小射程</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.minRange = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">冷却时间</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.cooldown = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">辐能/发</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.spec.fluxCostPerShot = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+
+                                                    <Grid columns="4" gap="2" mt="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">弹丸/发</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.projectilesPerShot ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.projectilesPerShot = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">连发次数</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.burstCount ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.burstCount = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">OP 成本</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.opCost ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.opCost = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">多目标射击</Text>
+                                                            <Select.Root value={weaponDraft.spec.allowsMultipleTargets ? "YES" : "NO"} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.allowsMultipleTargets = v === "YES"; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>
+                                                                    <Select.Item value="NO">否</Select.Item>
+                                                                    <Select.Item value="YES">是</Select.Item>
+                                                                </Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">标签</Text>
+                                                    <Flex gap="1" align="center" wrap="wrap">
+                                                        {(weaponDraft.spec.tags ?? []).map((tag) => (
+                                                            <Badge key={tag} size="1">{tag}</Badge>
+                                                        ))}
+                                                        <Select.Root onValueChange={(v) => {
+                                                            if (v && !weaponDraft.spec.tags?.includes(v as WeaponTag)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v as WeaponTag]; });
+                                                            }
+                                                        }}>
+                                                            <Select.Trigger placeholder="添加标签" />
+                                                            <Select.Content>{Object.values(WeaponTag).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                    </Flex>
+                                                </Box>
+                                            </Flex>
+                                        )}
+                                    </Card>
+
+                                    <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">武器预览</Text>
                                             <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
@@ -939,9 +1409,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                         <Flex direction="column" gap="2" align="center">
                                             {weaponDraft && (
-                                                <MiniWeaponPreview 
-                                                    weapon={weaponDraft} 
-                                                    texturePreviewUrl={weaponTexturePreviewUrl}
+                                                <MiniWeaponPreview
+                                                    weapon={weaponDraft}
+                                                    texturePreviewUrl={weaponColorKeyPreviewUrl}
                                                     zoom={weaponPreviewZoom}
                                                     onZoomChange={setWeaponPreviewZoom}
                                                 />
@@ -1010,15 +1480,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
                                                 <Separator size="2" />
 
-                                                <Text size="1" weight="bold">抠图取色（透明化指定颜色）</Text>
-                                                <Flex align="center" gap="2">
-                                                    <Text size="1" color="gray">目标色:</Text>
-                                                    <input type="color" value={weaponKeyColor} onChange={(e) => setWeaponKeyColor(e.target.value)} style={{ width: 32, height: 24, cursor: "pointer" }} />
-                                                    <Text size="1">{weaponKeyColor}</Text>
-                                                    <Text size="1" color="gray">容差:</Text>
-                                                    <input type="range" min={0} max={50} value={weaponKeyTolerance} onChange={(e) => setWeaponKeyTolerance(Number(e.target.value))} style={{ width: 60 }} />
-                                                    <Text size="1">{weaponKeyTolerance}</Text>
-                                                </Flex>
+                                                <ColorKeyPickerPanel
+                                                    color={weaponKeyColor}
+                                                    tolerance={weaponKeyTolerance}
+                                                    onColorChange={setWeaponKeyColor}
+                                                    onToleranceChange={setWeaponKeyTolerance}
+                                                    previewImageUrl={weaponTexturePreviewUrl}
+                                                />
                                             </Flex>
                                         )}
 
@@ -1032,39 +1500,166 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 if (!file) return;
                                                 void uploadWeaponTexture(file, weaponKeyColor !== "#000000" || weaponKeyTolerance > 0);
                                                 e.currentTarget.value = "";
-                                        }}
-                                    />
-                                </Card>
-                            </Flex>
+                                            }}
+                                        />
+                                    </Card>
+                                </Flex>
 
-                            <Flex direction="column" gap="3">
-                                <Card>
-                                    <Text weight="bold" mb="2">JSON 编辑</Text>
-                                    <TextArea rows={20} value={weaponRawJson} onChange={(e) => setWeaponRawJson(e.target.value)} />
-                                    <Flex gap="2" mt="2">
-                                        <Button variant="soft" onClick={validateWeaponRaw}>校验</Button>
-                                        <Button variant="ghost" onClick={() => navigator.clipboard.writeText(weaponRawJson)}><Copy size={12} /></Button>
-                                    </Flex>
-                                    <Flex justify="end" mt="2">
-                                        <Button onClick={() => void saveWeapon()} data-magnetic><Save size={14} /> 保存</Button>
-                                    </Flex>
-                                </Card>
+                                <Flex direction="column" gap="3">
+                                    <Card>
+                                        <Flex justify="between" align="center" mb="2">
+                                            <Text weight="bold">属性编辑</Text>
+                                            <Tabs.Root value={weaponEditorTab} onValueChange={(v) => setWeaponEditorTab(v as "form" | "json")}>
+                                                <Tabs.List>
+                                                    <Tabs.Trigger value="form">表单</Tabs.Trigger>
+                                                    <Tabs.Trigger value="json">JSON</Tabs.Trigger>
+                                                </Tabs.List>
+                                            </Tabs.Root>
+                                        </Flex>
 
-                                <Card>
-                                    <Text weight="bold" mb="2">预设模板</Text>
-                                    <Flex direction="column" gap="1">
-                                        {weaponPresets.map((preset) => (
-                                            <Flex key={preset.$id} justify="between" align="center">
+                                        {weaponEditorTab === "form" && weaponDraft && (
+                                            <Flex direction="column" gap="3">
                                                 <Box>
-                                                    <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
-                                                    <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.damageType}</Text>
+                                                    <Text size="1" weight="bold" mb="1">基本信息</Text>
+                                                    <Grid columns="2" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">名称</Text>
+                                                            <TextField.Root
+                                                                value={weaponDraft.metadata?.name ?? ""}
+                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), name: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">描述</Text>
+                                                            <TextField.Root
+                                                                value={weaponDraft.metadata?.description ?? ""}
+                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), description: e.target.value }; })}
+                                                            />
+                                                        </Box>
+                                                    </Grid>
                                                 </Box>
-                                                <Button size="1" variant="ghost" onClick={() => void copyWeaponPreset(preset.$id)}><Plus size={12} /></Button>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">武器规格</Text>
+                                                    <Grid columns="3" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">槽位尺寸</Text>
+                                                            <Select.Root value={weaponDraft.spec.size} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.size = v as WeaponSlotSize; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">伤害类型</Text>
+                                                            <Select.Root value={weaponDraft.spec.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.damageType = v as DamageType; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">基础伤害</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.damage)} onChange={(e) => updateWeaponDraft((d) => { d.spec.damage = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">射击参数</Text>
+                                                    <Grid columns="4" gap="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">最大射程</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.range)} onChange={(e) => updateWeaponDraft((d) => { d.spec.range = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">最小射程</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.minRange = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">冷却时间</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.cooldown = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">辐能/发</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.spec.fluxCostPerShot = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                    </Grid>
+
+                                                    <Grid columns="4" gap="2" mt="2">
+                                                        <Box>
+                                                            <Text size="1" color="gray">弹丸/发</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.projectilesPerShot ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.projectilesPerShot = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">连发次数</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.burstCount ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.burstCount = Number(e.target.value) || 1; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">OP 成本</Text>
+                                                            <TextField.Root type="number" value={String(weaponDraft.spec.opCost ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.opCost = Number(e.target.value) || 0; })} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Text size="1" color="gray">多目标射击</Text>
+                                                            <Select.Root value={weaponDraft.spec.allowsMultipleTargets ? "YES" : "NO"} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.allowsMultipleTargets = v === "YES"; })}>
+                                                                <Select.Trigger />
+                                                                <Select.Content>
+                                                                    <Select.Item value="NO">否</Select.Item>
+                                                                    <Select.Item value="YES">是</Select.Item>
+                                                                </Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+                                                    </Grid>
+                                                </Box>
+
+                                                <Box>
+                                                    <Text size="1" weight="bold" mb="1">标签</Text>
+                                                    <Flex gap="1" align="center" wrap="wrap">
+                                                        {(weaponDraft.spec.tags ?? []).map((tag) => (
+                                                            <Badge key={tag} size="1">{tag}</Badge>
+                                                        ))}
+                                                        <Select.Root onValueChange={(v) => {
+                                                            if (v && !weaponDraft.spec.tags?.includes(v as WeaponTag)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v as WeaponTag]; });
+                                                            }
+                                                        }}>
+                                                            <Select.Trigger placeholder="添加标签" />
+                                                            <Select.Content>{Object.values(WeaponTag).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                        </Select.Root>
+                                                    </Flex>
+                                                </Box>
                                             </Flex>
-                                        ))}
-                                    </Flex>
-                                </Card>
-                            </Flex>
+                                        )}
+
+                                        {weaponEditorTab === "json" && (
+                                            <Flex direction="column" gap="2">
+                                                <TextArea rows={20} value={weaponRawJson} onChange={(e) => setWeaponRawJson(e.target.value)} />
+                                                <Flex gap="2" mt="2">
+                                                    <Button variant="soft" onClick={validateWeaponRaw}>校验</Button>
+                                                    <Button variant="ghost" onClick={() => navigator.clipboard.writeText(weaponRawJson)}><Copy size={12} /></Button>
+                                                </Flex>
+                                            </Flex>
+                                        )}
+
+                                        <Flex justify="end" mt="2">
+                                            <Button onClick={() => void saveWeapon()} data-magnetic><Save size={14} /> 保存</Button>
+                                        </Flex>
+                                    </Card>
+
+                                    <Card>
+                                        <Text weight="bold" mb="2">预设模板</Text>
+                                        <Flex direction="column" gap="1">
+                                            {weaponPresets.map((preset) => (
+                                                <Flex key={preset.$id} justify="between" align="center">
+                                                    <Box>
+                                                        <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
+                                                        <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.damageType}</Text>
+                                                    </Box>
+                                                    <Button size="1" variant="ghost" onClick={() => void copyWeaponPreset(preset.$id)}><Plus size={12} /></Button>
+                                                </Flex>
+                                            ))}
+                                        </Flex>
+                                    </Card>
+                                </Flex>
+                            </Grid>
                         </Grid>
                     )}
                 </Tabs.Root>

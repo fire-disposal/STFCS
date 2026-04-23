@@ -42,7 +42,7 @@
 						"projectilesPerShot": 1,
 						"range": 600,
 						"minRange": 100,
-						"cooldown": 1.0,
+						"cooldown": 0,
 						"fluxCostPerShot": 20,
 						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
 					}
@@ -64,7 +64,7 @@
 						"projectilesPerShot": 1,
 						"range": 400,
 						"minRange": 50,
-						"cooldown": 0.5,
+						"cooldown": 0,
 						"fluxCostPerShot": 5,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}
@@ -86,7 +86,7 @@
 						"projectilesPerShot": 1,
 						"range": 400,
 						"minRange": 50,
-						"cooldown": 0.5,
+						"cooldown": 0,
 						"fluxCostPerShot": 5,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}

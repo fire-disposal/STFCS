@@ -12,7 +12,7 @@
 		"projectilesPerShot": 1,
 		"range": 600,
 		"minRange": 100,
-		"cooldown": 1.0,
+		"cooldown": 0,
 		"fluxCostPerShot": 20,
 		"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
 	}

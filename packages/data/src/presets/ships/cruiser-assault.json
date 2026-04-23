@@ -42,7 +42,7 @@
 						"projectilesPerShot": 1,
 						"range": 1000,
 						"minRange": 200,
-						"cooldown": 5.0,
+						"cooldown": 2,
 						"fluxCostPerShot": 100,
 						"tags": ["GUIDED", "HE", "ANTI_SHIP"]
 					}
@@ -64,7 +64,7 @@
 						"projectilesPerShot": 1,
 						"range": 600,
 						"minRange": 100,
-						"cooldown": 1.0,
+						"cooldown": 1,
 						"fluxCostPerShot": 20,
 						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
 					}
@@ -86,7 +86,7 @@
 						"projectilesPerShot": 1,
 						"range": 600,
 						"minRange": 100,
-						"cooldown": 1.0,
+						"cooldown": 1,
 						"fluxCostPerShot": 20,
 						"tags": ["ENERGY", "ANTI_SHIP", "BEAM"]
 					}
@@ -108,7 +108,7 @@
 						"projectilesPerShot": 1,
 						"range": 400,
 						"minRange": 50,
-						"cooldown": 0.5,
+						"cooldown": 0,
 						"fluxCostPerShot": 5,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}
@@ -130,7 +130,7 @@
 						"projectilesPerShot": 1,
 						"range": 400,
 						"minRange": 50,
-						"cooldown": 0.5,
+						"cooldown": 0,
 						"fluxCostPerShot": 5,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}

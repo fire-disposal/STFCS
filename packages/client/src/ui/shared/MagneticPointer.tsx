@@ -11,6 +11,7 @@
 
 import { useUIStore } from "@/state/stores/uiStore";
 import React, { createContext, useContext, useEffect, useRef, useCallback, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface MagneticContextValue {
 	registerTarget: (element: HTMLElement) => void;
@@ -19,8 +20,8 @@ interface MagneticContextValue {
 }
 
 const MagneticContext = createContext<MagneticContextValue>({
-	registerTarget: () => {},
-	unregisterTarget: () => {},
+	registerTarget: () => { },
+	unregisterTarget: () => { },
 	isEnabled: false,
 });
 
@@ -28,7 +29,7 @@ export const useMagneticContext = () => useContext(MagneticContext);
 
 const SCAN_INTERVAL = 500;
 
-export const MagneticPointerProvider: React.FC<{ 
+export const MagneticPointerProvider: React.FC<{
 	children: React.ReactNode;
 	enabled?: boolean;
 }> = ({ children, enabled = true }) => {
@@ -41,10 +42,15 @@ export const MagneticPointerProvider: React.FC<{
 	const scanTimerRef = useRef<number | null>(null);
 	const hideNativeCursor = useUIStore((state) => state.hideNativeCursor);
 	const [isEnabled, setIsEnabled] = useState(enabled);
+	const [portalReady, setPortalReady] = useState(false);
 
 	useEffect(() => {
 		setIsEnabled(enabled);
 	}, [enabled]);
+
+	useEffect(() => {
+		setPortalReady(typeof document !== "undefined");
+	}, []);
 
 	const resetPointerState = useCallback(() => {
 		currentTargetRef.current = null;
@@ -195,29 +201,31 @@ export const MagneticPointerProvider: React.FC<{
 		isEnabled,
 	}), [registerTarget, unregisterTarget, isEnabled]);
 
+	const pointerNode = isEnabled ? (
+		<div
+			ref={pointerRef}
+			style={{
+				position: "fixed",
+				top: "-2px",
+				left: "-2px",
+				width: "4px",
+				height: "4px",
+				pointerEvents: "none",
+				zIndex: 2147483647,
+				transition: "width 0.2s ease-out, height 0.2s ease-out, top 0.2s ease-out, left 0.2s ease-out",
+				display: "none",
+			}}
+		>
+			<div style={{ position: "absolute", top: 0, left: 0, width: "12px", height: "12px", borderLeft: "2px solid #4a9eff", borderTop: "2px solid #4a9eff" }} />
+			<div style={{ position: "absolute", top: 0, right: 0, width: "12px", height: "12px", borderRight: "2px solid #4a9eff", borderTop: "2px solid #4a9eff" }} />
+			<div style={{ position: "absolute", bottom: 0, left: 0, width: "12px", height: "12px", borderLeft: "2px solid #4a9eff", borderBottom: "2px solid #4a9eff" }} />
+			<div style={{ position: "absolute", bottom: 0, right: 0, width: "12px", height: "12px", borderRight: "2px solid #4a9eff", borderBottom: "2px solid #4a9eff" }} />
+		</div>
+	) : null;
+
 	return (
 		<MagneticContext.Provider value={contextValue}>
-			{isEnabled && (
-				<div
-					ref={pointerRef}
-					style={{
-						position: "fixed",
-						top: "-2px",
-						left: "-2px",
-						width: "4px",
-						height: "4px",
-						pointerEvents: "none",
-						zIndex: 100000,
-						transition: "width 0.2s ease-out, height 0.2s ease-out, top 0.2s ease-out, left 0.2s ease-out",
-						display: "none",
-					}}
-				>
-					<div style={{ position: "absolute", top: 0, left: 0, width: "12px", height: "12px", borderLeft: "2px solid #4a9eff", borderTop: "2px solid #4a9eff" }} />
-					<div style={{ position: "absolute", top: 0, right: 0, width: "12px", height: "12px", borderRight: "2px solid #4a9eff", borderTop: "2px solid #4a9eff" }} />
-					<div style={{ position: "absolute", bottom: 0, left: 0, width: "12px", height: "12px", borderLeft: "2px solid #4a9eff", borderBottom: "2px solid #4a9eff" }} />
-					<div style={{ position: "absolute", bottom: 0, right: 0, width: "12px", height: "12px", borderRight: "2px solid #4a9eff", borderBottom: "2px solid #4a9eff" }} />
-				</div>
-			)}
+			{portalReady && pointerNode ? createPortal(pointerNode, document.body) : pointerNode}
 
 			<style>{`
 				${hideNativeCursor
