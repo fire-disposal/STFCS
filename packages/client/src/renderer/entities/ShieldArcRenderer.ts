@@ -85,6 +85,7 @@ export interface ShieldArcCacheItem {
 		heading: number;
 		shieldActive: boolean;
 		shieldValue: number;
+		shieldDirection: number;
 		isOverloaded: boolean;
 	};
 }
@@ -165,9 +166,11 @@ function shouldUpdateShield(
 	const dHeading = Math.abs(ship.runtime.heading - last.heading);
 
 	const shieldValue = ship.runtime.shield?.value ?? 0;
+	const shieldDirection = ship.runtime.shield?.direction ?? 0;
 	const shieldChanged =
 		(ship.runtime.shield?.active ?? false) !== last.shieldActive ||
 		shieldValue !== last.shieldValue ||
+		shieldDirection !== (last.shieldDirection ?? 0) ||
 		(ship.runtime.overloaded ?? false) !== last.isOverloaded;
 
 	return dx > 0.5 || dy > 0.5 || dHeading > 1 || shieldChanged;
@@ -202,6 +205,7 @@ function createShieldArc(
 			heading: ship.runtime.heading,
 			shieldActive: ship.runtime.shield?.active ?? false,
 			shieldValue: ship.runtime.shield?.value ?? 0,
+			shieldDirection: ship.runtime.shield?.direction ?? 0,
 			isOverloaded: ship.runtime.overloaded ?? false,
 		},
 	});
@@ -227,6 +231,7 @@ function updateShieldArc(
 		heading: ship.runtime.heading,
 		shieldActive: ship.runtime.shield?.active ?? false,
 		shieldValue: ship.runtime.shield?.value ?? 0,
+		shieldDirection: ship.runtime.shield?.direction ?? 0,
 		isOverloaded: ship.runtime.overloaded ?? false,
 	};
 }
@@ -245,7 +250,8 @@ function drawShieldArcForShip(
 
 	const radius = ship.spec.shield?.radius ?? defaultRadius;
 	const arc = ship.spec.shield?.arc ?? defaultArc;
-	const orientation = ship.runtime.heading;
+	// 护盾朝向 = 舰船航向 + 护盾方向（航海坐标系：0°=船头向上）
+	const orientation = ship.runtime.heading + (ship.runtime.shield?.direction ?? 0);
 	const color = getShieldColor(ship.runtime.faction);
 	const alpha = getShieldAlpha(ship.runtime.shield?.value ?? 0, defaultMax);
 
