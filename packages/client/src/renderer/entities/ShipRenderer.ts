@@ -88,12 +88,7 @@ export function useShipRendering(
 	contextRef.current = context;
 
 	useEffect(() => {
-		if (!layers) {
-			console.log("[useShipRendering] no layers, skip render");
-			return;
-		}
-
-		console.log("[useShipRendering] layers ready, ships:", ships.length, "withPosition:", ships.filter(s => s.runtime?.position).length);
+		if (!layers) return;
 
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.$id));

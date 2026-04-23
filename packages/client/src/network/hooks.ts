@@ -198,17 +198,14 @@ export function useTokens(room: SocketRoom | null): CombatToken[] {
 
 	useEffect(() => {
 		if (!room?.state?.tokens) {
-			console.log("[useTokens] no room.state.tokens");
 			setTokens([]);
 			return;
 		}
 
 		const arr: CombatToken[] = [];
 		for (const [, token] of Object.entries(room.state.tokens)) {
-			console.log("[useTokens] token:", token.$id, "runtime:", token.runtime, "position:", token.runtime?.position);
 			arr.push(token);
 		}
-		console.log("[useTokens] total:", arr.length);
 		setTokens(arr);
 	}, [room?.state?.tokens]);
 

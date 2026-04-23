@@ -1,49 +1,91 @@
-## 舰船渲染问题修复 ✅
+## 舰船贴图渲染系统 ✅ 已实现
 
-### 问题诊断
-根本原因：**图层可见性设置错误**
-- ShipRenderer.ts 第119行设置 `shipSprites.visible = true`
-- 但舰船实际添加到 `tacticalTokens` 层（第264行）
-- 导致舰船永远无法显示
+### 架构设计
 
-### 修复内容
-
-**1. ShipRenderer.ts**
-```typescript
-// 错误代码
-layers.shipSprites.visible = true;
-
-// 正确代码
-layers.tacticalTokens.visible = true;
+```
+贴图渲染管线：
+├── collectAssetIds(ships) → 收集所有 assetId
+├── useTextureLoader(assetIds, fetchAssets) → TextureCache
+│   └── Assets.load(dataUrl) → PixiJS Texture
+├── useShipTextureRendering(layers, ships, textureCache)
+│   └── shipSprites 层渲染舰船贴图 Sprite
+└── useWeaponTextureRendering(layers, ships, textureCache)
+    └── shipSprites 层渲染武器贴图 Sprite
 ```
 
-**2. PixiCanvas.tsx**
+### 新增文件
+
+| 文件 | 功能 |
+|------|------|
+| `useTextureLoader.ts` | 预加载贴图到 PixiJS Texture 缓存 |
+| `ShipTextureRenderer.ts` | 舰船贴图精灵渲染 |
+| `WeaponTextureRenderer.ts` | 武器贴图精灵渲染 |
+
+### Texture Schema 应用
+
 ```typescript
-useEffect(() => {
-    if (!layerSystem.layers) return;
-    layerSystem.layers.tacticalTokens.visible = true;  // 新增
-    layerSystem.layers.effects.visible = showEffects;
-    layerSystem.layers.shipIcons.visible = showShipIcons;
-}, [...]);
+interface Texture {
+  assetId?: string;   // 贴图资产ID
+  offsetX?: number;   // X偏移（世界坐标）
+  offsetY?: number;   // Y偏移
+  scale?: number;     // 缩放比例
+}
+
+// 舰船贴图
+sprite.position.set(
+  ship.runtime.position.x + offsetX,
+  ship.runtime.position.y + offsetY
+);
+sprite.rotation = heading * Math.PI / 180;
+sprite.scale.set(scale ?? 1);
+
+// 武器贴图（考虑舰船旋转）
+const cos = Math.cos(shipHeadingRad);
+const sin = Math.sin(shipHeadingRad);
+const rotatedMountX = mountOffsetX * cos - mountOffsetY * sin;
+const rotatedMountY = mountOffsetX * sin + mountOffsetY * cos;
+sprite.position.set(
+  shipPos.x + rotatedMountX + weaponOffsetX,
+  shipPos.y + rotatedMountY + weaponOffsetY
+);
+sprite.rotation = (shipHeading + mountFacing) * Math.PI / 180;
 ```
 
-**3. 诊断日志**
-- `useTokens`: 打印 tokens 数量和 runtime/position 数据
-- `useShipRendering`: 打印 ships 数量及有 position 的数量
+### 渲染层
+
+| 层 | zIndex | 内容 |
+|----|--------|------|
+| shipSprites | 6 | 舰船/武器贴图精灵 |
+| tacticalTokens | 7 | 舰船战术标记（菱形箭头） |
+
+### Props
+
+```typescript
+interface GameCanvasProps {
+  ships: CombatToken[];
+  fetchAssets?: (assetIds, includeData) => Promise<AssetBatchGetResult[]>;
+  showShipTextures?: boolean;  // 贴图开关
+}
+```
+
+### GamePage 整合
+
+```typescript
+<PixiCanvas
+  ships={tokens}
+  fetchAssets={assetSocket.batchGet}
+/>
+```
 
 ---
 
 ## 其他已完成
 
+### 舰船渲染图层修复 ✅
+- tacticalTokens.visible 设置正确
+
 ### 挂点管理重构 ✅
-- 横向卡片布局（左侧列表 + 右侧详情）
-- 添加/删除/编辑功能完整
-- mountsHash 实时预览更新
+- 横向卡片布局，实时预览
 
 ### 准备按钮修复 ✅
-- sessionId/playerId 匹配问题
-
----
-
-## 待实际运行验证
-启动 `pnpm dev` 测试舰船部署和渲染
+- sessionId/playerId 匹配
