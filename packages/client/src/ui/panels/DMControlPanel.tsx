@@ -1,15 +1,10 @@
 /**
  * DMControlPanel - DM控制面板
- * 房主专用：回合推进、阶段切换、玩家管理
- * 
- * 回合推进会触发后端 processTurnEndLogic：
- * - 重置所有舰船的移动状态（phaseA/C、转向角度）
- * - 处理flux衰减、过载恢复
- * - 重置武器冷却
+ * 房主专用：回合推进、阶段切换、玩家管理、开始游戏
  */
 
-import React from "react";
-import { FastForward, Settings, ChevronDown, Users, UserX } from "lucide-react";
+import React, { useMemo } from "react";
+import { FastForward, Settings, ChevronDown, Users, UserX, Play, CheckCircle, XCircle } from "lucide-react";
 import { Button, Flex, Box, Text, Badge, DropdownMenu } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -25,13 +20,6 @@ interface DMControlPanelProps {
 	activeFaction: string;
 }
 
-const PHASE_OPTIONS = [
-	{ value: "DEPLOYMENT", label: "部署阶段" },
-	{ value: "PLAYER_ACTION", label: "玩家回合" },
-	{ value: "DM_ACTION", label: "DM回合" },
-	{ value: "TURN_END", label: "结算阶段" },
-];
-
 export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 	networkManager,
 	players,
@@ -42,42 +30,51 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 }) => {
 	const { send } = useGameAction();
 
-	if (!isHost) return null;
-
-	const handleForceEndTurn = async (faction?: "PLAYER" | "ENEMY" | "NEUTRAL") => {
-		const result = await send("edit:room", { action: "force_end_turn", faction } as any);
-		if (result) {
-			notify.success("回合已推进，回合结束逻辑已执行");
-		}
-	};
-
-	const handleSetPhase = async (newPhase: string) => {
-		const result = await send("edit:room", { action: "set_phase", phase: newPhase });
-		if (result) {
-			notify.success(`阶段已切换为 ${newPhase}`);
-		}
-	};
-
-	const handleSetTurn = async (turn: number) => {
-		const result = await send("edit:room", { action: "set_turn", turn });
-		if (result) {
-			notify.success(`回合已设置为 ${turn}`);
-		}
-	};
-
-	const handleTransferHost = (targetId: string) => {
-		networkManager.transferHost(targetId);
-		notify.success("房主权限已转移");
-	};
-
-	const playerList = Object.entries(players).map(([id, p]) => ({
+	const playerList = useMemo(() => Object.entries(players).map(([id, p]) => ({
 		id,
 		sessionId: p.sessionId,
 		nickname: p.nickname,
 		role: p.role,
 		isReady: p.isReady,
 		connected: p.connected,
-	}));
+	})), [players]);
+
+	const readyStats = useMemo(() => {
+		const total = playerList.filter(p => p.connected).length;
+		const ready = playerList.filter(p => p.connected && p.isReady).length;
+		return { total, ready, allReady: total > 0 && ready === total };
+	}, [playerList]);
+
+	if (!isHost) return null;
+
+	const handleStartGame = async () => {
+		if (!readyStats.allReady) {
+			notify.error("还有玩家未准备");
+			return;
+		}
+		networkManager.startGame();
+		notify.success("游戏已开始");
+	};
+
+	const handleForceEndTurn = async (faction?: "PLAYER" | "ENEMY" | "NEUTRAL") => {
+		const result = await send("edit:room", { action: "force_end_turn", faction } as any);
+		if (result) notify.success("回合已推进");
+	};
+
+	const handleSetPhase = async (newPhase: string) => {
+		const result = await send("edit:room", { action: "set_phase", phase: newPhase });
+		if (result) notify.success(`阶段已切换为 ${newPhase}`);
+	};
+
+	const handleSetTurn = async (turn: number) => {
+		const result = await send("edit:room", { action: "set_turn", turn });
+		if (result) notify.success(`回合已设置为 ${turn}`);
+	};
+
+	const handleTransferHost = (targetId: string) => {
+		networkManager.transferHost(targetId);
+		notify.success("房主权限已转移");
+	};
 
 	return (
 		<Flex className="panel-row" gap="3">
@@ -100,6 +97,28 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 			<Box className="panel-divider" />
 
 			<Flex className="panel-section" align="center" gap="2">
+				<Text size="1" color="gray">准备</Text>
+				<Badge size="1" color={readyStats.allReady ? "green" : "amber"}>
+					{readyStats.ready}/{readyStats.total}
+				</Badge>
+				{readyStats.allReady ? <CheckCircle size={12} color="#2ecc71" /> : <XCircle size={12} color="#f59e0b" />}
+			</Flex>
+
+			<Box className="panel-divider" />
+
+			<Flex className="panel-section" align="center" gap="2">
+				{phase === "DEPLOYMENT" && (
+					<Button 
+						size="1" 
+						variant="solid" 
+						color="green"
+						onClick={handleStartGame}
+						disabled={!readyStats.allReady}
+					>
+						<Play size={12} /> 开始游戏
+					</Button>
+				)}
+
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						<Button size="1" variant="solid" color="green">
@@ -107,16 +126,10 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 						</Button>
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content>
-						<DropdownMenu.Label>推进回合（触发回合结束逻辑）</DropdownMenu.Label>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn()}>
-							下一回合 - 玩家方
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>
-							下一回合 - 敌方
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>
-							下一回合 - 中立
-						</DropdownMenu.Item>
+						<DropdownMenu.Label>推进回合</DropdownMenu.Label>
+						<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 
@@ -128,15 +141,14 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content>
 						<DropdownMenu.Label>切换阶段</DropdownMenu.Label>
-						{PHASE_OPTIONS.map((opt) => (
-							<DropdownMenu.Item key={opt.value} onClick={() => handleSetPhase(opt.value)}>
-								{opt.label}
-							</DropdownMenu.Item>
-						))}
+						<DropdownMenu.Item onClick={() => handleSetPhase("DEPLOYMENT")}>部署阶段</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleSetPhase("PLAYER_ACTION")}>玩家回合</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleSetPhase("DM_ACTION")}>DM回合</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleSetPhase("TURN_END")}>结算阶段</DropdownMenu.Item>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Label>设置回合数</DropdownMenu.Label>
-						<DropdownMenu.Item onClick={() => handleSetTurn(turnCount + 1)}>下一回合</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleSetTurn(Math.max(1, turnCount - 1))}>上一回合</DropdownMenu.Item>
+						<DropdownMenu.Label>设置回合</DropdownMenu.Label>
+						<DropdownMenu.Item onClick={() => handleSetTurn(turnCount + 1)}>+1</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleSetTurn(Math.max(1, turnCount - 1))}>-1</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 
@@ -153,7 +165,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 								networkManager.kickPlayer(p.sessionId);
 								notify.success(`已踢出 ${p.nickname}`);
 							}}>
-								<UserX size={12} /> {p.nickname}
+								<UserX size={12} /> {p.nickname} {p.isReady ? "✓" : "○"}
 							</DropdownMenu.Item>
 						))}
 						<DropdownMenu.Separator />
