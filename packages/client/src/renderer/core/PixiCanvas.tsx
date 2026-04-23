@@ -14,12 +14,16 @@
  * ├── useZoomInteraction - 缩放交互
  * ├── usePixiApp         - Pixi 应用 + 事件绑定
  * ├── useStarfield       - 星空背景生成
+ * ├── useTextureLoader   - 贴图预加载
+ * ├── useShipTextureRendering - 舰船贴图渲染
+ * ├── useWeaponTextureRendering - 武器贴图渲染
  * └── useXxxRendering    - 各实体渲染
  *
  * Props 最小化原则：
  * - ships: 舰船数据列表
  * - onClick: 可选点击回调
  * - movementPreview: 移动预览状态
+ * - fetchAssets: 贴图数据获取函数
  * - 所有其他状态从 uiStore 内部订阅
  */
 
@@ -44,11 +48,23 @@ import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
 import { useWeaponArcRendering } from "../entities/WeaponArcRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
+import { useTextureLoader } from "../systems/useTextureLoader";
+import { useShipTextureRendering } from "../entities/ShipTextureRenderer";
+import { useWeaponTextureRendering } from "../entities/WeaponTextureRenderer";
+import type { AssetListItem } from "@vt/data";
+
+interface AssetBatchGetResult {
+	assetId: string;
+	info: AssetListItem | null;
+	data?: string;
+}
 
 interface GameCanvasProps {
 	ships: CombatToken[];
 	onClick?: (x: number, y: number) => void;
 	movementPreview?: MovementPreviewState;
+	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
+	showShipTextures?: boolean;
 }
 
 const useStarfield = () => {
@@ -64,10 +80,36 @@ const useStarfield = () => {
 	}), []);
 };
 
+const noopFetchAssets = async (_assetIds: string[], _includeData: boolean): Promise<AssetBatchGetResult[]> => [];
+
+function collectAssetIds(ships: CombatToken[]): string[] {
+	const assetIds = new Set<string>();
+
+	for (const ship of ships) {
+		if (ship.spec.texture?.assetId) {
+			assetIds.add(ship.spec.texture.assetId);
+		}
+
+		const mounts = ship.spec.mounts;
+		if (mounts) {
+			for (const mount of mounts) {
+				const weapon = mount.weapon;
+				if (weapon?.spec?.texture?.assetId) {
+					assetIds.add(weapon.spec.texture.assetId);
+				}
+			}
+		}
+	}
+
+	return Array.from(assetIds);
+}
+
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	ships,
 	onClick,
 	movementPreview,
+	fetchAssets = noopFetchAssets,
+	showShipTextures = true,
 }) => {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
@@ -124,8 +166,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		setMapCursor,
 	});
 
+	const assetIds = useMemo(() => collectAssetIds(ships), [ships]);
+	const textureCache = useTextureLoader({ assetIds, fetchAssets });
+
 	useCursorRendering(layerSystem.layers, mapCursor);
 	useStarfieldRendering(layerSystem.layers, starfield);
+
+	useShipTextureRendering(layerSystem.layers, ships, textureCache);
+	useWeaponTextureRendering(layerSystem.layers, ships, textureCache);
 
 	useShipRendering(
 		layerSystem.layers,
@@ -163,7 +211,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		layerSystem.layers.tacticalTokens.visible = true;
 		layerSystem.layers.effects.visible = showEffects;
 		layerSystem.layers.shipIcons.visible = showShipIcons;
-	}, [layerSystem.layers, showEffects, showShipIcons]);
+		layerSystem.layers.shipSprites.visible = showShipTextures;
+	}, [layerSystem.layers, showEffects, showShipIcons, showShipTextures]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;

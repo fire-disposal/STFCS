@@ -29,6 +29,7 @@ import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
 import RoomPlayerList from "@/ui/panels/RoomPlayerList";
 import { Avatar } from "@/ui/shared/Avatar";
+import { useAssetSocket } from "@/hooks/useAssetSocket";
 import "@/ui/panels/room-player-list.css";
 
 const PHASE_NAMES: Record<string, string> = {
@@ -47,6 +48,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const room = useSocketRoom(networkManager, onLeaveRoom);
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+	const socket = networkManager.getSocket();
+	const assetSocket = useAssetSocket(socket);
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
@@ -211,7 +214,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						playerId={room.sessionId ?? networkManager.getPlayerId()}
 						phase={phase}
 					/>
-					<PixiCanvas ships={tokens} />
+					<PixiCanvas
+						ships={tokens}
+						fetchAssets={assetSocket.batchGet}
+					/>
 				</Box>
 			</Box>
 

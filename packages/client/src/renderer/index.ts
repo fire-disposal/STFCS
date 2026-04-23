@@ -58,6 +58,10 @@ export { useCursorRendering } from "./systems/CursorRenderer";
 export { useCamera } from "./systems/useCamera";
 export { useCameraAnimation } from "./systems/useCameraAnimation";
 export type { UseCameraAnimationResult } from "./systems/useCameraAnimation";
+export { useTextureLoader, type TextureCache } from "./systems/useTextureLoader";
+
+export { useShipTextureRendering } from "./entities/ShipTextureRenderer";
+export { useWeaponTextureRendering } from "./entities/WeaponTextureRenderer";
 
 export { useInteraction, type DragState } from "./interactions/InteractionHandler";
 export { useZoomInteraction, type UseZoomInteractionResult } from "./interactions/ZoomHandler";

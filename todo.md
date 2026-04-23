@@ -1,44 +1,49 @@
-## 挂点管理重构 ✅ 已完成
+## 舰船渲染问题修复 ✅
 
-### 1. UI 重构
-- 移除分散的挂点配置区域（原第799-857行和第998-1190行）
-- 新增横向挂点管理卡片：
-  - 左侧（30%）：挂点列表 + 添加/删除按钮
-  - 右侧（70%）：挂点详情编辑（名称/尺寸/位置/朝向/射界/武器挂载）
+### 问题诊断
+根本原因：**图层可见性设置错误**
+- ShipRenderer.ts 第119行设置 `shipSprites.visible = true`
+- 但舰船实际添加到 `tacticalTokens` 层（第264行）
+- 导致舰船永远无法显示
 
-### 2. 添加挂点功能
-- 自动生成唯一 ID（格式：mount_xxxx_timestamp）
-- 默认尺寸 SMALL，位置 (0,0)，射界 360°
-- 支持自定义显示名称
+### 修复内容
 
-### 3. 删除挂点功能
-- 确认后删除，清空当前选择
-- 同步更新预览
+**1. ShipRenderer.ts**
+```typescript
+// 错误代码
+layers.shipSprites.visible = true;
 
-### 4. 挂点详情编辑
-- 位置：X/Y 偏移（-500~500，滑块+数字双输入）
-- 朝向：角度（-180~180°）
-- 射界：角度（0~360°）
-- 武器挂载：下拉选择兼容尺寸武器
+// 正确代码
+layers.tacticalTokens.visible = true;
+```
 
-### 5. 预览实时更新
-- ShipRenderer 新增 mountsHash 计算
-- 检测挂点配置变化触发重新渲染
-- 支持位置/朝向/射界/武器挂载变更后实时预览
+**2. PixiCanvas.tsx**
+```typescript
+useEffect(() => {
+    if (!layerSystem.layers) return;
+    layerSystem.layers.tacticalTokens.visible = true;  // 新增
+    layerSystem.layers.effects.visible = showEffects;
+    layerSystem.layers.shipIcons.visible = showShipIcons;
+}, [...]);
+```
+
+**3. 诊断日志**
+- `useTokens`: 打印 tokens 数量和 runtime/position 数据
+- `useShipRendering`: 打印 ships 数量及有 position 的数量
 
 ---
 
-## 其他修复 ✅
+## 其他已完成
 
-### 废弃 ShipViewModel，统一使用 CombatToken
-- 所有渲染器/面板使用 `$id` 作为舰船标识
-- gameStore.ts 简化保留 CameraState
-- uiStore.ts gameStateRef 清理
+### 挂点管理重构 ✅
+- 横向卡片布局（左侧列表 + 右侧详情）
+- 添加/删除/编辑功能完整
+- mountsHash 实时预览更新
 
-### 准备按钮修复
+### 准备按钮修复 ✅
 - sessionId/playerId 匹配问题
 
 ---
 
-## 待验证
-- 舰船渲染数据流需要实际运行测试
+## 待实际运行验证
+启动 `pnpm dev` 测试舰船部署和渲染
