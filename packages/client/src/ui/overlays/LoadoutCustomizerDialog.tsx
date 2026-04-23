@@ -91,6 +91,7 @@ async function convertToPng(sourceFile: File, applyKeyColor?: { color: string; t
 
     ctx.drawImage(img, 0, 0);
 
+    // 抠图条件：tolerance > 0 即应用抠图
     if (applyKeyColor && applyKeyColor.tolerance > 0) {
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
         const { data } = imageData;
@@ -123,7 +124,7 @@ async function convertToPng(sourceFile: File, applyKeyColor?: { color: string; t
     });
 
     const baseName = sourceFile.name.replace(/\.[^.]+$/, "");
-    const suffix = applyKeyColor ? "-colorkey" : "";
+    const suffix = applyKeyColor && applyKeyColor.tolerance > 0 ? "-colorkey" : "";
     return new File([blob], `${baseName}${suffix}.png`, { type: "image/png" });
 }
 
@@ -563,7 +564,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                 setShipColorKeyPreviewUrl(null);
                 return;
             }
-            if (!(keyColor !== "#000000" || keyTolerance > 0)) {
+            if (keyTolerance <= 0) {
                 setShipColorKeyPreviewUrl(texturePreviewUrl);
                 return;
             }
@@ -587,7 +588,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                 setWeaponColorKeyPreviewUrl(null);
                 return;
             }
-            if (!(weaponKeyColor !== "#000000" || weaponKeyTolerance > 0)) {
+            if (weaponKeyTolerance <= 0) {
                 setWeaponColorKeyPreviewUrl(weaponTexturePreviewUrl);
                 return;
             }
@@ -708,9 +709,20 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">贴图</Text>
-                                            <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
-                                                <Upload size={12} /> 上传图片
-                                            </Button>
+                                            <Flex gap="2">
+                                                {shipDraft?.spec.texture?.assetId && (
+                                                    <Button size="1" variant="soft" color="red" onClick={() => {
+                                                        updateShipTexture({ assetId: undefined });
+                                                        setTexturePreviewUrl(null);
+                                                        setShipColorKeyPreviewUrl(null);
+                                                    }} data-magnetic>
+                                                        <Trash2 size={12} /> 删除
+                                                    </Button>
+                                                )}
+                                                <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
+                                                    <Upload size={12} /> 上传图片
+                                                </Button>
+                                            </Flex>
                                         </Flex>
 
                                         <Flex direction="column" gap="2">
@@ -790,7 +802,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                void uploadShipTexture(file, keyColor !== "#000000" || keyTolerance > 0);
+                                                void uploadShipTexture(file, keyTolerance > 0);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
@@ -1465,9 +1477,20 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">武器预览</Text>
-                                            <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
-                                                <Upload size={12} /> 上传图片
-                                            </Button>
+                                            <Flex gap="2">
+                                                {weaponDraft?.spec.texture?.assetId && (
+                                                    <Button size="1" variant="soft" color="red" onClick={() => {
+                                                        updateWeaponTexture({ assetId: undefined });
+                                                        setWeaponTexturePreviewUrl(null);
+                                                        setWeaponColorKeyPreviewUrl(null);
+                                                    }} data-magnetic>
+                                                        <Trash2 size={12} /> 删除
+                                                    </Button>
+                                                )}
+                                                <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
+                                                    <Upload size={12} /> 上传图片
+                                                </Button>
+                                            </Flex>
                                         </Flex>
 
                                         <Flex direction="column" gap="2" align="center">
@@ -1561,7 +1584,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                void uploadWeaponTexture(file, weaponKeyColor !== "#000000" || weaponKeyTolerance > 0);
+                                                void uploadWeaponTexture(file, weaponKeyTolerance > 0);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
