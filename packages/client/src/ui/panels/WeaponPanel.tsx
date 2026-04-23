@@ -14,14 +14,10 @@ import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useTargets } from "@/hooks/useTargets";
 import { notify } from "@/ui/shared/Notification";
+import { UI_CONFIG } from "@/config/constants";
 import "./weapon-panel.css";
 
-const DAMAGE_TYPE_COLORS: Record<string, string> = {
-	KINETIC: "#ffd700",
-	HIGH_EXPLOSIVE: "#ff6b35",
-	ENERGY: "#7b68ee",
-	FRAGMENTATION: "#32cd32",
-};
+const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE;
 
 interface WeaponStatus {
 	mountId: string;
@@ -263,7 +259,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 				<Box className="weapon-col weapon-col--info">
 					<Flex className="weapon-col__header" align="center" gap="2">
 						<Text size="1" weight="bold" className="weapon-info__name">{currentWeapon.name}</Text>
-						<Badge size="1" style={{ color: DAMAGE_TYPE_COLORS[currentWeapon.damageType] ?? "#888" }}>
+						<Badge size="1" style={{ color: DAMAGE_TYPE_COLORS[currentWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
 							{currentWeapon.damageType}
 						</Badge>
 					</Flex>

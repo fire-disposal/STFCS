@@ -28,23 +28,15 @@ import { Faction } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
+import { UI_CONFIG } from "@/config/constants";
 
 const POSITION_THRESHOLD = 0.5;
 const HEADING_THRESHOLD = 0.8;
 const FLUX_THRESHOLD = 0.5;
 
-const FACTION_COLORS: Record<string, number> = {
-	[Faction.PLAYER]: 0x4fc3ff,
-	[Faction.ENEMY]: 0xff5d7e,
-	[Faction.NEUTRAL]: 0xff7f9f,
-};
+const FACTION_COLORS = UI_CONFIG.COLORS.FACTION_PIXI;
 
-const DAMAGE_TYPE_COLORS = {
-	KINETIC: 0xffd700,
-	HIGH_EXPLOSIVE: 0xff6b35,
-	ENERGY: 0x7b68ee,
-	FRAGMENTATION: 0x32cd32,
-} as const;
+const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
 
 const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
 	SMALL: 6,

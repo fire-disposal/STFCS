@@ -3,21 +3,10 @@
  *
  * 职责：
  * 1. 渲染舰船护甲六边形可视化
- * 2. 显示六个护甲扇区状态（RF/RR/RB/LB/LL/LF）
- * 3. 根据护甲值变化颜色（绿->黄->红）
+ * 2. 显示六个护甲扇区状态
+ * 3. 根据护甲值变化颜色（简化版）
  *
  * 渲染层：world.hexagonArmor (zIndex 13)
- *
- * 六边形结构：
- * - 中心点：舰船位置
- * - 六个边：对应六个护甲扇区
- * - 颜色：根据护甲百分比动态计算
- *
- * 颜色映射：
- * - 75-100%: 绿色系 (#57e38d -> #ffcc66)
- * - 50-75%: 黄色系
- * - 25-50%: 橙色系
- * - 0-25%: 红色系
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -39,32 +28,18 @@ const QUADRANT_TO_EDGE: Record<number, { from: number; to: number }> = {
 	5: { from: 1, to: 2 },
 };
 
+const ARMOR_COLORS = {
+	FULL: 0x57e38d,
+	HIGH: 0xffcc66,
+	MEDIUM: 0xffa366,
+	LOW: 0xff5d7e,
+} as const;
+
 function getArmorColor(percent: number): number {
-	if (percent >= 0.75) {
-		const t = (percent - 0.75) / 0.25;
-		const r = Math.round(87 + (255 - 87) * (1 - t));
-		const g = Math.round(227 + (206 - 227) * (1 - t));
-		const b = Math.round(141 + (102 - 141) * (1 - t));
-		return (r << 16) | (g << 8) | b;
-	} else if (percent >= 0.5) {
-		const t = (percent - 0.5) / 0.25;
-		const r = 255;
-		const g = Math.round(206 + (227 - 206) * t);
-		const b = Math.round(102 + (141 - 102) * t);
-		return (r << 16) | (g << 8) | b;
-	} else if (percent >= 0.25) {
-		const t = (percent - 0.25) / 0.25;
-		const r = 255;
-		const g = Math.round(127 + (206 - 127) * t);
-		const b = Math.round(127 + (102 - 127) * t);
-		return (r << 16) | (g << 8) | b;
-	} else {
-		const t = percent / 0.25;
-		const r = 255;
-		const g = Math.round(93 + (127 - 93) * t);
-		const b = Math.round(126 + (127 - 126) * t);
-		return (r << 16) | (g << 8) | b;
-	}
+	if (percent >= 0.75) return ARMOR_COLORS.FULL;
+	if (percent >= 0.5) return ARMOR_COLORS.HIGH;
+	if (percent >= 0.25) return ARMOR_COLORS.MEDIUM;
+	return ARMOR_COLORS.LOW;
 }
 
 export interface ArmorHexagonCacheItem {
@@ -210,9 +185,9 @@ function drawArmorHexagon(graphics: Graphics, ship: ShipViewModel, armorMax: num
 
 	for (let quadrantIndex = 0; quadrantIndex < 6; quadrantIndex++) {
 		const armorValue = armor[quadrantIndex] ?? 0;
-		const percent = armorValue / armorMax;
+		const percent = Math.max(0, Math.min(1, armorValue / armorMax));
 
-		if (armorValue <= 0 || percent <= 0) continue;
+		if (armorValue <= 0) continue;
 
 		const edge = QUADRANT_TO_EDGE[quadrantIndex];
 		const fromVertex = vertices[edge.from];

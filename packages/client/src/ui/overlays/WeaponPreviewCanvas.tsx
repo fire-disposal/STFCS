@@ -7,14 +7,10 @@ import { Application } from "@pixi/react";
 import { Graphics } from "pixi.js";
 import React, { useRef, useCallback } from "react";
 import type { WeaponJSON, WeaponSlotSize } from "@vt/data";
-import { DamageType, WeaponTag } from "@vt/data";
+import { WeaponTag } from "@vt/data";
+import { UI_CONFIG } from "@/config/constants";
 
-const DAMAGE_TYPE_COLORS: Record<string, number> = {
-	[DamageType.KINETIC]: 0xffd700,
-	[DamageType.HIGH_EXPLOSIVE]: 0xff6b35,
-	[DamageType.ENERGY]: 0x7b68ee,
-	[DamageType.FRAGMENTATION]: 0x32cd32,
-};
+const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
 
 const WEAPON_SIZE_RADIUS: Record<WeaponSlotSize, number> = {
 	SMALL: 12,

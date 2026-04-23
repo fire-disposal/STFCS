@@ -12,13 +12,9 @@ import { Graphics } from "pixi.js";
 import React, { useRef, useCallback } from "react";
 import type { InventoryToken } from "@vt/data";
 import { WeaponSlotSize } from "@vt/data";
+import { UI_CONFIG } from "@/config/constants";
 
-const DAMAGE_TYPE_COLORS = {
-	KINETIC: 0xffd700,
-	HIGH_EXPLOSIVE: 0xff6b35,
-	ENERGY: 0x7b68ee,
-	FRAGMENTATION: 0x32cd32,
-} as const;
+const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
 
 const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
 	SMALL: 5,

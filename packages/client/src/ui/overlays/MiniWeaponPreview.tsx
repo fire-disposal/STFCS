@@ -3,6 +3,9 @@ import { Application } from "@pixi/react";
 import { Graphics } from "pixi.js";
 import type { WeaponJSON } from "@vt/data";
 import "./ship-customization-modal.css";
+import { UI_CONFIG } from "@/config/constants";
+
+const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
 
 interface MiniWeaponPreviewProps {
     weapon: WeaponJSON | null;
@@ -10,13 +13,6 @@ interface MiniWeaponPreviewProps {
     zoom: number;
     onZoomChange: (value: number) => void;
 }
-
-const DAMAGE_TYPE_COLORS = {
-    KINETIC: 0xffd700,
-    HIGH_EXPLOSIVE: 0xff6b35,
-    ENERGY: 0x7b68ee,
-    FRAGMENTATION: 0x32cd32,
-} as const;
 
 function clampZoom(value: number): number {
     return Math.min(4, Math.max(0.2, value));

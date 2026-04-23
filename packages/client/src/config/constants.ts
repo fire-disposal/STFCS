@@ -103,12 +103,35 @@ export const GAME_CONFIG = {
 export const UI_CONFIG = {
   // 颜色配置
   COLORS: {
-    // 阵营颜色
-    FACTION: {
-      PLAYER: '#4CAF50', // 绿色
-      ENEMY: '#F44336',  // 红色
-      NEUTRAL: '#9E9E9E', // 灰色
+    // 阵营颜色（Pixi格式）
+    FACTION_PIXI: {
+      PLAYER: 0x4fc3ff,
+      ENEMY: 0xff5d7e,
+      NEUTRAL: 0xff7f9f,
     },
+    
+    // 阵营颜色（CSS格式）
+    FACTION: {
+      PLAYER: '#4fc3ff',
+      ENEMY: '#ff5d7e',
+      NEUTRAL: '#ff7f9f',
+    },
+    
+    // 武器伤害类型颜色（Pixi格式）
+    DAMAGE_TYPE_PIXI: {
+      KINETIC: 0xffd700,
+      HIGH_EXPLOSIVE: 0xff6b35,
+      ENERGY: 0x7b68ee,
+      FRAGMENTATION: 0x32cd32,
+    } as const,
+    
+    // 武器伤害类型颜色（CSS格式）
+    DAMAGE_TYPE: {
+      KINETIC: '#ffd700',
+      HIGH_EXPLOSIVE: '#ff6b35',
+      ENERGY: '#7b68ee',
+      FRAGMENTATION: '#32cd32',
+    } as const,
     
     // UI颜色
     UI: {
