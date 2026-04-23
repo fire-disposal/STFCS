@@ -181,7 +181,6 @@
 	position: absolute;
 	left: 50%;
 	top: 50%;
-	transform-origin: center;
 	pointer-events: none;
 	z-index: 3;
 }
@@ -189,7 +188,6 @@
 .customizer-preview-texture {
 	opacity: 0.72;
 	filter: drop-shadow(0 0 8px rgba(100, 180, 255, 0.35));
-	transform: translate(-50%, -50%);
 	user-select: none;
 	object-fit: contain;
 }

@@ -19,6 +19,22 @@
 - X轴：左舷为正（heading=0时指向屏幕左侧 -X）
 - Y轴：船头为正（heading=0时指向屏幕上方 -Y）
 
+**贴图偏移坐标系（同挂载点坐标系）：**
+- offsetX：左舷为正（heading=0时指向屏幕左侧）
+- offsetY：船头为正（heading=0时指向屏幕上方）
+- scale：贴图缩放比例（相对于原始尺寸）
+- 贴图中心点对齐舰船中心，加上偏移
+
+**PixiJS rotation 转换：**
+- PixiJS 正角度逆时针旋转
+- 航海角度顺时针增加
+- 因此 `sprite.rotation = -heading * π / 180`
+
+**屏幕坐标系 vs 航海坐标系：**
+- 屏幕坐标系：Y向下（左上角为原点）
+- 航海坐标系：Y向上（船头方向为正）
+- offsetY 在屏幕上表现为负方向移动
+
 **phase 和 activeFaction 固定对应关系：**
 修改 phase 时必须同步更新 activeFaction：
 - phase="DEPLOYMENT" → activeFaction=undefined

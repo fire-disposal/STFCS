@@ -95,13 +95,19 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
 
     const texture = weapon?.spec.texture;
     const textureScale = (texture?.scale ?? 1) * zoom;
+    // 航海坐标系：Y向上，屏幕坐标系：Y向下
+    // offsetY > 0（枪口方向）在屏幕上是向上（负方向）
     const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
-    const textureOffsetY = (texture?.offsetY ?? 0) * zoom;
-    const textureStyle = useMemo(() => {
-        return {
-            transform: `translate(${textureOffsetX}px, ${textureOffsetY}px) scale(${textureScale})`,
-        };
-    }, [textureScale, textureOffsetX, textureOffsetY]);
+    const textureOffsetY = -(texture?.offsetY ?? 0) * zoom; // 反转 Y
+    
+    // wrap 负责偏移，img 负责缩放和居中
+    const wrapStyle = useMemo(() => ({
+        transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)`,
+    }), [textureOffsetX, textureOffsetY]);
+    
+    const imgStyle = useMemo(() => ({
+        transform: `translate(-50%, -50%) scale(${textureScale})`,
+    }), [textureScale]);
 
     return (
         <div className="customizer-preview-shell">
@@ -134,10 +140,11 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
                 )}
 
                 {texturePreviewUrl && (
-                    <div className="customizer-preview-texture-wrap" style={textureStyle}>
+                    <div className="customizer-preview-texture-wrap" style={wrapStyle}>
                         <img
                             src={texturePreviewUrl}
                             className="customizer-preview-texture"
+                            style={imgStyle}
                             alt="weapon-texture"
                             draggable={false}
                         />
