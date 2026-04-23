@@ -5,17 +5,17 @@
 .turn-bar-compact {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 }
 
 .turn-bar-compact__phase {
 	display: flex;
 	align-items: center;
-	gap: 3px;
-	padding: 3px 6px;
-	font-size: 10px;
+	gap: 4px;
+	padding: 6px 10px;
+	font-size: 14px;
 	font-weight: 600;
-	border-radius: 3px;
+	border-radius: 4px;
 }
 
 .turn-bar-compact__phase--deployment {
@@ -43,10 +43,10 @@
 }
 
 .turn-bar-compact__faction {
-	padding: 2px 4px;
-	font-size: 9px;
+	padding: 4px 8px;
+	font-size: 12px;
 	font-weight: 600;
-	border-radius: 2px;
+	border-radius: 3px;
 }
 
 .turn-bar-compact__faction--player {
@@ -67,11 +67,11 @@
 .turn-bar-compact__btn {
 	display: flex;
 	align-items: center;
-	gap: 3px;
-	padding: 3px 6px;
-	font-size: 10px;
+	gap: 4px;
+	padding: 6px 12px;
+	font-size: 14px;
 	font-weight: 500;
-	border-radius: 3px;
+	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.15s ease;
 	border: 1px solid rgba(74, 158, 255, 0.4);
@@ -91,10 +91,10 @@
 }
 
 .turn-bar-compact__turn {
-	padding: 3px 6px;
-	font-size: 11px;
+	padding: 6px 12px;
+	font-size: 16px;
 	font-weight: 700;
 	color: #4a9eff;
 	background: rgba(20, 40, 60, 0.4);
-	border-radius: 3px;
+	border-radius: 4px;
 }

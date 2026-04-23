@@ -8,9 +8,8 @@
  */
 
 import React from "react";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Save } from "lucide-react";
 import TurnBar from "./TurnBar";
-import SaveMenu from "./SaveMenu";
 import { GamePhase, Faction } from "@vt/data";
 import type { RoomPlayerState } from "@vt/data";
 import "./top-bar.css";
@@ -65,12 +64,17 @@ export const TopBar: React.FC<TopBarProps> = ({
 			</div>
 
 			<div className="top-bar__right">
-				<SaveMenu isHost={isHost} inRoom={inRoom} />
-				<button className="top-bar__btn" onClick={onSettings} title="设置">
-					<Settings size={14} />
+				<button className="top-bar__action-btn" onClick={() => {}}>
+					<Save size={16} />
+					存档
 				</button>
-				<button className="top-bar__btn top-bar__btn--danger" onClick={onLeave} title="退出">
-					<LogOut size={14} />
+				<button className="top-bar__action-btn" onClick={onSettings}>
+					<Settings size={16} />
+					设置
+				</button>
+				<button className="top-bar__action-btn top-bar__action-btn--danger" onClick={onLeave}>
+					<LogOut size={16} />
+					离开
 				</button>
 			</div>
 		</div>

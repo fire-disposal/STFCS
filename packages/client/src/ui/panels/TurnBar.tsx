@@ -78,7 +78,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	return (
 		<div className="turn-bar-compact">
 			<div className={`turn-bar-compact__phase ${phaseColorClass}`}>
-				{phase === GamePhase.DM_ACTION && <Crown size={10} />}
+				{phase === GamePhase.DM_ACTION && <Crown size={14} />}
 				{PHASE_NAMES[phase]}
 			</div>
 
@@ -98,7 +98,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 						borderColor: isReady ? "rgba(87, 227, 141, 0.4)" : "rgba(245, 158, 11, 0.4)",
 					}}
 				>
-					<CheckCircle size={10} />
+					<CheckCircle size={14} />
 					{isReady ? "就绪" : "准备"}
 				</button>
 			)}
@@ -108,7 +108,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				onClick={onAdvancePhase}
 				disabled={!isHost}
 			>
-				<FastForward size={10} />
+				<FastForward size={14} />
 				{getAdvanceLabel()}
 			</button>
 

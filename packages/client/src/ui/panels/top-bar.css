@@ -5,9 +5,9 @@
 .top-bar {
 	display: flex;
 	align-items: center;
-	gap: 16px;
-	padding: 0 12px;
-	height: 32px;
+	gap: 20px;
+	padding: 0 16px;
+	height: 56px;
 	background: rgba(10, 20, 35, 0.95);
 	border-bottom: 1px solid rgba(74, 158, 255, 0.2);
 }
@@ -29,45 +29,51 @@
 .top-bar__right {
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: 8px;
 	flex-shrink: 0;
 }
 
 .top-bar__avatars {
 	display: flex;
 	align-items: center;
-	gap: 16px;
+	gap: 20px;
 }
 
 .top-bar__avatar-group {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 4px;
 }
 
-.top-bar__btn {
+.top-bar__action-btn {
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
+	gap: 6px;
+	padding: 8px 14px;
 	background: transparent;
-	border: 1px solid rgba(74, 158, 255, 0.2);
+	border: 1px solid rgba(74, 158, 255, 0.3);
 	border-radius: 4px;
 	color: #8ba4c7;
+	font-size: 14px;
+	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.15s ease;
 }
 
-.top-bar__btn:hover {
+.top-bar__action-btn:hover {
 	background: rgba(74, 158, 255, 0.1);
-	border-color: rgba(74, 158, 255, 0.4);
+	border-color: rgba(74, 158, 255, 0.5);
 	color: #cfe8ff;
 }
 
-.top-bar__btn--danger:hover {
-	background: rgba(255, 93, 126, 0.1);
-	border-color: rgba(255, 93, 126, 0.4);
+.top-bar__action-btn--danger {
+	color: #ff6f8f;
+	border-color: rgba(255, 111, 143, 0.3);
+}
+
+.top-bar__action-btn--danger:hover {
+	background: rgba(255, 111, 143, 0.1);
+	border-color: rgba(255, 111, 143, 0.5);
 	color: #ff6f8f;
 }
 
@@ -76,9 +82,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 24px;
-	height: 24px;
-	border-radius: 3px;
+	width: 32px;
+	height: 32px;
+	border-radius: 4px;
 	position: relative;
 	cursor: default;
 	transition: all 0.15s ease;
@@ -90,7 +96,7 @@
 
 .player-avatar--ready {
 	border: 2px solid rgba(87, 227, 141, 0.6);
-	box-shadow: 0 0 4px rgba(87, 227, 141, 0.3);
+	box-shadow: 0 0 6px rgba(87, 227, 141, 0.3);
 }
 
 .player-avatar--waiting {
@@ -99,26 +105,26 @@
 
 .player-avatar--active {
 	border: 2px solid rgba(255, 111, 143, 0.6);
-	box-shadow: 0 0 4px rgba(255, 111, 143, 0.3);
+	box-shadow: 0 0 6px rgba(255, 111, 143, 0.3);
 }
 
 .player-avatar__inner {
-	width: 18px;
-	height: 18px;
+	width: 24px;
+	height: 24px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background: rgba(13, 40, 71, 0.5);
-	font-size: 12px;
+	font-size: 16px;
 	font-weight: 600;
 }
 
 .player-avatar__dot {
 	position: absolute;
-	bottom: -1px;
-	right: -1px;
-	width: 6px;
-	height: 6px;
+	bottom: -2px;
+	right: -2px;
+	width: 8px;
+	height: 8px;
 	border-radius: 50%;
 	background: #2ecc71;
 	border: 1px solid rgba(10, 20, 35, 0.8);
