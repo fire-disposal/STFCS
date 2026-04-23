@@ -1,11 +1,20 @@
-name: CI/CD Pipeline
+name: Manual CI/CD Pipeline
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
+    inputs:
+      skip_checks:
+        description: "Skip lint & tests"
+        required: false
+        default: "false"
+      deploy:
+        description: "Run deployment"
+        required: false
+        default: "true"
+
+concurrency:
+  group: manual-cicd-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -16,129 +25,134 @@ env:
   CORS_ORIGINS: "*"
 
 jobs:
-  validate:
-    name: Lint & Typecheck
+  check:
+    name: Lint + Typecheck + Test
+    if: ${{ github.event.inputs.skip_checks != 'true' }}
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pnpm
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - name: Set up Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install dependencies
+      - name: Restore pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Run Lint
+      - name: Lint
         run: pnpm run lint
-        continue-on-error: true
 
-      - name: Run Typecheck
+      - name: Typecheck
         run: pnpm run typecheck
-        continue-on-error: true
 
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run Tests
+      - name: Test
         run: pnpm run test
 
   prepare:
-    name: Prepare Environment
-    needs: [validate, test]
-    if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    name: Prepare Metadata
     runs-on: ubuntu-latest
     outputs:
-      server_image: ${{ steps.set-images.outputs.server_image }}
-      client_image: ${{ steps.set-images.outputs.client_image }}
+      image: ${{ steps.meta.outputs.image }}
+
     steps:
-      - name: Set image tags
-        id: set-images
+      - name: Set image name
+        id: meta
         run: |
           LOWERED=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "server_image=${LOWERED}-server" >> $GITHUB_OUTPUT
-          echo "client_image=${LOWERED}-client" >> $GITHUB_OUTPUT
+          echo "image=${LOWERED}-app" >> $GITHUB_OUTPUT
 
   build:
     name: Build & Push Image
-    needs: prepare
+    needs: [prepare, check]
+    if: always()
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
+      - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
+      - name: Login GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Unified App
+      - name: Build & Push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.unified
           push: true
           tags: |
-            ${{ env.REGISTRY }}/fire-disposal/stfcs-app:latest
-            ${{ env.REGISTRY }}/fire-disposal/stfcs-app:${{ github.sha }}
-          cache-from: type=gha
+            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.image }}:latest
+            ${{ env.REGISTRY }}/${{ needs.prepare.outputs.image }}:${{ github.sha }}
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.REGISTRY }}/${{ needs.prepare.outputs.image }}:latest
           cache-to: type=gha,mode=max
 
   deploy:
+    name: Deploy to Server
     needs: build
+    if: ${{ github.event.inputs.deploy == 'true' }}
     runs-on: ubuntu-latest
+
     steps:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy
+      - name: Deploy via SSH
         run: |
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            docker system prune -af
-            docker pull ghcr.io/fire-disposal/stfcs-app:latest
+
+            docker pull ghcr.io/${{ github.repository }}-app:latest
+
             docker rm -f stfcs-app || true
             docker network create stfcs-network 2>/dev/null || true
-            mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
-            docker run -d --name stfcs-app --restart unless-stopped --network stfcs-network \
-              -p ${{ env.HOST_PORT }}:${{ env.APP_PORT }} -e NODE_ENV=production -e PORT=${{ env.APP_PORT }} -e CORS_ORIGINS='${{ env.CORS_ORIGINS }}' \
+
+            mkdir -p /srv/stfcs/storage/players
+            mkdir -p /srv/stfcs/storage/assets/ships
+            mkdir -p /srv/stfcs/storage/assets/weapons
+
+            docker run -d \
+              --name stfcs-app \
+              --restart unless-stopped \
+              --network stfcs-network \
+              -p ${{ env.HOST_PORT }}:${{ env.APP_PORT }} \
+              -e NODE_ENV=production \
+              -e PORT=${{ env.APP_PORT }} \
+              -e CORS_ORIGINS='${{ env.CORS_ORIGINS }}' \
               -v /srv/stfcs/storage:/app/storage \
-              ghcr.io/fire-disposal/stfcs-app:latest
-            sleep 10
+              ghcr.io/${{ github.repository }}-app:latest
+
+            sleep 5
             docker ps --filter name=stfcs-app
           EOF
 
@@ -148,5 +162,8 @@ jobs:
             curl -fsS --max-time 5 http://${{ secrets.SERVER_HOST }}:${{ env.HOST_PORT }}/health && exit 0
             sleep 5
           done
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "docker logs --tail 50 stfcs-app"
+
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "docker logs --tail 50 stfcs-app"
+
           exit 1
