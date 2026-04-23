@@ -52,23 +52,18 @@ export function useWeaponTextureRendering(
 				const cacheKey = `${ship.$id}:${mount.id}`;
 				currentKeys.add(cacheKey);
 
-				const mountOffsetX = mount.position?.x ?? 0;
-				const mountOffsetY = mount.position?.y ?? 0;
+				const mountOffsetX = -(mount.position?.x ?? 0);
+				const mountOffsetY = -(mount.position?.y ?? 0);
 				const mountFacing = mount.facing ?? 0;
 
 				const weaponOffsetX = weapon.spec.texture.offsetX ?? 0;
 				const weaponOffsetY = weapon.spec.texture.offsetY ?? 0;
 				const weaponScale = weapon.spec.texture.scale ?? 1;
 
-				const shipHeadingRad = (ship.runtime.heading * Math.PI) / 180;
-				const cos = Math.cos(shipHeadingRad);
-				const sin = Math.sin(shipHeadingRad);
-
-				const rotatedMountX = mountOffsetX * cos - mountOffsetY * sin;
-				const rotatedMountY = mountOffsetX * sin + mountOffsetY * cos;
-
-				const worldX = ship.runtime.position.x + rotatedMountX + weaponOffsetX;
-				const worldY = ship.runtime.position.y + rotatedMountY + weaponOffsetY;
+				// 挂载点世界坐标（航海坐标系转换）
+				const headingRad = (ship.runtime.heading * Math.PI) / 180;
+				const worldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad) + weaponOffsetX;
+				const worldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad) + weaponOffsetY;
 
 				const totalRotation = ((ship.runtime.heading + mountFacing) * Math.PI) / 180;
 

@@ -424,8 +424,11 @@ function drawMountMarkers(
 	const alpha = isSelected ? 0.85 : 0.5;
 
 	for (const mount of mounts) {
-		const offsetX = mount.position?.x ?? 0;
-		const offsetY = mount.position?.y ?? 0;
+		// 挂载点偏移坐标系：
+		// X轴：左舷为正 → 绘制时在 -X 方向（Container内）
+		// Y轴：船头为正 → 绘制时在 -Y 方向（Container内）
+		const offsetX = -(mount.position?.x ?? 0);
+		const offsetY = -(mount.position?.y ?? 0);
 		const mountSize = mount.size;
 		const slotRadius = MOUNT_SLOT_SIZE[mountSize];
 		const mountFacing = mount.facing ?? 0;
@@ -461,8 +464,9 @@ function drawSingleWeaponMarker(
 	const spec = mount.weapon.spec;
 	if (!spec) return;
 
-	const offsetX = mount.position?.x ?? 0;
-	const offsetY = mount.position?.y ?? 0;
+	// 挂载点偏移坐标系：左舷/船头为正 → 绘制时取负
+	const offsetX = -(mount.position?.x ?? 0);
+	const offsetY = -(mount.position?.y ?? 0);
 	const nauticalRad = ((mount.facing ?? 0) - 90) * Math.PI / 180;
 
 	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? 0x7b68ee;

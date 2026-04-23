@@ -212,8 +212,11 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 		const mountAlpha = selected ? 0.8 : 0.5;
 
 		for (const mount of mounts) {
-			const offsetX = (mount.position?.x ?? 0) * scale;
-			const offsetY = (mount.position?.y ?? 0) * scale;
+			// 挂载点偏移坐标系：
+			// X轴：左舷为正 → 绘制时在 -X 方向
+			// Y轴：船头为正 → 绘制时在 -Y 方向
+			const offsetX = -(mount.position?.x ?? 0) * scale;
+			const offsetY = -(mount.position?.y ?? 0) * scale;
 			const mountSize = mount.size;
 			const slotRadius = MOUNT_SLOT_SIZE[mountSize] * scale;
 			const mountFacing = mount.facing ?? 0;
@@ -227,8 +230,8 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 			const weaponSpec = mount.weapon.spec;
 			if (!weaponSpec) continue;
 
-			const offsetX = (mount.position?.x ?? 0) * scale;
-			const offsetY = (mount.position?.y ?? 0) * scale;
+			const offsetX = -(mount.position?.x ?? 0) * scale;
+			const offsetY = -(mount.position?.y ?? 0) * scale;
 			const nauticalRad = ((mount.facing ?? 0) - 90) * Math.PI / 180;
 
 			const weaponColor = DAMAGE_TYPE_COLORS[weaponSpec.damageType] ?? 0x7b68ee;
