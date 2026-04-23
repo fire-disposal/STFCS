@@ -123,7 +123,8 @@ export function useWeaponArcRendering(
 			if (!weapon) continue;
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
-			const mountFacing = (shipHeading + (mount.facing ?? 0)) * Math.PI / 180;
+			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
+			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 
 			const offsetX = mountPos.x;
 			const offsetY = mountPos.y;
@@ -157,7 +158,8 @@ export function useWeaponArcRendering(
 				if (!mount) continue;
 
 				const mountPos = mount.position ?? { x: 0, y: 0 };
-				const mountFacing = (shipHeading + (mount.facing ?? 0)) * Math.PI / 180;
+				const mountFacingNautical = shipHeading + (mount.facing ?? 0);
+				const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 				const cosH = Math.cos(shipHeading * Math.PI / 180);
 				const sinH = Math.sin(shipHeading * Math.PI / 180);
 				const worldX = shipPosition.x + (mountPos.x ?? 0) * cosH - (mountPos.y ?? 0) * sinH;

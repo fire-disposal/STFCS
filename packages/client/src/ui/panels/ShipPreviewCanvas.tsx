@@ -39,11 +39,11 @@ function drawMountSlotShape(
 	size: WeaponSlotSize,
 	slotRadius: number,
 	alpha: number,
-	facing: number = 0
+	facing: number = 0,
+	arc: number = 360
 ): void {
 	const r = slotRadius;
-	const facingRad = facing * Math.PI / 180;
-	g.rotation = facingRad;
+	const nauticalRad = (facing - 90) * Math.PI / 180;
 	
 	switch (size) {
 		case "SMALL":
@@ -80,12 +80,25 @@ function drawMountSlotShape(
 			break;
 	}
 	
-	g.rotation = 0;
-	
 	const arrowLen = r * 0.6;
 	g.moveTo(x, y);
-	g.lineTo(x + Math.cos(facingRad) * arrowLen, y + Math.sin(facingRad) * arrowLen);
+	g.lineTo(x + Math.cos(nauticalRad) * arrowLen, y + Math.sin(nauticalRad) * arrowLen);
 	g.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
+	
+	if (arc < 360) {
+		const arcRad = (arc * Math.PI) / 180;
+		const leftRad = nauticalRad - arcRad / 2;
+		const rightRad = nauticalRad + arcRad / 2;
+		const lineLen = r * 1.8;
+		
+		g.moveTo(x, y);
+		g.lineTo(x + Math.cos(leftRad) * lineLen, y + Math.sin(leftRad) * lineLen);
+		g.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
+		
+		g.moveTo(x, y);
+		g.lineTo(x + Math.cos(rightRad) * lineLen, y + Math.sin(rightRad) * lineLen);
+		g.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
+	}
 }
 
 function drawWeaponBar(
@@ -204,8 +217,9 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 			const mountSize = mount.size;
 			const slotRadius = MOUNT_SLOT_SIZE[mountSize] * scale;
 			const mountFacing = mount.facing ?? 0;
+			const mountArc = mount.arc ?? 360;
 
-			drawMountSlotShape(g, offsetX, offsetY, mountSize, slotRadius, mountAlpha, mountFacing);
+			drawMountSlotShape(g, offsetX, offsetY, mountSize, slotRadius, mountAlpha, mountFacing, mountArc);
 		}
 
 		for (const mount of mounts) {
@@ -215,13 +229,13 @@ export const ShipPreviewCanvas: React.FC<ShipPreviewCanvasProps> = ({
 
 			const offsetX = (mount.position?.x ?? 0) * scale;
 			const offsetY = (mount.position?.y ?? 0) * scale;
-			const facingRad = ((mount.facing ?? 0) + HEADING_RIGHT) * Math.PI / 180;
+			const nauticalRad = ((mount.facing ?? 0) - 90) * Math.PI / 180;
 
 			const weaponColor = DAMAGE_TYPE_COLORS[weaponSpec.damageType] ?? 0x7b68ee;
 			const iconSize = MOUNT_SLOT_SIZE[weaponSpec.size] * scale;
 			const wAlpha = selected ? 0.9 : 0.7;
 
-			drawWeaponBar(g, offsetX, offsetY, facingRad, iconSize, weaponColor, wAlpha, weaponSpec.damageType);
+			drawWeaponBar(g, offsetX, offsetY, nauticalRad, iconSize, weaponColor, wAlpha, weaponSpec.damageType);
 		}
 	}, [token, size, selected]);
 

@@ -349,16 +349,32 @@ function drawMountSlotShape(
 	size: WeaponSlotSize,
 	slotRadius: number,
 	alpha: number,
-	facing: number = 0
+	facing: number = 0,
+	arc: number = 360
 ): void {
 	const r = slotRadius;
-	const facingRad = facing * Math.PI / 180;
+	const nauticalRad = (facing - 90) * Math.PI / 180;
 	
 	target.poly([
-		x + Math.cos(facingRad) * r * 0.6, y + Math.sin(facingRad) * r * 0.6,
+		x + Math.cos(nauticalRad) * r * 0.6, y + Math.sin(nauticalRad) * r * 0.6,
 		x, y,
 	]);
 	target.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
+	
+	if (arc < 360) {
+		const arcRad = (arc * Math.PI) / 180;
+		const leftRad = nauticalRad - arcRad / 2;
+		const rightRad = nauticalRad + arcRad / 2;
+		const lineLen = r * 1.8;
+		
+		target.moveTo(x, y);
+		target.lineTo(x + Math.cos(leftRad) * lineLen, y + Math.sin(leftRad) * lineLen);
+		target.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
+		
+		target.moveTo(x, y);
+		target.lineTo(x + Math.cos(rightRad) * lineLen, y + Math.sin(rightRad) * lineLen);
+		target.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
+	}
 	
 	switch (size) {
 		case "SMALL":
@@ -413,8 +429,9 @@ function drawMountMarkers(
 		const mountSize = mount.size;
 		const slotRadius = MOUNT_SLOT_SIZE[mountSize];
 		const mountFacing = mount.facing ?? 0;
+		const mountArc = mount.arc ?? 360;
 
-		drawMountSlotShape(target, offsetX, offsetY, mountSize, slotRadius, alpha, mountFacing);
+		drawMountSlotShape(target, offsetX, offsetY, mountSize, slotRadius, alpha, mountFacing, mountArc);
 	}
 }
 
@@ -446,14 +463,14 @@ function drawSingleWeaponMarker(
 
 	const offsetX = mount.position?.x ?? 0;
 	const offsetY = mount.position?.y ?? 0;
-	const facingRad = (mount.facing ?? 0) * Math.PI / 180;
+	const nauticalRad = ((mount.facing ?? 0) - 90) * Math.PI / 180;
 
 	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? 0x7b68ee;
 	const iconSize = MOUNT_SLOT_SIZE[spec.size];
 	const alpha = isSelected ? 0.95 : 0.75;
 	const outlineAlpha = isSelected ? 1 : 0.8;
 
-	drawWeaponBar(target, offsetX, offsetY, facingRad, iconSize, weaponColor, alpha, outlineAlpha, spec.damageType);
+	drawWeaponBar(target, offsetX, offsetY, nauticalRad, iconSize, weaponColor, alpha, outlineAlpha, spec.damageType);
 }
 
 function drawWeaponBar(
