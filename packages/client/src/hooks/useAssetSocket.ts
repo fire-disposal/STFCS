@@ -152,17 +152,17 @@ export const ASSET_LIMITS: Record<"ship_texture" | "weapon_texture", {
 	ship_texture: {
 		allowedMimeTypes: ["image/png"],
 		maxFileSize: 2 * 1024 * 1024,
-		minWidth: 128,
+		minWidth: 9,
 		maxWidth: 1024,
-		minHeight: 128,
+		minHeight: 9,
 		maxHeight: 1024,
 	},
 	weapon_texture: {
 		allowedMimeTypes: ["image/png"],
 		maxFileSize: 1 * 1024 * 1024,
-		minWidth: 32,
+		minWidth: 3,
 		maxWidth: 256,
-		minHeight: 32,
+		minHeight: 3,
 		maxHeight: 256,
 	},
 };

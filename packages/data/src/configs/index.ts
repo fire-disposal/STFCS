@@ -97,28 +97,28 @@ export interface AssetConfig {
 
 export const DEFAULT_ASSET_CONFIG: AssetConfig = {
 	avatar: {
-		maxFileSize: 512 * 1024,       // 512KB
-		maxWidth: 512,
-		maxHeight: 512,
-		minWidth: 32,
-		minHeight: 32,
-		allowedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"],
+		allowedMimeTypes: ["image/png", "image/jpeg", "image/gif"],
+		maxFileSize: 512 * 1024,
+		minWidth: 16,
+		maxWidth: 256,
+		minHeight: 16,
+		maxHeight: 256,
 	},
 	ship_texture: {
-		maxFileSize: 2 * 1024 * 1024,  // 2MB
+		allowedMimeTypes: ["image/png"],
+		maxFileSize: 2 * 1024 * 1024,
+		minWidth: 9,
 		maxWidth: 1024,
+		minHeight: 9,
 		maxHeight: 1024,
-		minWidth: 64,
-		minHeight: 64,
-		allowedMimeTypes: ["image/png"],  // 仅PNG（需要透明层）
 	},
 	weapon_texture: {
-		maxFileSize: 512 * 1024,       // 512KB
+		allowedMimeTypes: ["image/png"],
+		maxFileSize: 1 * 1024 * 1024,
+		minWidth: 3,
 		maxWidth: 256,
+		minHeight: 3,
 		maxHeight: 256,
-		minWidth: 32,
-		minHeight: 32,
-		allowedMimeTypes: ["image/png"],  // 仅PNG（需要透明层）
 	},
 };
 
