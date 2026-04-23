@@ -200,11 +200,14 @@ export class SocketNetworkManager {
 	async joinRoom(roomId: string): Promise<RoomJoinResult> {
 		if (!this.socket?.connected || !this.playerId) return { success: false, error: "Not authenticated" };
 
+		this.currentRoomId = roomId;
+		this.gameState = null;
+
 		try {
 			const data = await this.request("room:join", { roomId });
-			this.currentRoomId = roomId;
 			return { success: true, roomId: data.roomId };
 		} catch (error) {
+			this.currentRoomId = null;
 			return { success: false, error: error instanceof Error ? error.message : "Join failed" };
 		}
 	}
