@@ -33,15 +33,17 @@ interface ShipPresetItem {
 export interface ShipPresetPanelProps {
 	room: SocketRoom | null;
 	networkManager: SocketNetworkManager;
-	cursorPosition: { x: number; y: number };
 }
 
 export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 	room,
 	networkManager,
-	cursorPosition,
 }) => {
 	const mapCursor = useUIStore((state) => state.mapCursor);
+	const cursorPosition = useMemo(() =>
+		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
+		[mapCursor]
+	);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterSize, setFilterSize] = useState<string>("all");

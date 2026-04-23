@@ -51,7 +51,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	}, [socket, assetSocket.handleResponse]);
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
-	const mapCursor = useUIStore((state) => state.mapCursor);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
 	const snapRadius = useUIStore((state) => state.snapRadius);
 	const snapToShips = useUIStore((state) => state.snapToShips);
@@ -95,10 +94,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
 	const turnCount = room?.state?.turnCount ?? 1;
 	const activeFaction = room?.state?.activeFaction ?? undefined;
-	const cursorPosition = useMemo(() =>
-		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
-		[mapCursor]
-	);
 
 	const tabs: TabConfig[] = useMemo(() => [
 		{
@@ -143,7 +138,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			id: "ship-preset",
 			label: "舰船预设",
 			icon: <Rocket size={14} />,
-			component: <ShipPresetPanel room={room} networkManager={networkManager} cursorPosition={cursorPosition} />,
+			component: <ShipPresetPanel room={room} networkManager={networkManager} />,
 			enabled: true,
 		},
 		{
@@ -167,7 +162,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ViewControlPanel />,
 			enabled: true,
 		},
-	], [selectedShip, isHost, room, networkManager, cursorPosition, phase, turnCount, activeFaction]);
+	], [selectedShip, isHost, room, networkManager, phase, turnCount, activeFaction]);
 
 	if (!room || !room.state || !networkManager.getCurrentRoomId()) {
 		return (
