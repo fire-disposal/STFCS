@@ -752,9 +752,12 @@ rpc.namespace("edit", {
             position: p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 },
             heading: p.token.runtime?.heading ?? 0,
             faction: p.faction ?? p.token.runtime?.faction ?? Faction.NEUTRAL,
-            ownerId: p.token.runtime?.ownerId ?? ctx.playerId,
             displayName,
           } as any,
+          metadata: {
+            ...p.token.metadata,
+            owner: p.token.metadata?.owner ?? ctx.playerId,
+          },
         };
         ctx.state.setToken(tokenId, createToken, ctx.editLogContext(p.reason ?? "创建舰船"));
         return { tokenId, displayName };

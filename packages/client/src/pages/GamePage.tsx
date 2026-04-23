@@ -111,7 +111,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ShieldPanel ship={selectedShip} canControl={true} />,
 			enabled: true,
 		},
-		{
+{
 			id: "reality-edit",
 			label: "现实修改",
 			icon: <Edit size={14} />,

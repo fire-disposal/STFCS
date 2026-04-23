@@ -26,7 +26,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 	const [fluxHard, setFluxHard] = useState(0);
 	const [overloaded, setOverloaded] = useState(false);
 	const [shieldActive, setShieldActive] = useState(false);
-	const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
+	const [selectedOwnerId, setSelectedOwnerId] = useState<string>("__none__");
 
 	const playerList = Object.values(players).filter((p) => p.connected);
 
@@ -38,7 +38,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 		setFluxHard(ship.runtime.fluxHard ?? 0);
 		setOverloaded(ship.runtime.overloaded ?? false);
 		setShieldActive(ship.runtime.shield?.active ?? false);
-		setSelectedOwnerId(ship.metadata?.owner ?? null);
+		setSelectedOwnerId(ship.metadata?.owner || "__none__");
 	}, [ship?.runtime, ship?.metadata?.owner]);
 
 	const handleReset = () => {
@@ -49,7 +49,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 		setFluxHard(ship.runtime.fluxHard ?? 0);
 		setOverloaded(ship.runtime.overloaded ?? false);
 		setShieldActive(ship.runtime.shield?.active ?? false);
-		setSelectedOwnerId(ship.metadata?.owner ?? null);
+		setSelectedOwnerId(ship.metadata?.owner || "__none__");
 		setEditMode(false);
 	};
 
@@ -66,8 +66,9 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 				await send("edit:token", { action: "modify", tokenId: ship.$id, path: "runtime/shield/active", value: shieldActive });
 			}
 
-			if (selectedOwnerId !== ship.metadata?.owner) {
-				await send("edit:token", { action: "modify", tokenId: ship.$id, path: "metadata/owner", value: selectedOwnerId ?? "" });
+			if (selectedOwnerId !== (ship.metadata?.owner || "__none__")) {
+				const newOwner = selectedOwnerId === "__none__" ? "" : selectedOwnerId;
+				await send("edit:token", { action: "modify", tokenId: ship.$id, path: "metadata/owner", value: newOwner });
 			}
 
 			onSubmit?.(ship.$id, {
@@ -99,12 +100,12 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 	};
 
 	const handleOwnerChange = (value: string) => {
-		setSelectedOwnerId(value || null);
+		setSelectedOwnerId(value);
 	};
 
-	const currentOwnerName = selectedOwnerId
-		? players[selectedOwnerId]?.nickname ?? "未知"
-		: "无所有者";
+	const currentOwnerName = selectedOwnerId === "__none__"
+		? "无所有者"
+		: players[selectedOwnerId]?.nickname ?? "未知";
 
 	if (!ship) {
 		return (
@@ -139,10 +140,10 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, player
 
 					<Flex className="panel-section" align="center" gap="2">
 						<Text size="1" className="panel-section__label">所有者</Text>
-						<Select.Root value={selectedOwnerId ?? ""} onValueChange={handleOwnerChange}>
+						<Select.Root value={selectedOwnerId} onValueChange={handleOwnerChange}>
 							<Select.Trigger style={{ width: 120 }} />
 							<Select.Content>
-								<Select.Item value="">无所有者</Select.Item>
+								<Select.Item value="__none__">无所有者</Select.Item>
 								{playerList.map((p) => (
 									<Select.Item key={p.sessionId} value={p.sessionId}>
 										{p.nickname}

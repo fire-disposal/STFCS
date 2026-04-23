@@ -83,7 +83,10 @@ export function createCombatToken(
 		$presetRef: inventoryToken.$presetRef,
 		spec,
 		runtime,
-		metadata: inventoryToken.metadata,
+		metadata: {
+			...inventoryToken.metadata,
+			...(ownerId !== undefined ? { owner: ownerId } : {}),
+		},
 	};
 }
 
