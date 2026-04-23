@@ -114,7 +114,16 @@ export function useWeaponArcRendering(
 		for (const [mountId, cache] of arcCacheRef.current) {
 			if (!currentMountIds.has(mountId)) {
 				layers.weaponArcs.removeChild(cache.root);
+				cache.root.destroy();
 				arcCacheRef.current.delete(mountId);
+			}
+		}
+
+		for (const [mountId, cache] of aimLineCacheRef.current) {
+			if (!currentMountIds.has(mountId)) {
+				layers.weaponArcs.removeChild(cache.graphics);
+				cache.graphics.destroy();
+				aimLineCacheRef.current.delete(mountId);
 			}
 		}
 
@@ -318,6 +327,8 @@ function drawAimLines(
 	const AIM_LINE_COLOR = 0xff6b35;
 
 	for (const target of weapon.validTargets) {
+		if (!target.inRange || !target.inArc) continue;
+
 		const targetShip = ships.find((s) => s.$id === target.targetId);
 		if (!targetShip?.runtime?.position) continue;
 
@@ -326,14 +337,11 @@ function drawAimLines(
 		const dx = targetPos.x - graphics.position.x;
 		const dy = targetPos.y - graphics.position.y;
 
-		const color = target.inRange && target.inArc ? AIM_LINE_COLOR : 0xff5d7e;
-		const alpha = target.inRange && target.inArc ? 0.8 : 0.3;
-
 		const localDx = dx * Math.cos(-graphics.rotation) - dy * Math.sin(-graphics.rotation);
 		const localDy = dx * Math.sin(-graphics.rotation) + dy * Math.cos(-graphics.rotation);
 
 		graphics.moveTo(0, 0);
 		graphics.lineTo(localDx, localDy);
-		graphics.stroke({ color, width: 2, alpha });
+		graphics.stroke({ color: AIM_LINE_COLOR, width: 2, alpha: 0.8 });
 	}
 }
