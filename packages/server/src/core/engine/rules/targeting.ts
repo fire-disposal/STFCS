@@ -110,7 +110,7 @@ export function calculateShipWeaponTargets(
 ): ShipTargetingResult {
 	const result: ShipTargetingResult = {
 		shipId: attacker.$id,
-		shipName: attacker.metadata.name || attacker.$id,
+		shipName: attacker.runtime?.displayName ?? attacker.metadata.name ?? attacker.$id.slice(-6),
 		canAttack: true,
 		weapons: [],
 	};
@@ -298,7 +298,7 @@ function calculateWeaponTargets(
 
 		const targetInfo: WeaponTargetInfo = {
 			targetId: target.$id,
-			targetName: target.metadata.name || target.$id,
+			targetName: target.runtime?.displayName ?? target.metadata.name ?? target.$id.slice(-6),
 			distance: Math.round(dist * 100) / 100,
 			inRange,
 			inArc,
