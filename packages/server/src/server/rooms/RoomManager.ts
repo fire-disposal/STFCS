@@ -107,13 +107,13 @@ export class RoomManager {
 	}
 
 	/** 玩家加入房间 */
-	joinRoom(roomId: string, connectionId: string, playerId: string, playerName: string): boolean {
+	joinRoom(roomId: string, connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
 		const room = this.getRoom(roomId);
 		if (!room) {
 			this.logger.warn("Room not found", { roomId, playerId });
 			return false;
 		}
-		return room.joinPlayer(connectionId, playerId, playerName);
+		return room.joinPlayer(connectionId, playerId, playerName, avatar);
 	}
 
 	/** 玩家离开房间 */

@@ -138,7 +138,10 @@ rpc.namespace("room", {
     const room = ctx.roomManager.getRoom(p.roomId);
     if (!room) throw err("房间不存在", "ROOM_NOT_FOUND");
 
-    const joinSuccess = ctx.roomManager.joinRoom(p.roomId, ctx.socket.id, ctx.playerId, ctx.playerName);
+    const playerInfo = await playerInfoService.findByPlayerId(ctx.playerId);
+    const avatar = playerInfo?.file.info.avatar ?? undefined;
+
+    const joinSuccess = ctx.roomManager.joinRoom(p.roomId, ctx.socket.id, ctx.playerId, ctx.playerName, avatar);
     if (!joinSuccess) throw err("无法加入房间（可能已在房间中或房间已满）", "JOIN_FAILED");
 
     ctx.socket.join(p.roomId);

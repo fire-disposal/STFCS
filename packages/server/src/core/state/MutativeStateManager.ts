@@ -322,7 +322,7 @@ export class MutativeStateManager {
 		})
 	}
 
-	addPlayer(playerId: string, player: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds?: string[] }): void {
+	addPlayer(playerId: string, player: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds?: string[]; avatar?: string }): void {
 		this.mutateAndBroadcast((draft) => {
 			draft.players[playerId] = player
 		})
@@ -334,7 +334,7 @@ export class MutativeStateManager {
 		})
 	}
 
-	updatePlayer(playerId: string, updates: Partial<{ sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds: string[] }>): void {
+	updatePlayer(playerId: string, updates: Partial<{ sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds: string[]; avatar: string }>): void {
 		this.mutateAndBroadcast((draft) => {
 			const player = draft.players[playerId]
 			if (player) {

@@ -85,20 +85,23 @@ export class Room {
 		return this.stateManager;
 	}
 
-	joinPlayer(connectionId: string, playerId: string, playerName: string): boolean {
+	joinPlayer(connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
 		if (!this.isActive) return false;
 		if (this.playerConnections.size >= this.options.maxPlayers) return false;
 		if (this.playerConnections.has(playerId)) return false;
 
 		this.emptiedAt = null;
 
-		this.stateManager.addPlayer(playerId, {
+		const playerData: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string } = {
 			sessionId: connectionId,
 			nickname: playerName,
 			role: this.options.creatorSessionId === playerId ? "HOST" : "PLAYER",
 			isReady: false,
 			connected: true,
-		});
+		};
+		if (avatar) playerData.avatar = avatar;
+
+		this.stateManager.addPlayer(playerId, playerData);
 
 		this.playerConnections.set(playerId, connectionId);
 
@@ -340,7 +343,7 @@ export class Room {
 		this.stateManager.updateTokenRuntime(tokenId, updates);
 	}
 
-	addPlayer(playerState: { id: string; sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean }): boolean {
+	addPlayer(playerState: { id: string; sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string }): boolean {
 		this.stateManager.addPlayer(playerState.id, playerState);
 		this.playerConnections.set(playerState.id, playerState.sessionId);
 		return true;

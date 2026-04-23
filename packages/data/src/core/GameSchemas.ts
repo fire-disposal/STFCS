@@ -522,6 +522,7 @@ export const RoomPlayerStateSchema = z.object({
 	isReady: z.boolean().default(false),
 	connected: z.boolean().default(true),
 	tokenIds: z.array(z.string()).optional(),
+	avatar: z.string().optional(),
 });
 export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 

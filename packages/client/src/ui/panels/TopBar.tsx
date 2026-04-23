@@ -12,6 +12,7 @@ import { Settings, LogOut, Save } from "lucide-react";
 import TurnBar from "./TurnBar";
 import { GamePhase, Faction } from "@vt/data";
 import type { RoomPlayerState } from "@vt/data";
+import { Avatar } from "@/ui/shared/Avatar";
 import "./top-bar.css";
 
 interface TopBarProps {
@@ -121,10 +122,6 @@ const PlayerAvatar: React.FC<{
 	isCurrentPlayer: boolean;
 	phase: GamePhase;
 }> = ({ player, isCurrentPlayer, phase }) => {
-	const initials = player.nickname.charAt(0).toUpperCase();
-	const colorIndex = player.nickname.charCodeAt(0) % 6;
-	const colors = ["#4a9eff", "#ff6f8f", "#9b59b6", "#f1c40f", "#2ecc71", "#e74c3c"];
-	
 	const getBorderColor = () => {
 		if (phase === "DEPLOYMENT" || phase === "PLAYER_ACTION") {
 			if (player.faction === "PLAYER" || !player.faction) {
@@ -139,9 +136,11 @@ const PlayerAvatar: React.FC<{
 
 	return (
 		<div className={`player-avatar player-avatar--${getBorderColor()}`} title={player.nickname}>
-			<div className="player-avatar__inner" style={{ color: isCurrentPlayer ? colors[colorIndex] : "#8ba4c7" }}>
-				{initials}
-			</div>
+			<Avatar
+				src={player.avatar}
+				size={28}
+				userName={player.nickname}
+			/>
 			{(phase === "DEPLOYMENT" || phase === "PLAYER_ACTION") && player.faction !== "ENEMY" && (
 				<div className={`player-avatar__dot ${player.isReady ? "" : "player-avatar__dot--not-ready"}`} />
 			)}
