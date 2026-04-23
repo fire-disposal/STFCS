@@ -68,66 +68,6 @@ function shortId(id: string): string {
     return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
 }
 
-async function convertToPng(sourceFile: File, applyKeyColor?: { color: string; tolerance: number }): Promise<File> {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result ?? ""));
-        reader.onerror = () => reject(new Error("文件读取失败"));
-        reader.readAsDataURL(sourceFile);
-    });
-
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = () => reject(new Error("图片解码失败"));
-        el.src = dataUrl;
-    });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas 不可用");
-
-    ctx.drawImage(img, 0, 0);
-
-    // 抠图条件：tolerance > 0 即应用抠图
-    if (applyKeyColor && applyKeyColor.tolerance > 0) {
-        const imageData = ctx.getImageData(0, 0, img.width, img.height);
-        const { data } = imageData;
-
-        const hex = applyKeyColor.color.replace("#", "");
-        const targetR = Number.parseInt(hex.slice(0, 2), 16);
-        const targetG = Number.parseInt(hex.slice(2, 4), 16);
-        const targetB = Number.parseInt(hex.slice(4, 6), 16);
-
-        for (let i = 0; i < data.length; i += 4) {
-            const dr = Math.abs(data[i] - targetR);
-            const dg = Math.abs(data[i + 1] - targetG);
-            const db = Math.abs(data[i + 2] - targetB);
-            if (dr <= applyKeyColor.tolerance && dg <= applyKeyColor.tolerance && db <= applyKeyColor.tolerance) {
-                data[i + 3] = 0;
-            }
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-    }
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-            if (!b) {
-                reject(new Error("无法导出图像"));
-                return;
-            }
-            resolve(b);
-        }, "image/png");
-    });
-
-    const baseName = sourceFile.name.replace(/\.[^.]+$/, "");
-    const suffix = applyKeyColor && applyKeyColor.tolerance > 0 ? "-colorkey" : "";
-    return new File([blob], `${baseName}${suffix}.png`, { type: "image/png" });
-}
-
 async function applyColorKeyToDataUrl(sourceDataUrl: string, applyKeyColor?: { color: string; tolerance: number }): Promise<string> {
     if (!applyKeyColor || applyKeyColor.tolerance <= 0) return sourceDataUrl;
 
@@ -216,6 +156,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [weaponKeyTolerance, setWeaponKeyTolerance] = useState(0);
     const [shipColorKeyPreviewUrl, setShipColorKeyPreviewUrl] = useState<string | null>(null);
     const [weaponColorKeyPreviewUrl, setWeaponColorKeyPreviewUrl] = useState<string | null>(null);
+    const [pendingShipTextureFile, setPendingShipTextureFile] = useState<File | null>(null);
+    const [pendingWeaponTextureFile, setPendingWeaponTextureFile] = useState<File | null>(null);
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -532,29 +474,75 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [networkManager, reloadData]);
 
-    const uploadShipTexture = useCallback(async (file: File, useColorKey: boolean) => {
+    const uploadShipTextureFromPreview = useCallback(async () => {
+        if (!shipColorKeyPreviewUrl) return;
         try {
-            const uploadFile = await convertToPng(file, useColorKey ? { color: keyColor, tolerance: keyTolerance } : undefined);
-            const assetId = await assetSocket.upload("ship_texture", uploadFile);
+            // 直接上传预览版本（已抠图）
+            const base64Data = shipColorKeyPreviewUrl.split(',')[1];
+            const mimeType = shipColorKeyPreviewUrl.split(',')[0].match(/data:(.*?);/)?.[1] ?? 'image/png';
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            const file = new File([blob], `ship-texture-${Date.now()}.png`, { type: 'image/png' });
+            
+            const assetId = await assetSocket.upload("ship_texture", file);
             notify.success("上传成功");
             updateShipTexture({ assetId });
+            setPendingShipTextureFile(null);
             await loadTexturePreview(assetId);
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, keyColor, keyTolerance, updateShipTexture, loadTexturePreview]);
+    }, [assetSocket, shipColorKeyPreviewUrl, updateShipTexture, loadTexturePreview]);
 
-    const uploadWeaponTexture = useCallback(async (file: File, useColorKey: boolean) => {
+    const uploadWeaponTextureFromPreview = useCallback(async () => {
+        if (!weaponColorKeyPreviewUrl) return;
         try {
-            const uploadFile = await convertToPng(file, useColorKey ? { color: weaponKeyColor, tolerance: weaponKeyTolerance } : undefined);
-            const assetId = await assetSocket.upload("weapon_texture", uploadFile);
+            // 直接上传预览版本（已抠图）
+            const base64Data = weaponColorKeyPreviewUrl.split(',')[1];
+            const mimeType = weaponColorKeyPreviewUrl.split(',')[0].match(/data:(.*?);/)?.[1] ?? 'image/png';
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            const file = new File([blob], `weapon-texture-${Date.now()}.png`, { type: 'image/png' });
+            
+            const assetId = await assetSocket.upload("weapon_texture", file);
             notify.success("上传成功");
             updateWeaponTexture({ assetId });
+            setPendingWeaponTextureFile(null);
             await loadWeaponTexturePreview(assetId);
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "上传失败");
         }
-    }, [assetSocket, weaponKeyColor, weaponKeyTolerance, updateWeaponTexture, loadWeaponTexturePreview]);
+    }, [assetSocket, weaponColorKeyPreviewUrl, updateWeaponTexture, loadWeaponTexturePreview]);
+
+    const loadLocalTexturePreview = useCallback(async (file: File) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ""));
+            reader.onerror = () => reject(new Error("文件读取失败"));
+            reader.readAsDataURL(file);
+        });
+        setTexturePreviewUrl(dataUrl);
+    }, []);
+
+    const loadLocalWeaponTexturePreview = useCallback(async (file: File) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ""));
+            reader.onerror = () => reject(new Error("文件读取失败"));
+            reader.readAsDataURL(file);
+        });
+        setWeaponTexturePreviewUrl(dataUrl);
+    }, []);
 
     useEffect(() => {
         let disposed = false;
@@ -715,13 +703,19 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         updateShipTexture({ assetId: undefined });
                                                         setTexturePreviewUrl(null);
                                                         setShipColorKeyPreviewUrl(null);
+                                                        setPendingShipTextureFile(null);
                                                     }} data-magnetic>
                                                         <Trash2 size={12} /> 删除
                                                     </Button>
                                                 )}
                                                 <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
-                                                    <Upload size={12} /> 上传图片
+                                                    <Upload size={12} /> 选择图片
                                                 </Button>
+                                                {pendingShipTextureFile && (
+                                                    <Button size="1" variant="solid" color="green" onClick={() => void uploadShipTextureFromPreview()} data-magnetic>
+                                                        <Save size={12} /> 确认上传
+                                                    </Button>
+                                                )}
                                             </Flex>
                                         </Flex>
 
@@ -802,7 +796,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                void uploadShipTexture(file, keyTolerance > 0);
+                                                setPendingShipTextureFile(file);
+                                                void loadLocalTexturePreview(file);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
@@ -1483,13 +1478,19 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         updateWeaponTexture({ assetId: undefined });
                                                         setWeaponTexturePreviewUrl(null);
                                                         setWeaponColorKeyPreviewUrl(null);
+                                                        setPendingWeaponTextureFile(null);
                                                     }} data-magnetic>
                                                         <Trash2 size={12} /> 删除
                                                     </Button>
                                                 )}
                                                 <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
-                                                    <Upload size={12} /> 上传图片
+                                                    <Upload size={12} /> 选择图片
                                                 </Button>
+                                                {pendingWeaponTextureFile && (
+                                                    <Button size="1" variant="solid" color="green" onClick={() => void uploadWeaponTextureFromPreview()} data-magnetic>
+                                                        <Save size={12} /> 确认上传
+                                                    </Button>
+                                                )}
                                             </Flex>
                                         </Flex>
 
@@ -1584,7 +1585,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                void uploadWeaponTexture(file, weaponKeyTolerance > 0);
+                                                setPendingWeaponTextureFile(file);
+                                                void loadLocalWeaponTexturePreview(file);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
