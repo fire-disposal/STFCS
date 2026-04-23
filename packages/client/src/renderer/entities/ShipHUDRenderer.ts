@@ -27,11 +27,11 @@
 import type { CombatToken } from "@vt/data";
 import { Text, TextStyle, Container } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
+import { useUIStore } from "@/state/stores/uiStore";
 
 const HP_BAR_OFFSET_Y = -40;
 const LABEL_OFFSET_Y = 25;
 const DEFAULT_HULL_MAX = 100;
-const DEFAULT_HP_PER_BAR = 20;
 const MAX_BARS_PER_SIDE = 15;
 
 const labelStyle = new TextStyle({
@@ -53,11 +53,6 @@ const getHpColor = (hpPercent: number): number => {
 	if (hpPercent >= 0.3) return 0xffce66;
 	return 0xff5d7e;
 };
-
-interface HpBarConfig {
-	hpPerBar: number;
-	maxBarsPerSide: number;
-}
 
 interface ShipHUDCache {
 	hpBarContainer: Container;
@@ -86,18 +81,10 @@ export class ShipHUDManager {
 	private hpBarLayer: Container;
 	private labelLayer: Container;
 	private lastCamera: CameraSnapshot | null = null;
-	private hpBarConfig: HpBarConfig;
 
-	constructor(
-		hudLayers: { shipBars: Container; shipNames: Container },
-		hpBarConfig?: Partial<HpBarConfig>
-	) {
+	constructor(hudLayers: { shipBars: Container; shipNames: Container }) {
 		this.hpBarLayer = hudLayers.shipBars;
 		this.labelLayer = hudLayers.shipNames;
-		this.hpBarConfig = {
-			hpPerBar: hpBarConfig?.hpPerBar ?? DEFAULT_HP_PER_BAR,
-			maxBarsPerSide: hpBarConfig?.maxBarsPerSide ?? MAX_BARS_PER_SIDE,
-		};
 	}
 
 	update(
@@ -105,6 +92,7 @@ export class ShipHUDManager {
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
 		selectedShipId: string | null = null,
+		hpPerBar: number = 20,
 		defaultHullMax: number = DEFAULT_HULL_MAX
 	): void {
 		const currentIds = new Set(ships.map((s) => s.$id));
@@ -125,9 +113,9 @@ export class ShipHUDManager {
 			const isSelected = ship.$id === selectedShipId;
 			const cached = this.cache.get(ship.$id);
 			if (!cached) {
-				this.createShipHUD(ship, isSelected, camera, canvasSize, defaultHullMax);
+				this.createShipHUD(ship, isSelected, camera, canvasSize, hpPerBar, defaultHullMax);
 			} else {
-				this.updateShipHUD(ship, isSelected, cached, camera, canvasSize, defaultHullMax);
+				this.updateShipHUD(ship, isSelected, cached, camera, canvasSize, hpPerBar, defaultHullMax);
 			}
 		}
 
@@ -139,6 +127,7 @@ export class ShipHUDManager {
 		isSelected: boolean,
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
+		hpPerBar: number,
 		defaultHullMax: number
 	): void {
 		if (!ship.runtime?.position) return;
@@ -153,7 +142,7 @@ export class ShipHUDManager {
 		const hullMax = ship.spec.maxHitPoints ?? defaultHullMax;
 		const hpPercent = ship.runtime.hull / hullMax;
 
-		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected);
+		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
 		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 
 		const label = new Text({
@@ -188,6 +177,7 @@ export class ShipHUDManager {
 		cached: ShipHUDCache,
 		camera: CameraSnapshot,
 		canvasSize: { width: number; height: number },
+		hpPerBar: number,
 		defaultHullMax: number
 	): void {
 		if (!ship.runtime?.position) return;
@@ -221,7 +211,7 @@ export class ShipHUDManager {
 		const selectedChanged = isSelected !== last.selected;
 
 		if (hpChanged || selectedChanged) {
-			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected);
+			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
 		}
 
 		const newName = ship.metadata?.name || ship.$id;
@@ -253,17 +243,16 @@ export class ShipHUDManager {
 		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
 	}
 
-	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): Container {
+	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean, hpPerBar: number): Container {
 		const container = new Container();
-		this.updateHpBarContainer(container, currentHp, maxHp, hpPercent, isSelected);
+		this.updateHpBarContainer(container, currentHp, maxHp, hpPercent, isSelected, hpPerBar);
 		return container;
 	}
 
-	private updateHpBarContainer(container: Container, currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): void {
+	private updateHpBarContainer(container: Container, currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean, hpPerBar: number): void {
 		container.removeChildren().forEach((child) => child.destroy());
 
-		const { hpPerBar, maxBarsPerSide } = this.hpBarConfig;
-		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar / 2), maxBarsPerSide);
+		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar / 2), MAX_BARS_PER_SIDE);
 		const filledBars = Math.ceil(hpPercent * totalBars);
 		const emptyBars = totalBars - filledBars;
 
@@ -379,6 +368,7 @@ export function useShipHUDRendering(
 	options: ShipHUDRenderOptions = {}
 ) {
 	const managerRef = useRef<ShipHUDManager | null>(null);
+	const hpPerBar = useUIStore((state) => state.hpPerBar);
 	const defaultHullMax = options.hullMax ?? DEFAULT_HULL_MAX;
 
 	useEffect(() => {
@@ -401,6 +391,6 @@ export function useShipHUDRendering(
 		layers.shipBars.visible = options.showHpBars ?? true;
 		layers.shipNames.visible = options.showLabels ?? true;
 
-		managerRef.current.update(ships, camera, canvasSize, selectedShipId, defaultHullMax);
-	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax]);
+		managerRef.current.update(ships, camera, canvasSize, selectedShipId, hpPerBar, defaultHullMax);
+	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax, hpPerBar]);
 }

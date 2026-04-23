@@ -10,7 +10,7 @@ import {
 	Text,
 	Button,
 	Dialog,
-	IconButton,
+	TextField,
 } from "@radix-ui/themes";
 import { Crown, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
@@ -44,14 +44,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const mapCursor = useUIStore((state) => state.mapCursor);
-	const showGrid = useUIStore((state) => state.showGrid);
-	const showBackground = useUIStore((state) => state.showBackground);
-	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
-	const showMovementRange = useUIStore((state) => state.showMovementRange);
-	const toggleGrid = useUIStore((state) => state.toggleGrid);
-	const toggleBackground = useUIStore((state) => state.toggleBackground);
-	const toggleWeaponArcs = useUIStore((state) => state.toggleWeaponArcs);
-	const toggleMovementRange = useUIStore((state) => state.toggleMovementRange);
+	const hpPerBar = useUIStore((state) => state.hpPerBar);
+	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
 
 	const tokens = useTokens(room);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
@@ -240,46 +234,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						</Flex>
 					</Dialog.Title>
 					<Flex direction="column" gap="3">
-						<Flex align="center" justify="between">
-							<Text size="2">显示网格</Text>
-							<IconButton
-								variant={showGrid ? "solid" : "soft"}
-								color={showGrid ? "blue" : "gray"}
-								onClick={toggleGrid}
-							>
-								{showGrid ? <CheckCircle size={14} /> : <XCircle size={14} />}
-							</IconButton>
+<Flex align="center" justify="between">
+							<Text size="2">血条单位HP</Text>
+							<TextField.Root
+								size="1"
+								value={hpPerBar.toString()}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHpPerBar(Number(e.target.value) || 20)}
+								style={{ width: 60 }}
+							/>
 						</Flex>
-						<Flex align="center" justify="between">
-							<Text size="2">显示背景</Text>
-							<IconButton
-								variant={showBackground ? "solid" : "soft"}
-								color={showBackground ? "blue" : "gray"}
-								onClick={toggleBackground}
-							>
-								{showBackground ? <CheckCircle size={14} /> : <XCircle size={14} />}
-							</IconButton>
-						</Flex>
-						<Flex align="center" justify="between">
-							<Text size="2">显示武器弧</Text>
-							<IconButton
-								variant={showWeaponArcs ? "solid" : "soft"}
-								color={showWeaponArcs ? "blue" : "gray"}
-								onClick={toggleWeaponArcs}
-							>
-								{showWeaponArcs ? <CheckCircle size={14} /> : <XCircle size={14} />}
-							</IconButton>
-						</Flex>
-						<Flex align="center" justify="between">
-							<Text size="2">显示移动范围</Text>
-							<IconButton
-								variant={showMovementRange ? "solid" : "soft"}
-								color={showMovementRange ? "blue" : "gray"}
-								onClick={toggleMovementRange}
-							>
-								{showMovementRange ? <CheckCircle size={14} /> : <XCircle size={14} />}
-							</IconButton>
-						</Flex>
+						<Text size="1" color="gray">每个 | 符号代表的HP数量</Text>
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>

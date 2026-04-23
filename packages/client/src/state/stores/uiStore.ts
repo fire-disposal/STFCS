@@ -75,6 +75,7 @@ interface UIState {
 	showWeaponTextures: boolean;      // 武器贴图显示
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
+	hpPerBar: number;                  // 血条每个|代表的HP数量
 
 	// 地图游标状态 (世界坐标，真实朝向)
 	mapCursor: { x: number; y: number; r: number } | null;
@@ -134,6 +135,9 @@ interface UIActions {
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
 
+	// 血条配置
+	setHpPerBar: (value: number) => void;
+
 	// 游标相关
 	setMapCursor: (x: number, y: number, r: number) => void;
 	clearMapCursor: () => void;
@@ -189,6 +193,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showWeaponTextures: true,         // 默认显示武器贴图
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
+	hpPerBar: 20,                    // 默认每个|代表20HP
 
 	// 地图游标初始状态
 	mapCursor: null,
@@ -256,6 +261,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
+	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(100, value)) }),
 
 	// 游标设置
 	setMapCursor: (x: number, y: number, r: number) =>

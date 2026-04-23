@@ -40,6 +40,7 @@ interface WeaponArcCache {
 
 interface AimLineCache {
 	graphics: Graphics;
+	arrow: Graphics;
 	shipId: string;
 	mountId: string;
 }
@@ -98,7 +99,9 @@ export function useWeaponArcRendering(
 
 			for (const [, cache] of aimLineCacheRef.current) {
 				layers.weaponArcs.removeChild(cache.graphics);
+				layers.weaponArcs.removeChild(cache.arrow);
 				cache.graphics.destroy();
+				cache.arrow.destroy();
 			}
 			aimLineCacheRef.current.clear();
 
@@ -124,7 +127,9 @@ export function useWeaponArcRendering(
 		for (const [key, cache] of aimLineCacheRef.current) {
 			if (cache.shipId !== selectedShip.$id) {
 				layers.weaponArcs.removeChild(cache.graphics);
+				layers.weaponArcs.removeChild(cache.arrow);
 				cache.graphics.destroy();
+				cache.arrow.destroy();
 				aimLineCacheRef.current.delete(key);
 			}
 		}
@@ -161,16 +166,19 @@ export function useWeaponArcRendering(
 				let aimCached = aimLineCacheRef.current.get(cacheKey);
 				if (!aimCached) {
 					const graphics = new Graphics();
+					const arrow = new Graphics();
 					layers.weaponArcs.addChild(graphics);
-					aimCached = { graphics, shipId: selectedShip.$id, mountId: mount.id };
+					layers.weaponArcs.addChild(arrow);
+					aimCached = { graphics, arrow, shipId: selectedShip.$id, mountId: mount.id };
 					aimLineCacheRef.current.set(cacheKey, aimCached);
 				}
-				drawAimLinesWorld(aimCached.graphics, worldX, worldY, validTargets, ships);
+				drawAimLinesWorld(aimCached.graphics, aimCached.arrow, worldX, worldY, validTargets, ships);
 			} else {
 				const cacheKey = `${selectedShip.$id}:${mount.id}`;
 				const aimCached = aimLineCacheRef.current.get(cacheKey);
 				if (aimCached) {
 					aimCached.graphics.clear();
+					aimCached.arrow.clear();
 				}
 			}
 		}
@@ -344,14 +352,6 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	graphics.closePath();
 	graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
 
-	graphics.moveTo(0, 0);
-	graphics.lineTo(startX * range, startY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
-
-	graphics.moveTo(0, 0);
-	graphics.lineTo(endX * range, endY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
-
 	graphics.arc(0, 0, range, startAngle, endAngle);
 	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.6 });
 
@@ -363,12 +363,14 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 
 function drawAimLinesWorld(
 	graphics: Graphics,
+	arrowGraphics: Graphics,
 	mountWorldX: number,
 	mountWorldY: number,
 	validTargets: WeaponTargetInfo[],
 	ships: CombatToken[]
 ): void {
 	graphics.clear();
+	arrowGraphics.clear();
 
 	if (validTargets.length === 0) return;
 
@@ -378,8 +380,27 @@ function drawAimLinesWorld(
 
 		const targetPos = targetShip.runtime.position;
 
+		const dx = targetPos.x - mountWorldX;
+		const dy = targetPos.y - mountWorldY;
+		const midX = mountWorldX + dx * 0.5;
+		const midY = mountWorldY + dy * 0.5;
+		const angle = Math.atan2(dy, dx);
+
 		graphics.moveTo(mountWorldX, mountWorldY);
 		graphics.lineTo(targetPos.x, targetPos.y);
 		graphics.stroke({ color: AIM_LINE_COLOR, width: 2, alpha: 0.8 });
+
+		const arrowSize = 8;
+		arrowGraphics.moveTo(midX, midY);
+		arrowGraphics.lineTo(
+			midX - arrowSize * Math.cos(angle - Math.PI / 6),
+			midY - arrowSize * Math.sin(angle - Math.PI / 6)
+		);
+		arrowGraphics.moveTo(midX, midY);
+		arrowGraphics.lineTo(
+			midX - arrowSize * Math.cos(angle + Math.PI / 6),
+			midY - arrowSize * Math.sin(angle + Math.PI / 6)
+		);
+		arrowGraphics.stroke({ color: AIM_LINE_COLOR, width: 2, alpha: 0.9 });
 	}
 }
