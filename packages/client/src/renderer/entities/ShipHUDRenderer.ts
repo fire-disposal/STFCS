@@ -239,7 +239,7 @@ export class ShipHUDManager {
 	}
 
 	private formatLabel(ship: ShipViewModel): string {
-		return ship.metadata?.name || ship.id.slice(-6);
+		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.id.slice(-6);
 	}
 
 	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean): Container {

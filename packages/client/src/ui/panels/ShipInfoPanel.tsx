@@ -1,22 +1,29 @@
 /**
  * 舰船信息面板 - 横向布局
+ * 支持战斗实例重命名
  */
 
-import React from "react";
-import { Anchor, Shield, Zap, Gauge, AlertTriangle } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { Anchor, Shield, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
 import type { ShipViewModel } from "@/renderer";
 import { Faction } from "@vt/data";
-import { Badge, Box, Flex, Progress, Text } from "@radix-ui/themes";
+import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
+import type { SocketRoom } from "@/network";
+import { notify } from "@/ui/shared/Notification";
 import "./battle-panel.css";
 
 export interface ShipInfoPanelProps {
 	ship: ShipViewModel | null;
+	room?: SocketRoom | null;
 }
 
-export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship }) => {
+export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
+	const [isEditingName, setIsEditingName] = useState(false);
+	const [editingName, setEditingName] = useState("");
+
 	const hasShip = ship && ship.runtime;
 
-	const name = hasShip ? (ship.metadata?.name ?? ship.id.slice(-6)) : "未选择";
+	const displayName = hasShip ? (ship.runtime.displayName ?? ship.metadata?.name ?? ship.id.slice(-6)) : "未选择";
 	const faction = hasShip ? ship.runtime.faction : null;
 	const hull = hasShip ? ship.runtime.hull : 0;
 	const hullMax = hasShip ? (ship.spec.maxHitPoints ?? 100) : 100;
@@ -37,15 +44,69 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship }) => {
 	const overloaded = hasShip ? ship.runtime.overloaded : false;
 	const destroyed = hasShip ? ship.runtime.destroyed : false;
 
+	const handleStartEdit = useCallback(() => {
+		if (!hasShip) return;
+		setEditingName(displayName);
+		setIsEditingName(true);
+	}, [hasShip, displayName]);
+
+	const handleCancelEdit = useCallback(() => {
+		setIsEditingName(false);
+		setEditingName("");
+	}, []);
+
+	const handleSaveName = useCallback(async () => {
+		if (!hasShip || !room || !editingName.trim()) return;
+		
+		try {
+			await room.send("edit:token", {
+				action: "rename",
+				tokenId: ship.id,
+				displayName: editingName.trim(),
+			});
+			notify.success(`已更名为 ${editingName.trim()}`);
+			setIsEditingName(false);
+			setEditingName("");
+		} catch (error) {
+			notify.error(error instanceof Error ? error.message : "更名失败");
+		}
+	}, [hasShip, room, ship?.id, editingName]);
+
 	return (
 		<Flex className="panel-row" gap="3">
 			<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 100 }}>
 				<Text size="2">
 					{faction === Faction.PLAYER ? "🔵" : faction === Faction.NEUTRAL ? "⚪" : faction === Faction.ENEMY ? "🔴" : "⚪"}
 				</Text>
-				<Text size="2" weight="bold" style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>
-					{hasShip ? name : "请选择舰船"}
-				</Text>
+				
+				{isEditingName ? (
+					<Flex align="center" gap="1">
+						<TextField.Root
+							size="1"
+							value={editingName}
+							onChange={(e) => setEditingName(e.target.value)}
+							style={{ width: 100 }}
+						/>
+						<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}>
+							<Check size={12} />
+						</IconButton>
+						<IconButton size="1" variant="ghost" color="red" onClick={handleCancelEdit}>
+							<X size={12} />
+						</IconButton>
+					</Flex>
+				) : (
+					<Flex align="center" gap="1">
+						<Text size="2" weight="bold" style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>
+							{hasShip ? displayName : "请选择舰船"}
+						</Text>
+						{hasShip && room && (
+							<IconButton size="1" variant="ghost" onClick={handleStartEdit}>
+								<Edit2 size={10} />
+							</IconButton>
+						)}
+					</Flex>
+				)}
+				
 				{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
 				{shieldActive && <Badge color="blue" size="1">护盾</Badge>}
 				{destroyed && <Badge color="gray" size="1">损毁</Badge>}

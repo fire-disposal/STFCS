@@ -93,7 +93,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			id: "ship-info",
 			label: "舰船信息",
 			icon: <Info size={14} />,
-			component: <ShipInfoPanel ship={selectedShip} />,
+			component: <ShipInfoPanel ship={selectedShip} room={room} />,
 			enabled: true,
 		},
 		{

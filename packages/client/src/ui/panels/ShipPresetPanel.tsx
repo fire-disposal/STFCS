@@ -112,13 +112,14 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 		};
 
 		try {
-			await room.send("edit:token", {
+			const result = await room.send("edit:token", {
 				action: "create",
 				token: combatToken,
 				faction: FactionEnum.PLAYER,
 				position: cursorPosition,
 			});
-			notify.success(`已部署 ${selectedPreset.name} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
+			const displayName = (result as { tokenId: string; displayName?: string }).displayName ?? selectedPreset.name;
+			notify.success(`已部署 ${displayName} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "部署失败");
 		}
@@ -164,8 +165,8 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 			<Box className="panel-divider" />
 
 			<Box style={{ flex: 1, minWidth: 0, maxWidth: 400 }}>
-				<ScrollArea style={{ height: 58 }}>
-					<Flex gap="2" style={{ paddingRight: 8 }}>
+				<ScrollArea style={{ height: 120 }}>
+					<Flex gap="2" style={{ paddingRight: 8, flexWrap: "wrap" }}>
 						{filteredPresets.length === 0 ? (
 							<Text size="1" color="gray">暂无预设舰船</Text>
 						) : (
