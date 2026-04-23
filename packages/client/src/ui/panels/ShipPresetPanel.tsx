@@ -92,27 +92,38 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 		}
 
 		const cursorHeading = mapCursor?.r ?? 0;
+		const spec = selectedPreset.token.spec;
+
+		const runtimeBase = {
+			position: cursorPosition,
+			heading: cursorHeading,
+			hull: spec.maxHitPoints,
+			armor: Array(6).fill(spec.armorMaxPerQuadrant),
+			fluxSoft: 0,
+			fluxHard: 0,
+			overloaded: false,
+			overloadTime: 1,
+			destroyed: false,
+			faction: FactionEnum.PLAYER,
+			venting: false,
+			weapons: (spec.mounts ?? []).map((m) => ({
+				mountId: m.id,
+				state: "READY",
+				cooldownRemaining: 0,
+			})),
+		};
+
+		if (spec.shield) {
+			(runtimeBase as any).shield = {
+				active: false,
+				value: spec.shield.radius,
+				direction: 0,
+			};
+		}
 
 		const combatToken: CombatToken = {
 			...selectedPreset.token,
-			runtime: {
-				position: cursorPosition,
-				heading: cursorHeading,
-				hull: selectedPreset.token.spec.maxHitPoints,
-				armor: Array(6).fill(selectedPreset.token.spec.armorMaxPerQuadrant),
-				fluxSoft: 0,
-				fluxHard: 0,
-				overloaded: false,
-				overloadTime: 1,
-				destroyed: false,
-				faction: FactionEnum.PLAYER,
-				venting: false,
-				weapons: (selectedPreset.token.spec.mounts ?? []).map((m) => ({
-					mountId: m.id,
-					state: "READY",
-					cooldownRemaining: 0,
-				})),
-			},
+			runtime: runtimeBase as any,
 		};
 
 		try {

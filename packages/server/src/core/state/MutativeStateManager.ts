@@ -245,6 +245,14 @@ export class MutativeStateManager {
 
 	setToken(tokenId: string, token: CombatToken, logContext?: EditLogContext): void {
 		const mutator = (draft: Draft<GameRoomState>) => {
+			if (token.spec?.shield && !token.runtime?.shield) {
+				token.runtime = token.runtime || {} as any
+				;(token.runtime as any).shield = {
+					active: false,
+					value: token.spec.shield.radius,
+					direction: 0,
+				}
+			}
 			draft.tokens[tokenId] = token
 		}
 		

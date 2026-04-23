@@ -345,7 +345,7 @@ export function validateShieldToggle(ship: any, newActive: boolean): { valid: bo
 		return { valid: false, error: "Ship is overloaded" };
 	}
 
-	if (!spec.shield) {
+	if (!spec.shield || !runtime?.shield) {
 		return { valid: false, error: "Ship has no shield" };
 	}
 

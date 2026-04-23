@@ -104,7 +104,6 @@ const PlayerAvatars: React.FC<{
 							<PlayerAvatar
 								key={player.sessionId}
 								player={player}
-								isCurrentPlayer={player.sessionId === currentPlayerId}
 								phase={phase}
 							/>
 						))}
@@ -117,9 +116,8 @@ const PlayerAvatars: React.FC<{
 
 const PlayerAvatar: React.FC<{
 	player: RoomPlayerState;
-	isCurrentPlayer: boolean;
 	phase: GamePhase;
-}> = ({ player, isCurrentPlayer, phase }) => {
+}> = ({ player, phase }) => {
 	const getBorderColor = () => {
 		if (phase === "DEPLOYMENT" || phase === "PLAYER_ACTION") {
 			if (player.faction === "PLAYER" || !player.faction) {

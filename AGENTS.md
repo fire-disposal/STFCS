@@ -45,6 +45,8 @@
 
 - Radix Select.Item 不接受空字符串 value，使用 `"__none__"` 作为特殊值
 - 舰船创建时 `metadata.owner` 应自动设置为创建者 playerId
+- 护盾初始化：舰船有 shield spec 时必须初始化 runtime.shield（包含 active, value, direction）
+- 所有舰船创建路径（createCombatToken, edit:token create, 机库部署）都需要初始化护盾
 
 ---
 
@@ -89,20 +91,35 @@
 4. **Avatar 组件存在**：`/packages/client/src/ui/shared/Avatar.tsx` 支持 assetId 和 base64 加载
 5. **PixiJS v8 无 beginHole/endHole**：需要用环形扇形绘制实现透明内圈
 6. **贴图加载超时**：GamePage 需要绑定 socket response 监听器
+7. **护盾初始化路径**：createCombatToken、edit:token create、机库部署三处都需要初始化护盾
+8. **setToken 迁移**：MutativeStateManager.setToken 会自动为有护盾规格但无运行时护盾的舰船初始化护盾
 
 ---
 
 ## Relevant files / directories
 
+**护盾系统：**
+- `/packages/server/src/core/engine/modules/shield.ts:190-216,336-362` - toggleShield, validateShieldToggle
+- `/packages/server/src/server/socketio/handlers.ts:517-546,750-776` - shield_toggle 处理, edit:token create
+- `/packages/server/src/core/state/Token.ts:48-89` - createCombatToken（护盾初始化）
+- `/packages/server/src/core/state/MutativeStateManager.ts:246-261` - setToken（护盾迁移）
+- `/packages/client/src/ui/panels/ShieldPanel.tsx` - 护盾面板
+- `/packages/client/src/ui/panels/ShipPresetPanel.tsx:88-141` - 机库部署（handleDeploy）
+- `/packages/data/src/core/GameSchemas.ts:196-202,427-446` - ShieldSpecSchema, TokenRuntimeSchema
+
+**回合系统：**
+- `/packages/client/src/ui/panels/TurnBar.tsx` - 准备按钮全程显示
+- `/packages/client/src/ui/panels/DMControlPanel.tsx` - 简化（移除开始/推进按钮）
+- `/packages/server/src/core/state/MutativeStateManager.ts:346-370` - changePhase, resetAllPlayersReady
+- `/packages/server/src/server/socketio/handlers.ts:869-902` - force_end_turn
+
+**舰船信息：**
+- `/packages/client/src/ui/panels/ShipInfoPanel.tsx` - 两行布局 + 护甲象限
+
 **坐标系统：**
 - `/packages/server/src/core/engine/geometry/angle.ts` - angleBetween 函数
 - `/packages/client/src/utils/math.ts` - 前端角度计算（待检查）
 - `/packages/client/src/utils/coordinateSystem.ts` - 坐标系统工具
-
-**回合系统：**
-- `/packages/data/src/core/GameSchemas.ts:538-551` - GameRoomStateSchema
-- `/packages/server/src/server/socketio/handlers.ts:869-902` - force_end_turn
-- `/packages/server/src/core/state/MutativeStateManager.ts:346-359` - changePhase
 
 **武器渲染：**
 - `/packages/client/src/renderer/entities/WeaponArcRenderer.ts` - 武器弧和瞄准线
@@ -123,3 +140,4 @@
 1. 检查前端 `utils/math.ts` 的 angleBetween 是否需要同步修复
 2. 讨论并统一坐标系统反转策略
 3. 添加 targeting.test.ts 的射界测试用例
+4. 修复 movement.test.ts 的测试数据结构（ship.spec vs shipJson.ship）

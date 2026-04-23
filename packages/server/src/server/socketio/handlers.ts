@@ -747,6 +747,10 @@ rpc.namespace("edit", {
         }).length;
         const displayName = `${baseName} ${sameTypeCount + 1}`;
 
+        const spec = p.token.spec;
+        const shieldSpec = spec?.shield;
+        const hasShield = Boolean(shieldSpec);
+
         const createToken: CombatToken = {
           ...p.token,
           $id: tokenId,
@@ -756,6 +760,13 @@ rpc.namespace("edit", {
             heading: p.token.runtime?.heading ?? 0,
             faction: p.faction ?? p.token.runtime?.faction ?? Faction.NEUTRAL,
             displayName,
+            ...(hasShield && !p.token.runtime?.shield ? {
+              shield: {
+                active: false,
+                value: shieldSpec!.radius,
+                direction: 0,
+              }
+            } : {}),
           } as any,
           metadata: {
             ...p.token.metadata,
