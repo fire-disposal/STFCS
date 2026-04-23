@@ -73,8 +73,8 @@ export function applyCombat(context: EngineContext): { newState: any; events: an
     // 应用目标减伤/易伤修正（damageTaken）
     const targetDamageTaken = calculateModifiedValue(1.0, targetShip.runtime, "damageTaken");
 
-    // 最终伤害 = 基础伤害 × 攻击者增伤 × 目标易伤
-    const finalDamage = attackResult.damage * attackerDamageDealt * targetDamageTaken;
+    // 最终伤害 = 基础伤害 × 攻击者增伤 × 目标易伤（四舍五入为整数）
+    const finalDamage = Math.round(attackResult.damage * attackerDamageDealt * targetDamageTaken);
 
     // 计算详细伤害
     const damageResult = calculateDamage(

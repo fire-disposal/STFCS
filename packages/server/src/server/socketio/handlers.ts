@@ -894,6 +894,9 @@ rpc.namespace("edit", {
         
         ctx.state.changePhase(nextPhase);
         
+        // 回合推进时重置所有玩家的准备状态
+        ctx.state.resetAllPlayersReady();
+        
         if (incrementTurn) {
           const newTurn = room.getStateManager().getState().turnCount + 1;
           ctx.state.changeTurn(newTurn);

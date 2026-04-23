@@ -3,6 +3,10 @@
  *
  * 布局：
  * 阶段徽章 | 准备按钮 | 推进按钮 | 回合计数
+ * 
+ * 准备按钮：
+ * - 部署阶段：表示"游戏开始准备"
+ * - 玩家回合：表示"本回合操作完毕"
  */
 
 import React, { useMemo } from "react";
@@ -73,6 +77,17 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 		}
 	};
 
+	// 准备按钮文案
+	const getReadyLabel = () => {
+		if (phase === GamePhase.DEPLOYMENT) {
+			return isReady ? "就绪" : "准备";
+		}
+		return isReady ? "完毕" : "操作中";
+	};
+
+	// 准备按钮在所有阶段显示
+	const showReadyButton = phase !== GamePhase.TURN_END;
+
 	return (
 		<div className="turn-bar-compact">
 			<div className={`turn-bar-compact__phase ${phaseColorClass}`}>
@@ -86,7 +101,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				</div>
 			)}
 
-			{phase === GamePhase.DEPLOYMENT && (
+			{showReadyButton && (
 				<button
 					className="turn-bar-compact__btn"
 					onClick={onReadyToggle}
@@ -97,7 +112,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 					}}
 				>
 					<CheckCircle size={14} />
-					{isReady ? "就绪" : "准备"}
+					{getReadyLabel()}
 				</button>
 			)}
 

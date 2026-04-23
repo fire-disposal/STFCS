@@ -350,6 +350,16 @@ export class MutativeStateManager {
 		})
 	}
 
+	resetAllPlayersReady(): void {
+		this.mutateAndBroadcast((draft) => {
+			for (const playerId in draft.players) {
+				if (draft.players[playerId]) {
+					draft.players[playerId].isReady = false
+				}
+			}
+		})
+	}
+
 	private getFactionForPhase(phase: GamePhase): Faction | undefined {
 		switch (phase) {
 			case "PLAYER_ACTION": return "PLAYER"

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from "react";
-import { Anchor, Shield, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
+import { Anchor, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
 import type { CombatToken } from "@vt/data";
 import { Faction } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
@@ -12,9 +12,20 @@ import type { SocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import "./battle-panel.css";
 
+// 象限名称（顺时针，从船头开始）
+const QUADRANT_NAMES = ["前", "右前", "右后", "后", "左后", "左前"];
+
 export interface ShipInfoPanelProps {
 	ship: CombatToken | null;
 	room?: SocketRoom | null;
+}
+
+// 护甲健康程度颜色
+function getArmorColor(percent: number): string {
+	if (percent >= 0.8) return "#2ecc71";
+	if (percent >= 0.5) return "#f1c40f";
+	if (percent >= 0.25) return "#e74c3c";
+	return "#8b0000";
 }
 
 export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
@@ -29,17 +40,17 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	const hullMax = hasShip ? (ship.spec.maxHitPoints ?? 100) : 100;
 	const hullPct = hasShip ? Math.min(100, (hull / hullMax) * 100) : 0;
 
-	const shieldVal = hasShip ? (ship.runtime.shield?.value ?? 0) : 0;
-	const shieldMax = hasShip ? (ship.spec.shield?.upkeep ?? 100) : 100;
-	const shieldPct = hasShip ? Math.min(100, (shieldVal / shieldMax) * 100) : 0;
-	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
-
 	const fluxSoft = hasShip ? (ship.runtime.fluxSoft ?? 0) : 0;
 	const fluxHard = hasShip ? (ship.runtime.fluxHard ?? 0) : 0;
 	const fluxTotal = fluxSoft + fluxHard;
 	const fluxMax = hasShip ? (ship.spec.fluxCapacity ?? 100) : 100;
 	const fluxSoftPct = hasShip ? Math.min(100, (fluxSoft / fluxMax) * 100) : 0;
 	const fluxHardPct = hasShip ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
+
+	// 护甲数据
+	const armor = hasShip ? (ship.runtime.armor ?? []) : [];
+	const armorMax = hasShip ? (ship.spec.armorMaxPerQuadrant ?? 100) : 100;
+	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
 
 	const phase = hasShip ? (ship.runtime.movement?.currentPhase ?? "A") : "-";
 	const overloaded = hasShip ? ship.runtime.overloaded : false;
@@ -121,13 +132,34 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 120 }} />
 					<Text size="1" className="panel-section__value">{hasShip ? `${hull}/${hullMax}` : "NA"}</Text>
 				</Flex>
+			</Flex>
 
-				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
-					<Shield size={14} />
-					<Text size="1" className="panel-section__label">护盾</Text>
-					<Progress value={shieldPct} color="blue" style={{ width: 120 }} />
-					<Text size="1" className="panel-section__value">{hasShip ? `${shieldVal}/${shieldMax}` : "NA"}</Text>
-				</Flex>
+			{/* 护甲象限面板 */}
+			<Flex className="panel-row" gap="2" align="center" wrap="wrap">
+				<Text size="1" className="panel-section__label">护甲</Text>
+				{armor.length === 6 ? (
+					<Flex gap="2" align="center">
+						{armor.map((val, idx) => {
+							const pct = val / armorMax;
+							return (
+								<Flex key={idx} direction="column" gap="1" align="center" style={{ minWidth: 32 }}>
+									<Text size="1" color="gray">{QUADRANT_NAMES[idx]}</Text>
+									<Box style={{
+										width: 20,
+										height: 20,
+										borderRadius: 2,
+										background: getArmorColor(pct),
+										opacity: pct > 0 ? 1 : 0.3,
+										border: "1px solid rgba(255,255,255,0.2)",
+									}} />
+									<Text size="1">{val}</Text>
+								</Flex>
+							);
+						})}
+					</Flex>
+				) : (
+					<Text size="1" color="gray">无护甲数据</Text>
+				)}
 			</Flex>
 
 			<Flex className="panel-row" gap="3" align="center">
