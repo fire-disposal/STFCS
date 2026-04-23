@@ -321,8 +321,8 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	graphics.clear();
 
 	const arcRad = (arc * Math.PI) / 180;
-	const startAngle = -arcRad / 2;  // 左边界（-90°对应左舷）
-	const endAngle = arcRad / 2;     // 右边界（+90°对应右舷）
+	const startAngle = -arcRad / 2;
+	const endAngle = arcRad / 2;
 
 	if (arc >= 360) {
 		if (minRange > 0) {
@@ -347,38 +347,38 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	const endX = Math.cos(endAngle);
 	const endY = Math.sin(endAngle);
 
-	// 绘制填充扇形
+	// 1. 填充扇形区域
 	graphics.moveTo(0, 0);
 	graphics.arc(0, 0, range, startAngle, endAngle);
 	graphics.lineTo(0, 0);
-	graphics.closePath();
 	graphics.fill({ color: ARC_COLOR, alpha: 0.12 });
 
-	// 如果有最小距离，挖空内圈
+	// 2. 挖空内圈（如果有最小距离）
 	if (minRange > 0) {
 		graphics.moveTo(0, 0);
 		graphics.arc(0, 0, minRange, startAngle, endAngle);
 		graphics.lineTo(0, 0);
-		graphics.closePath();
 		graphics.fill({ color: 0x06101a, alpha: 1 });
 	}
 
-	// 绘制外弧线（粗）
+	// 3. 外弧线
+	graphics.moveTo(startX * range, startY * range);
 	graphics.arc(0, 0, range, startAngle, endAngle);
 	graphics.stroke({ color: ARC_COLOR, width: 2.5, alpha: 0.6 });
 
-	// 绘制内弧线（如果有最小距离）
+	// 4. 内弧线（如果有最小距离）
 	if (minRange > 0) {
+		graphics.moveTo(startX * minRange, startY * minRange);
 		graphics.arc(0, 0, minRange, startAngle, endAngle);
 		graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
 	}
 
-	// 绘制左边界线（从中心向外）
+	// 5. 左边界线（从中心到弧线边缘）
 	graphics.moveTo(0, 0);
 	graphics.lineTo(startX * range, startY * range);
 	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.5 });
 
-	// 绘制右边界线（从中心向外）
+	// 6. 右边界线（从中心到弧线边缘）
 	graphics.moveTo(0, 0);
 	graphics.lineTo(endX * range, endY * range);
 	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.5 });
