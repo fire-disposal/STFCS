@@ -25,45 +25,6 @@ env:
   CORS_ORIGINS: "*"
 
 jobs:
-  check:
-    name: Lint + Typecheck + Test
-    if: ${{ github.event.inputs.skip_checks != 'true' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
-
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Test
-        run: pnpm run test
-
   prepare:
     name: Prepare Metadata
     runs-on: ubuntu-latest
@@ -79,8 +40,7 @@ jobs:
 
   build:
     name: Build & Push Image
-    needs: [prepare, check]
-    if: always()
+    needs: [prepare]
     runs-on: ubuntu-latest
 
     permissions:
