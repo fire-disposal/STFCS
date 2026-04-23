@@ -10,7 +10,6 @@ import App from "./App";
 import "@radix-ui/themes/styles.css";
 import "./styles/fonts.css";
 import "./styles.css";
-import { MagneticPointerProvider } from "@/ui/shared/MagneticPointer";
 import { NotificationContainer } from "@/ui/shared/Notification";
 
 const queryClient = new QueryClient({
@@ -38,10 +37,8 @@ root.render(
 							v7_relativeSplatPath: true,
 						}}
 					>
-						<MagneticPointerProvider>
-							<App />
-							<NotificationContainer />
-						</MagneticPointerProvider>
+						<App />
+						<NotificationContainer />
 					</BrowserRouter>
 				</Theme>
 			</QueryClientProvider>

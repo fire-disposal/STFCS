@@ -6,6 +6,7 @@ import { AuthPage } from "@/pages/AuthPage";
 import { LobbyPage } from "@/pages/LobbyPage";
 import { notify } from "@/ui/shared/Notification";
 import { DEFAULT_WS_URL } from "@/config";
+import { MagneticPointerProvider } from "@/ui/shared/MagneticPointer";
 import GamePage from "@/pages/GamePage";
 type AppState = "auth" | "lobby" | "game" | "loading";
 
@@ -182,36 +183,40 @@ setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
 		return <div style={{ padding: "40px", textAlign: "center", color: "#fff" }}>初始化中...</div>;
 	}
 
+	const magneticEnabled = appState === "lobby" || appState === "game";
+
 	return (
-		<div style={{ width: "100%", height: "100vh", overflow: "hidden" }}>
-			{appState === "auth" && <AuthPage onAuthenticated={handleAuthenticated} />}
+		<MagneticPointerProvider enabled={magneticEnabled}>
+			<div style={{ width: "100%", height: "100vh", overflow: "hidden" }}>
+				{appState === "auth" && <AuthPage onAuthenticated={handleAuthenticated} />}
 
-			{appState === "lobby" && (
-				<LobbyPage
-					networkManager={networkManager}
-					playerName={userName}
-					profile={userProfile}
-					rooms={rooms}
-					isLoading={roomsLoading}
-					myRoom={myRoom}
-					playerId={playerId}
-					onCreateRoom={handleCreateRoom}
-					onEnterMyRoom={handleEnterMyRoom}
-					onJoinRoom={handleJoinRoom}
-					onDeleteRoom={handleDeleteRoom}
-					onRefresh={handleRefresh}
-					onLogout={handleLogout}
-					onUpdateProfile={handleUpdateProfile}
-				/>
-			)}
+				{appState === "lobby" && (
+					<LobbyPage
+						networkManager={networkManager}
+						playerName={userName}
+						profile={userProfile}
+						rooms={rooms}
+						isLoading={roomsLoading}
+						myRoom={myRoom}
+						playerId={playerId}
+						onCreateRoom={handleCreateRoom}
+						onEnterMyRoom={handleEnterMyRoom}
+						onJoinRoom={handleJoinRoom}
+						onDeleteRoom={handleDeleteRoom}
+						onRefresh={handleRefresh}
+						onLogout={handleLogout}
+						onUpdateProfile={handleUpdateProfile}
+					/>
+				)}
 
-			{appState === "game" && networkManager.getCurrentRoomId() && (
-				<GamePage
-					networkManager={networkManager}
-					onLeaveRoom={handleBackToLobby}
-				/>
-			)}
-		</div>
+				{appState === "game" && networkManager.getCurrentRoomId() && (
+					<GamePage
+						networkManager={networkManager}
+						onLeaveRoom={handleBackToLobby}
+					/>
+				)}
+			</div>
+		</MagneticPointerProvider>
 	);
 };
 
