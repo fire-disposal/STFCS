@@ -86,11 +86,22 @@ export function useWeaponArcRendering(
 	}, [selectedShipId, show, fetchTargets]);
 
 	useEffect(() => {
-		if (!layers || !selectedShip || !show) {
+		if (!layers) return;
+
+		if (!selectedShip || !show) {
 			for (const [, cache] of arcCacheRef.current) {
-				cache.root.visible = false;
+				layers.weaponArcs.removeChild(cache.root);
+				cache.root.destroy();
 			}
-			if (layers) layers.weaponArcs.visible = false;
+			arcCacheRef.current.clear();
+
+			for (const [, cache] of aimLineCacheRef.current) {
+				layers.weaponArcs.removeChild(cache.graphics);
+				cache.graphics.destroy();
+			}
+			aimLineCacheRef.current.clear();
+
+			layers.weaponArcs.visible = false;
 			return;
 		}
 
@@ -137,7 +148,11 @@ export function useWeaponArcRendering(
 			if (finalCached) finalCached.root.visible = true;
 		}
 
-		if (targetingDataRef.current) {
+		if (targetingDataRef.current && selectedShip) {
+			const shipPosition = selectedShip.runtime?.position;
+			const shipHeading = selectedShip.runtime?.heading ?? 0;
+			if (!shipPosition) return;
+
 			for (const weapon of targetingDataRef.current.weapons) {
 				const mount = mounts.find((m) => m.id === weapon.mountId);
 				if (!mount) continue;
