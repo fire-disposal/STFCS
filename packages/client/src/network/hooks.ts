@@ -110,7 +110,7 @@ export function useSocketRoom(
 			}
 
 			hadStateRef.current = true;
-			log("setting roomState", { roomId: gameState.roomId });
+			log("setting roomState", { roomId: gameState.roomId, tokenCount: Object.keys(gameState.tokens).length });
 			setRoomState({
 				roomId: gameState.roomId,
 				playerId: nm.getPlayerId(),
@@ -119,8 +119,8 @@ export function useSocketRoom(
 				currentPhase: gameState.phase,
 				turnCount: gameState.turnCount,
 				activeFaction: gameState.activeFaction ?? FactionEnum.PLAYER,
-				tokens: gameState.tokens,
-				players: gameState.players as any,
+				tokens: { ...gameState.tokens },
+				players: { ...gameState.players } as any,
 			});
 		});
 
@@ -207,7 +207,7 @@ export function useTokens(room: SocketRoom | null): CombatToken[] {
 			arr.push(token);
 		}
 		setTokens(arr);
-	}, [room?.state?.tokens]);
+	}, [room, room?.state?.tokens, Object.keys(room?.state?.tokens ?? {}).join(",")]);
 
 	return tokens;
 }

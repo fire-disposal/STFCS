@@ -12,6 +12,7 @@ import { Faction as FactionEnum, HullSize } from "@vt/data";
 import type { SocketRoom, SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
 import { notify } from "@/ui/shared/Notification";
+import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
 const HULL_SIZE_NAMES: Record<string, string> = {
@@ -40,6 +41,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 	networkManager,
 	cursorPosition,
 }) => {
+	const mapCursor = useUIStore((state) => state.mapCursor);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterSize, setFilterSize] = useState<string>("all");
@@ -89,11 +91,13 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 			return;
 		}
 
+		const cursorHeading = mapCursor?.r ?? 0;
+
 		const combatToken: CombatToken = {
 			...selectedPreset.token,
 			runtime: {
 				position: cursorPosition,
-				heading: 0,
+				heading: cursorHeading,
 				hull: selectedPreset.token.spec.maxHitPoints,
 				armor: Array(6).fill(selectedPreset.token.spec.armorMaxPerQuadrant),
 				fluxSoft: 0,

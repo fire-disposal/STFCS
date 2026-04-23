@@ -12,15 +12,15 @@
  * │   ├── [zIndex 3] starfieldNear (近层星空，视差)
  * │   ├── [zIndex 4] grid (网格)
  * │   ├── [zIndex 5] cursor (世界坐标系光标)
- * │   ├── [zIndex 6] shipSprites (舰船精灵，预留)
- * │   ├── [zIndex 7] tacticalTokens (舰船战术标记 - 箭头)
- * │   ├── [zIndex 8] effects (特效 - 爆炸、粒子等)
- * │   ├── [zIndex 9] weaponArcs (武器射界可视化)
- * │   ├── [zIndex 10] movementVisuals (移动预览箭头)
- * │   ├── [zIndex 11] shipIcons (舰船图标层)
- * │   ├── [zIndex 12] shieldArcs (护盾辉光弧线)
- * │   ├── [zIndex 13] hexagonArmor (护甲六边形)
- * │   └── [zIndex 14] fluxIndicators (辐能/过载状态指示器)
+* │   ├── [zIndex 7] tacticalTokens (舰船战术标记 - 箭头)
+* │   ├── [zIndex 8] effects (特效 - 爆炸、粒子等)
+* │   ├── [zIndex 9] weaponArcs (武器射界可视化)
+* │   ├── [zIndex 10] movementVisuals (移动预览箭头)
+* │   ├── [zIndex 11] shipIcons (舰船图标层)
+* │   ├── [zIndex 12] shieldArcs (护盾辉光弧线)
+* │   ├── [zIndex 13] hexagonArmor (护甲六边形)
+* │   ├── [zIndex 14] fluxIndicators (辐能/过载状态指示器)
+* │   └── [zIndex 15] shipSprites (舰船贴图精灵 - 最高层)
  * │
  * └── hud (HUD层，独立于世界，固定像素大小，无变换)
  *     ├── [zIndex 0] shipBars (舰船血条 - 固定像素大小)
@@ -68,8 +68,6 @@ export interface LayerRegistry {
 	grid: Container;
 	/** [zIndex 5] 世界坐标系光标 */
 	cursor: Container;
-	/** [zIndex 6] 舰船精灵层（预留） */
-	shipSprites: Container;
 	/** [zIndex 7] 舰船战术标记（箭头 token） */
 	tacticalTokens: Container;
 	/** [zIndex 8] 特效层 */
@@ -86,6 +84,8 @@ export interface LayerRegistry {
 	hexagonArmor: Container;
 	/** [zIndex 14] 辐能/过载状态指示器 */
 	fluxIndicators: Container;
+	/** [zIndex 15] 舰船贴图精灵层（最高层） */
+	shipSprites: Container;
 
 	// === HUD 层（独立于世界） ===
 	/** HUD 层根容器 - 固定在画布中心，无变换 */
