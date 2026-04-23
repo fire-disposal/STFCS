@@ -61,12 +61,20 @@ function drawShieldArc(
 	const startAngle = screenOrientation - arcRad / 2;
 	const endAngle = screenOrientation + arcRad / 2;
 
+	const startX = radius * Math.cos(startAngle);
+	const startY = radius * Math.sin(startAngle);
+
+	if (arc >= 360) {
+		graphics.circle(0, 0, radius);
+		graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
+		return;
+	}
+
+	graphics.moveTo(startX, startY);
 	graphics.arc(0, 0, radius, startAngle, endAngle);
 	graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 
 	const endpointRadius = 3;
-	const startX = radius * Math.cos(startAngle);
-	const startY = radius * Math.sin(startAngle);
 	graphics.circle(startX, startY, endpointRadius);
 	graphics.fill({ color, alpha: alpha * 1.2 });
 

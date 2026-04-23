@@ -80,7 +80,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 						{shieldArc < 360 && <Text size="1" color="gray">{shieldArc}°</Text>}
 					</Flex>
 
-					{needsDirectionControl && (
+					{needsDirectionControl && shieldActive && (
 						<>
 							<Box className="panel-divider" />
 
