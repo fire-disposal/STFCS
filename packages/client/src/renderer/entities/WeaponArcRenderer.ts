@@ -44,7 +44,6 @@ interface AimLineCache {
 }
 
 const ARC_COLOR = 0x4fc3ff;
-const RANGE_COLOR = 0x3a8fdd;
 
 export function useWeaponArcRendering(
 	layers: LayerRegistry | null,
@@ -219,18 +218,14 @@ function createWeaponArc(
 	const arcGraphics = new Graphics();
 	root.addChild(arcGraphics);
 
-	const rangeGraphics = new Graphics();
-	root.addChild(rangeGraphics);
-
-	drawWeaponArc(arcGraphics, arc, range);
-	drawRangeCircles(rangeGraphics, range, minRange);
+	drawWeaponArc(arcGraphics, arc, range, minRange);
 
 	layers.weaponArcs.addChild(root);
 
 	cache.set(mountId, {
 		root,
 		arcGraphics,
-		rangeGraphics,
+		rangeGraphics: arcGraphics,
 		lastData: { range, minRange, arc, mountFacing },
 	});
 }
@@ -247,46 +242,63 @@ function updateWeaponArc(
 	cached.root.position.set(worldX, worldY);
 	cached.root.rotation = mountFacing;
 
-	drawWeaponArc(cached.arcGraphics, arc, range);
-	drawRangeCircles(cached.rangeGraphics, range, minRange);
+	drawWeaponArc(cached.arcGraphics, arc, range, minRange);
 
 	cached.lastData = { range, minRange, arc, mountFacing };
 }
 
-function drawWeaponArc(graphics: Graphics, arc: number, range: number): void {
+function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange: number = 0): void {
 	graphics.clear();
-
-	if (arc >= 360) {
-		graphics.circle(0, 0, range);
-		graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.5 });
-		return;
-	}
 
 	const arcRad = (arc * Math.PI) / 180;
 	const startAngle = -arcRad / 2;
 	const endAngle = arcRad / 2;
 
+	if (arc >= 360) {
+		if (minRange > 0) {
+			graphics.circle(0, 0, range);
+			graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
+			graphics.circle(0, 0, minRange);
+			graphics.fill({ color: 0x081423, alpha: 1 });
+			graphics.circle(0, 0, range);
+			graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.5 });
+			graphics.circle(0, 0, minRange);
+			graphics.stroke({ color: ARC_COLOR, width: 1, alpha: 0.3 });
+		} else {
+			graphics.circle(0, 0, range);
+			graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
+			graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.5 });
+		}
+		return;
+	}
+
+	const startX = Math.cos(startAngle);
+	const startY = Math.sin(startAngle);
+	const endX = Math.cos(endAngle);
+	const endY = Math.sin(endAngle);
+
+	graphics.moveTo(startX * minRange, startY * minRange);
+	graphics.arc(0, 0, minRange, startAngle, endAngle);
+	graphics.lineTo(endX * range, endY * range);
+	graphics.arc(0, 0, range, endAngle, startAngle, true);
+	graphics.lineTo(startX * minRange, startY * minRange);
+	graphics.closePath();
+	graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
+
+	graphics.moveTo(0, 0);
+	graphics.lineTo(startX * range, startY * range);
+	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
+
+	graphics.moveTo(0, 0);
+	graphics.lineTo(endX * range, endY * range);
+	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
+
 	graphics.arc(0, 0, range, startAngle, endAngle);
 	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.6 });
 
-	graphics.moveTo(0, 0);
-	graphics.lineTo(Math.cos(startAngle) * range, Math.sin(startAngle) * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
-
-	graphics.moveTo(0, 0);
-	graphics.lineTo(Math.cos(endAngle) * range, Math.sin(endAngle) * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
-}
-
-function drawRangeCircles(graphics: Graphics, maxRange: number, minRange: number): void {
-	graphics.clear();
-
-	graphics.circle(0, 0, maxRange);
-	graphics.stroke({ color: RANGE_COLOR, width: 1, alpha: 0.3 });
-
 	if (minRange > 0) {
-		graphics.circle(0, 0, minRange);
-		graphics.stroke({ color: 0xff5d7e, width: 1, alpha: 0.25 });
+		graphics.arc(0, 0, minRange, startAngle, endAngle);
+		graphics.stroke({ color: ARC_COLOR, width: 1, alpha: 0.3 });
 	}
 }
 
