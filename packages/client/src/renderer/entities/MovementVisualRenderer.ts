@@ -36,6 +36,7 @@ const COLORS = {
 	targetPreview: 0x00ff88,
 	lockMarker: 0xffffff,
 	turnRange: 0x4a9eff,
+	diamondTarget: 0xffd700,
 };
 
 const ALPHA = {
@@ -46,6 +47,8 @@ const ALPHA = {
 	lockMarker: 0.8,
 	turnRangeFill: 0.08,
 	turnRangeStroke: 0.4,
+	diamondFill: 0.5,
+	diamondStroke: 0.9,
 };
 
 const LINE_WIDTH = {
@@ -344,14 +347,13 @@ function drawTranslationLines(
 			targetY = -value;
 			color = value >= 0 ? COLORS.forwardLine : COLORS.backwardLine;
 		} else {
-			targetX = value;
-			color = value >= 0 ? COLORS.rightLine : COLORS.leftLine;
+			targetX = -value; // 左舷为正（-X方向）
+			color = value >= 0 ? COLORS.leftLine : COLORS.rightLine;
 		}
 
-		targetGraphics.circle(targetX, targetY, 8);
-		targetGraphics.fill({ color, alpha: ALPHA.targetFill });
-		targetGraphics.circle(targetX, targetY, 8);
-		targetGraphics.stroke({ color, width: LINE_WIDTH.target, alpha: ALPHA.targetStroke });
+		// 钻石形目标预览
+		const diamondSize = 8;
+		drawDiamond(targetGraphics, targetX, targetY, diamondSize, color);
 	}
 
 	if (directionLocked) {
@@ -366,9 +368,15 @@ function drawRotationArc(
 	remainingTurn: number,
 	turn: number
 ): void {
+	// PixiJS arc 角度：0° = +X（右），90° = +Y（下），顺时针视觉
+	// 船头方向 = -Y = PixiJS 角度 -90°（或 270°）
+	// 航海角度：正值右转（顺时针），负值左转（逆时针）
+	// PixiJS 角度变化：右转 = 角度增加（从 -90° 向 0°）
+	const baseAngle = -Math.PI / 2; // 船头方向（-Y 轴）
 	const turnRad = (remainingTurn * Math.PI) / 180;
-
-	directionGraphics.arc(0, 0, 50, -turnRad, turnRad);
+	
+	// 转向弧从左转最大到右转最大（相对于船头）
+	directionGraphics.arc(0, 0, 50, baseAngle - turnRad, baseAngle + turnRad);
 	directionGraphics.stroke({
 		color: COLORS.turnRange,
 		width: LINE_WIDTH.direction,
@@ -376,11 +384,16 @@ function drawRotationArc(
 	});
 
 	if (turn !== 0) {
-		const targetRad = (turn * Math.PI) / 180;
-		const tipX = 50 * Math.sin(targetRad);
-		const tipY = -50 * Math.cos(targetRad);
+		// turn 正值 = 右转（航海顺时针），PixiJS 角度增加
+		const targetAngle = baseAngle + (turn * Math.PI) / 180;
+		const tipX = 50 * Math.cos(targetAngle);
+		const tipY = 50 * Math.sin(targetAngle);
 
-		targetGraphics.moveTo(0, -50);
+		// 从船头位置（-Y 方向，即 baseAngle）到目标位置的线
+		const headX = 50 * Math.cos(baseAngle);
+		const headY = 50 * Math.sin(baseAngle);
+		
+		targetGraphics.moveTo(headX, headY);
 		targetGraphics.lineTo(tipX, tipY);
 		targetGraphics.stroke({
 			color: COLORS.targetPreview,
@@ -422,4 +435,25 @@ function drawDashedLine(
 		graphics.lineTo(endX, endY);
 		graphics.stroke({ color, width: LINE_WIDTH.direction, alpha });
 	}
+}
+
+function drawDiamond(
+	graphics: Graphics,
+	x: number,
+	y: number,
+	size: number,
+	color: number
+): void {
+	// 钻石形：上下左右四个顶点
+	const points = [
+		x, y - size,        // 上
+		x + size, y,        // 右
+		x, y + size,        // 下
+		x - size, y,        // 左
+	];
+	
+	graphics.poly(points);
+	graphics.fill({ color, alpha: ALPHA.diamondFill });
+	graphics.poly(points);
+	graphics.stroke({ color, width: 2, alpha: ALPHA.diamondStroke });
 }
