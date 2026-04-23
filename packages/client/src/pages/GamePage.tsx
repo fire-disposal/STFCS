@@ -30,7 +30,7 @@ import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
 import RoomPlayerList from "@/ui/panels/RoomPlayerList";
 import { Avatar } from "@/ui/shared/Avatar";
-import "./panels/room-player-list.css";
+import "@/ui/panels/room-player-list.css";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -85,7 +85,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
 	const turnCount = room?.state?.turnCount ?? 1;
 	const activeFaction = room?.state?.activeFaction ?? "PLAYER";
-	const cursorPosition = useMemo(() => 
+	const cursorPosition = useMemo(() =>
 		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
 		[mapCursor]
 	);
@@ -168,7 +168,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const players = Object.values(room.state.players).filter((p) => p.connected);
 	const phaseColor = room.state.currentPhase === GamePhase.PLAYER_ACTION ? "blue"
 		: room.state.currentPhase === GamePhase.DM_ACTION ? "red"
-		: room.state.currentPhase === GamePhase.DEPLOYMENT ? "purple" : "amber";
+			: room.state.currentPhase === GamePhase.DEPLOYMENT ? "purple" : "amber";
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
