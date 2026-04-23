@@ -102,12 +102,15 @@ rpc.namespace("room", {
       creatorName: ctx.playerName,
     });
     if (!room) throw err("创建房间失败", "ROOM_CREATE_FAILED");
+    
     ctx.socket.join(room.id);
     ctx.socket.data.roomId = room.id;
     ctx.socket.data.role = "HOST";
-    ctx.state.addPlayer(ctx.playerId, { sessionId: ctx.socket.id, nickname: ctx.playerName, role: "HOST", isReady: false, connected: true });
     
-    ctx.io.emit("room:list_updated", { action: "created", room: { roomId: room.id, name: room.name, playerCount: 1, maxPlayers: room.maxPlayers, phase: "WAITING", ownerName: ctx.playerName } });
+    room.joinPlayer(ctx.socket.id, ctx.playerId, ctx.playerName);
+    ctx.state.broadcastFull();
+    
+    ctx.io.emit("room:list_updated", { action: "created", room: { roomId: room.id, name: room.name, playerCount: room.getPlayerCount(), maxPlayers: room.maxPlayers, phase: "WAITING", ownerName: ctx.playerName } });
     
     return { roomId: room.id, roomName: room.name, isHost: true };
   },
@@ -134,7 +137,6 @@ rpc.namespace("room", {
     ctx.socket.data.roomId = p.roomId;
     const role = room.creatorId === ctx.playerId ? "HOST" : "PLAYER";
     ctx.socket.data.role = role;
-    ctx.state.addPlayer(ctx.playerId, { sessionId: ctx.socket.id, nickname: ctx.playerName, role, isReady: false, connected: true });
     ctx.state.broadcastFull();
     
     ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: p.roomId, name: room.name, playerCount: room.getPlayerCount(), maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
@@ -144,7 +146,6 @@ rpc.namespace("room", {
   leave: async (_, ctx) => {
     ctx.requireRoom();
     const room = ctx.roomManager.getRoom(ctx.roomId);
-    ctx.state.removePlayer(ctx.playerId);
     ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
     ctx.socket.leave(ctx.roomId);
     ctx.socket.data.roomId = undefined;
@@ -850,10 +851,12 @@ export function setupSocketIO(io: any, roomManager: any): void {
     middleware(socket, io, roomManager, services);
 
     socket.on("disconnect", () => {
-      const sd = socket.data as { playerId?: string; roomId?: string };
+      const sd = socket.data as { playerId?: string; roomId?: string; role?: string };
       if (sd.roomId && sd.playerId) {
         roomManager.leaveRoom(sd.roomId, sd.playerId);
       }
+      socket.data.roomId = undefined;
+      socket.data.role = undefined;
     });
   });
 }
