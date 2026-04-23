@@ -226,7 +226,7 @@ function calculateValidTargets(
 
 		const targetPos = target.runtime.position;
 		const dx = targetPos.x - mountWorldX;
-		const dy = targetPos.y - mountWorldY;
+		const dy = mountWorldY - targetPos.y;  // 反转 dy：屏幕Y向下，航海Y向上
 
 		const dist = Math.sqrt(dx * dx + dy * dy);
 
@@ -234,6 +234,9 @@ function calculateValidTargets(
 
 		let inArc = true;
 		if (arc < 360) {
+			// atan2(dx, dy) 给出航海角度：
+			// dx > 0 → 右舷 → 90°
+			// dy > 0 → 船头 → 0°（注意 dy 已反转）
 			const targetAngleNautical = Math.atan2(dx, dy) * 180 / Math.PI;
 			const weaponFacingNautical = attackerHeading + mountFacing;
 			const relativeAngle = normalizeAngle(targetAngleNautical - weaponFacingNautical);
