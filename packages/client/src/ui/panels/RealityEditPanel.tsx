@@ -103,7 +103,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubm
 					</Flex>
 
 					<Flex className="panel-section" align="center" gap="2">
-						<Text size="1" className="panel-section__label">软通量</Text>
+						<Text size="1" className="panel-section__label">软辐能</Text>
 						<TextField.Root
 							size="1"
 							value={fluxSoft.toString()}
@@ -113,7 +113,7 @@ export const RealityEditPanel: React.FC<RealityEditPanelProps> = ({ ship, onSubm
 					</Flex>
 
 					<Flex className="panel-section" align="center" gap="2">
-						<Text size="1" className="panel-section__label">硬通量</Text>
+						<Text size="1" className="panel-section__label">硬辐能</Text>
 						<TextField.Root
 							size="1"
 							value={fluxHard.toString()}

@@ -13,8 +13,9 @@ import {
 	Button,
 	Dialog,
 	IconButton,
+	DropdownMenu,
 } from "@radix-ui/themes";
-import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
+import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket, FastForward, ChevronDown } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
@@ -27,6 +28,7 @@ import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
+import { useGameAction } from "@/hooks/useGameAction";
 import RoomPlayerList from "@/ui/panels/RoomPlayerList";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -64,6 +66,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const tokens = useTokens(room);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
+	const { send } = useGameAction();
 
 	const handleRealityEdit = useCallback(async (shipId: string, runtimeData: Record<string, unknown>) => {
 		if (!room) return;
@@ -76,6 +79,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			notify.error(error instanceof Error ? error.message : "修改失败");
 		}
 	}, [room]);
+
+	const handleForceEndTurn = useCallback(async (faction?: "PLAYER" | "ENEMY" | "NEUTRAL") => {
+		const result = await send("edit:room", { action: "force_end_turn", faction } as any);
+		if (result) notify.success("回合已推进");
+	}, [send]);
 
 	const playerKeys = room?.state?.players ? Object.keys(room.state.players) : [];
 	const currentPlayerKey = playerKeys.find((k) => {
@@ -182,6 +190,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}
 						</Badge>
 						<Text size="2" color="gray">回合 {room.state.turnCount}</Text>
+						{isHost && (
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									<Button size="1" variant="solid" color="green">
+										<FastForward size={12} /> 推进回合 <ChevronDown size={10} />
+									</Button>
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content>
+									<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
+									<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
+									<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						)}
 					</Flex>
 
 					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>

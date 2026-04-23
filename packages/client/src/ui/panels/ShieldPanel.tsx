@@ -68,14 +68,14 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 			<Flex className="panel-section" align="center" gap="2">
 				<Radio size={14} />
-				<Text size="1" className="panel-section__label">软通量</Text>
+				<Text size="1" className="panel-section__label">软辐能</Text>
 				<Progress value={fluxPct} color="purple" style={{ width: 80 }} />
 				<Text size="1" className="panel-section__value">{hasShip ? `${fluxSoft}/${fluxMax}` : "NA"}</Text>
 			</Flex>
 
 			<Flex className="panel-section" align="center" gap="2">
 				<Zap size={14} />
-				<Text size="1" className="panel-section__label">硬通量</Text>
+				<Text size="1" className="panel-section__label">硬辐能</Text>
 				<Text size="1" className="panel-section__value">{hasShip ? `${fluxHard}` : "NA"}</Text>
 			</Flex>
 

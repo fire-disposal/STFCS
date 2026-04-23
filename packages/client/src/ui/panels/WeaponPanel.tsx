@@ -12,7 +12,6 @@ import { Crosshair, Bomb, CheckCircle, XCircle, Swords, Loader2 } from "lucide-r
 import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
-import { useTargets } from "@/hooks/useTargets";
 import { notify } from "@/ui/shared/Notification";
 import { UI_CONFIG } from "@/config/constants";
 import "./weapon-panel.css";
@@ -34,6 +33,8 @@ interface WeaponStatus {
 	burstCount: number;
 	ammo?: { current: number; max: number };
 	reason?: string;
+	mountName?: string;
+	weaponDisplayName?: string;
 }
 
 interface TargetInfo {
@@ -63,7 +64,6 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 	const [targetingData, setTargetingData] = useState<WeaponTargetingData | null>(null);
 
 	const { isAvailable, sendAttack, sendQuery } = useGameAction();
-	const allTargets = useTargets(ship?.$id ?? null);
 
 	const hasShip = ship && ship.runtime;
 	const canAct = canControl && hasShip && isAvailable;
@@ -113,6 +113,8 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 					burstCount: weaponSpec.burstCount ?? 1,
 					ammo: undefined,
 					reason,
+					mountName: m.id,
+					weaponDisplayName: (m.weapon as any)?.metadata?.name ?? (m.weapon as any)?.$id ?? m.id,
 				};
 			});
 	}, [hasShip, ship]);
@@ -171,17 +173,9 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 
 	// 可攻击目标列表
 	const attackableTargets = useMemo(() => {
-		if (!targetingData) return allTargets.map((t) => ({
-			id: t.id,
-			name: t.name,
-			distance: 999,
-			inRange: false,
-			inArc: false,
-			canAttack: false,
-			isFriendly: false,
-		}));
-		return targetingData.validTargets;
-	}, [targetingData, allTargets]);
+		if (!targetingData) return [];
+		return targetingData.validTargets.filter(t => t.canAttack);
+	}, [targetingData]);
 
 	// 选择武器
 	const handleSelectWeapon = useCallback((weapon: WeaponStatus) => {
@@ -247,7 +241,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 								title={w.reason ?? w.name}
 							>
 								<Box className={`weapon-indicator weapon-indicator--${indicatorColor}`} />
-								<Text size="1" className="weapon-item__name">{w.name}</Text>
+								<Text size="1" className="weapon-item__name">{w.mountName} / {w.weaponDisplayName}</Text>
 							</Flex>
 						);
 					})}

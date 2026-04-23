@@ -1,5 +1,5 @@
 /**
- * 舰船信息面板 - 横向布局
+ * 舰船信息面板 - 上下三行排布
  * 支持战斗实例重命名
  */
 
@@ -38,7 +38,8 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	const fluxHard = hasShip ? (ship.runtime.fluxHard ?? 0) : 0;
 	const fluxTotal = fluxSoft + fluxHard;
 	const fluxMax = hasShip ? (ship.spec.fluxCapacity ?? 100) : 100;
-	const fluxPct = hasShip ? Math.min(100, (fluxTotal / fluxMax) * 100) : 0;
+	const fluxSoftPct = hasShip ? Math.min(100, (fluxSoft / fluxMax) * 100) : 0;
+	const fluxHardPct = hasShip ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
 
 	const phase = hasShip ? (ship.runtime.movement?.currentPhase ?? "A") : "-";
 	const overloaded = hasShip ? ship.runtime.overloaded : false;
@@ -73,8 +74,8 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	}, [hasShip, room, ship?.$id, editingName]);
 
 	return (
-		<Flex className="panel-row" gap="3">
-			<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 100 }}>
+		<Flex direction="column" gap="2" className="panel-content">
+			<Flex className="panel-row" gap="3" align="center">
 				<Text size="2">
 					{faction === Faction.PLAYER ? "🔵" : faction === Faction.NEUTRAL ? "⚪" : faction === Faction.ENEMY ? "🔴" : "⚪"}
 				</Text>
@@ -85,7 +86,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 							size="1"
 							value={editingName}
 							onChange={(e) => setEditingName(e.target.value)}
-							style={{ width: 100 }}
+							style={{ width: 120 }}
 						/>
 						<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}>
 							<Check size={12} />
@@ -96,7 +97,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 					</Flex>
 				) : (
 					<Flex align="center" gap="1">
-						<Text size="2" weight="bold" style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>
+						<Text size="2" weight="bold" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
 							{hasShip ? displayName : "请选择舰船"}
 						</Text>
 						{hasShip && room && (
@@ -113,42 +114,70 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 				<Badge size="1" variant="soft">Phase {phase}</Badge>
 			</Flex>
 
-			<Box className="panel-divider" />
+			<Flex className="panel-row" gap="3" align="center">
+				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
+					<Anchor size={14} />
+					<Text size="1" className="panel-section__label">船体</Text>
+					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 120 }} />
+					<Text size="1" className="panel-section__value">{hasShip ? `${hull}/${hullMax}` : "NA"}</Text>
+				</Flex>
 
-			<Flex className="panel-section" align="center" gap="2">
-				<Anchor size={14} />
-				<Text size="1" className="panel-section__label">船体</Text>
-				<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 80 }} />
-				<Text size="1" className="panel-section__value">{hasShip ? `${hull}/${hullMax}` : "NA"}</Text>
+				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
+					<Shield size={14} />
+					<Text size="1" className="panel-section__label">护盾</Text>
+					<Progress value={shieldPct} color="blue" style={{ width: 120 }} />
+					<Text size="1" className="panel-section__value">{hasShip ? `${shieldVal}/${shieldMax}` : "NA"}</Text>
+				</Flex>
 			</Flex>
 
-			<Flex className="panel-section" align="center" gap="2">
-				<Shield size={14} />
-				<Text size="1" className="panel-section__label">护盾</Text>
-				<Progress value={shieldPct} color="blue" style={{ width: 80 }} />
-				<Text size="1" className="panel-section__value">{hasShip ? `${shieldVal}/${shieldMax}` : "NA"}</Text>
+			<Flex className="panel-row" gap="3" align="center">
+				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
+					<Zap size={14} />
+					<Text size="1" className="panel-section__label">辐能</Text>
+					<Box style={{ width: 120, height: 16, position: "relative", borderRadius: 4, overflow: "hidden", background: "rgba(43, 66, 97, 0.4)" }}>
+						<Box style={{
+							position: "absolute",
+							left: 0,
+							top: 0,
+							height: "100%",
+							width: `${fluxSoftPct}%`,
+							background: "linear-gradient(90deg, #1e3a5f, #3a6ea5)",
+							borderRadius: 4,
+						}} />
+						<Box style={{
+							position: "absolute",
+							left: `${fluxSoftPct}%`,
+							top: 0,
+							height: "100%",
+							width: `${fluxHardPct}%`,
+							background: "linear-gradient(90deg, #0a1930, #1a3050)",
+							borderRadius: "0 4px 4px 0",
+						}} />
+					</Box>
+					<Text size="1" className="panel-section__value">{hasShip ? `${fluxTotal}/${fluxMax}` : "NA"}</Text>
+				</Flex>
+
+				<Flex className="panel-section" align="center" gap="2">
+					<Text size="1" className="panel-section__label" style={{ color: "#3a6ea5" }}>软</Text>
+					<Text size="1" className="panel-section__value" style={{ color: "#3a6ea5" }}>{hasShip ? fluxSoft : "NA"}</Text>
+					<Text size="1" className="panel-section__label" style={{ color: "#1a3050" }}>硬</Text>
+					<Text size="1" className="panel-section__value" style={{ color: "#1a3050" }}>{hasShip ? fluxHard : "NA"}</Text>
+				</Flex>
 			</Flex>
 
-			<Flex className="panel-section" align="center" gap="2">
-				<Zap size={14} />
-				<Text size="1" className="panel-section__label">通量</Text>
-				<Progress value={fluxPct} color="purple" style={{ width: 80 }} />
-				<Text size="1" className="panel-section__value">{hasShip ? `${fluxTotal}/${fluxMax}` : "NA"}</Text>
-			</Flex>
+			<Flex className="panel-row" gap="3" align="center">
+				<Flex className="panel-section" align="center" gap="2">
+					<Gauge size={14} />
+					<Text size="1" className="panel-section__label">朝向</Text>
+					<Text size="1" className="panel-section__value">{hasShip ? `${Math.round(ship.runtime.heading ?? 0)}°` : "NA"}</Text>
+				</Flex>
 
-			<Box className="panel-divider" />
-
-			<Flex className="panel-section" align="center" gap="2">
-				<Gauge size={14} />
-				<Text size="1" className="panel-section__label">朝向</Text>
-				<Text size="1" className="panel-section__value">{hasShip ? `${Math.round(ship.runtime.heading ?? 0)}°` : "NA"}</Text>
-			</Flex>
-
-			<Flex className="panel-section" align="center" gap="2">
-				<Text size="1" className="panel-section__label">位置</Text>
-				<Text size="1" className="panel-section__value">
-					{hasShip ? `(${Math.round(ship.runtime.position?.x ?? 0)}, ${Math.round(ship.runtime.position?.y ?? 0)})` : "NA"}
-				</Text>
+				<Flex className="panel-section" align="center" gap="2">
+					<Text size="1" className="panel-section__label">位置</Text>
+					<Text size="1" className="panel-section__value">
+						{hasShip ? `(${Math.round(ship.runtime.position?.x ?? 0)}, ${Math.round(ship.runtime.position?.y ?? 0)})` : "NA"}
+					</Text>
+				</Flex>
 			</Flex>
 		</Flex>
 	);
