@@ -325,19 +325,12 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	const endAngle = arcRad / 2;
 
 	if (arc >= 360) {
+		// 360度 = 圆形射程
+		graphics.circle(0, 0, range);
+		graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
 		if (minRange > 0) {
-			graphics.circle(0, 0, range);
-			graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
 			graphics.circle(0, 0, minRange);
-			graphics.fill({ color: 0x081423, alpha: 1 });
-			graphics.circle(0, 0, range);
-			graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.5 });
-			graphics.circle(0, 0, minRange);
-			graphics.stroke({ color: ARC_COLOR, width: 1, alpha: 0.3 });
-		} else {
-			graphics.circle(0, 0, range);
-			graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
-			graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.5 });
+			graphics.fill({ color: 0x06101a, alpha: 1 });
 		}
 		return;
 	}
@@ -347,13 +340,13 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	const endX = Math.cos(endAngle);
 	const endY = Math.sin(endAngle);
 
-	// 1. 填充扇形区域
+	// 1. 填充扇形射程区域
 	graphics.moveTo(0, 0);
 	graphics.arc(0, 0, range, startAngle, endAngle);
 	graphics.lineTo(0, 0);
 	graphics.fill({ color: ARC_COLOR, alpha: 0.12 });
 
-	// 2. 挖空内圈（如果有最小距离）
+	// 2. 挖空最小射程区域
 	if (minRange > 0) {
 		graphics.moveTo(0, 0);
 		graphics.arc(0, 0, minRange, startAngle, endAngle);
@@ -361,27 +354,15 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 		graphics.fill({ color: 0x06101a, alpha: 1 });
 	}
 
-	// 3. 外弧线
-	graphics.moveTo(startX * range, startY * range);
-	graphics.arc(0, 0, range, startAngle, endAngle);
-	graphics.stroke({ color: ARC_COLOR, width: 2.5, alpha: 0.6 });
-
-	// 4. 内弧线（如果有最小距离）
-	if (minRange > 0) {
-		graphics.moveTo(startX * minRange, startY * minRange);
-		graphics.arc(0, 0, minRange, startAngle, endAngle);
-		graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.4 });
-	}
-
-	// 5. 左边界线（从中心到弧线边缘）
+	// 3. 左射界线（从中心向外）
 	graphics.moveTo(0, 0);
 	graphics.lineTo(startX * range, startY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.5 });
+	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
 
-	// 6. 右边界线（从中心到弧线边缘）
+	// 4. 右射界线（从中心向外）
 	graphics.moveTo(0, 0);
 	graphics.lineTo(endX * range, endY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 1.5, alpha: 0.5 });
+	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
 }
 
 function drawAimLinesWorld(
