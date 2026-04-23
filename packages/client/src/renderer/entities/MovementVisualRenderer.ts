@@ -36,24 +36,29 @@ const COLORS = {
 	targetPreview: 0x00ff88,
 	lockMarker: 0xffffff,
 	turnRange: 0x4a9eff,
+	turnFill: 0x4a9eff,
 	diamondTarget: 0xffd700,
+	aimLine: 0xffd700,
 };
 
 const ALPHA = {
 	lineActive: 0.9,
-	lineInactive: 0.4,
-	targetFill: 0.3,
-	targetStroke: 0.8,
+	lineInactive: 0.3,
+	targetFill: 0.4,
+	targetStroke: 0.9,
 	lockMarker: 0.8,
-	turnRangeFill: 0.08,
-	turnRangeStroke: 0.4,
-	diamondFill: 0.5,
-	diamondStroke: 0.9,
+	turnRangeFill: 0.12,
+	turnRangeStroke: 0.5,
+	diamondFill: 0.6,
+	diamondStroke: 1.0,
+	aimLine: 0.8,
+	aimDotFill: 0.25,
 };
 
 const LINE_WIDTH = {
 	direction: 2,
 	target: 3,
+	aim: 2,
 };
 
 const DEFAULT_MAX_SPEED = 100;
@@ -347,12 +352,22 @@ function drawTranslationLines(
 			targetY = -value;
 			color = value >= 0 ? COLORS.forwardLine : COLORS.backwardLine;
 		} else {
-			targetX = -value; // 左舷为正（-X方向）
+			targetX = -value;
 			color = value >= 0 ? COLORS.leftLine : COLORS.rightLine;
 		}
 
-		// 钻石形目标预览
-		const diamondSize = 8;
+		targetGraphics.moveTo(0, 0);
+		targetGraphics.lineTo(targetX, targetY);
+		targetGraphics.stroke({
+			color: COLORS.aimLine,
+			width: LINE_WIDTH.aim,
+			alpha: ALPHA.aimLine,
+		});
+
+		targetGraphics.circle(targetX, targetY, 5);
+		targetGraphics.fill({ color: COLORS.aimLine, alpha: ALPHA.aimDotFill });
+
+		const diamondSize = 10;
 		drawDiamond(targetGraphics, targetX, targetY, diamondSize, color);
 	}
 
@@ -368,31 +383,59 @@ function drawRotationArc(
 	remainingTurn: number,
 	turn: number
 ): void {
-	// PixiJS arc 角度：0° = +X（右），90° = +Y（下），顺时针视觉
-	// 船头方向 = -Y = PixiJS 角度 -90°（或 270°）
-	// 航海角度：正值右转（顺时针），负值左转（逆时针）
-	// PixiJS 角度变化：右转 = 角度增加（从 -90° 向 0°）
-	const baseAngle = -Math.PI / 2; // 船头方向（-Y 轴）
+	const baseAngle = -Math.PI / 2;
 	const turnRad = (remainingTurn * Math.PI) / 180;
-	
-	// 转向弧从左转最大到右转最大（相对于船头）
-	directionGraphics.arc(0, 0, 50, baseAngle - turnRad, baseAngle + turnRad);
+	const startAngle = baseAngle - turnRad;
+	const endAngle = baseAngle + turnRad;
+	const arcRadius = 60;
+
+	directionGraphics.moveTo(0, 0);
+	directionGraphics.arc(0, 0, arcRadius, startAngle, endAngle);
+	directionGraphics.lineTo(0, 0);
+	directionGraphics.closePath();
+	directionGraphics.fill({ color: COLORS.turnFill, alpha: ALPHA.turnRangeFill });
+
+	directionGraphics.moveTo(arcRadius * Math.cos(startAngle), arcRadius * Math.sin(startAngle));
+	directionGraphics.arc(0, 0, arcRadius, startAngle, endAngle);
 	directionGraphics.stroke({
 		color: COLORS.turnRange,
 		width: LINE_WIDTH.direction,
 		alpha: ALPHA.turnRangeStroke,
 	});
 
-	if (turn !== 0) {
-		// turn 正值 = 右转（航海顺时针），PixiJS 角度增加
-		const targetAngle = baseAngle + (turn * Math.PI) / 180;
-		const tipX = 50 * Math.cos(targetAngle);
-		const tipY = 50 * Math.sin(targetAngle);
+	const leftBorderX = arcRadius * Math.cos(startAngle);
+	const leftBorderY = arcRadius * Math.sin(startAngle);
+	directionGraphics.moveTo(0, 0);
+	directionGraphics.lineTo(leftBorderX, leftBorderY);
+	directionGraphics.stroke({ color: COLORS.turnRange, width: 2, alpha: 0.6 });
 
-		// 从船头位置（-Y 方向，即 baseAngle）到目标位置的线
-		const headX = 50 * Math.cos(baseAngle);
-		const headY = 50 * Math.sin(baseAngle);
-		
+	const rightBorderX = arcRadius * Math.cos(endAngle);
+	const rightBorderY = arcRadius * Math.sin(endAngle);
+	directionGraphics.moveTo(0, 0);
+	directionGraphics.lineTo(rightBorderX, rightBorderY);
+	directionGraphics.stroke({ color: COLORS.turnRange, width: 2, alpha: 0.6 });
+
+	directionGraphics.circle(leftBorderX, leftBorderY, 4);
+	directionGraphics.fill({ color: COLORS.turnRange, alpha: 0.8 });
+	directionGraphics.circle(rightBorderX, rightBorderY, 4);
+	directionGraphics.fill({ color: COLORS.turnRange, alpha: 0.8 });
+
+	if (turn !== 0) {
+		const targetAngle = baseAngle + (turn * Math.PI) / 180;
+		const tipX = arcRadius * Math.cos(targetAngle);
+		const tipY = arcRadius * Math.sin(targetAngle);
+
+		const headX = arcRadius * Math.cos(baseAngle);
+		const headY = arcRadius * Math.sin(baseAngle);
+
+		targetGraphics.moveTo(0, 0);
+		targetGraphics.lineTo(tipX, tipY);
+		targetGraphics.stroke({
+			color: COLORS.aimLine,
+			width: LINE_WIDTH.aim,
+			alpha: ALPHA.aimLine,
+		});
+
 		targetGraphics.moveTo(headX, headY);
 		targetGraphics.lineTo(tipX, tipY);
 		targetGraphics.stroke({

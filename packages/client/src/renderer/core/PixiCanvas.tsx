@@ -30,7 +30,7 @@
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
 import { Application } from "@pixi/react";
-import type { MovementPreviewState } from "../types";
+
 import type { CombatToken } from "@vt/data";
 import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useCamera } from "../systems/useCamera";
@@ -64,7 +64,6 @@ interface AssetBatchGetResult {
 interface GameCanvasProps {
 	ships: CombatToken[];
 	onClick?: (x: number, y: number) => void;
-	movementPreview?: MovementPreviewState;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
 }
 
@@ -108,7 +107,6 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	ships,
 	onClick,
-	movementPreview,
 	fetchAssets = noopFetchAssets,
 }) => {
 	const hostRef = useRef<HTMLDivElement>(null);
@@ -134,6 +132,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		setMapCursor,
 		mapCursor,
 		selectShip,
+		movementPreview,
 	} = useUIStore();
 
 	const cameraPositionRef = useRef(cameraPosition);
@@ -204,7 +203,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useArmorHexagonRendering(layerSystem.layers, ships);
 	useShieldArcRendering(layerSystem.layers, ships);
 	useFluxIndicatorRendering(layerSystem.layers, ships);
-	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview, {
+	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview ?? undefined, {
 		show: showMovementRange,
 	});
 	useWeaponArcRendering(layerSystem.layers, ships, selectedShipId ?? null);

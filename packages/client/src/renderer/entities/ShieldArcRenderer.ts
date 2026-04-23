@@ -27,6 +27,7 @@ import { useUIStore } from "@/state/stores/uiStore";
 
 const SHIELD_ARC_RADIUS_OFFSET = 15;
 const SHIELD_ARC_WIDTH = 2;
+const SHIELD_GLOW_WIDTH = 6;
 const DEFAULT_SHIELD_RADIUS = 40;
 const DEFAULT_SHIELD_ARC = 120;
 
@@ -65,16 +66,22 @@ function drawShieldArc(
 	const startY = radius * Math.sin(startAngle);
 
 	if (arc >= 360) {
+		graphics.circle(0, 0, radius + SHIELD_GLOW_WIDTH);
+		graphics.stroke({ color, width: SHIELD_GLOW_WIDTH, alpha: alpha * 0.3 });
 		graphics.circle(0, 0, radius);
 		graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 		return;
 	}
 
 	graphics.moveTo(startX, startY);
+	graphics.arc(0, 0, radius + SHIELD_GLOW_WIDTH, startAngle, endAngle);
+	graphics.stroke({ color, width: SHIELD_GLOW_WIDTH, alpha: alpha * 0.3 });
+
+	graphics.moveTo(startX, startY);
 	graphics.arc(0, 0, radius, startAngle, endAngle);
 	graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 
-	const endpointRadius = 3;
+	const endpointRadius = 4;
 	graphics.circle(startX, startY, endpointRadius);
 	graphics.fill({ color, alpha: alpha * 1.2 });
 
@@ -82,6 +89,14 @@ function drawShieldArc(
 	const endY = radius * Math.sin(endAngle);
 	graphics.circle(endX, endY, endpointRadius);
 	graphics.fill({ color, alpha: alpha * 1.2 });
+
+	graphics.moveTo(0, 0);
+	graphics.lineTo(startX, startY);
+	graphics.stroke({ color, width: 1, alpha: alpha * 0.5 });
+
+	graphics.moveTo(0, 0);
+	graphics.lineTo(endX, endY);
+	graphics.stroke({ color, width: 1, alpha: alpha * 0.5 });
 }
 
 export interface ShieldArcCacheItem {
