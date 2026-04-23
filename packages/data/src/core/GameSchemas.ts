@@ -420,11 +420,11 @@ export const TokenRuntimeSchema = z.object({
 	movement: MovementStateSchema.optional(),
 	hasFired: z.boolean().optional(),
 	weapons: z.array(WeaponRuntimeSchema).optional(),
-	/** 当前激活的修正（BUFF/倍率） */
 	modifiers: z.array(TokenModifierSchema).optional(),
 	faction: FactionSchema.optional(),
 	ownerId: z.string().optional(),
 	venting: z.boolean().optional(),
+	displayName: z.string().optional(),
 });
 export type TokenRuntime = z.infer<typeof TokenRuntimeSchema>;
 

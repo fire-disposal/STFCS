@@ -132,7 +132,10 @@ rpc.namespace("room", {
     const p = payload as WsPayload<"room:join">;
     const room = ctx.roomManager.getRoom(p.roomId);
     if (!room) throw err("房间不存在", "ROOM_NOT_FOUND");
-    ctx.roomManager.joinRoom(p.roomId, ctx.socket.id, ctx.playerId, ctx.playerName);
+    
+    const joinSuccess = ctx.roomManager.joinRoom(p.roomId, ctx.socket.id, ctx.playerId, ctx.playerName);
+    if (!joinSuccess) throw err("无法加入房间（可能已在房间中或房间已满）", "JOIN_FAILED");
+    
     ctx.socket.join(p.roomId);
     ctx.socket.data.roomId = p.roomId;
     const role = room.creatorId === ctx.playerId ? "HOST" : "PLAYER";
@@ -143,17 +146,23 @@ rpc.namespace("room", {
     
     return { roomId: p.roomId, roomName: room.name, isHost: role === "HOST", role };
   },
-  leave: async (_, ctx) => {
+leave: async (_, ctx) => {
     ctx.requireRoom();
     const room = ctx.roomManager.getRoom(ctx.roomId);
-    ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
+    
+    const leaveSuccess = ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
+    
     ctx.socket.leave(ctx.roomId);
     ctx.socket.data.roomId = undefined;
     ctx.socket.data.role = undefined;
     
     if (room) {
-      const playerCountAfter = room.getPlayerCount();
-      ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+        const playerCountAfter = room.getPlayerCount();
+        ctx.io.emit("room:list_updated", { action: "updated", room: { roomId: ctx.roomId, name: room.name, playerCount: playerCountAfter, maxPlayers: room.maxPlayers, phase: room.phase, ownerName: room.creatorName } });
+    }
+    
+    if (!leaveSuccess) {
+        console.warn(`leaveRoom returned false for player ${ctx.playerId} in room ${ctx.roomId}`);
     }
   },
   action: async (payload: unknown, ctx) => {
@@ -669,19 +678,30 @@ rpc.namespace("edit", {
     switch (p.action) {
       case "create": {
         if (!p.token) throw err("需要 token 数据", "TOKEN_DATA_REQUIRED");
-        const tokenId = p.token.$id || `token_${Date.now()}`;
+        const tokenId = `token_${generateShortId()}_${Date.now()}`;
+        
+        const baseName = p.token.metadata?.name ?? p.token.$presetRef?.split(":").pop() ?? "舰船";
+        const existingTokens = room.getCombatTokens();
+        const sameTypeCount = existingTokens.filter(t => {
+          const existingBaseName = t.metadata?.name ?? t.$presetRef?.split(":").pop() ?? "舰船";
+          return existingBaseName === baseName;
+        }).length;
+        const displayName = `${baseName} ${sameTypeCount + 1}`;
+        
         const createToken: CombatToken = {
           ...p.token,
+          $id: tokenId,
           runtime: {
             ...p.token.runtime,
             position: p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 },
             heading: p.token.runtime?.heading ?? 0,
             faction: p.faction ?? p.token.runtime?.faction ?? Faction.NEUTRAL,
             ownerId: p.token.runtime?.ownerId ?? ctx.playerId,
+            displayName,
           } as any,
         };
         ctx.state.setToken(tokenId, createToken, ctx.editLogContext(p.reason ?? "创建舰船"));
-        return { tokenId };
+        return { tokenId, displayName };
       }
       case "modify": {
         if (!p.tokenId) throw err("需要 tokenId", "TOKEN_ID_REQUIRED");
@@ -757,6 +777,14 @@ rpc.namespace("edit", {
           hasFired: false,
         }, ctx.editLogContext(p.reason ?? "重置状态"));
         return;
+      }
+      case "rename": {
+        if (!p.tokenId) throw err("需要 tokenId", "TOKEN_ID_REQUIRED");
+        if (!p.displayName) throw err("需要 displayName", "DISPLAY_NAME_REQUIRED");
+        const token = room.getCombatToken(p.tokenId);
+        if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
+        ctx.state.updateToken(p.tokenId, "runtime/displayName", p.displayName, ctx.editLogContext(p.reason ?? `更名为 ${p.displayName}`));
+        return { tokenId: p.tokenId, displayName: p.displayName };
       }
       default:
         throw err("未知操作", "UNKNOWN_ACTION");

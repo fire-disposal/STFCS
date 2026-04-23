@@ -342,7 +342,7 @@ export type GameQueryPayload = z.infer<typeof GameQueryDef.payload>
 
 export const EditTokenDef = {
   payload: z.object({
-    action: z.enum(["create", "modify", "remove", "heal", "damage", "restore", "reset"]),
+    action: z.enum(["create", "modify", "remove", "heal", "damage", "restore", "reset", "rename"]),
     tokenId: z.string().optional(),
     token: CombatTokenSchema.optional(),
     path: z.string().optional(),
@@ -351,9 +351,10 @@ export const EditTokenDef = {
     faction: FactionSchema.optional(),
     position: PointSchema.optional(),
     reason: z.string().optional(),
+    displayName: z.string().optional(),
   }),
   response: z.union([
-    z.object({ tokenId: z.string() }),
+    z.object({ tokenId: z.string(), displayName: z.string().optional() }),
     VoidSchema,
   ]),
 } as const satisfies WsEventDef<any, any>
