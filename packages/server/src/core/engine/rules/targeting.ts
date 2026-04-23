@@ -278,13 +278,17 @@ function calculateWeaponTargets(
 		// 检查射界（arc < 360 时需要检查）
 		let inArc = true;
 		if (arc < 360) {
-			// 计算目标相对挂载点的角度
+			// 计算目标相对挂载点的角度（航海坐标系）
+			// angleBetween 已修复：返回航海角度（0°=船头/屏幕上方，90°=右舷）
 			const targetAngle = angleBetween(
 				mountWorldPos,
 				target.runtime?.position ?? { x: 0, y: 0 }
 			);
 			const heading = attacker.runtime?.heading || 0;
-			const relativeAngle = ((targetAngle - heading - mountFacing + 540) % 360) - 180;
+			// 武器朝向 = 舰船航向 + 挂载点朝向
+			const weaponFacing = heading + mountFacing;
+			// 相对角度差（规范化到 ±180°）
+			const relativeAngle = ((targetAngle - weaponFacing + 540) % 360) - 180;
 			inArc = Math.abs(relativeAngle) <= arc / 2;
 		}
 

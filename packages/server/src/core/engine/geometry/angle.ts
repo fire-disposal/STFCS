@@ -24,14 +24,15 @@ export function toDegrees(radians: number): number {
 /**
  * 计算两点之间的航海角度（0-360度）
  * 
- * 航海角度定义：
+ * 航海角度定义（屏幕坐标系 Y 向下）：
+ * - dy 反转：p1.y - p2.y（使得屏幕上方 = 航海 Y 正向）
  * - atan2(dx, dy) 给出相对于 Y 轴的角度
- * - dx > 0 → 右舷方向 → 角度在 90° 附近
- * - dy < 0 → 船尾方向 → 角度在 180° 附近
+ * - dx > 0 → 右舷方向 → 角度在 90°
+ * - dy > 0 → 船头方向（屏幕上方）→ 角度在 0°
  */
 export function angleBetween(p1: Point, p2: Point): number {
   const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
+  const dy = p1.y - p2.y;  // 反转 dy：屏幕Y向下，航海Y向上
   let angle = toDegrees(Math.atan2(dx, dy));
   if (angle < 0) angle += 360;
   return angle;
