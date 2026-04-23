@@ -60,6 +60,7 @@ export interface ShipCacheItem {
 		heading: number;
 		flux: number;
 		weaponCount: number;
+		mountsHash: string;
 	};
 }
 
@@ -125,6 +126,11 @@ export function useShipRendering(
 	}, []);
 }
 
+function computeMountsHash(mounts: MountSpec[] | undefined): string {
+	if (!mounts?.length) return "empty";
+	return mounts.map(m => `${m.id}:${m.position?.x ?? 0},${m.position?.y ?? 0}:${m.facing ?? 0}:${m.arc ?? 360}:${m.size}:${m.weapon?.$id ?? "none"}`).join("|");
+}
+
 function shouldUpdate(
 	cached: ShipCacheItem,
 	ship: CombatToken,
@@ -140,6 +146,8 @@ function shouldUpdate(
 	const selectedChanged = cached.isSelected !== isSelected;
 	const weaponCount = ship.runtime.weapons?.length ?? 0;
 	const weaponCountChanged = cached.lastState.weaponCount !== weaponCount;
+	const mountsHash = computeMountsHash(ship.spec.mounts);
+	const mountsChanged = cached.lastState.mountsHash !== mountsHash;
 
 	return (
 		dx > POSITION_THRESHOLD ||
@@ -147,7 +155,8 @@ function shouldUpdate(
 		dHeading > HEADING_THRESHOLD ||
 		dFlux > FLUX_THRESHOLD ||
 		selectedChanged ||
-		weaponCountChanged
+		weaponCountChanged ||
+		mountsChanged
 	);
 }
 
@@ -181,6 +190,7 @@ function updateShipToken(
 		heading: ship.runtime.heading,
 		flux: fluxTotal,
 		weaponCount: ship.runtime.weapons?.length ?? 0,
+		mountsHash: computeMountsHash(ship.spec.mounts),
 	};
 }
 
@@ -267,6 +277,7 @@ function createShipToken(
 			heading: ship.runtime.heading,
 			flux: fluxTotal,
 			weaponCount: ship.runtime.weapons?.length ?? 0,
+			mountsHash: computeMountsHash(ship.spec.mounts),
 		},
 	});
 }
