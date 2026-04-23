@@ -319,6 +319,7 @@ export const GameActionDef = {
     strafe: z.number().optional(),
     angle: z.number().optional(),
     active: z.boolean().optional(),
+    direction: z.number().optional(),
     allocations: z.array(z.object({
       mountId: z.string(),
       targets: z.array(z.object({

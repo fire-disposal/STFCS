@@ -26,7 +26,6 @@ import ShieldPanel from "@/ui/panels/ShieldPanel";
 import RealityEditPanel from "@/ui/panels/RealityEditPanel";
 import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
-import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
 import { useGameAction } from "@/hooks/useGameAction";
 import RoomPlayerList from "@/ui/panels/RoomPlayerList";
@@ -85,13 +84,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		if (result) notify.success("回合已推进");
 	}, [send]);
 
-	const playerKeys = room?.state?.players ? Object.keys(room.state.players) : [];
-	const currentPlayerKey = playerKeys.find((k) => {
-		const p = room?.state?.players[k];
-		return p?.sessionId === room?.sessionId;
-	});
-	const currentPlayer = currentPlayerKey ? room?.state?.players[currentPlayerKey] : undefined;
+	const playerId = networkManager.getPlayerId();
+	const currentPlayer = playerId ? room?.state?.players[playerId] : undefined;
 	const isHost = currentPlayer?.role === "HOST";
+	const isReady = currentPlayer?.isReady ?? false;
 	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
 	const turnCount = room?.state?.turnCount ?? 1;
 	const activeFaction = room?.state?.activeFaction ?? "PLAYER";
@@ -190,20 +186,30 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							{PHASE_NAMES[room.state.currentPhase] ?? room.state.currentPhase}
 						</Badge>
 						<Text size="2" color="gray">回合 {room.state.turnCount}</Text>
-						{isHost && (
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger>
-									<Button size="1" variant="solid" color="green">
-										<FastForward size={12} /> 推进回合 <ChevronDown size={10} />
-									</Button>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content>
-									<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
-									<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
-									<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
+						
+						{phase === "DEPLOYMENT" && (
+							<Button
+								size="1"
+								variant={isReady ? "solid" : "outline"}
+								color={isReady ? "green" : "gray"}
+								onClick={() => networkManager.setReady()}
+							>
+								{isReady ? "取消准备" : "准备"}
+							</Button>
 						)}
+						
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								<Button size="1" variant="solid" color="green" disabled={!isHost}>
+									<FastForward size={12} /> 推进回合 <ChevronDown size={10} />
+								</Button>
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content>
+								<DropdownMenu.Item onClick={() => handleForceEndTurn()}>玩家方</DropdownMenu.Item>
+								<DropdownMenu.Item onClick={() => handleForceEndTurn("ENEMY")}>敌方</DropdownMenu.Item>
+								<DropdownMenu.Item onClick={() => handleForceEndTurn("NEUTRAL")}>中立</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</Flex>
 
 					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
@@ -230,12 +236,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-					<ReadyStatusFloat
-						networkManager={networkManager}
-						players={room.state.players}
-						playerId={room.sessionId ?? networkManager.getPlayerId()}
-						phase={phase}
-					/>
 					<PixiCanvas
 						ships={tokens}
 						fetchAssets={assetSocket.batchGet}

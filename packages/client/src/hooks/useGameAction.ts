@@ -95,6 +95,19 @@ export function useGameAction() {
 		return result !== null;
 	}, [send]);
 
+	const sendShieldRotate = useCallback(async (
+		tokenId: string,
+		direction: number
+	): Promise<boolean> => {
+		const result = await send("game:action", {
+			action: "shield",
+			tokenId,
+			active: true,
+			direction,
+		}, `护盾朝向 ${direction}°`);
+		return result !== null;
+	}, [send]);
+
 	const sendVent = useCallback(async (
 		tokenId: string
 	): Promise<boolean> => {
@@ -160,6 +173,7 @@ export function useGameAction() {
 		sendEndTurn,
 		sendAttack,
 		sendShieldToggle,
+		sendShieldRotate,
 		sendVent,
 		sendEditToken,
 		sendQuery,

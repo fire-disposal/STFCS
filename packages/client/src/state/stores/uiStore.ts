@@ -1,7 +1,23 @@
 import { GamePhase } from "@vt/data";
-import type { GameRoomState, PlayerRole, WsEventName, WsPayload, WsResponseData } from "@vt/data";
+import type { GameRoomState, PlayerRole, WsEventName, WsPayload, WsResponseData, MovementPhase } from "@vt/data";
 import type { SocketRoom } from "@/network";
 import { create } from "zustand";
+
+export type MoveMode = "forward" | "strafe";
+
+export interface MovementPreviewState {
+	shipId: string;
+	phase: MovementPhase | undefined;
+	mode: MoveMode;
+	value: number;
+	turn: number;
+	remaining: {
+		forward: number;
+		strafe: number;
+		turn: number;
+	};
+	directionLocked: boolean;
+}
 
 // 交互模式枚举
 export type InteractionMode = "IDLE" | "DRAWING_MOVE" | "SELECTING_TARGET" | "DM_OVERRIDING";
@@ -76,6 +92,9 @@ interface UIState {
 	// UI面板状态
 	isSidebarOpen: boolean;
 	activePanel: "ships" | "combat" | "dm" | "settings" | null;
+
+	// 移动预览状态
+	movementPreview: MovementPreviewState | null;
 }
 
 interface UIActions {
@@ -129,6 +148,9 @@ interface UIActions {
 	// 面板相关
 	toggleSidebar: () => void;
 	setActivePanel: (panel: "ships" | "combat" | "dm" | "settings" | null) => void;
+
+	// 移动预览相关
+	setMovementPreview: (preview: MovementPreviewState | null) => void;
 }
 
 export const useUIStore = create<UIState & UIActions>((set) => ({
@@ -179,6 +201,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	isSidebarOpen: true,
 	activePanel: "ships",
+
+	movementPreview: null,
 
 	// Actions
 	setConnected: (connected) => set({ isConnected: connected }),
@@ -245,6 +269,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 	setActivePanel: (panel) => set({ activePanel: panel }),
+
+	setMovementPreview: (preview) => set({ movementPreview: preview }),
 }));
 
 /**

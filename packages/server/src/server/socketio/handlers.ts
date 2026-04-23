@@ -516,13 +516,25 @@ rpc.namespace("game", {
         const token = room.getCombatToken(p.tokenId);
         if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
         const active = p.active ?? false;
+        const direction = p.direction;
+
         const shieldValidation = validateShieldToggle(token, active);
         if (!shieldValidation.valid) throw err(shieldValidation.error ?? "护盾切换验证失败", "INVALID_SHIELD");
+
         const shieldResult = toggleShield(token, active);
         if (!shieldResult.success) throw err(shieldResult.reason ?? "护盾切换失败", "SHIELD_TOGGLE_FAILED");
+
         const runtime = token.runtime;
         const shieldRuntime = runtime?.shield;
-        const updates: Record<string, unknown> = { shield: shieldRuntime };
+
+        const updates: Record<string, unknown> = {
+          shield: {
+            ...shieldRuntime,
+            active: shieldResult.newActive,
+            direction: direction ?? shieldRuntime?.direction ?? 0,
+          },
+        };
+
         if (shieldResult.fluxCost && shieldResult.fluxCost > 0) {
           const newFluxSoft = (runtime?.fluxSoft ?? 0) + shieldResult.fluxCost;
           updates["fluxSoft"] = newFluxSoft;

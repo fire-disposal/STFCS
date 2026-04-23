@@ -758,8 +758,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
-                                                                min={0.5}
-                                                                max={3}
+                                                                min={0.1}
+                                                                max={10}
                                                                 step={0.1}
                                                                 value={shipDraft?.spec.texture?.scale ?? 1}
                                                                 onChange={(e) => updateShipTexture({ scale: Number(e.target.value) })}
@@ -1529,8 +1529,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Flex align="center" gap="1">
                                                             <input
                                                                 type="range"
-                                                                min={0.5}
-                                                                max={3}
+                                                                min={0.1}
+                                                                max={10}
                                                                 step={0.1}
                                                                 value={weaponDraft.spec.texture?.scale ?? 1}
                                                                 onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) })}

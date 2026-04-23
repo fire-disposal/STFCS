@@ -3,10 +3,10 @@
  * 使用 useGameAction hook，无需 room prop
  */
 
-import React from "react";
-import { Shield, Zap, Radio, AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { Shield, Zap, Radio, AlertTriangle, RotateCw } from "lucide-react";
 import type { CombatToken } from "@vt/data";
-import { Button, Flex, Box, Text, Badge, Progress } from "@radix-ui/themes";
+import { Button, Flex, Box, Text, Badge, Progress, TextField } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
 
@@ -16,7 +16,7 @@ export interface ShieldPanelProps {
 }
 
 export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) => {
-	const { isAvailable, sendShieldToggle, sendVent } = useGameAction();
+	const { isAvailable, sendShieldToggle, sendShieldRotate, sendVent } = useGameAction();
 
 	const hasShip = ship && ship.runtime;
 
@@ -24,6 +24,8 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const shieldVal = hasShip ? (ship.runtime.shield?.value ?? 0) : 0;
 	const shieldMax = hasShip ? (ship.spec.shield?.upkeep ?? 100) : 100;
 	const shieldPct = hasShip ? Math.min(100, (shieldVal / shieldMax) * 100) : 0;
+	const shieldDirection = hasShip ? (ship.runtime.shield?.direction ?? 0) : 0;
+	const [directionInput, setDirectionInput] = useState(shieldDirection);
 
 	const fluxSoft = hasShip ? (ship.runtime.fluxSoft ?? 0) : 0;
 	const fluxHard = hasShip ? (ship.runtime.fluxHard ?? 0) : 0;
@@ -35,10 +37,17 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const venting = hasShip ? ship.runtime.venting : false;
 
 	const canAct = canControl && hasShip && isAvailable;
+	const canRotateShield = canAct && shieldActive;
 
 	const handleToggleShield = async () => {
 		if (!canAct) return;
 		await sendShieldToggle(ship.$id, !shieldActive);
+	};
+
+	const handleRotateShield = async (direction: number) => {
+		if (!canRotateShield) return;
+		setDirectionInput(direction);
+		await sendShieldRotate(ship.$id, direction);
 	};
 
 	const handleVent = async () => {
@@ -62,6 +71,34 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 				<Progress value={shieldPct} color="blue" style={{ width: 80 }} />
 				<Text size="1" className="panel-section__value">{hasShip ? `${shieldVal}/${shieldMax}` : "NA"}</Text>
 				<Badge size="1" color={shieldActive ? "blue" : "gray"}>{shieldActive ? "ON" : "OFF"}</Badge>
+			</Flex>
+
+			<Box className="panel-divider" />
+
+			<Flex className="panel-section" align="center" gap="2">
+				<RotateCw size={14} />
+				<Text size="1" className="panel-section__label">朝向</Text>
+				<input
+					type="range"
+					min={0}
+					max={360}
+					step={5}
+					value={directionInput}
+					onChange={(e) => handleRotateShield(Number(e.target.value))}
+					disabled={!canRotateShield}
+					style={{ width: 80 }}
+				/>
+				<TextField.Root
+					size="1"
+					value={directionInput.toString()}
+					onChange={(e) => {
+						const v = Number(e.target.value) || 0;
+						handleRotateShield(Math.max(0, Math.min(360, v)));
+					}}
+					style={{ width: 50 }}
+					disabled={!canRotateShield}
+				/>
+				<Text size="1" color="gray">°</Text>
 			</Flex>
 
 			<Box className="panel-divider" />
