@@ -20,8 +20,8 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 	const hasShip = ship && ship.runtime;
 
-	// 检查舰船是否有护盾规格
-	const hasShieldSpec = hasShip && ship.spec.shield && ship.spec.shield.arc > 0;
+	// 检查舰船是否有护盾规格（直接访问 ship.spec.shield）
+	const hasShieldSpec = Boolean(hasShip && ship.spec?.shield);
 	
 	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
 	const shieldDirection = hasShip ? (ship.runtime.shield?.direction ?? 0) : 0;
