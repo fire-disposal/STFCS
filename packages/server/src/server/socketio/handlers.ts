@@ -469,10 +469,20 @@ rpc.namespace("game", {
     ctx.requireRoom();
     ctx.requirePlayer();
     const p = payload as WsPayload<"game:action">;
-    if (ctx.room!.creatorId !== ctx.playerId) {
+    const room = ctx.room!;
+    const phase = room.getStateManager().getState().phase;
+    
+    if (phase !== "PLAYER_ACTION" && phase !== "DM_ACTION") {
+      throw err("当前阶段不允许操作", "INVALID_PHASE");
+    }
+    
+    if (phase === "DM_ACTION" && room.creatorId !== ctx.playerId) {
+      throw err("DM回合只有房主可操作", "DM_ONLY");
+    }
+    
+    if (phase === "PLAYER_ACTION" && room.creatorId !== ctx.playerId) {
       ctx.requireTokenControl(p.tokenId);
     }
-    const room = ctx.room!;
     
     switch (p.action) {
       case "move": {

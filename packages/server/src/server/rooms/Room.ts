@@ -154,9 +154,10 @@ export class Room {
 		const playerList = Object.keys(state.players).map(k => state.players[k]);
 		const allReady = playerList.length > 0 && playerList.every(p => p?.isReady);
 
-		if (allReady && state.phase === "DEPLOYMENT") {
-			this.startGame();
-		}
+		this.callbacks.broadcast({
+			type: "ALL_READY_STATUS",
+			payload: { allReady, playerCount: playerList.length, readyCount: playerList.filter(p => p?.isReady).length },
+		});
 	}
 
 	startGame(): void {
