@@ -103,13 +103,6 @@ rpc.namespace("room", {
     });
     if (!room) throw err("创建房间失败", "ROOM_CREATE_FAILED");
     
-    ctx.socket.join(room.id);
-    ctx.socket.data.roomId = room.id;
-    ctx.socket.data.role = "HOST";
-    
-    room.joinPlayer(ctx.socket.id, ctx.playerId, ctx.playerName);
-    ctx.state.broadcastFull();
-    
     ctx.io.emit("room:list_updated", { 
       action: "created", 
       room: { 
@@ -117,7 +110,7 @@ rpc.namespace("room", {
         name: room.name, 
         ownerId: ctx.playerId,
         ownerName: ctx.playerName,
-        playerCount: room.getPlayerCount(), 
+        playerCount: 0, 
         maxPlayers: room.maxPlayers, 
         phase: "WAITING",
       } 

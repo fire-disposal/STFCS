@@ -190,8 +190,7 @@ export class SocketNetworkManager {
 
 		try {
 			const data = await this.request("room:create", { name: options.roomName, maxPlayers: options.maxPlayers ?? 4 }, 10000);
-			this.currentRoomId = data.roomId;
-			logger.info("Room created and joined", { roomId: data.roomId });
+			logger.info("Room created", { roomId: data.roomId });
 			return { success: true, roomId: data.roomId };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Room creation failed" };

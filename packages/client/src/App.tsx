@@ -102,7 +102,7 @@ setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
 		});
 
 		if (result.success && result.roomId) {
-			notify.success("房间创建成功，点击「进入房间」开始游戏");
+			notify.success("房间创建成功，点击「进入我的房间」开始游戏");
 			setAppState("lobby");
 			setRefreshKey(Date.now());
 		} else {
