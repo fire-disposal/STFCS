@@ -13,9 +13,8 @@ import {
 	Button,
 	Dialog,
 	IconButton,
-	DropdownMenu,
 } from "@radix-ui/themes";
-import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket, FastForward, ChevronDown } from "lucide-react";
+import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket, FastForward } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
@@ -80,19 +79,17 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	}, [room]);
 
 	const handleAdvancePhase = useCallback(async () => {
-		const phase = room?.state?.currentPhase;
-		if (!phase) return;
+		const currentPhase = room?.state?.currentPhase;
+		if (!currentPhase) return;
 
-		if (phase === "PLAYER_ACTION") {
+		if (currentPhase === "PLAYER_ACTION") {
 			await send("edit:room", { action: "set_phase", phase: "DM_ACTION" });
-		} else if (phase === "DM_ACTION") {
+		} else if (currentPhase === "DM_ACTION") {
 			await send("edit:room", { action: "set_phase", phase: "TURN_END" });
-		} else if (phase === "TURN_END") {
-			const newTurn = (room?.state?.turnCount ?? 1) + 1;
-			await send("edit:room", { action: "set_turn", turn: newTurn });
-			await send("edit:room", { action: "set_phase", phase: "PLAYER_ACTION" });
+		} else if (currentPhase === "TURN_END") {
+			await send("edit:room", { action: "force_end_turn" });
 		}
-	}, [send, room?.state?.currentPhase, room?.state?.turnCount]);
+	}, [send, room?.state?.currentPhase]);
 
 	const playerId = networkManager.getPlayerId();
 	const currentPlayer = playerId ? room?.state?.players[playerId] : undefined;
