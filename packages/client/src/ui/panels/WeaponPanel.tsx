@@ -50,6 +50,7 @@ interface TargetInfo {
 interface WeaponTargetingData {
 	mountId: string;
 	validTargets: TargetInfo[];
+	uiStatus: "FIRED" | "UNAVAILABLE" | "READY" | "READY_WITH_TARGETS";
 }
 
 export interface WeaponPanelProps {
@@ -61,7 +62,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 	const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
 	const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
-	const [targetingData, setTargetingData] = useState<WeaponTargetingData | null>(null);
+	const [allWeaponsTargeting, setAllWeaponsTargeting] = useState<Map<string, WeaponTargetingData>>(new Map());
 
 	const { isAvailable, sendAttack, sendQuery } = useGameAction();
 
@@ -119,20 +120,20 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 			});
 	}, [hasShip, ship]);
 
-	// 查询火控数据
+	// 查询火控数据（整个舰船所有武器）
 	useEffect(() => {
-		if (!canAct || !selectedWeaponId) {
-			setTargetingData(null);
+		if (!canAct) {
+			setAllWeaponsTargeting(new Map());
 			return;
 		}
 
 		const fetchTargeting = async () => {
 			setIsLoading(true);
 			try {
-				const result = await sendQuery("targets", ship!.$id, selectedWeaponId);
+				const result = await sendQuery("targets", ship!.$id);
 				if (result && result.weapons) {
-					const weaponData = result.weapons.find((w: any) => w.mountId === selectedWeaponId);
-					if (weaponData) {
+					const map = new Map<string, WeaponTargetingData>();
+					for (const weaponData of result.weapons) {
 						const validTargets: TargetInfo[] = (weaponData.validTargets ?? []).map((t: any) => ({
 							id: t.targetId,
 							name: t.targetName ?? t.targetId.slice(-6),
@@ -142,8 +143,13 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 							canAttack: t.inRange && t.inArc,
 							isFriendly: t.faction === "PLAYER",
 						}));
-						setTargetingData({ mountId: selectedWeaponId, validTargets });
+						map.set(weaponData.mountId, {
+							mountId: weaponData.mountId,
+							validTargets,
+							uiStatus: weaponData.uiStatus ?? "READY",
+						});
 					}
+					setAllWeaponsTargeting(map);
 				}
 			} catch (error) {
 				console.warn("Failed to query targeting data:", error);
@@ -152,7 +158,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 		};
 
 		fetchTargeting();
-	}, [canAct, selectedWeaponId, ship, sendQuery]);
+	}, [canAct, ship, sendQuery]);
 
 	// 默认选中第一个可用武器
 	useEffect(() => {
@@ -171,17 +177,17 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 		return weapons.find((w) => w.mountId === selectedWeaponId) ?? null;
 	}, [weapons, selectedWeaponId]);
 
-	// 可攻击目标列表
+	// 可攻击目标列表（当前选中武器）
 	const attackableTargets = useMemo(() => {
-		if (!targetingData) return [];
-		return targetingData.validTargets.filter(t => t.canAttack);
-	}, [targetingData]);
+		const weaponData = allWeaponsTargeting.get(selectedWeaponId ?? "");
+		if (!weaponData) return [];
+		return weaponData.validTargets.filter((t) => t.canAttack);
+	}, [allWeaponsTargeting, selectedWeaponId]);
 
 	// 选择武器
 	const handleSelectWeapon = useCallback((weapon: WeaponStatus) => {
 		setSelectedWeaponId(weapon.mountId);
 		setSelectedTargetIds([]);
-		setTargetingData(null);
 	}, []);
 
 	// 选择目标（支持多选）
@@ -228,8 +234,22 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 				</Flex>
 				<Box className="weapon-col__content">
 					{weapons.map((w) => {
-						// 指示灯：红(不能开火) > 黄(已开火) > 绿(就绪)
-						const indicatorColor = !w.canFire ? "red" : w.hasFired ? "yellow" : "green";
+						// 指示灯颜色：从目标数据获取 uiStatus
+						// 红=不可用, 黄=已开火, 绿=待命无目标, 蓝=待命有目标
+						const targetingData = allWeaponsTargeting.get(w.mountId);
+						let indicatorColor: string;
+						if (targetingData) {
+							switch (targetingData.uiStatus) {
+								case "UNAVAILABLE": indicatorColor = "red"; break;
+								case "FIRED": indicatorColor = "yellow"; break;
+								case "READY": indicatorColor = "green"; break;
+								case "READY_WITH_TARGETS": indicatorColor = "blue"; break;
+								default: indicatorColor = "green";
+							}
+						} else {
+							// 回退逻辑
+							indicatorColor = !w.canFire ? "red" : w.hasFired ? "yellow" : "green";
+						}
 
 						return (
 							<Flex

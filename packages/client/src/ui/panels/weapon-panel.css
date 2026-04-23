@@ -134,6 +134,11 @@
 	box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
 }
 
+.weapon-indicator--blue {
+	background: #4a9eff;
+	box-shadow: 0 0 4px rgba(74, 158, 255, 0.6);
+}
+
 .weapon-item__name {
 	flex: 1;
 	font-size: 11px;
