@@ -1,0 +1,141 @@
+/**
+ * 房间内玩家列表组件样式
+ */
+
+.room-player-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+
+.room-player-list--empty {
+	color: #6b7280;
+	font-size: 12px;
+	padding: 8px;
+}
+
+.room-player-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	background: rgba(26, 45, 66, 0.6);
+	border: 1px solid rgba(43, 66, 97, 0.5);
+	transition: all 0.15s ease;
+	cursor: default;
+}
+
+.room-player-item:hover {
+	background: rgba(36, 55, 76, 0.7);
+	border-color: rgba(74, 158, 255, 0.3);
+}
+
+.room-player-item--self {
+	border-color: rgba(74, 158, 255, 0.6);
+	background: rgba(26, 50, 80, 0.7);
+}
+
+.room-player-item--self:hover {
+	border-color: rgba(74, 158, 255, 0.8);
+}
+
+.room-player-item--more {
+	padding: 4px 10px;
+	background: rgba(26, 45, 66, 0.4);
+	color: #8ba4c7;
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.room-player-info {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.room-player-name {
+	font-size: 11px;
+	color: #cfe8ff;
+	max-width: 70px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.room-player-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1px 3px;
+	font-size: 9px;
+	border-radius: 2px;
+}
+
+.room-player-badge--dm {
+	color: #ff6f8f;
+	background: rgba(255, 111, 143, 0.15);
+}
+
+.room-player-status {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+}
+
+.room-player-status--ready {
+	color: #2ecc71;
+}
+
+.room-player-status--not-ready {
+	color: #6b7280;
+}
+
+/* 大尺寸变体 */
+.room-player-list--large .room-player-item {
+	padding: 8px 12px;
+	gap: 10px;
+}
+
+.room-player-list--large .room-player-name {
+	font-size: 13px;
+	max-width: 100px;
+}
+
+/* 紧凑变体 */
+.room-player-list--compact .room-player-item {
+	padding: 2px 6px;
+	gap: 4px;
+}
+
+.room-player-list--compact .room-player-name {
+	font-size: 10px;
+	max-width: 50px;
+}
+
+/* 详细列表变体（用于对话框） */
+.room-player-list--detailed {
+	flex-direction: column;
+	gap: 8px;
+}
+
+.room-player-list--detailed .room-player-item {
+	padding: 10px 14px;
+	gap: 12px;
+}
+
+.room-player-list--detailed .room-player-name {
+	font-size: 14px;
+	max-width: 150px;
+}
+
+.room-player-list--detailed .room-player-info {
+	flex: 1;
+}
+
+.room-player-list--detailed .room-player-status {
+	width: 20px;
+	height: 20px;
+}

@@ -13,7 +13,6 @@ import {
 	Badge,
 	Button,
 	Dialog,
-	ScrollArea,
 	IconButton,
 } from "@radix-ui/themes";
 import { Crown, LogOut, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
@@ -29,6 +28,9 @@ import ViewControlPanel from "@/ui/panels/ViewControlPanel";
 import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 import ReadyStatusFloat from "@/ui/panels/ReadyStatusFloat";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
+import RoomPlayerList from "@/ui/panels/RoomPlayerList";
+import { Avatar } from "@/ui/shared/Avatar";
+import "./panels/room-player-list.css";
 
 const PHASE_NAMES: Record<string, string> = {
 	DEPLOYMENT: "部署",
@@ -154,10 +156,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		},
 	], [selectedShip, handleRealityEdit, isHost, room, networkManager, cursorPosition, phase, turnCount, activeFaction]);
 
-	if (!room || !room.state) {
+	if (!room || !room.state || !networkManager.getCurrentRoomId()) {
 		return (
-			<Box style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+			<Box style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
 				<Text color="gray">连接中...</Text>
+				<Text size="1" color="gray">{networkManager.getCurrentRoomId() ? "同步状态..." : "等待房间..."}</Text>
 			</Box>
 		);
 	}
@@ -180,13 +183,11 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 					</Flex>
 
 					<Flex align="center" gap="2" style={{ flex: 1, justifyContent: "center" }}>
-						{players.slice(0, 6).map((p) => (
-							<Flex key={p.sessionId} align="center" gap="1" style={{ padding: "2px 6px", background: "rgba(26, 45, 66, 0.5)", borderRadius: 2 }}>
-								{p.role === "HOST" && <Crown size={10} color="#ff6f8f" />}
-								<Text size="1" style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>{p.nickname}</Text>
-								{p.isReady ? <CheckCircle size={10} color="#2ecc71" /> : <XCircle size={10} color="#6b7280" />}
-							</Flex>
-						))}
+						<RoomPlayerList
+							players={room.state.players}
+							currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
+							maxVisible={6}
+						/>
 					</Flex>
 
 					<Flex align="center" gap="2">
@@ -224,21 +225,27 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							<Users size={16} /> 玩家列表
 						</Flex>
 					</Dialog.Title>
-					<ScrollArea style={{ maxHeight: 300 }}>
-						<Flex direction="column" gap="2">
-							{players.map((p) => (
-								<Card key={p.sessionId} variant="surface" style={{
-									borderLeft: p.sessionId === room.sessionId ? "2px solid #4a9eff" : "none"
-								}}>
-									<Flex align="center" gap="2">
-										{p.role === "HOST" && <Crown size={14} color="#ff6f8f" />}
-										<Text size="2" style={{ flex: 1 }}>{p.nickname}</Text>
-										{p.isReady ? <CheckCircle size={12} color="#2ecc71" /> : <XCircle size={12} color="#6b7280" />}
-									</Flex>
-								</Card>
-							))}
-						</Flex>
-					</ScrollArea>
+					<div className="room-player-list room-player-list--detailed">
+						{players.map((p) => (
+							<div
+								key={p.sessionId}
+								className={`room-player-item ${p.sessionId === room.sessionId ? "room-player-item--self" : ""}`}
+							>
+								<Avatar userName={p.nickname} size={32} />
+								<div className="room-player-info">
+									<span className="room-player-name">{p.nickname}</span>
+									{p.role === "HOST" && (
+										<span className="room-player-badge room-player-badge--dm">
+											<Crown size={12} />
+										</span>
+									)}
+								</div>
+								<div className={`room-player-status ${p.isReady ? "room-player-status--ready" : "room-player-status--not-ready"}`}>
+									{p.isReady ? <CheckCircle size={14} /> : <XCircle size={14} />}
+								</div>
+							</div>
+						))}
+					</div>
 					<Flex justify="end" gap="2" mt="4">
 						{isHost && (
 							<Button variant="soft" onClick={() => {
