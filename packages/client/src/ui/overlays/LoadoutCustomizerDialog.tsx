@@ -796,64 +796,322 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         />
                                     </Card>
 
-                                    <Card>
-                                        <Text weight="bold" mb="2">挂点武器</Text>
-                                        {shipDraft?.spec.mounts?.length ? (
-                                            <Flex direction="column" gap="2">
-                                                <Select.Root value={mountSelection} onValueChange={setMountSelection}>
-                                                    <Select.Trigger />
-                                                    <Select.Content>
-                                                        {shipDraft.spec.mounts.map((mount) => (
-                                                            <Select.Item key={mount.id} value={mount.id}>
-                                                                {mount.displayName ?? mount.id} ({mount.size})
-                                                            </Select.Item>
-                                                        ))}
-                                                    </Select.Content>
-                                                </Select.Root>
+                                    <Card style={{ marginTop: 16 }}>
+                                        <Text weight="bold" mb="2">挂点管理</Text>
+                                        <Grid columns="30% 70%" gap="4">
+                                            <Box style={{ borderRight: "1px solid rgba(255,255,255,0.1)", paddingRight: 16 }}>
+                                                <Button
+                                                    size="1"
+                                                    variant="soft"
+                                                    onClick={() => {
+                                                        const existingIds = shipDraft?.spec.mounts?.map((m) => m.id) ?? [];
+                                                        let newId = "mount_1";
+                                                        let counter = 1;
+                                                        while (existingIds.includes(newId)) {
+                                                            counter++;
+                                                            newId = `mount_${counter}`;
+                                                        }
+                                                        updateShipDraft((draft) => {
+                                                            draft.spec.mounts = draft.spec.mounts ?? [];
+                                                            draft.spec.mounts.push({
+                                                                id: newId,
+                                                                size: WeaponSlotSize.SMALL,
+                                                                position: { x: 0, y: 0 },
+                                                                arc: 360,
+                                                            });
+                                                        });
+                                                        setMountSelection(newId);
+                                                        notify.success("已添加挂点");
+                                                    }}
+                                                    data-magnetic
+                                                >
+                                                    <Plus size={12} /> 添加挂点
+                                                </Button>
 
-                                                {selectedMount && (
-                                                    <Flex align="center" gap="2">
-                                                        <Text size="1">武器:</Text>
-                                                        <Select.Root
-                                                            value={selectedMount.weapon?.$id ?? ""}
-                                                            onValueChange={(v) => {
-                                                                if (!v) return;
-                                                                const matched = weaponBuilds.find((item) => item.$id === v);
-                                                                if (!matched) return;
-                                                                if (!isWeaponSizeCompatible(selectedMount.size, matched.spec.size)) {
-                                                                    notify.error("尺寸不兼容");
-                                                                    return;
-                                                                }
-                                                                updateShipDraft((draft) => {
-                                                                    const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
-                                                                    if (mount) mount.weapon = matched;
-                                                                });
-                                                                notify.success("已挂载");
-                                                            }}
-                                                        >
-                                                            <Select.Trigger placeholder="选择武器..." />
-                                                            <Select.Content>
-                                                                {compatibleWeapons.map((item) => (
-                                                                    <Select.Item key={item.$id} value={item.$id}>
-                                                                        {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
-                                                                    </Select.Item>
-                                                                ))}
-                                                            </Select.Content>
-                                                        </Select.Root>
-                                                        {selectedMount.weapon && (
-                                                            <Button size="1" variant="ghost" color="red" onClick={() => {
-                                                                updateShipDraft((draft) => {
-                                                                    const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
-                                                                    if (mount) mount.weapon = undefined;
-                                                                });
-                                                            }}>卸载</Button>
-                                                        )}
+                                                <Box mt="2" style={{ maxHeight: 300, overflowY: "auto" }}>
+                                                    {shipDraft?.spec.mounts?.length ? (
+                                                        <Flex direction="column" gap="1">
+                                                            {shipDraft.spec.mounts.map((mount) => (
+                                                                <Flex
+                                                                    key={mount.id}
+                                                                    align="center"
+                                                                    justify="between"
+                                                                    gap="2"
+                                                                    onClick={() => setMountSelection(mount.id)}
+                                                                    style={{
+                                                                        padding: "6px 8px",
+                                                                        borderRadius: 4,
+                                                                        border: mountSelection === mount.id ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
+                                                                        background: mountSelection === mount.id ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    <Box style={{ minWidth: 0, flex: 1 }}>
+                                                                        <Text size="1" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                            {mount.displayName ?? mount.id}
+                                                                        </Text>
+                                                                        <Badge size="1">{mount.size}</Badge>
+                                                                    </Box>
+                                                                    <Button
+                                                                        size="1"
+                                                                        variant="ghost"
+                                                                        color="red"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (window.confirm(`确定删除挂点 "${mount.displayName ?? mount.id}"？`)) {
+                                                                                updateShipDraft((draft) => {
+                                                                                    draft.spec.mounts = draft.spec.mounts?.filter((m) => m.id !== mount.id) ?? [];
+                                                                                });
+                                                                                if (mountSelection === mount.id) {
+                                                                                    setMountSelection("");
+                                                                                }
+                                                                                notify.success("已删除挂点");
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 size={12} />
+                                                                    </Button>
+                                                                </Flex>
+                                                            ))}
+                                                        </Flex>
+                                                    ) : (
+                                                        <Text color="gray" size="1">暂无挂点</Text>
+                                                    )}
+                                                </Box>
+                                            </Box>
+
+                                            <Box>
+                                                {selectedMount ? (
+                                                    <Flex direction="column" gap="3">
+                                                        <Box>
+                                                            <Text size="1" color="gray">显示名称</Text>
+                                                            <TextField.Root
+                                                                value={selectedMount.displayName ?? selectedMount.id}
+                                                                onChange={(e) => {
+                                                                    updateShipDraft((draft) => {
+                                                                        const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                        if (mount) mount.displayName = e.target.value;
+                                                                    });
+                                                                }}
+                                                            />
+                                                        </Box>
+
+                                                        <Box>
+                                                            <Text size="1" color="gray">尺寸</Text>
+                                                            <Select.Root
+                                                                value={selectedMount.size}
+                                                                onValueChange={(v) => {
+                                                                    updateShipDraft((draft) => {
+                                                                        const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                        if (mount) {
+                                                                            mount.size = v as WeaponSlotSize;
+                                                                            mount.weapon = undefined;
+                                                                        }
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <Select.Trigger />
+                                                                <Select.Content>
+                                                                    {Object.values(WeaponSlotSize).map((v) => (
+                                                                        <Select.Item key={v} value={v}>{v}</Select.Item>
+                                                                    ))}
+                                                                </Select.Content>
+                                                            </Select.Root>
+                                                        </Box>
+
+                                                        <Grid columns="2" gap="2">
+                                                            <Box>
+                                                                <Text size="1" color="gray">X 偏移</Text>
+                                                                <Flex align="center" gap="2">
+                                                                    <input
+                                                                        type="range"
+                                                                        min={-500}
+                                                                        max={500}
+                                                                        value={selectedMount.position?.x ?? 0}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value);
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), x: value };
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 100 }}
+                                                                    />
+                                                                    <TextField.Root
+                                                                        type="number"
+                                                                        value={String(selectedMount.position?.x ?? 0)}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value) || 0;
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), x: value };
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 60 }}
+                                                                    />
+                                                                </Flex>
+                                                            </Box>
+
+                                                            <Box>
+                                                                <Text size="1" color="gray">Y 偏移</Text>
+                                                                <Flex align="center" gap="2">
+                                                                    <input
+                                                                        type="range"
+                                                                        min={-500}
+                                                                        max={500}
+                                                                        value={selectedMount.position?.y ?? 0}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value);
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), y: value };
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 100 }}
+                                                                    />
+                                                                    <TextField.Root
+                                                                        type="number"
+                                                                        value={String(selectedMount.position?.y ?? 0)}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value) || 0;
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), y: value };
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 60 }}
+                                                                    />
+                                                                </Flex>
+                                                            </Box>
+                                                        </Grid>
+
+                                                        <Grid columns="2" gap="2">
+                                                            <Box>
+                                                                <Text size="1" color="gray">朝向角度</Text>
+                                                                <Flex align="center" gap="2">
+                                                                    <input
+                                                                        type="range"
+                                                                        min={-180}
+                                                                        max={180}
+                                                                        value={selectedMount.facing ?? 0}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value);
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.facing = value;
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 100 }}
+                                                                    />
+                                                                    <TextField.Root
+                                                                        type="number"
+                                                                        value={String(selectedMount.facing ?? 0)}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value) || 0;
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.facing = value;
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 60 }}
+                                                                    />
+                                                                </Flex>
+                                                            </Box>
+
+                                                            <Box>
+                                                                <Text size="1" color="gray">射界角度</Text>
+                                                                <Flex align="center" gap="2">
+                                                                    <input
+                                                                        type="range"
+                                                                        min={0}
+                                                                        max={360}
+                                                                        value={selectedMount.arc ?? 360}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value);
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.arc = value;
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 100 }}
+                                                                    />
+                                                                    <TextField.Root
+                                                                        type="number"
+                                                                        value={String(selectedMount.arc ?? 360)}
+                                                                        onChange={(e) => {
+                                                                            const value = Number(e.target.value) || 0;
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.arc = value;
+                                                                            });
+                                                                        }}
+                                                                        style={{ width: 60 }}
+                                                                    />
+                                                                </Flex>
+                                                            </Box>
+                                                        </Grid>
+
+                                                        <Box>
+                                                            <Text size="1" color="gray">武器挂载</Text>
+                                                            <Flex align="center" gap="2">
+                                                                <Select.Root
+                                                                    value={selectedMount.weapon?.$id ?? "__NONE__"}
+                                                                    onValueChange={(v) => {
+                                                                        if (v === "__NONE__") {
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.weapon = undefined;
+                                                                            });
+                                                                            return;
+                                                                        }
+                                                                        const matched = weaponBuilds.find((item) => item.$id === v);
+                                                                        if (!matched) return;
+                                                                        if (!isWeaponSizeCompatible(selectedMount.size, matched.spec.size)) {
+                                                                            notify.error("尺寸不兼容");
+                                                                            return;
+                                                                        }
+                                                                        updateShipDraft((draft) => {
+                                                                            const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                            if (mount) mount.weapon = matched;
+                                                                        });
+                                                                        notify.success("已挂载");
+                                                                    }}
+                                                                >
+                                                                    <Select.Trigger placeholder="选择武器..." />
+                                                                    <Select.Content>
+                                                                        <Select.Item value="__NONE__">不装载</Select.Item>
+                                                                        {compatibleWeapons.map((item) => (
+                                                                            <Select.Item key={item.$id} value={item.$id}>
+                                                                                {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
+                                                                            </Select.Item>
+                                                                        ))}
+                                                                    </Select.Content>
+                                                                </Select.Root>
+                                                                {selectedMount.weapon && (
+                                                                    <Button
+                                                                        size="1"
+                                                                        variant="ghost"
+                                                                        color="red"
+                                                                        onClick={() => {
+                                                                            updateShipDraft((draft) => {
+                                                                                const mount = draft.spec.mounts?.find((m) => m.id === selectedMount.id);
+                                                                                if (mount) mount.weapon = undefined;
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        卸载
+                                                                    </Button>
+                                                                )}
+                                                            </Flex>
+                                                        </Box>
+                                                    </Flex>
+                                                ) : (
+                                                    <Flex align="center" justify="center" style={{ height: 200 }}>
+                                                        <Text color="gray" size="2">请选择挂点</Text>
                                                     </Flex>
                                                 )}
-                                            </Flex>
-                                        ) : (
-                                            <Text color="gray">无挂点</Text>
-                                        )}
+                                            </Box>
+                                        </Grid>
                                     </Card>
                                 </Flex>
 
@@ -993,202 +1251,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     </Grid>
                                                 )}
 
-                                                <Separator size="2" />
-
-                                                <Box>
-                                                    <Text size="1" weight="bold" mb="1">挂点配置（位置 / 朝向 / 装载）</Text>
-                                                    {shipDraft.spec.mounts?.length ? (
-                                                        <Flex direction="column" gap="3">
-                                                            {shipDraft.spec.mounts.map((mount) => {
-                                                                const mountWeapons = weaponBuilds.filter((item) => isWeaponSizeCompatible(mount.size, item.spec.size));
-                                                                return (
-                                                                    <Card key={mount.id} variant="surface">
-                                                                        <Flex justify="between" align="center" mb="2" wrap="wrap" gap="2">
-                                                                            <Text size="2" weight="bold">{mount.displayName ?? mount.id}</Text>
-                                                                            <Badge size="1">{mount.size}</Badge>
-                                                                        </Flex>
-
-                                                                        <Grid columns="2" gap="2">
-                                                                            <Box>
-                                                                                <Text size="1" color="gray">X 偏移</Text>
-                                                                                <Flex align="center" gap="2">
-                                                                                    <input
-                                                                                        type="range"
-                                                                                        min={-500}
-                                                                                        max={500}
-                                                                                        value={mount.position?.x ?? 0}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value);
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), x: value };
-                                                                                            });
-                                                                                        }}
-                                                                                        style={{ width: 120 }}
-                                                                                    />
-                                                                                    <TextField.Root
-                                                                                        type="number"
-                                                                                        value={String(mount.position?.x ?? 0)}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value) || 0;
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), x: value };
-                                                                                            });
-                                                                                        }}
-                                                                                    />
-                                                                                </Flex>
-                                                                            </Box>
-
-                                                                            <Box>
-                                                                                <Text size="1" color="gray">Y 偏移</Text>
-                                                                                <Flex align="center" gap="2">
-                                                                                    <input
-                                                                                        type="range"
-                                                                                        min={-500}
-                                                                                        max={500}
-                                                                                        value={mount.position?.y ?? 0}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value);
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), y: value };
-                                                                                            });
-                                                                                        }}
-                                                                                        style={{ width: 120 }}
-                                                                                    />
-                                                                                    <TextField.Root
-                                                                                        type="number"
-                                                                                        value={String(mount.position?.y ?? 0)}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value) || 0;
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.position = { ...(m.position ?? { x: 0, y: 0 }), y: value };
-                                                                                            });
-                                                                                        }}
-                                                                                    />
-                                                                                </Flex>
-                                                                            </Box>
-
-                                                                            <Box>
-                                                                                <Text size="1" color="gray">朝向角度</Text>
-                                                                                <Flex align="center" gap="2">
-                                                                                    <input
-                                                                                        type="range"
-                                                                                        min={-180}
-                                                                                        max={180}
-                                                                                        value={mount.facing ?? 0}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value);
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.facing = value;
-                                                                                            });
-                                                                                        }}
-                                                                                        style={{ width: 120 }}
-                                                                                    />
-                                                                                    <TextField.Root
-                                                                                        type="number"
-                                                                                        value={String(mount.facing ?? 0)}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value) || 0;
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.facing = value;
-                                                                                            });
-                                                                                        }}
-                                                                                    />
-                                                                                </Flex>
-                                                                            </Box>
-
-                                                                            <Box>
-                                                                                <Text size="1" color="gray">射界角度</Text>
-                                                                                <Flex align="center" gap="2">
-                                                                                    <input
-                                                                                        type="range"
-                                                                                        min={0}
-                                                                                        max={360}
-                                                                                        value={mount.arc ?? 360}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value);
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.arc = value;
-                                                                                            });
-                                                                                        }}
-                                                                                        style={{ width: 120 }}
-                                                                                    />
-                                                                                    <TextField.Root
-                                                                                        type="number"
-                                                                                        value={String(mount.arc ?? 360)}
-                                                                                        onChange={(e) => {
-                                                                                            const value = Number(e.target.value) || 0;
-                                                                                            updateShipDraft((d) => {
-                                                                                                const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                                if (!m) return;
-                                                                                                m.arc = value;
-                                                                                            });
-                                                                                        }}
-                                                                                    />
-                                                                                </Flex>
-                                                                            </Box>
-                                                                        </Grid>
-
-                                                                        <Box mt="2">
-                                                                            <Text size="1" color="gray">装载武器</Text>
-                                                                            <Select.Root
-                                                                                value={mount.weapon?.$id ?? "__NONE__"}
-                                                                                onValueChange={(v) => {
-                                                                                    updateShipDraft((d) => {
-                                                                                        const m = d.spec.mounts?.find((it) => it.id === mount.id);
-                                                                                        if (!m) return;
-                                                                                        if (v === "__NONE__") {
-                                                                                            m.weapon = undefined;
-                                                                                            return;
-                                                                                        }
-                                                                                        const matched = weaponBuilds.find((item) => item.$id === v);
-                                                                                        if (matched && isWeaponSizeCompatible(m.size, matched.spec.size)) {
-                                                                                            m.weapon = matched;
-                                                                                        }
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                <Select.Trigger />
-                                                                                <Select.Content>
-                                                                                    <Select.Item value="__NONE__">不装载</Select.Item>
-                                                                                    {mountWeapons.map((item) => (
-                                                                                        <Select.Item key={item.$id} value={item.$id}>
-                                                                                            {item.metadata?.name ?? shortId(item.$id)} ({item.spec.size})
-                                                                                        </Select.Item>
-                                                                                    ))}
-                                                                                </Select.Content>
-                                                                            </Select.Root>
-                                                                        </Box>
-                                                                    </Card>
-                                                                );
-                                                            })}
-
-                                                            <Box>
-                                                                <Text size="1" color="gray" mb="1">挂点配置 JSON 预览</Text>
-                                                                <TextArea
-                                                                    rows={8}
-                                                                    value={JSON.stringify(shipDraft.spec.mounts ?? [], null, 2)}
-                                                                    readOnly
-                                                                />
-                                                            </Box>
-                                                        </Flex>
-                                                    ) : (
-                                                        <Text color="gray" size="1">该舰船暂无挂点配置</Text>
-                                                    )}
-                                                </Box>
+                                                
                                             </Flex>
                                         )}
 
