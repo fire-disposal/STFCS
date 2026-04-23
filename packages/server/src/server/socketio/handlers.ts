@@ -39,7 +39,7 @@ rpc.namespace("auth", {
     const p = payload as WsPayload<"auth:login">;
     let result = await playerInfoService.findByUsername(p.playerName);
     let playerId: string;
-    
+
     if (result) {
       playerId = result.file.info.playerId;
       await playerInfoService.updateInfo(playerId, { lastLogin: Date.now() });
@@ -47,7 +47,7 @@ rpc.namespace("auth", {
       playerId = generateShortId();
       await playerInfoService.create(p.playerName, playerId);
     }
-    
+
     ctx.socket.data.playerId = playerId;
     ctx.socket.data.playerName = p.playerName;
     await playerProfileService.createAccount(playerId, p.playerName);
@@ -87,12 +87,12 @@ rpc.namespace("room", {
   create: async (payload: unknown, ctx) => {
     ctx.requireAuth();
     const p = payload as WsPayload<"room:create">;
-    
+
     const existingRooms = ctx.roomManager.getAllRooms().filter(r => r.creatorId === ctx.playerId);
     if (existingRooms.length > 0) {
       throw err("你已拥有一个房间，请先删除现有房间", "ALREADY_HAS_ROOM");
     }
-    
+
     const room = ctx.roomManager.createRoom({
       roomName: p.name,
       maxPlayers: p.maxPlayers ?? 4,
@@ -102,20 +102,20 @@ rpc.namespace("room", {
       creatorName: ctx.playerName,
     });
     if (!room) throw err("创建房间失败", "ROOM_CREATE_FAILED");
-    
-    ctx.io.emit("room:list_updated", { 
-      action: "created", 
-      room: { 
-        roomId: room.id, 
-        name: room.name, 
+
+    ctx.io.emit("room:list_updated", {
+      action: "created",
+      room: {
+        roomId: room.id,
+        name: room.name,
         ownerId: ctx.playerId,
         ownerName: ctx.playerName,
-        playerCount: 0, 
-        maxPlayers: room.maxPlayers, 
-        phase: "WAITING",
-      } 
+        playerCount: 0,
+        maxPlayers: room.maxPlayers,
+        phase: room.phase,
+      }
     });
-    
+
     return { roomId: room.id, roomName: room.name, ownerId: ctx.playerId, isHost: true };
   },
   list: async (_, ctx) => {
@@ -137,58 +137,64 @@ rpc.namespace("room", {
     const p = payload as WsPayload<"room:join">;
     const room = ctx.roomManager.getRoom(p.roomId);
     if (!room) throw err("房间不存在", "ROOM_NOT_FOUND");
-    
+
     const joinSuccess = ctx.roomManager.joinRoom(p.roomId, ctx.socket.id, ctx.playerId, ctx.playerName);
     if (!joinSuccess) throw err("无法加入房间（可能已在房间中或房间已满）", "JOIN_FAILED");
-    
+
     ctx.socket.join(p.roomId);
     ctx.socket.data.roomId = p.roomId;
     const isHost = room.creatorId === ctx.playerId;
     const role = isHost ? "HOST" : "PLAYER";
     ctx.socket.data.role = role;
-    ctx.state.broadcastFull();
-    
-    ctx.io.emit("room:list_updated", { 
-      action: "updated", 
-      room: { 
-        roomId: p.roomId, 
-        name: room.name, 
+
+    ctx.io.emit("room:list_updated", {
+      action: "updated",
+      room: {
+        roomId: p.roomId,
+        name: room.name,
         ownerId: room.creatorId,
         ownerName: room.creatorName,
-        playerCount: room.getPlayerCount(), 
-        maxPlayers: room.maxPlayers, 
+        playerCount: room.getPlayerCount(),
+        maxPlayers: room.maxPlayers,
         phase: room.phase,
-      } 
+      }
     });
-    
-    return { roomId: p.roomId, roomName: room.name, ownerId: room.creatorId, isHost, role };
+
+    return {
+      roomId: p.roomId,
+      roomName: room.name,
+      ownerId: room.creatorId,
+      isHost,
+      role,
+      state: room.getGameState(),
+    };
   },
-leave: async (_, ctx) => {
+  leave: async (_, ctx) => {
     ctx.requireRoom();
     const room = ctx.roomManager.getRoom(ctx.roomId);
-    
+
     const leaveSuccess = ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
-    
+
     ctx.socket.leave(ctx.roomId);
     ctx.socket.data.roomId = undefined;
     ctx.socket.data.role = undefined;
-    
+
     if (room) {
       const playerCountAfter = room.getPlayerCount();
-      ctx.io.emit("room:list_updated", { 
-        action: "updated", 
-        room: { 
-          roomId: ctx.roomId, 
-          name: room.name, 
+      ctx.io.emit("room:list_updated", {
+        action: "updated",
+        room: {
+          roomId: ctx.roomId,
+          name: room.name,
           ownerId: room.creatorId,
           ownerName: room.creatorName,
-          playerCount: playerCountAfter, 
-          maxPlayers: room.maxPlayers, 
+          playerCount: playerCountAfter,
+          maxPlayers: room.maxPlayers,
           phase: room.phase,
-        } 
+        }
       });
     }
-    
+
     if (!leaveSuccess) {
       console.warn(`leaveRoom returned false for player ${ctx.playerId} in room ${ctx.roomId}`);
     }
@@ -256,7 +262,7 @@ rpc.namespace("customize", {
   token: async (payload: unknown, ctx): Promise<WsResponseData<"customize:token">> => {
     ctx.requireAuth();
     const p = payload as WsPayload<"customize:token">;
-    
+
     switch (p.action) {
       case "list": {
         const ships = await playerProfileService.getPlayerShips(ctx.playerId);
@@ -294,11 +300,11 @@ rpc.namespace("customize", {
         throw err("未知操作", "UNKNOWN_ACTION");
     }
   },
-  
+
   weapon: async (payload: unknown, ctx) => {
     ctx.requireAuth();
     const p = payload as WsPayload<"customize:weapon">;
-    
+
     switch (p.action) {
       case "list": {
         const weapons = await playerProfileService.getPlayerWeapons(ctx.playerId);
@@ -342,7 +348,7 @@ rpc.namespace("save", {
   action: async (payload: unknown, ctx) => {
     ctx.requireAuth();
     const p = payload as WsPayload<"save:action">;
-    
+
     switch (p.action) {
       case "list": {
         const saves = await playerProfileService.listSaves(ctx.playerId);
@@ -471,19 +477,19 @@ rpc.namespace("game", {
     const p = payload as WsPayload<"game:action">;
     const room = ctx.room!;
     const phase = room.getStateManager().getState().phase;
-    
+
     if (phase !== "PLAYER_ACTION" && phase !== "DM_ACTION") {
       throw err("当前阶段不允许操作", "INVALID_PHASE");
     }
-    
+
     if (phase === "DM_ACTION" && room.creatorId !== ctx.playerId) {
       throw err("DM回合只有房主可操作", "DM_ONLY");
     }
-    
+
     if (phase === "PLAYER_ACTION" && room.creatorId !== ctx.playerId) {
       ctx.requireTokenControl(p.tokenId);
     }
-    
+
     switch (p.action) {
       case "move": {
         const token = room.getCombatToken(p.tokenId);
@@ -560,10 +566,10 @@ rpc.namespace("game", {
         const attackerToken = room.getCombatToken(p.tokenId);
         if (!attackerToken) throw err("攻击舰船不存在", "TOKEN_NOT_FOUND");
 
-const allocations: WeaponAllocation[] = p.allocations.map((a: { mountId: string; targets: { targetId: string; shots: number }[] }) => ({
-        mountId: a.mountId,
-        targets: a.targets.map((t: { targetId: string; shots: number }) => ({ targetId: t.targetId, shotCount: t.shots })),
-      }));
+        const allocations: WeaponAllocation[] = p.allocations.map((a: { mountId: string; targets: { targetId: string; shots: number }[] }) => ({
+          mountId: a.mountId,
+          targets: a.targets.map((t: { targetId: string; shots: number }) => ({ targetId: t.targetId, shotCount: t.shots })),
+        }));
 
         const validation = validateAttackAllocations(attackerToken, allocations);
         if (!validation.valid) {
@@ -577,22 +583,22 @@ const allocations: WeaponAllocation[] = p.allocations.map((a: { mountId: string;
         let totalFluxCost = 0;
         const updatedWeapons = attackerRuntime.weapons ? [...attackerRuntime.weapons] : [];
 
-for (const alloc of p.allocations) {
-        const mount = attackerSpec.mounts?.find((m: { id: string }) => m.id === alloc.mountId);
-        const weaponIdx = updatedWeapons.findIndex((w: { mountId: string }) => w.mountId === alloc.mountId);
-        if (weaponIdx === -1 || !mount) continue;
-        const weaponRuntime = updatedWeapons[weaponIdx];
-        if (!weaponRuntime) continue;
-        const weaponSpec = mount.weapon?.spec;
-        if (!weaponSpec) continue;
-        let lastHitTargetPos = attackerPos;
+        for (const alloc of p.allocations) {
+          const mount = attackerSpec.mounts?.find((m: { id: string }) => m.id === alloc.mountId);
+          const weaponIdx = updatedWeapons.findIndex((w: { mountId: string }) => w.mountId === alloc.mountId);
+          if (weaponIdx === -1 || !mount) continue;
+          const weaponRuntime = updatedWeapons[weaponIdx];
+          if (!weaponRuntime) continue;
+          const weaponSpec = mount.weapon?.spec;
+          if (!weaponSpec) continue;
+          let lastHitTargetPos = attackerPos;
 
-        for (const target of alloc.targets) {
-          const targetToken = room.getCombatToken(target.targetId);
-          if (!targetToken) continue;
-          const targetRuntime = targetToken.runtime;
-          if (!targetRuntime || targetRuntime.destroyed) continue;
-          const targetPos = targetRuntime.position ?? { x: 0, y: 0 };
+          for (const target of alloc.targets) {
+            const targetToken = room.getCombatToken(target.targetId);
+            if (!targetToken) continue;
+            const targetRuntime = targetToken.runtime;
+            if (!targetRuntime || targetRuntime.destroyed) continue;
+            const targetPos = targetRuntime.position ?? { x: 0, y: 0 };
 
             const attackResult = calculateWeaponAttack(
               weaponSpec,
@@ -712,12 +718,12 @@ rpc.namespace("edit", {
     ctx.requireHost();
     const p = payload as WsPayload<"edit:token">;
     const room = ctx.room!;
-    
+
     switch (p.action) {
       case "create": {
         if (!p.token) throw err("需要 token 数据", "TOKEN_DATA_REQUIRED");
         const tokenId = `token_${generateShortId()}_${Date.now()}`;
-        
+
         const baseName = p.token.metadata?.name ?? p.token.$presetRef?.split(":").pop() ?? "舰船";
         const existingTokens = room.getCombatTokens();
         const sameTypeCount = existingTokens.filter(t => {
@@ -725,7 +731,7 @@ rpc.namespace("edit", {
           return existingBaseName === baseName;
         }).length;
         const displayName = `${baseName} ${sameTypeCount + 1}`;
-        
+
         const createToken: CombatToken = {
           ...p.token,
           $id: tokenId,
@@ -828,11 +834,11 @@ rpc.namespace("edit", {
         throw err("未知操作", "UNKNOWN_ACTION");
     }
   },
-  
+
   room: async (payload: unknown, ctx) => {
     ctx.requireHost();
     const p = payload as WsPayload<"edit:room">;
-    
+
     switch (p.action) {
       case "set_modifier": {
         if (!p.key) throw err("需要 key", "KEY_REQUIRED");
@@ -882,7 +888,7 @@ export function setupSocketIO(io: any, roomManager: any): void {
   roomManager.setOnRoomRemove(async (room: any, roomId: string) => {
     const gameState = room.getGameState();
     const creatorId = room.creatorId;
-    
+
     if (gameState && creatorId && gameState.turnCount > 0) {
       const archiveId = `save_${roomId}_${Date.now()}`;
       const archive = {
@@ -905,11 +911,11 @@ export function setupSocketIO(io: any, roomManager: any): void {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      
+
       await playerInfoService.addRoomSave(creatorId, archive);
       console.log(`[RoomManager] Auto-saved room ${roomId} to archive ${archiveId} for creator ${creatorId}`);
     }
-    
+
     io.emit("room:list_updated", { action: "removed", roomId });
   });
 

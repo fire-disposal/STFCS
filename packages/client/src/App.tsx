@@ -28,10 +28,10 @@ const App: React.FC = () => {
 		refreshKey
 	);
 
-const myRoom = useMemo(() => {
-    if (!rooms.length || !playerId) return null;
-    return rooms.find((r) => r.ownerId === playerId) ?? null;
-  }, [playerId, rooms]);
+	const myRoom = useMemo(() => {
+		if (!rooms.length || !playerId) return null;
+		return rooms.find((r) => r.ownerId === playerId) ?? null;
+	}, [playerId, rooms]);
 
 	useEffect(() => {
 		const manager = new SocketNetworkManager(DEFAULT_WS_URL);
@@ -48,14 +48,14 @@ const myRoom = useMemo(() => {
 			const restoredName = userService.restoreUsername();
 			if (restoredName) {
 				manager.authenticate(restoredName).then((result) => {
-if (result.success) {
-setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
-				setUserName(restoredName);
-				setUserProfile(result.profile ?? { nickname: restoredName, avatar: null });
-				setAppState("lobby");
-				notify.success(`欢迎回来，${restoredName}！`);
-				setRefreshKey(Date.now());
-			}
+					if (result.success) {
+						setPlayerId(networkManagerRef.current?.getPlayerId() ?? null);
+						setUserName(restoredName);
+						setUserProfile(result.profile ?? { nickname: restoredName, avatar: null });
+						setAppState("lobby");
+						notify.success(`欢迎回来，${restoredName}！`);
+						setRefreshKey(Date.now());
+					}
 				});
 			}
 		});

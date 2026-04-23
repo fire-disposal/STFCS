@@ -141,6 +141,17 @@ export function useSocketRoom(
 			});
 		} else {
 			log("no existing state, waiting for sync:full");
+
+			const roomId = nm.getCurrentRoomId();
+			if (roomId) {
+				void nm.requestFullState()
+					.then((state) => {
+						log("sync:request_full resolved", { roomId: (state as any)?.roomId ?? roomId });
+					})
+					.catch((error) => {
+						log("sync:request_full failed", { roomId, error: error instanceof Error ? error.message : error });
+					});
+			}
 		}
 
 		return () => {
@@ -164,17 +175,20 @@ export function useSocketRoom(
 		if (onLeaveRef.current) onLeaveRef.current();
 	}, []);
 
-	if (!roomState?.roomId) return null;
+	const socketRoom = useMemo<SocketRoom | null>(() => {
+		if (!roomState?.roomId) return null;
+		return {
+			state: roomState,
+			sessionId: roomState.playerId,
+			roomId: roomState.roomId,
+			send,
+			leave,
+		};
+	}, [roomState, send, leave]);
 
-	const socketRoom = useMemo(() => ({
-		state: roomState,
-		sessionId: roomState.playerId,
-		roomId: roomState.roomId,
-		send,
-		leave,
-	}), [roomState, send, leave]);
-
-	setGameRoomRef(socketRoom);
+	useEffect(() => {
+		setGameRoomRef(socketRoom);
+	}, [socketRoom]);
 
 	return socketRoom;
 }

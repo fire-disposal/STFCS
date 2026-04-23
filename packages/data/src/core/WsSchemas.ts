@@ -142,6 +142,7 @@ export const RoomJoinDef = {
     ownerId: z.string(),
     isHost: z.boolean(),
     role: z.enum(["HOST", "PLAYER"]).nullable(),
+    state: GameRoomStateSchema,
   }),
 } as const satisfies WsEventDef<any, any>
 
@@ -264,11 +265,13 @@ export const AssetActionDef = {
   }),
   response: z.union([
     z.object({ assets: z.array(AssetListItemSchema) }),
-    z.object({ results: z.array(z.object({
-      assetId: z.string(),
-      info: AssetListItemSchema.nullable(),
-      data: z.string().optional(),
-    })) }),
+    z.object({
+      results: z.array(z.object({
+        assetId: z.string(),
+        info: AssetListItemSchema.nullable(),
+        data: z.string().optional(),
+      }))
+    }),
     VoidSchema,
   ]),
 } as const satisfies WsEventDef<any, any>

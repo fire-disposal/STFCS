@@ -3,7 +3,7 @@
  * 
  * 设计原则：
  * 1. 状态驱动：gameState 变化自动触发 React 更新
- * 2. 简单直接：joinRoom 只发送请求，sync:full 自动同步
+ * 2. 房间流程：create 仅创建；join 返回状态快照并可回退 sync:request_full
  * 3. 利用 Zustand：前端 hooks 直接订阅 gameState
  */
 
@@ -188,7 +188,17 @@ export class SocketNetworkManager {
 		try {
 			logger.info("joinRoom start", { roomId });
 			this.currentRoomId = roomId;
-			await this.request("room:join", { roomId });
+			const data = await this.request("room:join", { roomId });
+
+			if (data.state) {
+				this.setGameState(data.state);
+			}
+
+			if (!this.gameState || this.gameState.roomId !== roomId) {
+				logger.warn("joinRoom missing sync:full, requesting full state", { roomId });
+				await this.requestFullState();
+			}
+
 			logger.info("joinRoom request success", { roomId });
 			return { success: true, roomId };
 		} catch (error) {
@@ -196,6 +206,12 @@ export class SocketNetworkManager {
 			this.currentRoomId = null;
 			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
+	}
+
+	async requestFullState(): Promise<GameRoomState> {
+		const fullState = await this.request("sync:request_full", {});
+		this.setGameState(fullState);
+		return fullState;
 	}
 
 	leaveRoom(): void {
