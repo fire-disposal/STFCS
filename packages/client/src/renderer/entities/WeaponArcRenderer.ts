@@ -325,13 +325,9 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	const endAngle = arcRad / 2;
 
 	if (arc >= 360) {
-		// 360度 = 圆形射程
+		// 360度 = 圆形射程，只画外圈，内圈自然透明
 		graphics.circle(0, 0, range);
 		graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
-		if (minRange > 0) {
-			graphics.circle(0, 0, minRange);
-			graphics.fill({ color: 0x06101a, alpha: 1 });
-		}
 		return;
 	}
 
@@ -340,27 +336,30 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	const endX = Math.cos(endAngle);
 	const endY = Math.sin(endAngle);
 
-	// 1. 填充扇形射程区域
-	graphics.moveTo(0, 0);
-	graphics.arc(0, 0, range, startAngle, endAngle);
-	graphics.lineTo(0, 0);
+	// 绘制扇形填充（从 minRange 到 range）
+	if (minRange > 0) {
+		// 有最小射程：绘制环形扇形
+		graphics.moveTo(startX * minRange, startY * minRange);
+		graphics.arc(0, 0, minRange, startAngle, endAngle);
+		graphics.lineTo(endX * range, endY * range);
+		graphics.arc(0, 0, range, endAngle, startAngle, true);
+		graphics.closePath();
+	} else {
+		// 无最小射程：绘制完整扇形
+		graphics.moveTo(0, 0);
+		graphics.lineTo(startX * range, startY * range);
+		graphics.arc(0, 0, range, startAngle, endAngle);
+		graphics.closePath();
+	}
 	graphics.fill({ color: ARC_COLOR, alpha: 0.12 });
 
-	// 2. 挖空最小射程区域
-	if (minRange > 0) {
-		graphics.moveTo(0, 0);
-		graphics.arc(0, 0, minRange, startAngle, endAngle);
-		graphics.lineTo(0, 0);
-		graphics.fill({ color: 0x06101a, alpha: 1 });
-	}
-
-	// 3. 左射界线（从中心向外）
-	graphics.moveTo(0, 0);
+	// 左射界线
+	graphics.moveTo(minRange > 0 ? startX * minRange : 0, minRange > 0 ? startY * minRange : 0);
 	graphics.lineTo(startX * range, startY * range);
 	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
 
-	// 4. 右射界线（从中心向外）
-	graphics.moveTo(0, 0);
+	// 右射界线
+	graphics.moveTo(minRange > 0 ? endX * minRange : 0, minRange > 0 ? endY * minRange : 0);
 	graphics.lineTo(endX * range, endY * range);
 	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
 }
