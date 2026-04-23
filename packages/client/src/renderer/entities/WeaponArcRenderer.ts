@@ -202,6 +202,13 @@ function calculateValidTargets(
 	const attackerPos = attacker.runtime?.position ?? { x: 0, y: 0 };
 	const attackerHeading = attacker.runtime?.heading ?? 0;
 
+	const mountOffsetX = mount.position?.x ?? 0;
+	const mountOffsetY = mount.position?.y ?? 0;
+
+	const headingRad = attackerHeading * Math.PI / 180;
+	const mountWorldX = attackerPos.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
+	const mountWorldY = attackerPos.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
+
 	const results: WeaponTargetInfo[] = [];
 
 	for (const target of allShips) {
@@ -210,17 +217,18 @@ function calculateValidTargets(
 		if (!target.runtime?.position) continue;
 
 		const targetPos = target.runtime.position;
-		const dist = Math.sqrt(
-			Math.pow(targetPos.x - attackerPos.x, 2) +
-			Math.pow(targetPos.y - attackerPos.y, 2)
-		);
+		const dx = targetPos.x - mountWorldX;
+		const dy = targetPos.y - mountWorldY;
+
+		const dist = Math.sqrt(dx * dx + dy * dy);
 
 		const inRange = dist >= minRange && dist <= range;
 
 		let inArc = true;
 		if (arc < 360) {
-			const targetAngle = Math.atan2(targetPos.y - attackerPos.y, targetPos.x - attackerPos.x) * 180 / Math.PI;
-			const relativeAngle = normalizeAngle(targetAngle - attackerHeading - mountFacing);
+			const targetAngleNautical = Math.atan2(dx, dy) * 180 / Math.PI;
+			const weaponFacingNautical = attackerHeading + mountFacing;
+			const relativeAngle = normalizeAngle(targetAngleNautical - weaponFacingNautical);
 			inArc = Math.abs(relativeAngle) <= arc / 2;
 		}
 

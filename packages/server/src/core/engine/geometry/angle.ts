@@ -1,5 +1,12 @@
 /**
  * 角度计算模块
+ * 
+ * 所有角度使用航海坐标系：
+ * - 0° = 船头（Y轴正向，屏幕上方）
+ * - 90° = 右舷（X轴正向，屏幕右侧）
+ * - 180° = 船尾（Y轴负向，屏幕下方）
+ * - 270° = 左舷（X轴负向，屏幕左侧）
+ * - 顺时针增加
  */
 
 import type { Point } from "../../types/common.js";
@@ -14,11 +21,18 @@ export function toDegrees(radians: number): number {
   return (radians * 180) / Math.PI;
 }
 
-/** 计算两点之间的角度（0-360度） */
+/**
+ * 计算两点之间的航海角度（0-360度）
+ * 
+ * 航海角度定义：
+ * - atan2(dx, dy) 给出相对于 Y 轴的角度
+ * - dx > 0 → 右舷方向 → 角度在 90° 附近
+ * - dy < 0 → 船尾方向 → 角度在 180° 附近
+ */
 export function angleBetween(p1: Point, p2: Point): number {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
-  let angle = toDegrees(Math.atan2(dy, dx));
+  let angle = toDegrees(Math.atan2(dx, dy));
   if (angle < 0) angle += 360;
   return angle;
 }
