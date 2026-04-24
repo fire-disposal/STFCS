@@ -18,7 +18,6 @@ import { toggleShield, validateShieldToggle, validateShieldRotate } from "../../
 import { ventFlux, canVent } from "../../core/engine/modules/flux.js";
 import { Faction, type PlayerInfo } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken, InventoryToken, WeaponJSON } from "@vt/data";
-import { createCombatToken } from "../../core/state/Token.js";
 import { generateShortId } from "../utils/shortId.js";
 
 const playerInfoService = new PlayerInfoService();
@@ -361,21 +360,11 @@ rpc.namespace("save", {
       }
       case "create": {
         if (!p.name) throw err("需要 name", "NAME_REQUIRED");
-        const ships = await playerProfileService.getPlayerShips(ctx.playerId);
-        const combatTokens: CombatToken[] = ships.map((s, i) => {
-          const spacing = 200;
-          const row = Math.floor(i / 3);
-          const col = i % 3;
-          return createCombatToken(
-            s.$id,
-            s,
-            { x: 500 + col * spacing, y: 500 + row * spacing },
-            0,
-            Faction.PLAYER,
-            ctx.playerId
-          );
-        });
-        const save = await playerProfileService.createSave(ctx.playerId, p.name, combatTokens);
+        ctx.requireRoom();
+
+        // 直接保存当前游戏状态快照（包含 tokens、phase、turnCount 等全部运行时信息）
+        const snapshot = ctx.room!.getGameState();
+        const save = await playerProfileService.createSave(ctx.playerId, p.name, snapshot);
         return { save };
       }
       case "load": {
@@ -385,11 +374,17 @@ rpc.namespace("save", {
         const saves = await playerProfileService.listSaves(ctx.playerId);
         const save = saves.find(s => s.$id === p.saveId);
         if (!save) throw err("存档不存在", "SAVE_NOT_FOUND");
-        const stateManager = ctx.state;
-        stateManager.clearTokens();
-        for (const token of save.tokens) {
-          stateManager.setToken(token.$id, token);
-        }
+
+        // 用快照替换游戏数据，清空玩家列表让当前房间玩家重新加入
+        const snapshot = save.snapshot;
+        const currentState = ctx.state.getState();
+        ctx.state.setState({
+          ...snapshot,
+          players: {}, // 清空玩家列表，当前房间玩家需重新加入/准备
+          roomId: currentState.roomId,
+          ownerId: currentState.ownerId,
+          createdAt: currentState.createdAt,
+        });
         ctx.state.broadcastFull();
         return;
       }

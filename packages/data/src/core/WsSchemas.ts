@@ -217,7 +217,7 @@ const SaveBuildSchema = z.object({
     description: z.string().optional(),
     tags: z.array(z.string()).optional(),
   }),
-  tokens: z.array(CombatTokenSchema),
+  snapshot: GameRoomStateSchema,
   createdAt: z.number(),
   updatedAt: z.number().optional(),
 })

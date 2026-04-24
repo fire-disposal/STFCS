@@ -570,8 +570,7 @@ export type SaveMetadata = z.infer<typeof SaveMetadataSchema>;
 export const GameSaveSchema = z.object({
 	$id: z.string(),
 	metadata: SaveMetadataSchema,
-	room: GameRoomStateSchema.optional(),
-	tokens: z.array(CombatTokenSchema),
+	snapshot: GameRoomStateSchema,
 	createdAt: z.number(),
 	updatedAt: z.number().optional(),
 });

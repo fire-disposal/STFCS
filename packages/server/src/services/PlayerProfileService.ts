@@ -10,7 +10,7 @@ function generateId(prefix: string, userId: string): string {
 }
 
 export class PlayerProfileService {
-	constructor(private playerInfoService: PlayerInfoService) {}
+	constructor(private playerInfoService: PlayerInfoService) { }
 
 	async createAccount(userId: string, playerName?: string): Promise<void> {
 		const existingShips = await this.playerInfoService.getShips(userId);
@@ -70,11 +70,11 @@ export class PlayerProfileService {
 		return await this.playerInfoService.deleteWeapon(userId, weaponId);
 	}
 
-	async createSave(userId: string, name: string, tokens: GameSave["tokens"]): Promise<GameSave> {
+	async createSave(userId: string, name: string, snapshot: GameSave["snapshot"]): Promise<GameSave> {
 		const save: GameSave = {
 			$id: generateId("save", userId),
 			metadata: { name, createdAt: Date.now(), updatedAt: Date.now() },
-			tokens,
+			snapshot,
 			createdAt: Date.now(),
 		};
 
@@ -83,16 +83,16 @@ export class PlayerProfileService {
 			name,
 			saveJson: save,
 			metadata: {
-				roomId: "",
+				roomId: snapshot.roomId,
 				roomName: name,
-				mapWidth: 2000,
-				mapHeight: 2000,
-				maxPlayers: 2,
-				playerCount: 1,
-				totalTurns: 0,
-				gameDuration: 0,
+				mapWidth: snapshot.map?.size?.width ?? 2000,
+				mapHeight: snapshot.map?.size?.height ?? 2000,
+				maxPlayers: Object.keys(snapshot.players).length,
+				playerCount: Object.keys(snapshot.players).length,
+				totalTurns: snapshot.turnCount,
+				gameDuration: Date.now() - snapshot.createdAt,
 			},
-			playerIds: [userId],
+			playerIds: Object.keys(snapshot.players),
 			isAutoSave: false,
 			tags: [],
 			createdAt: Date.now(),

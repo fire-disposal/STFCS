@@ -171,7 +171,7 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 												{formatDate(save.createdAt)}
 											</Text>
 											<Badge size="1" color="gray">
-												{save.tokens.length} 舰船
+												{Object.keys(save.snapshot.tokens).length} 舰船
 											</Badge>
 										</Flex>
 									</Box>
