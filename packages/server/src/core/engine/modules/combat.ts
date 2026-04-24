@@ -8,7 +8,7 @@ import { applyStateUpdates, createAttackEvent, createDamageEvent, createShipDest
 import { calculateWeaponAttack, setWeaponFired } from "../rules/weapon.js";
 import { calculateDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
-import { angleBetween } from "../geometry/angle.js";
+import { angleBetween } from "@vt/data";
 
 /**
  * 应用战斗Action

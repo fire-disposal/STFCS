@@ -14,6 +14,7 @@ import { Sprite } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
+import { getMountWorldPosition, toPixiRotation } from "@vt/data";
 import type { TextureCache } from "../systems/useTextureLoader";
 
 interface WeaponTextureCacheItem {
@@ -60,21 +61,16 @@ export function useWeaponTextureRendering(
 				const weaponOffsetY = weapon.spec.texture.offsetY ?? 0;
 				const weaponScale = weapon.spec.texture.scale ?? 1;
 
-				// 航海角度转换：PixiJS rotation 正角度逆时针，航海角度顺时针
-				const headingRad = (-ship.runtime.heading * Math.PI) / 180;
-				
-				// 挂载点世界坐标（偏移需要根据舰船朝向旋转）
-				// mountOffsetX/Y 是舰船坐标系下的偏移（左舷为正X，船头为正Y）
-				const mountWorldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
-				const mountWorldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
-				
-				// 武器贴图偏移（挂载点坐标系）
-				const worldX = mountWorldX - weaponOffsetX;
-				const worldY = mountWorldY - weaponOffsetY;
+				const mountWorldPos = getMountWorldPosition(
+					ship.runtime.position,
+					ship.runtime.heading,
+					{ x: mountOffsetX, y: mountOffsetY }
+				);
 
-				// 武器朝向 = 舰船航向 + 挂载点朝向（航海角度）
-				// PixiJS rotation = -总朝向（负数使其顺时针旋转）
-				const totalRotation = -(ship.runtime.heading + mountFacing) * Math.PI / 180;
+				const worldX = mountWorldPos.x - weaponOffsetX;
+				const worldY = mountWorldPos.y - weaponOffsetY;
+
+				const totalRotation = toPixiRotation(ship.runtime.heading + mountFacing);
 
 				const cached = cache.get(cacheKey);
 

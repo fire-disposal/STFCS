@@ -12,7 +12,7 @@ import { AssetService } from "../../services/AssetService.js";
 import { calculateShipWeaponTargets, validateAttackAllocations, type WeaponAllocation } from "../../core/engine/rules/targeting.js";
 import { calculateWeaponAttack } from "../../core/engine/rules/weapon.js";
 import { calculateDamage } from "../../core/engine/rules/damage.js";
-import { angleBetween } from "../../core/engine/geometry/angle.js";
+import { angleBetween } from "@vt/data";
 import { validateMovement, validateRotation, validatePhaseAdvance, processMovement, processRotation, advancePhase } from "../../core/engine/modules/movement.js";
 import { toggleShield, validateShieldToggle } from "../../core/engine/modules/shield.js";
 import { ventFlux, canVent } from "../../core/engine/modules/flux.js";

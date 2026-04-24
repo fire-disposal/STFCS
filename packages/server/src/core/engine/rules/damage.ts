@@ -19,10 +19,9 @@
  */
 
 import type { TokenSpec, TokenRuntime, DamageTypeValue } from "@vt/data";
-import { GAME_RULES } from "@vt/data";
+import { GAME_RULES, angleBetween } from "@vt/data";
 
 import type { Point } from "../../types/common.js";
-import { angleBetween } from "../geometry/angle.js";
 import { calculateModifiedValue } from "../modules/modifier.js";
 
 export interface DamageResult {

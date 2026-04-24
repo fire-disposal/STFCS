@@ -17,6 +17,7 @@
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createMoveEvent, createRotateEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
+import { getMovementVector } from "@vt/data";
 
 /** 移动阶段 */
 export type MovementPhase = "A" | "B" | "C" | "DONE";
@@ -155,23 +156,11 @@ function processMovement(ship: any, payload: any) {
   const heading = ship.runtime.heading || 0;
   const movement = getMovementState(ship);
 
-  let newPosition = { ...currentPos };
-  const rad = (heading * Math.PI) / 180;
-
-  // 航海坐标系：0°=船头（上），顺时针增加
-  // 屏幕坐标系：Y向下
-  // 前进方向向量：(sin(θ), -cos(θ))，即 0°→(0,-1)向上，90°→(1,0)向右
-  if (forwardDistance !== 0) {
-    newPosition.x += Math.sin(rad) * forwardDistance;
-    newPosition.y -= Math.cos(rad) * forwardDistance;
-  }
-
-  // 侧移：左舷为正（heading+90°），右舷为负（heading-90°）
-  // 左舷方向向量：(cos(θ), sin(θ))，即 0°→(1,0)左，90°→(0,1)上
-  if (strafeDistance !== 0) {
-    newPosition.x += Math.cos(rad) * strafeDistance;
-    newPosition.y += Math.sin(rad) * strafeDistance;
-  }
+  const vector = getMovementVector(heading, forwardDistance, strafeDistance);
+  const newPosition = {
+    x: currentPos.x + vector.x,
+    y: currentPos.y + vector.y,
+  };
 
   const isStrafe = strafeDistance !== 0;
   const distance = isStrafe ? Math.abs(strafeDistance) : Math.abs(forwardDistance);

@@ -1,5 +1,6 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
+import { getMountWorldPosition, nauticalToMath, toRadians, distanceBetween, angleBetween, normalizeAngleSigned } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
@@ -142,11 +143,11 @@ export function useWeaponArcRendering(
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
 			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
-			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
+			const mountFacing = toRadians(nauticalToMath(mountFacingNautical));
 
-			const headingRad = shipHeading * Math.PI / 180;
-			const worldX = shipPosition.x - (mountPos.x ?? 0) * Math.cos(headingRad) + (mountPos.y ?? 0) * Math.sin(headingRad);
-			const worldY = shipPosition.y - (mountPos.x ?? 0) * Math.sin(headingRad) - (mountPos.y ?? 0) * Math.cos(headingRad);
+			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountPos);
+			const worldX = worldPos.x;
+			const worldY = worldPos.y;
 
 			const range = weapon.spec.range;
 			const minRange = weapon.spec.minRange ?? 0;
@@ -212,12 +213,8 @@ function calculateValidTargets(
 	const attackerPos = attacker.runtime?.position ?? { x: 0, y: 0 };
 	const attackerHeading = attacker.runtime?.heading ?? 0;
 
-	const mountOffsetX = mount.position?.x ?? 0;
-	const mountOffsetY = mount.position?.y ?? 0;
-
-	const headingRad = attackerHeading * Math.PI / 180;
-	const mountWorldX = attackerPos.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
-	const mountWorldY = attackerPos.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
+	const mountOffset = mount.position ?? { x: 0, y: 0 };
+	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountOffset);
 
 	const results: WeaponTargetInfo[] = [];
 
@@ -227,21 +224,15 @@ function calculateValidTargets(
 		if (!target.runtime?.position) continue;
 
 		const targetPos = target.runtime.position;
-		const dx = targetPos.x - mountWorldX;
-		const dy = mountWorldY - targetPos.y;  // 反转 dy：屏幕Y向下，航海Y向上
-
-		const dist = Math.sqrt(dx * dx + dy * dy);
+		const dist = distanceBetween(mountWorldPos, targetPos);
 
 		const inRange = dist >= minRange && dist <= range;
 
 		let inArc = true;
 		if (arc < 360) {
-			// atan2(dx, dy) 给出航海角度：
-			// dx > 0 → 右舷 → 90°
-			// dy > 0 → 船头 → 0°（注意 dy 已反转）
-			const targetAngleNautical = Math.atan2(dx, dy) * 180 / Math.PI;
-			const weaponFacingNautical = attackerHeading + mountFacing;
-			const relativeAngle = normalizeAngle(targetAngleNautical - weaponFacingNautical);
+			const targetAngle = angleBetween(mountWorldPos, targetPos);
+			const weaponFacing = attackerHeading + mountFacing;
+			const relativeAngle = normalizeAngleSigned(targetAngle - weaponFacing);
 			inArc = Math.abs(relativeAngle) <= arc / 2;
 		}
 
@@ -256,10 +247,6 @@ function calculateValidTargets(
 	}
 
 	return results;
-}
-
-function normalizeAngle(angle: number): number {
-	return ((angle + 180) % 360) - 180;
 }
 
 function shouldUpdateArc(

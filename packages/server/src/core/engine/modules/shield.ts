@@ -13,6 +13,7 @@ import type { CombatToken } from "../../state/Token.js";
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createShieldToggleEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
+import { angleBetween } from "@vt/data";
 
 /**
  * 护盾开启结果
@@ -117,9 +118,7 @@ export function isShieldHit(
 	}
 
 	const position = runtime?.position ?? { x: 0, y: 0 };
-	const dx = attackerPosition.x - position.x;
-	const dy = attackerPosition.y - position.y;
-	const attackAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+	const attackAngle = angleBetween(position, attackerPosition);
 
 	const shieldSpec = ship.spec.shield;
 	if (!shieldSpec) return { hit: false };
