@@ -337,49 +337,53 @@ export class SocketNetworkManager {
 		});
 	}
 
+	/**
+	 * 通用 JSON Patch (RFC 6902) 应用器
+	 *
+	 * 递归遍历 patch.path，在 target 对象上执行 add/remove/replace 操作。
+	 * 支持任意深度的嵌套路径，无需为每个顶层字段编写分支。
+	 *
+	 * 路径约定：
+	 * - path=["tokens", "id"] op="add" → 在 tokens 字典中添加条目
+	 * - path=["tokens", "id", "runtime", "heading"] op="replace" → 替换嵌套字段
+	 * - path=["phase"] op="replace" → 替换顶层标量字段
+	 * - path=["players", "id"] op="remove" → 删除字典条目
+	 */
 	private applyPatches(patches: StatePatch[]): void {
 		if (!this.gameState) return;
-
 		for (const patch of patches) {
 			if (patch.path.length === 0) continue;
-			const [root, ...rest] = patch.path;
-
-			if (root === "tokens") {
-				if (rest.length === 0 && patch.op === "add" && patch.value) {
-					this.gameState.tokens[(patch.value as CombatToken).$id] = patch.value as CombatToken;
-				} else if (rest.length >= 1) {
-					const id = String(rest[0]);
-					if (patch.op === "remove") delete this.gameState.tokens[id];
-					else if (rest.length === 1) this.gameState.tokens[id] = patch.value as CombatToken;
-					else if (this.gameState.tokens[id]) this.patchObject(this.gameState.tokens[id], rest.slice(1), patch);
-				}
-			} else if (root === "players") {
-				if (rest.length === 0 && patch.op === "add" && patch.value) {
-					this.gameState.players[(patch.value as any).sessionId] = patch.value as any;
-				} else if (rest.length >= 1) {
-					const id = String(rest[0]);
-					if (patch.op === "remove") delete this.gameState.players[id];
-					else if (this.gameState.players[id]) this.patchObject(this.gameState.players[id], rest.slice(1), patch);
-				}
-			} else if (root === "phase" && patch.op === "replace") {
-				this.gameState.phase = patch.value as any;
-			} else if (root === "turnCount" && patch.op === "replace") {
-				this.gameState.turnCount = patch.value as number;
-			} else if (root === "activeFaction" && patch.op === "replace") {
-				this.gameState.activeFaction = patch.value as any;
-			}
+			this.applyPatchAt(this.gameState, patch.path, patch);
 		}
 	}
 
-	private patchObject(obj: any, path: (string | number)[], patch: StatePatch): void {
-		if (path.length === 0) return;
+	/**
+	 * 在 target 对象的 path 位置执行 patch 操作。
+	 * 递归直到 path 耗尽（叶子节点），然后执行 add/replace/remove。
+	 */
+	private applyPatchAt(target: any, path: (string | number)[], patch: StatePatch): void {
 		const [key, ...rest] = path;
+
 		if (rest.length === 0) {
-			if (patch.op === "remove") delete obj[key];
-			else obj[key] = patch.value;
+			// 叶子节点：直接执行操作
+			if (patch.op === "remove") {
+				delete target[key];
+			} else {
+				// add / replace 统一处理
+				target[key] = patch.value;
+			}
+			return;
+		}
+
+		// 非叶子节点：确保中间对象存在后递归
+		if (!target[key]) target[key] = {};
+
+		if (patch.op === "remove") {
+			// 删除子节点（如 ["tokens", "id"] op="remove"）
+			delete target[key][String(rest[0])];
 		} else {
-			if (!obj[key]) obj[key] = {};
-			this.patchObject(obj[key], rest, patch);
+			// add / replace：递归进入子路径
+			this.applyPatchAt(target[key], rest, patch);
 		}
 	}
 }

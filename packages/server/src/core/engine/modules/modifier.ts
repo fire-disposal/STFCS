@@ -8,8 +8,6 @@
  * 4. 支持持续回合数（duration），undefined = 永久
  */
 
-import type { EngineContext } from "../context.js";
-import { applyStateUpdates, createStatusEffectEvent } from "../context.js";
 import type { TokenModifier, TokenRuntime } from "@vt/data";
 
 // ============================================================
@@ -20,48 +18,48 @@ import type { TokenModifier, TokenRuntime } from "@vt/data";
 export function addModifier(
 	runtime: TokenRuntime,
 	modifier: TokenModifier
-): { added: boolean; replaced?: boolean } {
+): { added: boolean; replaced: boolean } {
 	if (!runtime.modifiers) {
 		runtime.modifiers = [];
 	}
 
+	// 如果不叠加且已有同 stackKey 的修正，覆盖之
 	if (!modifier.stacks && modifier.stackKey) {
-		// 不可叠加：查找同 stackKey 的修正并替换
 		const existingIndex = runtime.modifiers.findIndex(
-			(m: TokenModifier) => m.stackKey === modifier.stackKey
+			(m) => m.stackKey === modifier.stackKey
 		);
-		if (existingIndex >= 0) {
+		if (existingIndex !== -1) {
 			runtime.modifiers[existingIndex] = modifier;
 			return { added: true, replaced: true };
 		}
 	}
 
 	runtime.modifiers.push(modifier);
-	return { added: true };
+	return { added: true, replaced: false };
 }
 
-/** 从舰船移除修正 */
+/** 从舰船移除修正（按 id） */
 export function removeModifier(
 	runtime: TokenRuntime,
 	modifierId: string
 ): boolean {
 	if (!runtime.modifiers) return false;
-	const initialLength = runtime.modifiers.length;
-	runtime.modifiers = runtime.modifiers.filter((m: TokenModifier) => m.id !== modifierId);
-	return runtime.modifiers.length < initialLength;
+
+	const index = runtime.modifiers.findIndex((m) => m.id === modifierId);
+	if (index === -1) return false;
+
+	runtime.modifiers.splice(index, 1);
+	return true;
 }
 
-/** 按 stat 获取所有相关修正 */
+/** 获取某个属性的所有修正 */
 export function getModifiersByStat(
 	runtime: TokenRuntime,
 	stat: TokenModifier["stat"]
 ): TokenModifier[] {
-	return runtime.modifiers?.filter((m: TokenModifier) => m.stat === stat) ?? [];
+	if (!runtime.modifiers) return [];
+	return runtime.modifiers.filter((m) => m.stat === stat);
 }
-
-// ============================================================
-// 核心 API：计算修正后属性值
-// ============================================================
 
 /** 计算修正后的属性值 */
 export function calculateModifiedValue(
@@ -100,181 +98,4 @@ export function calculateModifiedValues(
 		result[stat] = calculateModifiedValue(baseValues[stat]!, runtime, stat);
 	}
 	return result;
-}
-
-// ============================================================
-// 回合更新：处理持续时间
-// ============================================================
-
-/** 更新所有舰船的修正持续时间（每回合调用） */
-export function updateModifiers(state: any): {
-	shipUpdates: Map<string, any>;
-	expiredModifiers: Map<string, TokenModifier[]>;
-} {
-	const shipUpdates = new Map<string, any>();
-	const expiredModifiers = new Map<string, TokenModifier[]>();
-
-	for (const [shipId, ship] of state.tokens.entries()) {
-		if (!ship.runtime?.modifiers || ship.runtime.modifiers.length === 0) {
-			continue;
-		}
-
-		const runtime: TokenRuntime = { ...ship.runtime };
-		const expired: TokenModifier[] = [];
-		const remaining: TokenModifier[] = [];
-
-		for (const modifier of runtime.modifiers!) {
-			if (modifier.duration !== undefined) {
-				modifier.duration--;
-				if (modifier.duration <= 0) {
-					expired.push(modifier);
-					continue;
-				}
-			}
-			remaining.push(modifier);
-		}
-
-		if (expired.length > 0) {
-			runtime.modifiers = remaining;
-			shipUpdates.set(shipId, { runtime });
-			expiredModifiers.set(shipId, expired);
-		} else {
-			// duration 减少但未过期，也需更新
-			runtime.modifiers = remaining;
-			shipUpdates.set(shipId, { runtime });
-		}
-	}
-
-	return { shipUpdates, expiredModifiers };
-}
-
-// ============================================================
-// Engine Action 处理
-// ============================================================
-
-/** 应用修正 Action */
-export function applyModifier(context: EngineContext): { newState: any; events: any[] } {
-	const { state, action } = context;
-	const payload = action.payload as any;
-
-	const events = [];
-	const updates = new Map<string, any>();
-
-	if (action.type === "APPLY_MODIFIER") {
-		const result = processModifierApplication(state, payload);
-
-		for (const [shipId, shipUpdate] of result.shipUpdates.entries()) {
-			updates.set(`ship:${shipId}`, shipUpdate);
-			if (result.modifierChanges.has(shipId)) {
-				const change = result.modifierChanges.get(shipId)!;
-				events.push(
-					createStatusEffectEvent(
-						shipId,
-						change.modifierId,
-						change.stat,
-						change.action,
-						change.duration
-					)
-				);
-			}
-		}
-	}
-
-	const newState = applyStateUpdates(state, updates);
-	return { newState, events };
-}
-
-function processModifierApplication(state: any, payload: any) {
-	const shipUpdates = new Map<string, any>();
-	const modifierChanges = new Map<
-		string,
-		{ modifierId: string; stat: string; action: "APPLIED" | "UPDATED"; duration?: number }
-	>();
-
-	const { targetType, targetId, faction, modifier } = payload;
-	const targetShips = getTargetShips(state, targetType, targetId, faction);
-
-	for (const ship of targetShips) {
-		const runtime: TokenRuntime = { ...ship.runtime };
-
-		const shipModifier: TokenModifier = {
-			id: modifier.id || `mod_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-			source: modifier.source || payload.sourceId || "system",
-			stat: modifier.stat,
-			value: modifier.value,
-			operation: modifier.operation || "multiply",
-			stacks: modifier.stacks ?? false,
-			stackKey: modifier.stackKey,
-			duration: modifier.duration,
-			metadata: modifier.metadata,
-		};
-
-		const result = addModifier(runtime, shipModifier);
-
-		modifierChanges.set(ship.$id, {
-			modifierId: shipModifier.id,
-			stat: shipModifier.stat,
-			action: result.replaced ? "UPDATED" : "APPLIED",
-			duration: shipModifier.duration,
-		});
-
-		shipUpdates.set(ship.$id, { runtime });
-	}
-
-	return { shipUpdates, modifierChanges };
-}
-
-function getTargetShips(state: any, targetType: string, targetId?: string, _faction?: string): any[] {
-	const ships = Array.from(state.tokens.values());
-
-	switch (targetType) {
-		case "SHIP": {
-			const ship = targetId ? state.tokens.get(targetId) : undefined;
-			return ship ? [ship] : [];
-		}
-		case "FACTION":
-			return ships.filter((ship: any) => ship.runtime?.faction === _faction);
-		case "ALL":
-			return ships;
-		default:
-			return [];
-	}
-}
-
-/** 检查修正应用合法性 */
-export function validateModifierApplication(
-	state: any,
-	playerId: string,
-	payload: any
-): { valid: boolean; error?: string } {
-	const player = state.players.get(playerId);
-
-	if (!player) {
-		return { valid: false, error: "Player not found" };
-	}
-
-	// 检查权限（简化：只有 DM 可以应用全局修正）
-	if (payload.targetType === "ALL" || payload.targetType === "FACTION") {
-		if (player.role !== "OWNER") {
-			return { valid: false, error: "Only DM can apply global modifiers" };
-		}
-	}
-
-	// 检查目标是否存在
-	if (payload.targetType === "SHIP" && payload.targetId) {
-		const targetShip = state.tokens.get(payload.targetId);
-		if (!targetShip) {
-			return { valid: false, error: "Target ship not found" };
-		}
-	}
-
-	// 检查修正数据
-	if (!payload.modifier || !payload.modifier.stat) {
-		return { valid: false, error: "Invalid modifier data: missing stat" };
-	}
-	if (payload.modifier.value === undefined) {
-		return { valid: false, error: "Invalid modifier data: missing value" };
-	}
-
-	return { valid: true };
 }

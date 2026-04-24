@@ -1,10 +1,10 @@
 /**
- * 舰船信息面板 - 上下三行排布
+ * 舰船信息面板 - 两行布局
  * 支持战斗实例重命名
  */
 
 import React, { useState, useCallback } from "react";
-import { Anchor, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
+import { Anchor, Zap, AlertTriangle, Edit2, Check, X } from "lucide-react";
 import type { CombatToken } from "@vt/data";
 import { FactionColors } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
@@ -44,8 +44,9 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	const fluxHard = hasShip ? (ship.runtime.fluxHard ?? 0) : 0;
 	const fluxTotal = fluxSoft + fluxHard;
 	const fluxMax = hasShip ? (ship.spec.fluxCapacity ?? 100) : 100;
-	const fluxSoftPct = hasShip ? Math.min(100, (fluxSoft / fluxMax) * 100) : 0;
-	const fluxHardPct = hasShip ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
+	const fluxSoftPct = fluxMax > 0 ? Math.min(100, (fluxSoft / fluxMax) * 100) : 0;
+	const fluxHardPct = fluxMax > 0 ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
+	const fluxTotalPct = Math.min(100, fluxSoftPct + fluxHardPct);
 
 	// 护甲数据
 	const armor = hasShip ? (ship.runtime.armor ?? []) : [];
@@ -88,56 +89,70 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 		<Flex direction="column" gap="2" className="panel-content">
 			{/* 第一行：舰船名称 + 状态徽章 + 朝向 + 位置 */}
 			<Flex className="panel-row" gap="3" align="center">
-				{faction && (
-					<Text size="2" style={{ color: `#${FactionColors[faction]?.toString(16).padStart(6, "0")}` }}>
-						◆
-					</Text>
-				)}
-
-				{isEditingName ? (
-					<Flex align="center" gap="1">
-						<TextField.Root
-							size="1"
-							value={editingName}
-							onChange={(e) => setEditingName(e.target.value)}
-							style={{ width: 120 }}
+				<Flex className="panel-section" align="center" gap="2">
+					{faction && (
+						<Box
+							style={{
+								width: 10,
+								height: 10,
+								borderRadius: "50%",
+								background: `#${FactionColors[faction]?.toString(16).padStart(6, "0")}`,
+								boxShadow: `0 0 8px #${FactionColors[faction]?.toString(16).padStart(6, "0")}`,
+								flexShrink: 0,
+							}}
 						/>
-						<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}>
-							<Check size={12} />
-						</IconButton>
-						<IconButton size="1" variant="ghost" color="red" onClick={handleCancelEdit}>
-							<X size={12} />
-						</IconButton>
-					</Flex>
-				) : (
-					<Flex align="center" gap="1">
-						<Text size="2" weight="bold" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
-							{hasShip ? displayName : "请选择舰船"}
-						</Text>
-						{hasShip && room && (
-							<IconButton size="1" variant="ghost" onClick={handleStartEdit}>
-								<Edit2 size={10} />
-							</IconButton>
-						)}
-					</Flex>
-				)}
+					)}
 
-				{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
-				{shieldActive && <Badge color="blue" size="1">护盾</Badge>}
-				{destroyed && <Badge color="gray" size="1">损毁</Badge>}
-				<Badge size="1" variant="soft">Phase {phase}</Badge>
+					{isEditingName ? (
+						<Flex align="center" gap="1">
+							<TextField.Root
+								size="2"
+								value={editingName}
+								onChange={(e) => setEditingName(e.target.value)}
+								style={{ width: 140 }}
+							/>
+							<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}>
+								<Check size={14} />
+							</IconButton>
+							<IconButton size="1" variant="ghost" color="red" onClick={handleCancelEdit}>
+								<X size={14} />
+							</IconButton>
+						</Flex>
+					) : (
+						<Flex align="center" gap="1">
+							<Text size="3" weight="bold" style={{ color: "#cfe8ff", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}>
+								{hasShip ? displayName : "请选择舰船"}
+							</Text>
+							{hasShip && room && (
+								<IconButton size="1" variant="ghost" onClick={handleStartEdit}>
+									<Edit2 size={12} />
+								</IconButton>
+							)}
+						</Flex>
+					)}
+				</Flex>
 
 				<Box className="panel-divider" />
 
 				<Flex className="panel-section" align="center" gap="2">
-					<Gauge size={14} />
-					<Text size="1" className="panel-section__label">朝向</Text>
-					<Text size="1" className="panel-section__value">{hasShip ? `${Math.round(ship.runtime.heading ?? 0)}°` : "NA"}</Text>
+					{overloaded && <Badge color="red" size="2"><AlertTriangle size={12} /> 过载</Badge>}
+					{shieldActive && <Badge color="blue" size="2">护盾</Badge>}
+					{destroyed && <Badge color="gray" size="2">损毁</Badge>}
+					<Badge size="2" variant="soft" color={phase === "DONE" ? "gray" : "green"}>Phase {phase}</Badge>
+				</Flex>
+
+				<Box className="panel-divider" />
+
+				<Flex className="panel-section" align="center" gap="2">
+					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>朝向</Text>
+					<Text size="3" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
+						{hasShip ? `${Math.round(ship.runtime.heading ?? 0)}°` : "NA"}
+					</Text>
 				</Flex>
 
 				<Flex className="panel-section" align="center" gap="2">
-					<Text size="1" className="panel-section__label">位置</Text>
-					<Text size="1" className="panel-section__value">
+					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>位置</Text>
+					<Text size="3" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
 						{hasShip ? `(${Math.round(ship.runtime.position?.x ?? 0)}, ${Math.round(ship.runtime.position?.y ?? 0)})` : "NA"}
 					</Text>
 				</Flex>
@@ -145,70 +160,104 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 
 			{/* 第二行：船体 | 辐能 | 护甲 */}
 			<Flex className="panel-row" gap="3" align="center">
-				<Flex className="panel-section" align="center" gap="2">
-					<Anchor size={14} />
-					<Text size="1" className="panel-section__label">船体</Text>
-					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 80 }} />
-					<Text size="1" className="panel-section__value">{hasShip ? `${hull}/${hullMax}` : "NA"}</Text>
+				{/* 船体 */}
+				<Flex className="panel-section" align="center" gap="3" style={{ minWidth: 180 }}>
+					<Anchor size={18} style={{ color: "#2ecc71" }} />
+					<Flex direction="column" gap="1" style={{ flex: 1 }}>
+						<Flex justify="between" align="center">
+							<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>船体</Text>
+							<Text size="2" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
+								{hasShip ? `${hull}/${hullMax}` : "NA"}
+							</Text>
+						</Flex>
+						<Progress
+							value={hullPct}
+							color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"}
+							style={{ width: "100%", height: 10 }}
+						/>
+					</Flex>
 				</Flex>
 
 				<Box className="panel-divider" />
 
-				<Flex className="panel-section" align="center" gap="2">
-					<Zap size={14} />
-					<Text size="1" className="panel-section__label">辐能</Text>
-					<Box style={{ width: 80, height: 16, position: "relative", borderRadius: 4, overflow: "hidden", background: "rgba(43, 66, 97, 0.4)" }}>
-						<Box style={{
-							position: "absolute",
-							left: 0,
-							top: 0,
-							height: "100%",
-							width: `${fluxSoftPct}%`,
-							background: "linear-gradient(90deg, #1e3a5f, #3a6ea5)",
-							borderRadius: 4,
-						}} />
-						<Box style={{
-							position: "absolute",
-							left: `${fluxSoftPct}%`,
-							top: 0,
-							height: "100%",
-							width: `${fluxHardPct}%`,
-							background: "linear-gradient(90deg, #0a1930, #1a3050)",
-							borderRadius: "0 4px 4px 0",
-						}} />
+				{/* 辐能 */}
+				<Flex className="panel-section panel-section--vertical" gap="1" style={{ minWidth: 220, flex: 1 }}>
+					<Flex justify="between" align="center" style={{ width: "100%" }}>
+						<Flex align="center" gap="2">
+							<Zap size={16} style={{ color: overloaded ? "#ff4444" : "#ffaa00" }} />
+							<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>辐能</Text>
+						</Flex>
+						<Flex gap="2" align="center">
+							<Flex gap="1" align="center">
+								<Box style={{ width: 8, height: 8, borderRadius: 2, background: "#6ab4ff" }} />
+								<Text size="1" style={{ color: "#8ba4c7" }}>{fluxSoft}</Text>
+							</Flex>
+							<Flex gap="1" align="center">
+								<Box style={{ width: 8, height: 8, borderRadius: 2, background: "#ff6f8f" }} />
+								<Text size="1" style={{ color: "#8ba4c7" }}>{fluxHard}</Text>
+							</Flex>
+						</Flex>
+					</Flex>
+					<Box className="flux-bar-container" style={{ width: "100%", minWidth: 0 }}>
+						<Box className="flux-bar" style={{ height: 16 }}>
+							{/* 硬辐能（左）— 粉色 */}
+							<Box
+								className="flux-bar__fill--hard"
+								style={{ width: `${fluxHardPct}%` }}
+							/>
+							{/* 软辐能（右）— 蓝色 */}
+							<Box
+								className="flux-bar__fill--soft"
+								style={{ width: `${fluxSoftPct}%`, left: `${fluxHardPct}%` }}
+							/>
+							{/* 过载时全条红色闪烁覆盖 */}
+							{overloaded && (
+								<Box
+									className="flux-bar__fill--overload"
+									style={{ width: `${fluxTotalPct}%` }}
+								/>
+							)}
+						</Box>
+						<Flex justify="between" style={{ width: "100%" }}>
+							<Text size="2" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
+								{fluxTotal}/{fluxMax}
+							</Text>
+							<Text size="1" style={{ color: overloaded ? "#ff4444" : "#6b8aaa" }}>
+								{fluxTotalPct.toFixed(0)}%
+							</Text>
+						</Flex>
 					</Box>
-					<Text size="1" className="panel-section__value">{hasShip ? `${fluxTotal}/${fluxMax}` : "NA"}</Text>
-					<Text size="1" style={{ color: "#3a6ea5" }}>软{fluxSoft}</Text>
-					<Text size="1" style={{ color: "#1a3050" }}>硬{fluxHard}</Text>
 				</Flex>
 
 				<Box className="panel-divider" />
 
 				{/* 护甲象限 */}
-				<Flex className="panel-section" align="center" gap="1">
-					<Text size="1" className="panel-section__label">护甲</Text>
+				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
+					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>护甲</Text>
 					{armor.length === 6 ? (
-						<Flex gap="1" align="center">
+						<Flex gap="2" align="center">
 							{armor.map((val, idx) => {
 								const pct = val / armorMax;
 								return (
-									<Flex key={idx} direction="column" gap="1" align="center" style={{ minWidth: 24 }}>
-										<Text size="1" color="gray" style={{ fontSize: 10 }}>{QUADRANT_NAMES[idx]}</Text>
+									<Flex key={idx} direction="column" gap="1" align="center" style={{ minWidth: 28 }}>
+										<Text size="1" style={{ color: "#6b8aaa", fontSize: 10 }}>{QUADRANT_NAMES[idx]}</Text>
 										<Box style={{
-											width: 16,
-											height: 16,
-											borderRadius: 2,
+											width: 20,
+											height: 20,
+											borderRadius: 3,
 											background: getArmorColor(pct),
 											opacity: pct > 0 ? 1 : 0.3,
-											border: "1px solid rgba(255,255,255,0.2)",
+											border: "1px solid rgba(255,255,255,0.15)",
 										}} />
-										<Text size="1" style={{ fontSize: 10 }}>{val}</Text>
+										<Text size="1" weight="bold" style={{ color: "#cfe8ff", fontSize: 11, fontFamily: "'Fira Code', monospace" }}>
+											{val}
+										</Text>
 									</Flex>
 								);
 							})}
 						</Flex>
 					) : (
-						<Text size="1" color="gray">无护甲</Text>
+						<Text size="2" style={{ color: "#4a5568" }}>无护甲</Text>
 					)}
 				</Flex>
 			</Flex>

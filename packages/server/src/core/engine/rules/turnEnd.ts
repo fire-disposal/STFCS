@@ -12,7 +12,10 @@
 import type { CombatToken } from "../../state/Token.js";
 import type { WeaponRuntime, MountSpec } from "@vt/data";
 import { updateWeaponStateAtTurnEnd } from "./weapon.js";
-import { getFluxDissipation, endOverload } from "../modules/flux.js";
+import { getFluxDissipation, endOverload, addSoftFlux } from "../modules/flux.js";
+import { calculateShieldUpkeep } from "../modules/shield.js";
+import type { EngineContext, EngineResult } from "../context.js";
+import { createEngineEvent } from "../context.js";
 
 export interface TurnEndResult {
 	fluxDissipated: boolean;
@@ -73,7 +76,14 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		}
 	}
 
-	// 3. 处理辐能消散
+	// 3. 护盾维持消耗：护盾开启时每回合结束产生 soft flux（含容量检查和过载触发）
+	const shieldUpkeep = calculateShieldUpkeep(token);
+	if (shieldUpkeep > 0) {
+		addSoftFlux(token, shieldUpkeep);
+		result.newFluxSoft = token.runtime?.fluxSoft ?? 0;
+	}
+
+	// 4. 处理辐能消散
 	const dissipation = getFluxDissipation(token);
 	const shieldActive = runtime.shield?.active ?? false;
 
@@ -121,7 +131,7 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		}
 	}
 
-	// 5. 重置移动状态
+	// 6. 重置移动状态
 	if (runtime.movement) {
 		runtime.movement = {
 			currentPhase: "A",
@@ -135,7 +145,7 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		result.movementReset = true;
 	}
 
-	// 6. 重置开火标记
+	// 7. 重置开火标记
 	runtime.hasFired = false;
 
 	return result;
@@ -157,8 +167,8 @@ export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokens
 
 		const tokenResult = processTokenTurnEnd(token);
 
-		if (tokenResult.fluxDissipated || tokenResult.overloadEnded || 
-			tokenResult.weaponsUpdated || tokenResult.movementReset || 
+		if (tokenResult.fluxDissipated || tokenResult.overloadEnded ||
+			tokenResult.weaponsUpdated || tokenResult.movementReset ||
 			tokenResult.ventingCleared) {
 			result.tokensUpdated.push(token.$id);
 		}
@@ -201,4 +211,24 @@ export function validateEndTurn(
 	}
 
 	return { valid: true };
+}
+
+// ==================== Engine Action Handlers ====================
+
+/**
+* 应用结束回合（标记 hasFired）
+* 纯计算：读取 state，返回更新指令
+*/
+export function applyEndTurn(context: EngineContext): EngineResult {
+	const payload = context.payload as Record<string, unknown>;
+	const tokenId = payload["tokenId"] as string;
+	if (!context.state.tokens[tokenId]) return { runtimeUpdates: [], events: [] };
+
+	return {
+		runtimeUpdates: [{
+			tokenId,
+			updates: { hasFired: true } as Record<string, unknown>,
+		}],
+		events: [createEngineEvent("end_turn", tokenId)],
+	};
 }

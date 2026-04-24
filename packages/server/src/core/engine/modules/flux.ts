@@ -9,35 +9,16 @@
  * 5. 武器开火、护盾维持/防御产生的辐能
  */
 
-import type { EngineContext } from "../context.js";
-import { applyStateUpdates, createFluxChangeEvent } from "../context.js";
 import type { CombatToken } from "../../state/Token.js";
 import { calculateModifiedValue } from "./modifier.js";
+import type { EngineContext, EngineResult } from "../context.js";
+import { createEngineEvent } from "../context.js";
 
 /**
  * 辐能计算结果
  */
-export interface FluxCalculationResult {
-	newFluxSoft: number;
-	newFluxHard: number;
-	totalFlux: number;
-	overloaded: boolean;
-	overloadChanged: boolean;
-}
-
-/**
- * 辐能变化来源
- */
-export type FluxSource =
-	| "WEAPON_FIRE"
-	| "SHIELD_UPKEEP"
-	| "SHIELD_HIT"
-	| "VENT"
-	| "DISSIPATION"
-	| "MANUAL";
 
 // ==================== 基础查询函数 ====================
-
 export function getFluxCapacity(ship: CombatToken): number {
 	return ship.spec.fluxCapacity || 100;
 }
@@ -190,93 +171,6 @@ export function endOverload(ship: CombatToken): void {
 	}
 }
 
-// ==================== 辐散 ====================
-
-export function dissipateFlux(ship: CombatToken): FluxCalculationResult {
-	const runtime = ship.runtime;
-	if (!runtime) {
-		return {
-			newFluxSoft: 0,
-			newFluxHard: 0,
-			totalFlux: 0,
-			overloaded: false,
-			overloadChanged: false,
-		};
-	}
-	const dissipation = getFluxDissipation(ship);
-	const shieldActive = runtime.shield?.active ?? false;
-
-	let newFluxSoft = runtime.fluxSoft || 0;
-	let newFluxHard = runtime.fluxHard || 0;
-	let overloadChanged = false;
-
-	if (dissipation > 0 && newFluxSoft > 0) {
-		newFluxSoft = Math.max(0, newFluxSoft - dissipation);
-	}
-
-	if (!shieldActive && dissipation > 0 && newFluxHard > 0) {
-		newFluxHard = Math.max(0, newFluxHard - dissipation);
-	}
-
-	let overloaded = runtime.overloaded || false;
-	if (overloaded) {
-		const overloadTime = runtime.overloadTime || 0;
-		if (overloadTime <= 0) {
-			overloaded = false;
-			overloadChanged = true;
-		}
-	}
-
-	return {
-		newFluxSoft,
-		newFluxHard,
-		totalFlux: newFluxSoft + newFluxHard,
-		overloaded,
-		overloadChanged,
-	};
-}
-
-// ==================== 回合结束处理 ====================
-
-export function processTurnEndFlux(ship: CombatToken): {
-	fluxDissipated: boolean;
-	overloadEnded: boolean;
-	newFluxSoft: number;
-	newFluxHard: number;
-} {
-	const runtime = ship.runtime;
-	if (!runtime) {
-		return {
-			fluxDissipated: false,
-			overloadEnded: false,
-			newFluxSoft: 0,
-			newFluxHard: 0,
-		};
-	}
-
-	if (runtime.overloaded && (runtime.overloadTime || 0) > 0) {
-		runtime.overloadTime = (runtime.overloadTime || 0) - 1;
-	}
-
-	const result = dissipateFlux(ship);
-
-	runtime.fluxSoft = result.newFluxSoft;
-	runtime.fluxHard = result.newFluxHard;
-
-	if (result.overloadChanged) {
-		endOverload(ship);
-	} else {
-		runtime.overloaded = result.overloaded;
-	}
-
-	return {
-		fluxDissipated: result.newFluxSoft < (runtime.fluxSoft || 0),
-		overloadEnded: result.overloadChanged,
-		newFluxSoft: result.newFluxSoft,
-		newFluxHard: result.newFluxHard,
-	};
-}
-
 // ==================== 主动排散 ====================
 
 export function ventFlux(ship: CombatToken): {
@@ -299,6 +193,15 @@ export function ventFlux(ship: CombatToken): {
 
 	if (runtime.shield) {
 		runtime.shield.active = false;
+	}
+
+	// 禁用所有武器（主动排散期间无法开火）
+	if (runtime.weapons) {
+		runtime.weapons.forEach((w: any) => {
+			if (w.state === "READY" || w.state === "COOLDOWN") {
+				w.state = "DISABLED";
+			}
+		});
 	}
 
 	const fluxCleared = getTotalFlux(ship);
@@ -369,98 +272,33 @@ export function getFluxStatus(ship: CombatToken): {
 	};
 }
 
-// ==================== 兼容性接口（保留现有功能）====================
+// ==================== Engine Action Handlers ====================
 
-export function applyFlux(context: EngineContext): { newState: any; events: any[] } {
-	const { state, action, ship } = context;
-	
-	if (!ship) {
-		throw new Error("Ship not found for flux action");
+/**
+	* 应用主动排散
+	* 纯计算：读取 state，返回更新指令（不直接修改 state）
+	* 注意：不调用 ventFlux（该函数有副作用），直接计算更新值
+	*/
+export function applyVent(context: EngineContext): EngineResult {
+	const payload = context.payload as Record<string, unknown>;
+	const tokenId = payload["tokenId"] as string;
+	const ship = context.state.tokens[tokenId];
+	if (!ship) return { runtimeUpdates: [], events: [] };
+
+	const runtime = ship.runtime;
+	if (!runtime || runtime.destroyed || runtime.venting || runtime.hasFired) {
+		return { runtimeUpdates: [], events: [] };
 	}
 
-	const events = [];
-	const updates = new Map<string, any>();
-
-	if (action.type === "VENT_FLUX") {
-		const ventResult = ventFlux(ship);
-		
-		if (ventResult.success) {
-			updates.set(`ship:${ship.$id}`, {
-				spec: ship.spec,
-				runtime: ship.runtime,
-			});
-
-			events.push(createFluxChangeEvent(
-				ship.$id,
-				ship.runtime?.fluxSoft || 0,
-				ship.runtime?.fluxHard || 0,
-				getTotalFlux(ship),
-				"VENTED"
-			));
-		}
-	} else if (action.type === "END_TURN") {
-	}
-
-	const newState = applyStateUpdates(state, updates);
-	return { newState, events };
-}
-
-export function validateFluxVent(ship: any): { valid: boolean; error?: string } {
-	const result = canVent(ship);
-	if (result.canVent) {
-		return { valid: true };
-	}
-	return result.reason 
-		? { valid: false, error: result.reason }
-		: { valid: false };
-}
-
-export function calculateFluxState(
-	fluxSoft: number,
-	fluxHard: number,
-	fluxCapacity: number
-): "NORMAL" | "HIGH" | "OVERLOADED" | "VENTING" {
-	const totalFlux = fluxSoft + fluxHard;
-	const ratio = totalFlux / fluxCapacity;
-
-	if (ratio >= 1.0) {
-		return "OVERLOADED";
-	} else if (ratio >= 0.7) {
-		return "HIGH";
-	} else {
-		return "NORMAL";
-	}
-}
-
-export function processFluxDissipation(state: any): {
-	shipUpdates: Map<string, any>;
-	fluxChanges: Map<string, any>;
-} {
-	const shipUpdates = new Map<string, any>();
-	const fluxChanges = new Map<string, any>();
-
-	for (const [shipId, ship] of state.tokens.entries()) {
-		if (ship.runtime?.destroyed) continue;
-
-		const oldTotalFlux = getTotalFlux(ship);
-		const oldOverloaded = ship.runtime?.overloaded;
-
-		processTurnEndFlux(ship);
-
-		const newTotalFlux = getTotalFlux(ship);
-		const newOverloaded = ship.runtime?.overloaded;
-
-		shipUpdates.set(shipId, { spec: ship.spec, runtime: ship.runtime });
-
-		if (oldTotalFlux !== newTotalFlux || oldOverloaded !== newOverloaded) {
-			fluxChanges.set(shipId, {
-				newFluxSoft: ship.runtime?.fluxSoft,
-				newFluxHard: ship.runtime?.fluxHard,
-				newTotalFlux: newTotalFlux,
-				isOverloaded: newOverloaded,
-			});
-		}
-	}
-
-	return { shipUpdates, fluxChanges };
+	return {
+		runtimeUpdates: [{
+			tokenId,
+			updates: {
+				fluxSoft: 0,
+				fluxHard: 0,
+				venting: true,
+			} as Record<string, unknown>,
+		}],
+		events: [createEngineEvent("vent", tokenId)],
+	};
 }

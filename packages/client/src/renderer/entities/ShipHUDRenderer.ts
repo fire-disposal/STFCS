@@ -538,7 +538,6 @@ export class ShipHUDManager {
 		const ratio = fluxCapacity > 0 ? Math.min(totalFlux / fluxCapacity, 1) : 0;
 		const filledSegments = Math.round(ratio * FLUX_BAR_SEGMENTS);
 		const hardSegments = fluxCapacity > 0 ? Math.round((fluxHard / fluxCapacity) * FLUX_BAR_SEGMENTS) : 0;
-		const emptySegments = FLUX_BAR_SEGMENTS - filledSegments;
 
 		const baseAlpha = isSelected ? 1.0 : 0.85;
 		const isOverloaded = fluxStatusChar === "O";

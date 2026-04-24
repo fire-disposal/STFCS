@@ -6,8 +6,8 @@ import { v4 as uuidv4 } from "uuid";
 import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
-import type { GameRoomState, CombatToken, Faction, GamePhase, TokenRuntime } from "@vt/data";
-import { TURN_ORDER } from "@vt/data";
+import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
+import { TURN_ORDER, GamePhase, Faction } from "@vt/data";
 import { processTokenTurnEnd } from "../../core/engine/rules/turnEnd.js";
 
 export interface RoomOptions {
@@ -63,7 +63,7 @@ export class Room {
 		this.stateManager = new MutativeStateManager(this.id, {
 			roomId: this.id,
 			ownerId: this.options.creatorSessionId,
-			phase: "DEPLOYMENT",
+			phase: GamePhase.DEPLOYMENT,
 			turnCount: 0,
 			players: {},
 			tokens: {},
@@ -166,12 +166,12 @@ export class Room {
 
 	startGame(): void {
 		this.stateManager.changeTurn(1);
-		this.stateManager.changePhase("PLAYER_ACTION");
+		this.stateManager.changePhase(GamePhase.PLAYER_ACTION);
 		this.logger.info("Game started");
 
 		this.callbacks.broadcast({
 			type: "GAME_STARTED",
-			payload: { startedAt: Date.now(), turn: 1, activeFaction: "PLAYER_ALLIANCE" },
+			payload: { startedAt: Date.now(), turn: 1, activeFaction: Faction.PLAYER_ALLIANCE },
 		});
 	}
 
@@ -182,10 +182,10 @@ export class Room {
 		let incrementTurn = false;
 
 		switch (currentPhase) {
-			case "DEPLOYMENT":
-				nextPhase = "PLAYER_ACTION";
+			case GamePhase.DEPLOYMENT:
+				nextPhase = GamePhase.PLAYER_ACTION;
 				break;
-			case "PLAYER_ACTION": {
+			case GamePhase.PLAYER_ACTION: {
 				// PLAYER_ACTION 内：推进到 TURN_ORDER 中的下一个派系
 				const currentFaction = this.stateManager.getState().activeFaction;
 				const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
@@ -194,11 +194,11 @@ export class Room {
 					// 最后一个派系，回到第一个并递增回合
 					incrementTurn = true;
 				}
-				nextPhase = "PLAYER_ACTION";
+				nextPhase = GamePhase.PLAYER_ACTION;
 				break;
 			}
 			default:
-				nextPhase = "PLAYER_ACTION";
+				nextPhase = GamePhase.PLAYER_ACTION;
 		}
 
 		this.stateManager.changePhase(nextPhase);
@@ -368,7 +368,7 @@ export class Room {
 					});
 					break;
 				case "START_GAME":
-					if (this.stateManager.getState().phase !== "DEPLOYMENT") {
+					if (this.stateManager.getState().phase !== GamePhase.DEPLOYMENT) {
 						this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" }, requestId });
 						return;
 					}

@@ -14,10 +14,10 @@
  * - 输入：移动距离和旋转角度强制为整数
  */
 
-import type { EngineContext } from "../context.js";
-import { applyStateUpdates, createMoveEvent, createRotateEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
 import { getMovementVector, findCollidingShips } from "@vt/data";
+import type { EngineContext, EngineResult } from "../context.js";
+import { createEngineEvent } from "../context.js";
 
 /** 移动阶段 */
 export type MovementPhase = "A" | "B" | "C" | "DONE";
@@ -70,109 +70,6 @@ function getMovementState(ship: any): {
 function getTranslationType(isStrafe: boolean): TranslationLock {
   return isStrafe ? "LEFT_RIGHT" : "FORWARD_BACKWARD";
 }
-
-/**
- * 应用移动Action
- */
-export function applyMovement(context: EngineContext): { newState: any; events: any[] } {
-  const { state, action, ship } = context;
-  const payload = action.payload as any;
-
-  if (!ship) {
-    throw new Error("Ship not found for movement");
-  }
-
-  const events = [];
-  const updates = new Map<string, any>();
-
-  // 获取所有舰船用于碰撞检测
-  const allShips = Array.from(state.tokens.values());
-
-  if (action.type === "MOVE") {
-    // ===== 碰撞检测 =====
-    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
-    const heading = ship.runtime?.heading ?? 0;
-    const vector = getMovementVector(heading, payload.forwardDistance ?? 0, payload.strafeDistance ?? 0);
-    const newPos = {
-      x: currentPos.x + vector.x,
-      y: currentPos.y + vector.y,
-    };
-    const halfWidth = (ship.spec?.width ?? 30) / 2;
-    const halfLength = (ship.spec?.length ?? 50) / 2;
-    const collidingIds = findCollidingShips(newPos, heading, halfWidth, halfLength, ship.$id, allShips);
-    if (collidingIds.length > 0) {
-      throw new Error(`移动会导致与 ${collidingIds.length} 艘舰船碰撞`);
-    }
-
-    const moveResult = processMovement(ship, payload);
-
-    updates.set(`ship:${ship.$id}`, {
-      runtime: {
-        ...ship.runtime,
-        position: moveResult.newPosition,
-        movement: moveResult.newMovementState,
-      },
-    });
-
-    events.push(createMoveEvent(
-      ship.$id,
-      ship.runtime.position,
-      moveResult.newPosition,
-      Math.abs(payload.distance)
-    ));
-
-  } else if (action.type === "ROTATE") {
-    // ===== 碰撞检测：旋转后新朝向是否与其他舰船碰撞 =====
-    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
-    const currentHeading = ship.runtime?.heading ?? 0;
-    const angle = payload.angle ?? 0;
-    let newHeading = (currentHeading + angle) % 360;
-    if (newHeading < 0) newHeading += 360;
-    const halfWidth = (ship.spec?.width ?? 30) / 2;
-    const halfLength = (ship.spec?.length ?? 50) / 2;
-    const collidingIds = findCollidingShips(currentPos, newHeading, halfWidth, halfLength, ship.$id, allShips);
-    if (collidingIds.length > 0) {
-      throw new Error(`旋转会导致与 ${collidingIds.length} 艘舰船碰撞`);
-    }
-
-    const rotateResult = processRotation(ship, payload);
-
-    updates.set(`ship:${ship.$id}`, {
-      runtime: {
-        ...ship.runtime,
-        heading: rotateResult.newHeading,
-        movement: rotateResult.newMovementState,
-      },
-    });
-
-    events.push(createRotateEvent(
-      ship.$id,
-      ship.runtime.heading || 0,
-      rotateResult.newHeading,
-      payload.angle
-    ));
-  } else if (action.type === "ADVANCE_PHASE") {
-    const phaseResult = advancePhase(ship);
-
-    updates.set(`ship:${ship.$id}`, {
-      runtime: {
-        ...ship.runtime,
-        movement: phaseResult.newMovementState,
-      },
-    });
-
-    events.push({
-      type: "PHASE_ADVANCED",
-      shipId: ship.$id,
-      fromPhase: phaseResult.fromPhase,
-      toPhase: phaseResult.toPhase,
-    });
-  }
-
-  const newState = applyStateUpdates(state, updates);
-  return { newState, events };
-}
-
 /**
  * 处理移动（A/C阶段）
  *
@@ -486,5 +383,95 @@ export function getMovementStatus(ship: any): {
     phaseALock: movement.phaseALock,
     phaseCLock: movement.phaseCLock,
     canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
+  };
+}
+
+// ==================== Engine Action Handlers ====================
+
+/**
+ * 应用移动（A/C阶段）
+ * 纯计算：读取 state，返回更新指令
+ */
+export function applyMove(context: EngineContext): EngineResult {
+  const payload = context.payload as Record<string, unknown>;
+  const tokenId = payload["tokenId"] as string;
+  const ship = context.state.tokens[tokenId];
+  if (!ship) return { runtimeUpdates: [], events: [] };
+
+  const forward = (payload["forward"] ?? 0) as number;
+  const strafe = (payload["strafe"] ?? 0) as number;
+  const allTokens = Object.values(context.state.tokens);
+
+  const validation = validateMovement(ship, forward, strafe, allTokens);
+  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+
+  const result = processMovement(ship, { forwardDistance: forward, strafeDistance: strafe });
+
+  return {
+    runtimeUpdates: [{
+      tokenId,
+      updates: {
+        position: result.newPosition,
+        movement: result.newMovementState,
+      } as Record<string, unknown>,
+    }],
+    events: [createEngineEvent("move", tokenId, { forward, strafe })],
+  };
+}
+
+/**
+ * 应用旋转（B阶段）
+ * 纯计算：读取 state，返回更新指令
+ */
+export function applyRotate(context: EngineContext): EngineResult {
+  const payload = context.payload as Record<string, unknown>;
+  const tokenId = payload["tokenId"] as string;
+  const ship = context.state.tokens[tokenId];
+  if (!ship) return { runtimeUpdates: [], events: [] };
+
+  const angle = (payload["angle"] ?? 0) as number;
+  const allTokens = Object.values(context.state.tokens);
+
+  const validation = validateRotation(ship, angle, allTokens);
+  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+
+  const result = processRotation(ship, { angle });
+
+  return {
+    runtimeUpdates: [{
+      tokenId,
+      updates: {
+        heading: result.newHeading,
+        movement: result.newMovementState,
+      } as Record<string, unknown>,
+    }],
+    events: [createEngineEvent("rotate", tokenId, { angle })],
+  };
+}
+
+/**
+ * 推进移动阶段（A→B→C→DONE）
+ * 纯计算：读取 state，返回更新指令
+ */
+export function applyAdvancePhase(context: EngineContext): EngineResult {
+  const payload = context.payload as Record<string, unknown>;
+  const tokenId = payload["tokenId"] as string;
+  const ship = context.state.tokens[tokenId];
+  if (!ship) return { runtimeUpdates: [], events: [] };
+
+  const validation = validatePhaseAdvance(ship);
+  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+
+  const phaseResult = advancePhase(ship);
+
+  return {
+    runtimeUpdates: [{
+      tokenId,
+      updates: { movement: phaseResult.newMovementState } as Record<string, unknown>,
+    }],
+    events: [createEngineEvent("advance_phase", tokenId, {
+      fromPhase: phaseResult.fromPhase,
+      toPhase: phaseResult.toPhase,
+    })],
   };
 }

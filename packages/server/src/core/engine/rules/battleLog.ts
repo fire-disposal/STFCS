@@ -212,8 +212,6 @@ export function formatBattleLog(
 
 	if (damageResult.targetDestroyed) {
 		lines.push(`${Colors.red}${Colors.bold}★ ${targetName} 被摧毁！${Colors.reset}`);
-	} else if (damageResult.targetOverloaded) {
-		lines.push(`${Colors.yellow}${Colors.bold}★ ${targetName} 过载！${Colors.reset}`);
 	}
 
 	lines.push(`${Colors.bold}${Colors.blue}==============================${Colors.reset}`);
@@ -247,8 +245,6 @@ export function formatSimpleBattleLog(
 	}
 	if (damageResult.targetDestroyed) {
 		result += ` ${Colors.red}${Colors.bold}[摧毁]${Colors.reset}`;
-	} else if (damageResult.targetOverloaded) {
-		result += ` ${Colors.yellow}[过载]${Colors.reset}`;
 	}
 
 	return result;

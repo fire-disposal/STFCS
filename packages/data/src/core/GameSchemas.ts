@@ -225,6 +225,7 @@ export const ShieldSpecSchema = z.object({
 	radius: z.number().min(0),
 	efficiency: z.number().min(0).default(1.0),
 	upkeep: z.number().min(0).default(0),
+	fixed: z.boolean().optional(),
 });
 export type ShieldSpec = z.infer<typeof ShieldSpecSchema>;
 
@@ -458,7 +459,7 @@ export const TokenRuntimeSchema = z.object({
 	armor: z.array(z.number().min(0)).length(6),
 	fluxSoft: z.number().min(0).optional(),
 	fluxHard: z.number().min(0).optional(),
-	shield: z.object({ active: z.boolean(), value: z.number().min(0), direction: z.number().min(0).max(360).optional() }).optional(),
+	shield: z.object({ active: z.boolean(), direction: z.number().min(0).max(360).optional() }).optional(),
 	overloaded: z.boolean().default(false),
 	overloadTime: z.number().min(0).default(1),
 	destroyed: z.boolean().default(false),

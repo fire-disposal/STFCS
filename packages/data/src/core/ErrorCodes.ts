@@ -1,0 +1,62 @@
+/**
+ * 错误码常量集
+ *
+ * 集中管理所有 Socket RPC 错误码，消除 handlers.ts 中的内联字面量风险。
+ * 所有错误码遵循 UPPER_SNAKE_CASE 命名规范。
+ * 使用 as const 确保类型安全，客户端可通过 ErrorCode 类型引用。
+ */
+export const ErrorCodes = {
+    // ==================== 通用错误 ====================
+    ERROR: "ERROR",
+
+    // ==================== 认证/授权 ====================
+    PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
+    UPDATE_FAILED: "UPDATE_FAILED",
+    NOT_HOST: "NOT_HOST",
+
+    // ==================== 房间操作 ====================
+    ALREADY_HAS_ROOM: "ALREADY_HAS_ROOM",
+    ROOM_CREATE_FAILED: "ROOM_CREATE_FAILED",
+    ROOM_NOT_FOUND: "ROOM_NOT_FOUND",
+    JOIN_FAILED: "JOIN_FAILED",
+
+    // ==================== 参数验证 ====================
+    TARGET_REQUIRED: "TARGET_REQUIRED",
+    TOKEN_ID_REQUIRED: "TOKEN_ID_REQUIRED",
+    TOKEN_DATA_REQUIRED: "TOKEN_DATA_REQUIRED",
+    TOKEN_NOT_FOUND: "TOKEN_NOT_FOUND",
+    PATH_REQUIRED: "PATH_REQUIRED",
+    AMOUNT_REQUIRED: "AMOUNT_REQUIRED",
+    NAME_REQUIRED: "NAME_REQUIRED",
+    SAVE_ID_REQUIRED: "SAVE_ID_REQUIRED",
+    PRESET_ID_REQUIRED: "PRESET_ID_REQUIRED",
+    WEAPON_ID_REQUIRED: "WEAPON_ID_REQUIRED",
+    WEAPON_DATA_REQUIRED: "WEAPON_DATA_REQUIRED",
+    MOUNT_ID_REQUIRED: "MOUNT_ID_REQUIRED",
+    KEY_REQUIRED: "KEY_REQUIRED",
+    VALUE_REQUIRED: "VALUE_REQUIRED",
+    PHASE_REQUIRED: "PHASE_REQUIRED",
+    TURN_REQUIRED: "TURN_REQUIRED",
+    PLAYER_ID_REQUIRED: "PLAYER_ID_REQUIRED",
+    FACTION_REQUIRED: "FACTION_REQUIRED",
+    DISPLAY_NAME_REQUIRED: "DISPLAY_NAME_REQUIRED",
+    ASSET_IDS_REQUIRED: "ASSET_IDS_REQUIRED",
+    ASSET_ID_REQUIRED: "ASSET_ID_REQUIRED",
+
+    // ==================== 业务操作 ====================
+    UNKNOWN_ACTION: "UNKNOWN_ACTION",
+    INVALID_PHASE: "INVALID_PHASE",
+    UNKNOWN_QUERY_TYPE: "UNKNOWN_QUERY_TYPE",
+    DEPLOY_COLLISION: "DEPLOY_COLLISION",
+
+    // ==================== CRUD 操作 ====================
+    UPSERT_FAILED: "UPSERT_FAILED",
+    TOKEN_DELETE_FAILED: "TOKEN_DELETE_FAILED",
+    WEAPON_NOT_FOUND: "WEAPON_NOT_FOUND",
+    WEAPON_DELETE_FAILED: "WEAPON_DELETE_FAILED",
+    SAVE_NOT_FOUND: "SAVE_NOT_FOUND",
+    ASSET_DELETE_FAILED: "ASSET_DELETE_FAILED",
+    PRESET_NOT_FOUND: "PRESET_NOT_FOUND",
+} as const;
+
+export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

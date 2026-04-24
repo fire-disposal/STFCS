@@ -98,6 +98,9 @@ interface UIState {
 
 	// 移动预览状态
 	movementPreview: MovementPreviewState | null;
+
+	// 护盾方向预览（shipId -> 方向角度）
+	shieldDirectionPreview: Record<string, number | undefined>;
 }
 
 interface UIActions {
@@ -159,6 +162,9 @@ interface UIActions {
 
 	// 移动预览相关
 	setMovementPreview: (preview: MovementPreviewState | null) => void;
+
+	// 护盾方向预览相关
+	setShieldDirectionPreview: (shipId: string, direction: number | undefined) => void;
 }
 
 export const useUIStore = create<UIState & UIActions>((set) => ({
@@ -214,6 +220,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	activePanel: "ships",
 
 	movementPreview: null,
+	shieldDirectionPreview: {},
 
 	// Actions
 	setConnected: (connected) => set({ isConnected: connected }),
@@ -285,6 +292,14 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setActivePanel: (panel) => set({ activePanel: panel }),
 
 	setMovementPreview: (preview) => set({ movementPreview: preview }),
+
+	setShieldDirectionPreview: (shipId, direction) =>
+		set((state) => ({
+			shieldDirectionPreview: {
+				...state.shieldDirectionPreview,
+				[shipId]: direction,
+			},
+		})),
 }));
 
 /**

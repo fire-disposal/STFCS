@@ -268,7 +268,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 				</Box>
 			</Box>
 
-			{/* 列2：武器信息 */}
+			{/* 列2：武器信息（两列子布局） */}
 			{currentWeapon && (
 				<Box className="weapon-col weapon-col--info">
 					<Flex className="weapon-col__header" align="center" gap="2">
@@ -278,21 +278,49 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 						</Badge>
 					</Flex>
 					<Box className="weapon-col__content">
-						<Flex className="weapon-stat-row" justify="between">
-							<Text size="1" color="gray">射程</Text>
-							<Text size="1">{currentWeapon.minRange > 0 ? `${currentWeapon.minRange}-${currentWeapon.range}` : currentWeapon.range}</Text>
-						</Flex>
-						<Flex className="weapon-stat-row" justify="between">
-							<Text size="1" color="gray">射界</Text>
-							<Text size="1">{currentWeapon.arc}°</Text>
-						</Flex>
-						<Flex className="weapon-stat-row" justify="between">
-							<Text size="1" color="gray">连射</Text>
-							<Text size="1">{currentWeapon.burstCount}</Text>
-						</Flex>
-						<Flex className="weapon-stat-row" justify="between">
-							<Text size="1" color="gray">辐能</Text>
-							<Text size="1">{currentWeapon.fluxCost}</Text>
+						<Flex className="weapon-info__cols" gap="2">
+							{/* 左列：基础参数 */}
+							<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">射程</Text>
+									<Text size="1">{currentWeapon.minRange > 0 ? `${currentWeapon.minRange}-${currentWeapon.range}` : currentWeapon.range}</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">射界</Text>
+									<Text size="1">{currentWeapon.arc}°</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">连射</Text>
+									<Text size="1">{currentWeapon.burstCount}</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">弹药</Text>
+									<Text size="1">{currentWeapon.ammo ? `${currentWeapon.ammo.current}/${currentWeapon.ammo.max}` : "∞"}</Text>
+								</Flex>
+							</Flex>
+							{/* 右列：武器参数 */}
+							<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">伤害</Text>
+									<Text size="1" style={{ color: DAMAGE_TYPE_COLORS[currentWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
+										{currentWeapon.damageType}
+									</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">辐能</Text>
+									<Text size="1">{currentWeapon.fluxCost}</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">冷却</Text>
+									<Text size="1">{currentWeapon.cooldown > 0 ? `${currentWeapon.cooldown}s` : "就绪"}</Text>
+								</Flex>
+								<Flex className="weapon-stat-row" justify="between">
+									<Text size="1" color="gray">状态</Text>
+									<Text size="1" style={{ color: currentWeapon.canFire ? "#2ecc71" : "#e74c3c" }}>
+										{currentWeapon.canFire ? "可用" : currentWeapon.hasFired ? "已射击" : currentWeapon.state}
+									</Text>
+								</Flex>
+							</Flex>
 						</Flex>
 					</Box>
 					<Box className={`weapon-info__status ${currentWeapon.canFire ? "weapon-info__status--ready" : "weapon-info__status--blocked"}`}>
@@ -356,14 +384,14 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 			<Box className="weapon-col weapon-col--fire">
 				<Button
 					className={`fire-btn ${!currentWeapon?.canFire ? "fire-btn--locked" : ""}`}
-					size="2"
+					size="4"
 					variant="solid"
 					color="red"
 					onClick={handleFire}
 					disabled={selectedTargetIds.length === 0 || !currentWeapon?.canFire}
 					data-magnetic
 				>
-					<Flex direction="column" align="center" gap="1">
+					<Flex direction="column" align="center" gap="2">
 						{currentWeapon?.canFire ? <Bomb size={18} /> : <Loader2 size={18} className="spin" />}
 						<Text size="1" weight="bold">
 							{currentWeapon?.canFire ? "开火" : currentWeapon?.reason ?? "锁定"}

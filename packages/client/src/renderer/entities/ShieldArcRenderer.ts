@@ -4,18 +4,18 @@
  * 职责：
  * 1. 渲染舰船护盾弧线可视化
  * 2. 显示护盾覆盖范围（arc 角度）
- * 3. 根据护盾值调整透明度
+ * 3. 支持滑动条预览方向
  *
  * 渲染层：world.shieldArcs (zIndex 12)
  *
  * 护盾样式：
- * - 弧线：表示护盾覆盖范围
- * - 辉光：多层叠加效果
+ * - 简洁弧线 + 辉光特效（内外两层辉光）
  * - 颜色：根据 faction 区分（玩家蓝色，敌人粉色）
  *
- * 护盾状态：
- * - active: 显示辉光弧线
- * - inactive: 隐藏护盾可视化
+ * 坐标系说明：
+ * - Container 已按 ship.runtime.heading 旋转（PixiJS rotation）
+ * - drawShieldArc 只使用 shield.direction（相对船头的方向）
+ * - 通过 nauticalToPixiSectorRotation 转换为 PixiJS 弧线角度
  */
 
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -27,7 +27,8 @@ import { useUIStore } from "@/state/stores/uiStore";
 
 const SHIELD_ARC_RADIUS_OFFSET = 15;
 const SHIELD_ARC_WIDTH = 2;
-const SHIELD_GLOW_WIDTH = 6;
+const SHIELD_GLOW_OUTER_WIDTH = 12;
+const SHIELD_GLOW_INNER_WIDTH = 5;
 const DEFAULT_SHIELD_RADIUS = 40;
 const DEFAULT_SHIELD_ARC = 120;
 
@@ -35,10 +36,8 @@ function getShieldColor(faction?: string): number {
 	return FactionColors[faction as keyof typeof FactionColors] ?? 0x4fc3ff;
 }
 
-function getShieldAlpha(shieldValue: number, shieldMax?: number): number {
-	const max = shieldMax ?? 100;
-	const ratio = shieldValue / max;
-	return 0.4 + ratio * 0.5;
+function getShieldAlpha(): number {
+	return 0.7;
 }
 
 function drawShieldArc(
@@ -56,41 +55,41 @@ function drawShieldArc(
 	const startAngle = screenOrientation - arcRad / 2;
 	const endAngle = screenOrientation + arcRad / 2;
 
-	const startX = radius * Math.cos(startAngle);
-	const startY = radius * Math.sin(startAngle);
-
 	if (arc >= 360) {
-		graphics.circle(0, 0, radius + SHIELD_GLOW_WIDTH);
-		graphics.stroke({ color, width: SHIELD_GLOW_WIDTH, alpha: alpha * 0.3 });
+		// 360度全向护盾：外层辉光
+		graphics.circle(0, 0, radius + SHIELD_GLOW_OUTER_WIDTH);
+		graphics.stroke({ color, width: SHIELD_GLOW_OUTER_WIDTH, alpha: alpha * 0.15 });
+
+		// 内层辉光
+		graphics.circle(0, 0, radius + SHIELD_GLOW_INNER_WIDTH);
+		graphics.stroke({ color, width: SHIELD_GLOW_INNER_WIDTH, alpha: alpha * 0.4 });
+
+		// 主弧线
 		graphics.circle(0, 0, radius);
 		graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 		return;
 	}
 
-	graphics.moveTo(startX, startY);
-	graphics.arc(0, 0, radius + SHIELD_GLOW_WIDTH, startAngle, endAngle);
-	graphics.stroke({ color, width: SHIELD_GLOW_WIDTH, alpha: alpha * 0.3 });
+	// 外层辉光（大范围低透明度）
+	graphics.moveTo(
+		(radius + SHIELD_GLOW_OUTER_WIDTH) * Math.cos(startAngle),
+		(radius + SHIELD_GLOW_OUTER_WIDTH) * Math.sin(startAngle)
+	);
+	graphics.arc(0, 0, radius + SHIELD_GLOW_OUTER_WIDTH, startAngle, endAngle);
+	graphics.stroke({ color, width: SHIELD_GLOW_OUTER_WIDTH, alpha: alpha * 0.12 });
 
-	graphics.moveTo(startX, startY);
+	// 内层辉光（小范围中透明度）
+	graphics.moveTo(
+		(radius + SHIELD_GLOW_INNER_WIDTH) * Math.cos(startAngle),
+		(radius + SHIELD_GLOW_INNER_WIDTH) * Math.sin(startAngle)
+	);
+	graphics.arc(0, 0, radius + SHIELD_GLOW_INNER_WIDTH, startAngle, endAngle);
+	graphics.stroke({ color, width: SHIELD_GLOW_INNER_WIDTH, alpha: alpha * 0.35 });
+
+	// 主弧线（清晰轮廓）
+	graphics.moveTo(radius * Math.cos(startAngle), radius * Math.sin(startAngle));
 	graphics.arc(0, 0, radius, startAngle, endAngle);
 	graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
-
-	const endpointRadius = 4;
-	graphics.circle(startX, startY, endpointRadius);
-	graphics.fill({ color, alpha: alpha * 1.2 });
-
-	const endX = radius * Math.cos(endAngle);
-	const endY = radius * Math.sin(endAngle);
-	graphics.circle(endX, endY, endpointRadius);
-	graphics.fill({ color, alpha: alpha * 1.2 });
-
-	graphics.moveTo(0, 0);
-	graphics.lineTo(startX, startY);
-	graphics.stroke({ color, width: 1, alpha: alpha * 0.5 });
-
-	graphics.moveTo(0, 0);
-	graphics.lineTo(endX, endY);
-	graphics.stroke({ color, width: 1, alpha: alpha * 0.5 });
 }
 
 export interface ShieldArcCacheItem {
@@ -101,7 +100,6 @@ export interface ShieldArcCacheItem {
 		y: number;
 		heading: number;
 		shieldActive: boolean;
-		shieldValue: number;
 		shieldDirection: number;
 		isOverloaded: boolean;
 	};
@@ -121,6 +119,7 @@ export function useShieldArcRendering(
 ) {
 	const cacheRef = useRef<Map<string, ShieldArcCacheItem>>(new Map());
 	const showShieldArc = useUIStore((state) => state.showShieldArc);
+	const shieldDirectionPreview = useUIStore((state) => state.shieldDirectionPreview);
 	const show = options.show ?? showShieldArc;
 	const defaultRadius = options.shieldRadius ?? DEFAULT_SHIELD_RADIUS;
 	const defaultArc = options.shieldArc ?? DEFAULT_SHIELD_ARC;
@@ -152,17 +151,17 @@ export function useShieldArcRendering(
 
 			const cached = cache.get(ship.$id);
 			if (!cached) {
-				createShieldArc(layers, cache, ship, defaultRadius, defaultArc, defaultMax);
+				createShieldArc(layers, cache, ship, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview);
 				continue;
 			}
 
 			if (shouldUpdateShield(cached, ship, defaultRadius, defaultMax)) {
-				updateShieldArc(cached, ship, defaultRadius, defaultArc, defaultMax);
+				updateShieldArc(cached, ship, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview);
 			}
 		}
 
 		layers.shieldArcs.visible = show;
-	}, [layers, ships, show, defaultRadius, defaultArc, defaultMax]);
+	}, [layers, ships, show, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview]);
 
 	useEffect(() => {
 		return () => {
@@ -189,11 +188,9 @@ function shouldUpdateShield(
 	const dy = Math.abs(ship.runtime.position.y - last.y);
 	const dHeading = Math.abs(ship.runtime.heading - last.heading);
 
-	const shieldValue = ship.runtime.shield?.value ?? 0;
 	const shieldDirection = ship.runtime.shield?.direction ?? 0;
 	const shieldChanged =
 		(ship.runtime.shield?.active ?? false) !== last.shieldActive ||
-		shieldValue !== last.shieldValue ||
 		shieldDirection !== (last.shieldDirection ?? 0) ||
 		(ship.runtime.overloaded ?? false) !== last.isOverloaded;
 
@@ -206,7 +203,8 @@ function createShieldArc(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number
+	defaultMax: number,
+	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.position) return;
 
@@ -215,7 +213,7 @@ function createShieldArc(
 	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	const graphics = new Graphics();
-	drawShieldArcForShip(graphics, ship, defaultRadius, defaultArc, defaultMax);
+	drawShieldArcForShip(graphics, ship, defaultRadius, defaultArc, defaultMax, previewDirections);
 	root.addChild(graphics);
 
 	layers.shieldArcs.addChild(root);
@@ -228,7 +226,6 @@ function createShieldArc(
 			y: ship.runtime.position.y,
 			heading: ship.runtime.heading,
 			shieldActive: ship.runtime.shield?.active ?? false,
-			shieldValue: ship.runtime.shield?.value ?? 0,
 			shieldDirection: ship.runtime.shield?.direction ?? 0,
 			isOverloaded: ship.runtime.overloaded ?? false,
 		},
@@ -240,21 +237,21 @@ function updateShieldArc(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number
+	defaultMax: number,
+	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.position) return;
 
 	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
-	drawShieldArcForShip(cached.graphics, ship, defaultRadius, defaultArc, defaultMax);
+	drawShieldArcForShip(cached.graphics, ship, defaultRadius, defaultArc, defaultMax, previewDirections);
 
 	cached.lastState = {
 		x: ship.runtime.position.x,
 		y: ship.runtime.position.y,
 		heading: ship.runtime.heading,
 		shieldActive: ship.runtime.shield?.active ?? false,
-		shieldValue: ship.runtime.shield?.value ?? 0,
 		shieldDirection: ship.runtime.shield?.direction ?? 0,
 		isOverloaded: ship.runtime.overloaded ?? false,
 	};
@@ -265,7 +262,8 @@ function drawShieldArcForShip(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number
+	defaultMax: number,
+	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.shield?.active || ship.runtime.overloaded) {
 		graphics.clear();
@@ -274,10 +272,15 @@ function drawShieldArcForShip(
 
 	const radius = ship.spec.shield?.radius ?? defaultRadius;
 	const arc = ship.spec.shield?.arc ?? defaultArc;
-	// 护盾朝向 = 舰船航向 + 护盾方向（航海坐标系：0°=船头向上）
-	const orientation = ship.runtime.heading + (ship.runtime.shield?.direction ?? 0);
+
+	// 护盾朝向 = 仅护盾方向（航海坐标系：0°=船头向上）
+	// Container 已按 ship.runtime.heading 旋转，因此这里不需要再加 heading
+	const previewDir = previewDirections[ship.$id];
+	const shieldDirection = previewDir ?? ship.runtime.shield?.direction ?? 0;
+	const orientation = shieldDirection;
+
 	const color = getShieldColor(ship.runtime.faction);
-	const alpha = getShieldAlpha(ship.runtime.shield?.value ?? 0, defaultMax);
+	const alpha = getShieldAlpha();
 
 	drawShieldArc(graphics, radius + SHIELD_ARC_RADIUS_OFFSET, arc, orientation, color, alpha);
 }

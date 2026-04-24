@@ -85,7 +85,7 @@ export function createCombatToken(
 		hasFired: false,
 		faction: faction ?? FactionEnum.PLAYER_ALLIANCE,
 		...(ownerId !== undefined ? { ownerId } : {}),
-		...(spec.shield ? { shield: { active: false, value: spec.shield.radius, direction: 0 } } : {}),
+		...(spec.shield ? { shield: { active: false, direction: 0 } } : {}),
 		weapons,
 	};
 

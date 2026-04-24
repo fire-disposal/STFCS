@@ -1,18 +1,19 @@
 /**
  * 护盾管理面板 - 横向布局
- * 
+ *
  * 功能：
  * 1. 护盾开关（独立按钮）
  * 2. 护盾朝向调整（预览 + 确认）
- * 3. 辐能显示
+ * 3. 辐能条可视化（软辐 + 硬辐 + 过载区）
  * 4. 散辐功能
  */
 
 import React, { useState, useEffect } from "react";
-import { Shield, Zap, Radio, AlertTriangle, RotateCw, Check } from "lucide-react";
+import { Shield, Zap, AlertTriangle, RotateCw, Check, X } from "lucide-react";
 import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, Badge, TextField } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
+import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
 export interface ShieldPanelProps {
@@ -42,6 +43,10 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const fluxTotal = fluxSoft + fluxHard;
 	const fluxMax = hasShip ? (ship.spec.fluxCapacity ?? 100) : 100;
 
+	const fluxSoftPct = fluxMax > 0 ? Math.min(100, (fluxSoft / fluxMax) * 100) : 0;
+	const fluxHardPct = fluxMax > 0 ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
+	const fluxTotalPct = Math.min(100, fluxSoftPct + fluxHardPct);
+
 	const overloaded = hasShip ? ship.runtime.overloaded : false;
 	const venting = hasShip ? ship.runtime.venting : false;
 	const destroyed = hasShip ? ship.runtime.destroyed : false;
@@ -62,17 +67,26 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 	const handleDirectionPreview = (direction: number) => {
 		setPreviewDirection(direction);
 		setPendingDirection(direction);
+		if (ship) {
+			useUIStore.getState().setShieldDirectionPreview(ship.$id, direction);
+		}
 	};
 
 	const handleConfirmDirection = async () => {
 		if (!canRotateShield || pendingDirection === null) return;
 		await sendShieldRotate(ship.$id, pendingDirection);
 		setPendingDirection(null);
+		if (ship) {
+			useUIStore.getState().setShieldDirectionPreview(ship.$id, undefined);
+		}
 	};
 
 	const handleCancelDirection = () => {
 		setPreviewDirection(shieldDirection);
 		setPendingDirection(null);
+		if (ship) {
+			useUIStore.getState().setShieldDirectionPreview(ship.$id, undefined);
+		}
 	};
 
 	const handleVent = async () => {
@@ -82,37 +96,42 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 	return (
 		<Flex className="panel-row" gap="3">
-			<Flex className="panel-section" align="center" gap="2">
-				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.$id.slice(-6)) : "请选择舰船"}</Text>
-				{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
-				{venting && <Badge color="purple" size="1">散辐中</Badge>}
-				{destroyed && <Badge color="gray" size="1">损毁</Badge>}
+			{/* 舰船标识 */}
+			<Flex className="panel-section panel-section--vertical" gap="1" style={{ minWidth: 100 }}>
+				<Text size="5" weight="bold" style={{ color: "#cfe8ff", lineHeight: 1.2 }}>
+					{hasShip ? (ship.metadata?.name ?? ship.$id.slice(-6)) : "请选择舰船"}
+				</Text>
+				<Flex align="center" gap="2" wrap="wrap">
+					{overloaded && <Badge size="2" color="red"><AlertTriangle size={12} /> 过载</Badge>}
+					{venting && <Badge size="2" color="purple">散辐中</Badge>}
+					{destroyed && <Badge size="2" color="gray">损毁</Badge>}
+				</Flex>
 			</Flex>
 
 			<Box className="panel-divider" />
 
+			{/* 护盾控制区 */}
 			{hasShieldSpec ? (
-				<>
-					<Flex className="panel-section" align="center" gap="2">
-						<Shield size={14} />
-						<Text size="1" className="panel-section__label">护盾</Text>
+				<Flex className="panel-section" align="center" gap="3">
+					{/* 护盾开关 */}
+					<Flex direction="column" align="center" gap="1">
+						<Button size="2" variant="solid" color={shieldActive ? "gray" : "blue"} onClick={handleToggleShield} disabled={!canToggleShield} data-magnetic style={{ width: 64, height: 48 }}>
+							<Shield size={18} />
+						</Button>
 						<Badge size="1" color={shieldActive ? "blue" : "gray"}>{shieldActive ? "ON" : "OFF"}</Badge>
-						{shieldArc < 360 && <Text size="1" color="gray">{shieldArc}°弧</Text>}
 					</Flex>
 
-					<Box className="panel-divider" />
-
-					<Button size="1" variant="solid" color={shieldActive ? "gray" : "blue"} onClick={handleToggleShield} disabled={!canToggleShield} data-magnetic>
-						<Shield size={12} /> {shieldActive ? "关闭" : "开启"}
-					</Button>
-
-					{needsDirectionControl && (
-						<>
-							<Box className="panel-divider" />
-
-							<Flex className="panel-section" align="center" gap="2">
-								<RotateCw size={14} />
-								<Text size="1" className="panel-section__label">朝向</Text>
+					{/* 朝向控制 */}
+					{needsDirectionControl ? (
+						<Flex direction="column" gap="2">
+							<Flex align="center" gap="2">
+								<RotateCw size={16} style={{ color: "#6b8aaa" }} />
+								<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>朝向</Text>
+								<Text size="4" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace", minWidth: 36 }}>
+									{previewDirection}°
+								</Text>
+							</Flex>
+							<Flex align="center" gap="2">
 								<input
 									type="range"
 									min={0}
@@ -121,7 +140,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 									value={previewDirection}
 									onChange={(e) => handleDirectionPreview(Number(e.target.value))}
 									disabled={!canRotateShield}
-									style={{ width: 80 }}
+									style={{ width: 120 }}
 								/>
 								<TextField.Root
 									size="1"
@@ -133,50 +152,102 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 									style={{ width: 50 }}
 									disabled={!canRotateShield}
 								/>
-								<Text size="1" color="gray">°</Text>
 								{!shieldActive && <Badge size="1" color="amber">需开启</Badge>}
 							</Flex>
-
+							{/* 确认/取消按钮 */}
 							{hasDirectionChange && (
-								<>
+								<Flex gap="1">
 									<Button size="1" variant="solid" color="green" onClick={handleConfirmDirection} data-magnetic>
 										<Check size={12} /> 确认
 									</Button>
 									<Button size="1" variant="soft" color="gray" onClick={handleCancelDirection} data-magnetic>
-										取消
+										<X size={12} /> 取消
 									</Button>
-								</>
+								</Flex>
 							)}
-						</>
+						</Flex>
+					) : (
+						<Flex align="center" gap="2">
+							<Text size="2" style={{ color: "#6b8aaa" }}>全向护盾</Text>
+							<Text size="1" style={{ color: "#4a5568" }}>(360°)</Text>
+						</Flex>
 					)}
-				</>
+				</Flex>
 			) : (
 				<Flex className="panel-section" align="center" gap="2">
-					<Shield size={14} />
-					<Text size="1" className="panel-section__label">护盾</Text>
-					<Badge size="1" color="gray">无护盾</Badge>
+					<Shield size={20} style={{ color: "#4a5568" }} />
+					<Text size="3" style={{ color: "#4a5568" }}>无护盾</Text>
 				</Flex>
 			)}
 
 			<Box className="panel-divider" />
 
-			<Flex className="panel-section" align="center" gap="2">
-				<Radio size={14} />
-				<Text size="1" className="panel-section__label">软辐</Text>
-				<Text size="1" className="panel-section__value">{hasShip ? `${fluxSoft}/${fluxMax}` : "NA"}</Text>
-			</Flex>
-
-			<Flex className="panel-section" align="center" gap="2">
-				<Zap size={14} />
-				<Text size="1" className="panel-section__label">硬辐</Text>
-				<Text size="1" className="panel-section__value">{hasShip ? `${fluxHard}` : "NA"}</Text>
+			{/* 辐能可视化 - 大号 */}
+			<Flex className="panel-section panel-section--vertical" gap="2" style={{ minWidth: 240, flex: 1 }}>
+				<Flex align="center" justify="between" style={{ width: "100%" }}>
+					<Flex align="center" gap="2">
+						<Zap size={18} style={{ color: overloaded ? "#ff4444" : "#ffaa00" }} />
+						<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>辐能</Text>
+					</Flex>
+					<Flex gap="3" align="center">
+						<Flex gap="1" align="center">
+							<Box style={{ width: 10, height: 10, borderRadius: 2, background: "#6ab4ff" }} />
+							<Text size="2" style={{ color: "#8ba4c7" }}>软 {fluxSoft}</Text>
+						</Flex>
+						<Flex gap="1" align="center">
+							<Box style={{ width: 10, height: 10, borderRadius: 2, background: "#ff6f8f" }} />
+							<Text size="2" style={{ color: "#8ba4c7" }}>硬 {fluxHard}</Text>
+						</Flex>
+					</Flex>
+				</Flex>
+				<Box className="flux-bar-container" style={{ width: "100%", minWidth: 0 }}>
+					<Box className="flux-bar" style={{ height: 20 }}>
+						{/* 硬辐能（左）— 粉色 */}
+						<Box
+							className="flux-bar__fill--hard"
+							style={{ width: `${fluxHardPct}%` }}
+						/>
+						{/* 软辐能（右）— 蓝色 */}
+						<Box
+							className="flux-bar__fill--soft"
+							style={{ width: `${fluxSoftPct}%`, left: `${fluxHardPct}%` }}
+						/>
+						{/* 过载时全条红色闪烁覆盖 */}
+						{overloaded && (
+							<Box
+								className="flux-bar__fill--overload"
+								style={{ width: `${fluxTotalPct}%` }}
+							/>
+						)}
+					</Box>
+					<Flex justify="between" style={{ width: "100%" }}>
+						<Text size="2" weight="bold" style={{ color: fluxTotalPct > 90 ? "#ff4444" : "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
+							{fluxTotal} / {fluxMax}
+						</Text>
+						<Text size="1" style={{ color: overloaded ? "#ff4444" : "#6b8aaa" }}>
+							{overloaded ? "过载" : `${fluxTotalPct.toFixed(0)}%`}
+						</Text>
+					</Flex>
+				</Box>
 			</Flex>
 
 			<Box className="panel-divider" />
 
-			<Button size="1" variant="soft" color="purple" onClick={handleVent} disabled={!canAct || fluxTotal === 0 || venting} data-magnetic>
-				<Zap size={12} /> 散辐
-			</Button>
+			{/* 散辐按钮 */}
+			<Flex direction="column" align="center" gap="1">
+				<Button
+					size="2"
+					variant="soft"
+					color="purple"
+					onClick={handleVent}
+					disabled={!canAct || fluxTotal === 0 || venting}
+					data-magnetic
+					style={{ width: 64, height: 48 }}
+				>
+					<Zap size={18} />
+				</Button>
+				<Badge size="1" color={venting ? "purple" : "gray"}>散辐</Badge>
+			</Flex>
 		</Flex>
 	);
 };

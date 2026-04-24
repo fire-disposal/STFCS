@@ -10,10 +10,10 @@
  */
 
 import type { CombatToken } from "../../state/Token.js";
-import type { EngineContext } from "../context.js";
-import { applyStateUpdates, createShieldToggleEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
 import { angleBetween } from "@vt/data";
+import type { EngineContext, EngineResult } from "../context.js";
+import { createEngineEvent } from "../context.js";
 
 /**
  * 护盾开启结果
@@ -23,71 +23,6 @@ export interface ShieldToggleResult {
 	newActive: boolean;
 	reason?: string;
 	fluxCost?: number;
-}
-
-/**
- * 应用护盾Action
- */
-export function applyShield(context: EngineContext): { newState: any; events: any[] } {
-	const { state, action, ship } = context;
-	const payload = action.payload as any;
-	
-	if (!ship) {
-		throw new Error("Ship not found for shield action");
-	}
-
-	const events = [];
-	const updates = new Map<string, any>();
-
-	if (action.type === "TOGGLE_SHIELD") {
-		const shieldResult = processShieldToggle(ship, payload);
-		
-		updates.set(`ship:${ship.$id}`, {
-			runtime: shieldResult.newRuntime,
-		});
-
-		events.push(createShieldToggleEvent(
-			ship.$id,
-			shieldResult.newRuntime.shield?.active || false,
-			shieldResult.previousActive
-		));
-	}
-
-	const newState = applyStateUpdates(state, updates);
-	return { newState, events };
-}
-
-/**
- * 处理护盾切换
- */
-function processShieldToggle(ship: any, payload: any) {
-	const runtime = { ...ship.runtime };
-	const spec = ship.spec;
-	
-	const previousActive = runtime.shield?.active || false;
-	const newActive = payload.active !== undefined ? payload.active : !previousActive;
-
-	if (!runtime.shield) {
-		runtime.shield = {
-			active: false,
-			value: spec.shield?.radius || 0,
-			maxShield: spec.shield?.radius || 0,
-		};
-	}
-
-	runtime.shield.active = newActive;
-
-	if (newActive && !previousActive) {
-		const shieldUpkeep = spec.shield?.upkeep || 0;
-		if (shieldUpkeep > 0) {
-			runtime.fluxSoft = (runtime.fluxSoft || 0) + shieldUpkeep;
-		}
-	}
-
-	return {
-		newRuntime: runtime,
-		previousActive,
-	};
 }
 
 /**
@@ -123,7 +58,7 @@ export function isShieldHit(
 	const runtime = ship.runtime;
 	const shield = runtime?.shield;
 
-	if (!shield || !shield.active || shield.value <= 0) {
+	if (!shield || !shield.active) {
 		return { hit: false };
 	}
 
@@ -171,28 +106,6 @@ export function calculateShieldUpkeep(ship: CombatToken): number {
 	return shieldSpec.upkeep || 0;
 }
 
-/**
- * 应用护盾伤害
- */
-export function applyShieldDamage(
-	ship: CombatToken,
-	damage: number
-): { shieldDamage: number; overflow: number } {
-	const shield = ship.runtime?.shield;
-
-	if (!shield || !shield.active || shield.value <= 0) {
-		return { shieldDamage: 0, overflow: damage };
-	}
-
-	const remaining = shield.value;
-	if (damage >= remaining) {
-		shield.value = 0;
-		return { shieldDamage: remaining, overflow: damage - remaining };
-	} else {
-		shield.value -= damage;
-		return { shieldDamage: damage, overflow: 0 };
-	}
-}
 
 /**
  * 切换护盾状态
@@ -231,9 +144,6 @@ export function toggleShield(
 export function getShieldStatus(ship: CombatToken): {
 	hasShield: boolean;
 	active: boolean;
-	value: number;
-	maxShield: number;
-	percentage: number;
 	isOmni: boolean;
 	upkeep: number;
 	canToggle: boolean;
@@ -245,24 +155,17 @@ export function getShieldStatus(ship: CombatToken): {
 		return {
 			hasShield: false,
 			active: false,
-			value: 0,
-			maxShield: 0,
-			percentage: 0,
 			isOmni: false,
 			upkeep: 0,
 			canToggle: false,
 		};
 	}
 
-	const maxShield = shieldSpec.radius || 100;
 	const canToggle = !ship.runtime?.overloaded && !ship.runtime?.destroyed;
 
 	return {
 		hasShield: true,
 		active: shield.active,
-		value: shield.value,
-		maxShield,
-		percentage: maxShield > 0 ? (shield.value / maxShield) * 100 : 0,
 		isOmni: shieldSpec.arc >= 360,
 		upkeep: shieldSpec.upkeep || 0,
 		canToggle,
@@ -330,7 +233,7 @@ export function checkShieldHit(
 
 	const shipAngle = runtime.heading || 0;
 	const shieldDirection = runtime.shield?.direction ?? 0;
-	
+
 	const relativeAttackAngle = ((attackAngle - shipAngle + 360) % 360);
 
 	const angleDiff = Math.abs(((relativeAttackAngle - shieldDirection + 180) % 360) - 180);
@@ -392,6 +295,10 @@ export function validateShieldRotate(ship: any, newDirection: number): { valid: 
 		return { valid: false, error: "Omni shield does not need direction control" };
 	}
 
+	if (spec.shield.fixed) {
+		return { valid: false, error: "Shield direction is fixed and cannot be rotated" };
+	}
+
 	if (!runtime?.shield?.active) {
 		return { valid: false, error: "Shield must be active to rotate" };
 	}
@@ -401,4 +308,72 @@ export function validateShieldRotate(ship: any, newDirection: number): { valid: 
 	}
 
 	return { valid: true };
+}
+
+// ==================== Engine Action Handlers ====================
+
+/**
+* 应用护盾开关
+* 纯计算：读取 state，返回更新指令（不直接修改 state）
+*/
+export function applyShieldToggle(context: EngineContext): EngineResult {
+	const payload = context.payload as Record<string, unknown>;
+	const tokenId = payload["tokenId"] as string;
+	const ship = context.state.tokens[tokenId];
+	if (!ship) return { runtimeUpdates: [], events: [] };
+
+	const active = !!payload["active"];
+	const shieldRuntime = ship.runtime?.shield;
+	const shieldSpec = ship.spec.shield;
+
+	if (!shieldSpec || !shieldRuntime) return { runtimeUpdates: [], events: [] };
+	if (ship.runtime?.overloaded) return { runtimeUpdates: [], events: [] };
+	if (active && ship.runtime?.venting) return { runtimeUpdates: [], events: [] };
+
+	const updates: Record<string, unknown> = {
+		shield: {
+			...shieldRuntime,
+			active,
+		},
+	};
+
+	// 注：开启护盾不立即产生辐能
+	// 维护费由 processTokenTurnEnd → calculateShieldUpkeep 在回合结束时根据护盾最终状态收取
+	const fluxCost = 0;
+
+	return {
+		runtimeUpdates: [{ tokenId, updates }],
+		events: [createEngineEvent("shield_toggle", tokenId, { active, fluxCost })],
+	};
+}
+
+/**
+* 应用护盾转向
+* 纯计算：读取 state，返回更新指令
+*/
+export function applyShieldRotate(context: EngineContext): EngineResult {
+	const payload = context.payload as Record<string, unknown>;
+	const tokenId = payload["tokenId"] as string;
+	const ship = context.state.tokens[tokenId];
+	if (!ship) return { runtimeUpdates: [], events: [] };
+
+	const direction = (payload["direction"] ?? 0) as number;
+	const shieldRuntime = ship.runtime?.shield;
+	if (!shieldRuntime) return { runtimeUpdates: [], events: [] };
+
+	const validation = validateShieldRotate(ship, direction);
+	if (!validation.valid) return { runtimeUpdates: [], events: [] };
+
+	return {
+		runtimeUpdates: [{
+			tokenId,
+			updates: {
+				shield: {
+					active: shieldRuntime.active ?? false,
+					direction,
+				},
+			} as Record<string, unknown>,
+		}],
+		events: [createEngineEvent("shield_rotate", tokenId, { direction })],
+	};
 }

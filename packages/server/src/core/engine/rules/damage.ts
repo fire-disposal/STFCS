@@ -18,10 +18,9 @@
  * - 若 (X - D) / X > 最大护甲减伤比，则 D = X * (1 - 最大护甲减伤比)
  */
 
-import type { TokenSpec, TokenRuntime, DamageTypeValue } from "@vt/data";
+import type { TokenSpec, TokenRuntime, DamageTypeValue, Point } from "@vt/data";
 import { GAME_RULES, angleBetween } from "@vt/data";
 
-import type { Point } from "../../types/common.js";
 import { calculateModifiedValue } from "../modules/modifier.js";
 
 export interface DamageResult {
@@ -33,7 +32,6 @@ export interface DamageResult {
 	armorQuadrant: number;
 	armorDamage: number;
 	hullDamage: number;
-	targetOverloaded: boolean;
 	targetDestroyed: boolean;
 }
 
@@ -61,7 +59,6 @@ export function calculateDamage(
 		armorQuadrant: -1,
 		armorDamage: 0,
 		hullDamage: 0,
-		targetOverloaded: false,
 		targetDestroyed: false,
 	};
 
@@ -75,13 +72,19 @@ export function calculateDamage(
 	let remainingDamage = damageAmount;
 
 	// 1. 护盾阶段
+	// 护盾拦截攻击：使用全局坐标角度（angleBetween）判定是否命中护盾弧
+	// 护盾无独立血量，拦截产生硬辐能，辐能超限时舰船过载 -> 护盾强制关闭
 	if (targetRuntime.shield?.active && targetSpec.shield) {
 		const shieldArc = targetSpec.shield.arc || 360;
 		const shipHeading = targetRuntime.heading ?? 0;
+		const shieldDirection = targetRuntime.shield.direction ?? 0;
 		const hitAngle = angleBetween(targetPosition, attackerPosition);
-		const angleDiff = Math.abs(((hitAngle - shipHeading + 180) % 360) - 180);
 
-		if (shieldArc >= 360 || angleDiff <= shieldArc / 2) {
+		// 使用 isAngleInShieldArc 公式正确考虑 shield.direction
+		const relativeAngle = ((hitAngle - shipHeading - shieldDirection + 540) % 360) - 180;
+		const inArc = Math.abs(relativeAngle) <= shieldArc / 2;
+
+		if (shieldArc >= 360 || inArc) {
 			result.shieldHit = true;
 
 			// 对护盾伤害 Y = X * shieldMultiplier
@@ -91,15 +94,8 @@ export function calculateDamage(
 			const baseEfficiency = targetSpec.shield.efficiency || 1;
 			const efficiency = calculateModifiedValue(baseEfficiency, targetRuntime, "shieldEfficiency");
 
-			// 硬辐能 = Y * 护盾效率
-			const fluxGenerated = shieldDamage * efficiency;
-			result.fluxGenerated = fluxGenerated;
-
-			// 检查过载
-			const newFluxHard = (targetRuntime.fluxHard || 0) + fluxGenerated;
-			if (newFluxHard > (targetSpec.fluxCapacity || 0)) {
-				result.targetOverloaded = true;
-			}
+			// 硬辐能 = Y * 护盾效率（shieldHit产生的辐能，在combat.ts中计入fluxHard）
+			result.fluxGenerated = shieldDamage * efficiency;
 
 			remainingDamage = 0;
 		}
