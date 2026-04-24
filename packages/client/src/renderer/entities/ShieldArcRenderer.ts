@@ -20,7 +20,7 @@
 
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { Faction, nauticalToPixiSectorRotation } from "@vt/data";
+import { FactionColors, nauticalToPixiSectorRotation } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -31,14 +31,8 @@ const SHIELD_GLOW_WIDTH = 6;
 const DEFAULT_SHIELD_RADIUS = 40;
 const DEFAULT_SHIELD_ARC = 120;
 
-const FACTION_SHIELD_COLORS: Record<string, number> = {
-	[Faction.PLAYER]: 0x4fc3ff,
-	[Faction.ENEMY]: 0xff5d7e,
-	[Faction.NEUTRAL]: 0xff7f9f,
-};
-
 function getShieldColor(faction?: string): number {
-	return FACTION_SHIELD_COLORS[faction ?? Faction.PLAYER] ?? 0x4fc3ff;
+	return FactionColors[faction as keyof typeof FactionColors] ?? 0x4fc3ff;
 }
 
 function getShieldAlpha(shieldValue: number, shieldMax?: number): number {

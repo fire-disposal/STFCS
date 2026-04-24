@@ -31,7 +31,7 @@ import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
 import { Application } from "@pixi/react";
 
-import type { CombatToken } from "@vt/data";
+import type { CombatToken, RoomPlayerState } from "@vt/data";
 import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
@@ -63,6 +63,7 @@ interface AssetBatchGetResult {
 
 interface GameCanvasProps {
 	ships: CombatToken[];
+	players?: Record<string, RoomPlayerState>;
 	onClick?: (x: number, y: number) => void;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
 }
@@ -106,6 +107,7 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	ships,
+	players,
 	onClick,
 	fetchAssets = noopFetchAssets,
 }) => {
@@ -197,7 +199,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		{ x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation },
 		canvasSize,
 		selectedShipId ?? null,
-		{ showHpBars: showLabels, showLabels: showLabels }
+		{ showHpBars: showLabels, showLabels: showLabels },
+		players ?? {}
 	);
 
 	useArmorHexagonRendering(layerSystem.layers, ships);

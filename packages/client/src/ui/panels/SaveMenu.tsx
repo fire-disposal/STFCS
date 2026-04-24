@@ -106,9 +106,10 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
 			<Dialog.Trigger>
-				<IconButton variant="ghost" size="1" title="存档">
-					<Save size={14} />
-				</IconButton>
+				<button className="top-bar__action-btn" title="存档">
+					<Save size={16} />
+					存档
+				</button>
 			</Dialog.Trigger>
 
 			<Dialog.Content className="save-menu-dialog" style={{ maxWidth: 480 }}>

@@ -73,10 +73,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				notify.success("游戏已开始");
 			} else if (currentPhase === "PLAYER_ACTION") {
 				await send("edit:room", { action: "force_end_turn" });
-				notify.success("推进到 DM 回合");
-			} else if (currentPhase === "DM_ACTION") {
-				await send("edit:room", { action: "force_end_turn" });
-				notify.success("回合已结算");
+				notify.success("已推进到下一回合");
 			}
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "操作失败");
@@ -186,12 +183,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				onAdvancePhase={handleAdvancePhase}
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
+				onFactionChange={(playerId, faction) => {
+					send("edit:room", { action: "set_faction", playerId, faction });
+				}}
 			/>
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
 					<PixiCanvas
 						ships={tokens}
+						players={room.state.players as Record<string, import("@vt/data").RoomPlayerState>}
 						fetchAssets={assetSocket.batchGet}
 					/>
 				</Box>

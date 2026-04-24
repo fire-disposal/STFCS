@@ -116,7 +116,7 @@ function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolea
         overloaded: false,
         overloadTime: 1,
         destroyed: false,
-        faction: Faction.PLAYER,
+        faction: Faction.PLAYER_ALLIANCE,
     };
 
     return {
@@ -149,12 +149,12 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
     // offsetY > 0（船头方向）在屏幕上是向上（负方向）
     const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
     const textureOffsetY = -(texture?.offsetY ?? 0) * zoom; // 反转 Y
-    
+
     // wrap 负责偏移，img 负责缩放和居中
     const wrapStyle = useMemo(() => ({
         transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)`,
     }), [textureOffsetX, textureOffsetY]);
-    
+
     const imgStyle = useMemo(() => ({
         transform: `translate(-50%, -50%) scale(${textureScale})`,
     }), [textureScale]);

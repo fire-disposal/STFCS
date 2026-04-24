@@ -11,21 +11,21 @@ export const NETWORK_CONFIG = {
     MAX_RECONNECT_ATTEMPTS: 10,
     RECONNECT_BASE_DELAY: 1000, // 1秒
     RECONNECT_MAX_DELAY: 30000, // 30秒
-    
+
     // 心跳配置
     HEARTBEAT_INTERVAL: 30000, // 30秒
     HEARTBEAT_TIMEOUT: 10000, // 10秒
-    
+
     // 消息队列
     MAX_QUEUE_SIZE: 1000,
-    
+
     // 连接超时
     CONNECT_TIMEOUT: 10000, // 10秒
   },
-  
+
   // 协议版本
   PROTOCOL_VERSION: '1.0.0',
-  
+
   // 消息类型
   MESSAGE_TYPES: {
     // 连接/会话
@@ -34,7 +34,7 @@ export const NETWORK_CONFIG = {
     HEARTBEAT: 'heartbeat',
     HEARTBEAT_ACK: 'heartbeat_ack',
     DISCONNECT: 'disconnect',
-    
+
     // 房间管理
     ROOM_LIST: 'room:list',
     ROOM_LIST_RESULT: 'room:list_result',
@@ -44,7 +44,7 @@ export const NETWORK_CONFIG = {
     ROOM_JOINED: 'room:joined',
     ROOM_LEAVE: 'room:leave',
     ROOM_LEFT: 'room:left',
-    
+
     // 游戏命令
     GAME_MOVE: 'game:move',
     GAME_ROTATE: 'game:rotate',
@@ -53,12 +53,12 @@ export const NETWORK_CONFIG = {
     GAME_VENT_FLUX: 'game:vent_flux',
     GAME_END_TURN: 'game:end_turn',
     GAME_COMMAND_RESULT: 'game:command_result',
-    
+
     // 状态同步
     STATE_FULL: 'state:full',
     STATE_DELTA: 'state:delta',
     EVENT: 'event',
-    
+
     // 错误
     ERROR: 'error',
   } as const,
@@ -73,7 +73,7 @@ export const GAME_CONFIG = {
     DEFAULT_HEIGHT: 10000,
     GRID_SIZE: 100,
   },
-  
+
   // 相机配置
   CAMERA: {
     MIN_ZOOM: 0.1,
@@ -82,14 +82,14 @@ export const GAME_CONFIG = {
     ZOOM_SPEED: 0.1,
     PAN_SPEED: 1,
   },
-  
+
   // 舰船配置
   SHIP: {
     DEFAULT_SPEED: 100,
     ROTATION_SPEED: 90, // 度/秒
     SELECTION_RADIUS: 50,
   },
-  
+
   // 武器配置
   WEAPON: {
     DEFAULT_RANGE: 1000,
@@ -105,18 +105,16 @@ export const UI_CONFIG = {
   COLORS: {
     // 阵营颜色（Pixi格式）
     FACTION_PIXI: {
-      PLAYER: 0x4fc3ff,
-      ENEMY: 0xff5d7e,
-      NEUTRAL: 0xff7f9f,
+      PLAYER_ALLIANCE: 0x4fc3ff,
+      FATE_GRIP: 0xff5d7e,
     },
-    
+
     // 阵营颜色（CSS格式）
     FACTION: {
-      PLAYER: '#4fc3ff',
-      ENEMY: '#ff5d7e',
-      NEUTRAL: '#ff7f9f',
+      PLAYER_ALLIANCE: '#4fc3ff',
+      FATE_GRIP: '#ff5d7e',
     },
-    
+
     // 武器伤害类型颜色（Pixi格式）
     DAMAGE_TYPE_PIXI: {
       KINETIC: 0xffd700,
@@ -124,7 +122,7 @@ export const UI_CONFIG = {
       ENERGY: 0x7b68ee,
       FRAGMENTATION: 0x32cd32,
     } as const,
-    
+
     // 武器伤害类型颜色（CSS格式）
     DAMAGE_TYPE: {
       KINETIC: '#ffd700',
@@ -132,7 +130,7 @@ export const UI_CONFIG = {
       ENERGY: '#7b68ee',
       FRAGMENTATION: '#32cd32',
     } as const,
-    
+
     // UI颜色
     UI: {
       PRIMARY: '#2196F3',
@@ -142,7 +140,7 @@ export const UI_CONFIG = {
       WARNING: '#FFC107',
       INFO: '#00BCD4',
     },
-    
+
     // 状态颜色
     STATUS: {
       HEALTH: '#4CAF50',
@@ -151,7 +149,7 @@ export const UI_CONFIG = {
       OVERLOAD: '#F44336',
     },
   },
-  
+
   // 字体配置
   FONTS: {
     FAMILY: 'Arial, sans-serif',
@@ -162,7 +160,7 @@ export const UI_CONFIG = {
       XLARGE: '20px',
     },
   },
-  
+
   // 动画配置
   ANIMATIONS: {
     DURATION: {
@@ -172,7 +170,7 @@ export const UI_CONFIG = {
     },
     EASING: 'cubic-bezier(0.4, 0, 0.2, 1)',
   },
-  
+
   // 布局配置
   LAYOUT: {
     // 面板宽度
@@ -181,7 +179,7 @@ export const UI_CONFIG = {
       RIGHT: 300,
       BOTTOM: 200,
     },
-    
+
     // 间距
     SPACING: {
       SMALL: '8px',
@@ -199,34 +197,34 @@ export const PERFORMANCE_CONFIG = {
     MAX_FPS: 60,
     TARGET_FPS: 60,
     FRAME_TIME: 16.67, // 1000 / 60
-    
+
     // 实体限制
     MAX_ENTITIES: 1000,
     MAX_PARTICLES: 10000,
-    
+
     // 批处理大小
     BATCH_SIZE: 100,
   },
-  
+
   // 状态管理配置
   STATE: {
     // 状态快照
     MAX_SNAPSHOTS: 50,
     SNAPSHOT_INTERVAL: 1000, // 毫秒
-    
+
     // 订阅优化
     DEBOUNCE_TIME: 16, // 约60fps
   },
-  
+
   // 内存配置
   MEMORY: {
     // 纹理缓存
     MAX_TEXTURE_CACHE: 50,
     TEXTURE_CACHE_TIMEOUT: 300000, // 5分钟
-    
+
     // 几何缓存
     MAX_GEOMETRY_CACHE: 100,
-    
+
     // 对象池
     MAX_POOL_SIZE: 1000,
   },
@@ -238,7 +236,7 @@ export const DEVELOPMENT_CONFIG = {
   // 调试模式
   DEBUG: {
     ENABLED: process.env.NODE_ENV === 'development',
-    
+
     // 调试功能
     FEATURES: {
       SHOW_FPS: true,
@@ -247,7 +245,7 @@ export const DEVELOPMENT_CONFIG = {
       SHOW_DEBUG_INFO: false,
       ENABLE_CONSOLE_LOGS: true,
     },
-    
+
     // 性能监控
     PERFORMANCE: {
       ENABLE_PROFILING: true,
@@ -259,7 +257,7 @@ export const DEVELOPMENT_CONFIG = {
       },
     },
   },
-  
+
   // 模拟配置
   SIMULATION: {
     // 网络模拟
@@ -269,7 +267,7 @@ export const DEVELOPMENT_CONFIG = {
       JITTER: 0, // 毫秒
       PACKET_LOSS: 0, // 百分比
     },
-    
+
     // 性能测试
     STRESS_TEST: {
       ENABLED: false,

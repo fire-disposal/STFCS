@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from "react";
 import { Anchor, Zap, Gauge, AlertTriangle, Edit2, Check, X } from "lucide-react";
 import type { CombatToken } from "@vt/data";
-import { Faction } from "@vt/data";
+import { FactionColors } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
 import type { SocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
@@ -69,7 +69,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 
 	const handleSaveName = useCallback(async () => {
 		if (!hasShip || !room || !editingName.trim()) return;
-		
+
 		try {
 			await room.send("edit:token", {
 				action: "rename",
@@ -88,10 +88,12 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 		<Flex direction="column" gap="2" className="panel-content">
 			{/* 第一行：舰船名称 + 状态徽章 + 朝向 + 位置 */}
 			<Flex className="panel-row" gap="3" align="center">
-				<Text size="2">
-					{faction === Faction.PLAYER ? "🔵" : faction === Faction.NEUTRAL ? "⚪" : faction === Faction.ENEMY ? "🔴" : "⚪"}
-				</Text>
-				
+				{faction && (
+					<Text size="2" style={{ color: `#${FactionColors[faction]?.toString(16).padStart(6, "0")}` }}>
+						◆
+					</Text>
+				)}
+
 				{isEditingName ? (
 					<Flex align="center" gap="1">
 						<TextField.Root
@@ -119,7 +121,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 						)}
 					</Flex>
 				)}
-				
+
 				{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
 				{shieldActive && <Badge color="blue" size="1">护盾</Badge>}
 				{destroyed && <Badge color="gray" size="1">损毁</Badge>}

@@ -1,9 +1,9 @@
 /**
  * RoomPlayerList - 房间内玩家列表组件
  * 显示：头像 + 用户名 + DM标记 + 准备状态
- * 
+ *
  * 头像边框颜色规则：
- * - 红色：当前非本玩家回合（DM_ACTION/TURN_END）
+ * - 红色：当前非本玩家回合
  * - 蓝色：当前玩家回合且未准备（PLAYER_ACTION/DEPLOYMENT，isReady=false）
  * - 绿色：当前玩家回合且已准备（PLAYER_ACTION/DEPLOYMENT，isReady=true）
  */
@@ -47,18 +47,14 @@ export const RoomPlayerList: React.FC<RoomPlayerListProps> = ({
 
 	const getBorderColor = (player: PlayerInfo): string => {
 		const isCurrentPlayer = player.sessionId === currentPlayerId;
-		
-		if (phase === "DM_ACTION" || phase === "TURN_END") {
-			return "red";
-		}
-		
+
 		if (phase === "PLAYER_ACTION" || phase === "DEPLOYMENT") {
 			if (isCurrentPlayer) {
 				return player.isReady ? "green" : "blue";
 			}
 			return "red";
 		}
-		
+
 		return "gray";
 	};
 

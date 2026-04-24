@@ -83,7 +83,7 @@ export function createCombatToken(
 			hasMoved: false,
 		},
 		hasFired: false,
-		faction: faction ?? FactionEnum.NEUTRAL,
+		faction: faction ?? FactionEnum.PLAYER_ALLIANCE,
 		...(ownerId !== undefined ? { ownerId } : {}),
 		...(spec.shield ? { shield: { active: false, value: spec.shield.radius, direction: 0 } } : {}),
 		weapons,
@@ -316,9 +316,9 @@ export function getTokenHeading(token: Token): number {
 
 export function getTokenFaction(token: Token): Faction {
 	if (isCombatToken(token)) {
-		return token.runtime?.faction ?? FactionEnum.NEUTRAL;
+		return token.runtime?.faction ?? FactionEnum.PLAYER_ALLIANCE;
 	}
-	return token.runtime?.faction ?? FactionEnum.NEUTRAL;
+	return token.runtime?.faction ?? FactionEnum.PLAYER_ALLIANCE;
 }
 
 export function isCombatToken(token: Token): token is CombatToken {

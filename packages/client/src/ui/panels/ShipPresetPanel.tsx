@@ -106,7 +106,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 			overloaded: false,
 			overloadTime: 1,
 			destroyed: false,
-			faction: FactionEnum.PLAYER,
+			faction: FactionEnum.PLAYER_ALLIANCE,
 			venting: false,
 			weapons: (spec.mounts ?? []).map((m) => ({
 				mountId: m.id,
@@ -132,7 +132,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 			const result = await room.send("edit:token", {
 				action: "create",
 				token: combatToken,
-				faction: FactionEnum.PLAYER,
+				faction: FactionEnum.PLAYER_ALLIANCE,
 				position: cursorPosition,
 			});
 			const displayName = (result as { tokenId: string; displayName?: string }).displayName ?? selectedPreset.name;

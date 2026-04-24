@@ -24,18 +24,20 @@
  * - selected=false: 半透明（alpha=0.85）
  */
 
-import type { CombatToken } from "@vt/data";
+import type { CombatToken, RoomPlayerState } from "@vt/data";
+import { FactionColors } from "@vt/data";
 import { Text, TextStyle, Container } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 import { useUIStore } from "@/state/stores/uiStore";
 
-const HP_BAR_OFFSET_Y = -40;
-const LABEL_OFFSET_Y = 25;
+const HP_BAR_OFFSET_Y = -60;
+const LABEL_OFFSET_Y = 45;
+const OWNER_LABEL_OFFSET_Y = 60;
 const DEFAULT_HULL_MAX = 100;
 
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
-	fontSize: 12,
+	fontSize: 15,
 	fontFamily: "Arial, sans-serif",
 	fontWeight: "600",
 	stroke: { color: 0x081423, width: 2 },
@@ -47,6 +49,20 @@ const labelStyle = new TextStyle({
 	},
 });
 
+/** 所有者标签样式选项（纯对象，避免 spread TextStyle 实例丢失属性） */
+const ownerLabelStyleOptions = {
+	fontSize: 13,
+	fontFamily: "Arial, sans-serif",
+	fontWeight: "600",
+	stroke: { color: 0x081423, width: 2 },
+	dropShadow: {
+		color: 0x081423,
+		alpha: 0.5,
+		blur: 1,
+		distance: 1,
+	},
+} as const;
+
 const getHpColor = (hpPercent: number): number => {
 	if (hpPercent >= 0.6) return 0x57e38d;
 	if (hpPercent >= 0.3) return 0xffce66;
@@ -56,6 +72,7 @@ const getHpColor = (hpPercent: number): number => {
 interface ShipHUDCache {
 	hpBarContainer: Container;
 	label: Text;
+	ownerLabel: Text | null;
 	lastUpdate: {
 		worldX: number;
 		worldY: number;
@@ -64,6 +81,8 @@ interface ShipHUDCache {
 		maxHp: number;
 		name: string;
 		displayName: string;
+		ownerName: string;
+		ownerColor: number;
 		selected: boolean;
 	};
 }
@@ -80,10 +99,15 @@ export class ShipHUDManager {
 	private hpBarLayer: Container;
 	private labelLayer: Container;
 	private lastCamera: CameraSnapshot | null = null;
+	private players: Record<string, RoomPlayerState> = {};
 
 	constructor(hudLayers: { shipBars: Container; shipNames: Container }) {
 		this.hpBarLayer = hudLayers.shipBars;
 		this.labelLayer = hudLayers.shipNames;
+	}
+
+	setPlayers(players: Record<string, RoomPlayerState>): void {
+		this.players = players;
 	}
 
 	update(
@@ -154,9 +178,28 @@ export class ShipHUDManager {
 		this.hpBarLayer.addChild(hpBarContainer);
 		this.labelLayer.addChild(label);
 
+		// 所有者标签（有 ownerId 时显示）
+		const ownerName = this.getOwnerName(ship);
+		const ownerColor = this.getOwnerColor(ship);
+		let ownerLabel: Text | null = null;
+		if (ownerName) {
+			const ownerStyle = new TextStyle({
+				...ownerLabelStyleOptions,
+				fill: ownerColor,
+			});
+			ownerLabel = new Text({
+				text: ownerName,
+				style: ownerStyle,
+			});
+			ownerLabel.anchor.set(0.5, 0);
+			ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
+			this.labelLayer.addChild(ownerLabel);
+		}
+
 		this.cache.set(ship.$id, {
 			hpBarContainer,
 			label,
+			ownerLabel,
 			lastUpdate: {
 				worldX: ship.runtime.position.x,
 				worldY: ship.runtime.position.y,
@@ -165,6 +208,8 @@ export class ShipHUDManager {
 				maxHp: hullMax,
 				name: ship.metadata?.name || ship.$id,
 				displayName: this.getDisplayName(ship),
+				ownerName: ownerName ?? "",
+				ownerColor: ownerColor,
 				selected: isSelected,
 			},
 		});
@@ -203,6 +248,9 @@ export class ShipHUDManager {
 			);
 			cached.hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 			cached.label.position.set(screenX, screenY + LABEL_OFFSET_Y);
+			if (cached.ownerLabel) {
+				cached.ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
+			}
 		}
 
 		const hpPercent = ship.runtime.hull / hullMax;
@@ -222,6 +270,37 @@ export class ShipHUDManager {
 			cached.label.text = this.formatLabel(ship);
 		}
 
+		// 更新所有者标签
+		const newOwnerName = this.getOwnerName(ship);
+		const newOwnerColor = this.getOwnerColor(ship);
+		const ownerChanged = newOwnerName !== last.ownerName || newOwnerColor !== last.ownerColor;
+		if (ownerChanged) {
+			if (cached.ownerLabel) {
+				this.labelLayer.removeChild(cached.ownerLabel);
+				cached.ownerLabel.destroy();
+				cached.ownerLabel = null;
+			}
+			if (newOwnerName) {
+				const ownerStyle = new TextStyle({
+					...ownerLabelStyleOptions,
+					fill: newOwnerColor,
+				});
+				cached.ownerLabel = new Text({
+					text: newOwnerName,
+					style: ownerStyle,
+				});
+				cached.ownerLabel.anchor.set(0.5, 0);
+				const { screenX, screenY } = worldToScreen(
+					ship.runtime.position.x,
+					ship.runtime.position.y,
+					camera,
+					canvasSize
+				);
+				cached.ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
+				this.labelLayer.addChild(cached.ownerLabel);
+			}
+		}
+
 		cached.lastUpdate = {
 			worldX: ship.runtime.position.x,
 			worldY: ship.runtime.position.y,
@@ -230,6 +309,8 @@ export class ShipHUDManager {
 			maxHp: hullMax,
 			name: newName,
 			displayName: newDisplayName,
+			ownerName: newOwnerName ?? "",
+			ownerColor: newOwnerColor,
 			selected: isSelected,
 		};
 	}
@@ -240,6 +321,38 @@ export class ShipHUDManager {
 
 	private getDisplayName(ship: CombatToken): string {
 		return ship.runtime?.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
+	}
+
+	/**
+	 * 获取舰船所有者名称
+	 * 从 metadata.owner 获取，如果存在则返回玩家昵称
+	 */
+	private getOwnerName(ship: CombatToken): string | null {
+		const ownerId = ship.runtime?.ownerId ?? ship.metadata?.owner;
+		if (!ownerId) return null;
+		// 通过 players 映射查找玩家昵称
+		const player = this.players[ownerId];
+		if (player) {
+			return player.nickname;
+		}
+		// 找不到时返回 ownerId 作为后备
+		return ownerId;
+	}
+
+	/**
+	 * 获取所有者标签颜色
+	 * 优先使用玩家所属派系的主题色，无派系时使用舰船名称颜色
+	 */
+	private getOwnerColor(ship: CombatToken): number {
+		const ownerId = ship.runtime?.ownerId ?? ship.metadata?.owner;
+		if (ownerId) {
+			const player = this.players[ownerId];
+			if (player?.faction) {
+				return FactionColors[player.faction as keyof typeof FactionColors] ?? 0xcfe8ff;
+			}
+		}
+		// 无所有者或无派系时使用舰船名称颜色
+		return 0xcfe8ff;
 	}
 
 	private createHpBarContainer(currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean, hpPerBar: number): Container {
@@ -262,14 +375,14 @@ export class ShipHUDManager {
 
 		const filledStyle = new TextStyle({
 			fill: hpColor,
-			fontSize: 12,
+			fontSize: 13,
 			fontFamily: "monospace",
 			fontWeight: "700",
 		});
 
 		const emptyStyle = new TextStyle({
 			fill: 0xffffff,
-			fontSize: 12,
+			fontSize: 13,
 			fontFamily: "monospace",
 			fontWeight: "700",
 		});
@@ -324,6 +437,10 @@ export class ShipHUDManager {
 		for (const cached of this.cache.values()) {
 			this.hpBarLayer.removeChild(cached.hpBarContainer);
 			this.labelLayer.removeChild(cached.label);
+			if (cached.ownerLabel) {
+				this.labelLayer.removeChild(cached.ownerLabel);
+				cached.ownerLabel.destroy();
+			}
 			cached.hpBarContainer.destroy();
 			cached.label.destroy();
 		}
@@ -350,7 +467,8 @@ export function useShipHUDRendering(
 	camera: { x: number; y: number; zoom: number; viewRotation: number },
 	canvasSize: { width: number; height: number },
 	selectedShipId: string | null = null,
-	options: ShipHUDRenderOptions = {}
+	options: ShipHUDRenderOptions = {},
+	players: Record<string, RoomPlayerState> = {}
 ) {
 	const managerRef = useRef<ShipHUDManager | null>(null);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
@@ -376,6 +494,7 @@ export function useShipHUDRendering(
 		layers.shipBars.visible = options.showHpBars ?? true;
 		layers.shipNames.visible = options.showLabels ?? true;
 
+		managerRef.current.setPlayers(players);
 		managerRef.current.update(ships, camera, canvasSize, selectedShipId, hpPerBar, defaultHullMax);
-	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax, hpPerBar]);
+	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax, hpPerBar, players]);
 }

@@ -24,7 +24,7 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipRenderOptions } from "../types";
 import type { CombatToken, WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
-import { Faction, toPixiRotation, nauticalToPixiSectorRotation, mountOffsetToScreen } from "@vt/data";
+import { Faction, FactionColors, toPixiRotation, nauticalToPixiSectorRotation, mountOffsetToScreen } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -34,7 +34,6 @@ const POSITION_THRESHOLD = 0.5;
 const HEADING_THRESHOLD = 0.8;
 const FLUX_THRESHOLD = 0.5;
 
-const FACTION_COLORS = UI_CONFIG.COLORS.FACTION_PIXI;
 
 const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
 
@@ -180,7 +179,7 @@ function updateShipToken(
 ): void {
 	if (!ship.runtime?.position) return;
 
-	const color = FACTION_COLORS[ship.runtime.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
+	const color = FactionColors[ship.runtime.faction ?? Faction.PLAYER_ALLIANCE] ?? 0xcfd8e3;
 	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
 	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 
@@ -217,7 +216,7 @@ function createShipToken(
 ): void {
 	if (!ship.runtime?.position) return;
 
-	const color = FACTION_COLORS[ship.runtime.faction ?? Faction.PLAYER] ?? 0xcfd8e3;
+	const color = FactionColors[ship.runtime.faction ?? Faction.PLAYER_ALLIANCE] ?? 0xcfd8e3;
 	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
 	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 	const hitRadius = Math.max(halfWidth, halfLength) + 10;

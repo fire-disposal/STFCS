@@ -23,6 +23,9 @@ import type {
 	Faction,
 	GamePhase,
 } from "@vt/data"
+import {
+	TURN_ORDER,
+} from "@vt/data"
 
 export interface MutateResult {
 	patches: Patch[]
@@ -352,7 +355,7 @@ export class MutativeStateManager {
 		})
 	}
 
-	updatePlayer(playerId: string, updates: Partial<{ sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds: string[]; avatar: string }>): void {
+	updatePlayer(playerId: string, updates: Partial<{ sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; tokenIds: string[]; avatar: string; faction: string }>): void {
 		this.mutateAndBroadcast((draft) => {
 			const player = draft.players[playerId]
 			if (player) {
@@ -378,12 +381,18 @@ export class MutativeStateManager {
 		})
 	}
 
+	/**
+	 * 根据阶段获取当前活跃派系
+	 * PLAYER_ACTION 阶段使用 TURN_ORDER 决定当前派系
+	 * DEPLOYMENT 阶段无派系
+	 */
 	private getFactionForPhase(phase: GamePhase): Faction | undefined {
-		switch (phase) {
-			case "PLAYER_ACTION": return "PLAYER"
-			case "DM_ACTION": return "ENEMY"
-			default: return undefined
+		if (phase === "PLAYER_ACTION") {
+			// 根据回合数决定当前活跃派系（TURN_ORDER 循环）
+			const factionIndex = (this.state.turnCount - 1) % TURN_ORDER.length;
+			return TURN_ORDER[factionIndex] as Faction;
 		}
+		return undefined;
 	}
 
 	changeTurn(turn: number): void {

@@ -105,8 +105,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 					<DropdownMenu.Content>
 						<DropdownMenu.Label>切换阶段</DropdownMenu.Label>
 						<DropdownMenu.Item onClick={() => handleSetPhase("DEPLOYMENT")}>部署阶段</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleSetPhase("PLAYER_ACTION")}>玩家回合</DropdownMenu.Item>
-						<DropdownMenu.Item onClick={() => handleSetPhase("DM_ACTION")}>DM回合</DropdownMenu.Item>
+						<DropdownMenu.Item onClick={() => handleSetPhase("PLAYER_ACTION")}>行动回合</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Label>设置回合</DropdownMenu.Label>
 						<DropdownMenu.Item onClick={() => handleSetTurn(turnCount + 1)}>+1</DropdownMenu.Item>

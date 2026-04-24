@@ -74,29 +74,56 @@ export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
 
 /**
  * 游戏阶段（GamePhase）- 顶层状态
- * 
+ *
  * Phase ↔ activeFaction 对应规则：
  * - DEPLOYMENT: activeFaction = undefined（部署阶段不区分派系）
- * - PLAYER_ACTION: activeFaction = "PLAYER"（玩家行动阶段）
- * - DM_ACTION: activeFaction = "ENEMY"（DM/敌人行动阶段）
- * - TURN_END: activeFaction = undefined（结算阶段不区分派系）
- * 
+ * - PLAYER_ACTION: activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+ *
  * Phase 转换流程：
  * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后，游戏开始）
- * 2. PLAYER_ACTION → DM_ACTION（玩家回合结束）
- * 3. DM_ACTION → TURN_END（DM回合结束，进入结算）
- * 4. TURN_END → PLAYER_ACTION（结算完成，新回合开始，turnCount++）
- * 
+ * 2. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
+ * 3. 最后一个派系行动完毕后 turn++，回到第一个派系
+ *
  * 注意：phase 和 activeFaction 存在固定对应关系，
  * 修改 phase 时应同步更新 activeFaction。
  */
-export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION", "DM_ACTION", "TURN_END"]);
+export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION"]);
 export const GamePhase = GamePhaseSchema.enum;
 export type GamePhase = z.infer<typeof GamePhaseSchema>;
 
-export const FactionSchema = z.enum(["PLAYER", "ENEMY", "NEUTRAL"]);
+export const FactionSchema = z.enum(["PLAYER_ALLIANCE", "FATE_GRIP"]);
 export const Faction = FactionSchema.enum;
 export type Faction = z.infer<typeof FactionSchema>;
+
+/**
+ * 派系主题色映射
+ * - PLAYER_ALLIANCE: 蓝色系（玩家联盟）
+ * - FATE_GRIP: 红色系（命运之握）
+ */
+export const FactionColors: Record<Faction, number> = {
+	[Faction.PLAYER_ALLIANCE]: 0x4a9eff,
+	[Faction.FATE_GRIP]: 0xff4a4a,
+};
+
+/**
+ * 派系显示名称映射
+ */
+export const FactionLabels: Record<Faction, string> = {
+	[Faction.PLAYER_ALLIANCE]: "玩家联盟",
+	[Faction.FATE_GRIP]: "命运之握",
+};
+
+/**
+ * 回合行动顺序
+ * 定义每轮（turn）中各派系的行动顺序。
+ * 添加新派系时只需在此数组中插入即可。
+ * 系统按此顺序循环：每个派系行动完毕后切换到下一个，
+ * 最后一个派系行动完毕后 turn++ 并回到第一个。
+ */
+export const TURN_ORDER: Faction[] = [
+	Faction.PLAYER_ALLIANCE,
+	Faction.FATE_GRIP,
+];
 
 export const PlayerRoleSchema = z.enum(["HOST", "PLAYER"]);
 export const PlayerRole = PlayerRoleSchema.enum;
@@ -528,13 +555,11 @@ export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 
 /**
  * 游戏房间状态
- * 
+ *
  * 重要：phase 和 activeFaction 存在固定对应关系
  * 修改 phase 时必须同步更新 activeFaction：
  * - phase="DEPLOYMENT" → activeFaction=undefined
- * - phase="PLAYER_ACTION" → activeFaction="PLAYER"
- * - phase="DM_ACTION" → activeFaction="ENEMY"
- * - phase="TURN_END" → activeFaction=undefined
+ * - phase="PLAYER_ACTION" → activeFaction 由 TURN_ORDER 决定（派系轮流行动）
  */
 export const GameRoomStateSchema = z.object({
 	roomId: z.string(),

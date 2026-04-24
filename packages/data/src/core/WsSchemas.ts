@@ -369,13 +369,14 @@ export type EditTokenPayload = z.infer<typeof EditTokenDef.payload>
 
 export const EditRoomDef = {
   payload: z.object({
-    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn"]),
+    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction"]),
     key: z.string().optional(),
     value: z.number().optional(),
     duration: z.number().optional(),
     faction: FactionSchema.optional(),
     phase: z.string().optional(),
     turn: z.number().optional(),
+    playerId: z.string().optional(),
   }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>

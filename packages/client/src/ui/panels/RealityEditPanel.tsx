@@ -3,15 +3,13 @@
  * 参考 LoadoutCustomizerDialog 风格，提供 CombatToken 的运行时和规格编辑
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
 	Badge,
 	Box,
 	Button,
-	Card,
 	Flex,
 	Select,
-	Separator,
 	Switch,
 	Tabs,
 	Text,
@@ -19,7 +17,7 @@ import {
 	TextField,
 } from "@radix-ui/themes";
 import { RotateCcw, Save, Trash2, User, Code, ShieldCheck, Crosshair, Zap, Move } from "lucide-react";
-import type { CombatToken, RoomPlayerState, TokenRuntime, TokenSpec, WeaponRuntime } from "@vt/data";
+import type { CombatToken, RoomPlayerState, TokenRuntime, TokenSpec } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
@@ -81,60 +79,6 @@ function extractSpecDraft(ship: CombatToken): Partial<TokenSpec> {
 }
 
 // ===== 武器运行时编辑子组件 =====
-
-interface WeaponRuntimeEditorProps {
-	weapons: WeaponRuntime[];
-	onChange: (weapons: WeaponRuntime[]) => void;
-}
-
-const WeaponRuntimeEditor: React.FC<WeaponRuntimeEditorProps> = ({ weapons, onChange }) => {
-	const updateWeapon = (index: number, field: string, value: unknown) => {
-		const next = clone(weapons);
-		(next[index] as any)[field] = value;
-		onChange(next);
-	};
-
-	return (
-		<Flex direction="column" gap="2">
-			{weapons.length === 0 ? (
-				<Text size="1" color="gray">无武器</Text>
-			) : (
-				weapons.map((w, i) => (
-					<Card key={w.mountId} size="1" variant="surface">
-						<Flex direction="column" gap="1">
-							<Text size="1" weight="bold">{shortId(w.mountId)}</Text>
-							<Flex align="center" gap="2">
-								<Text size="1" color="gray">状态</Text>
-								<Select.Root
-									value={w.state}
-									onValueChange={(v) => updateWeapon(i, "state", v)}
-								>
-									<Select.Trigger style={{ width: 100 }} />
-									<Select.Content>
-										<Select.Item value="READY">就绪</Select.Item>
-										<Select.Item value="FIRED">已开火</Select.Item>
-										<Select.Item value="COOLDOWN">冷却中</Select.Item>
-										<Select.Item value="DISABLED">损坏</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</Flex>
-							<Flex align="center" gap="2">
-								<Text size="1" color="gray">冷却</Text>
-								<TextField.Root
-									size="1"
-									type="number"
-									value={w.cooldownRemaining ?? 0}
-									onChange={(e) => updateWeapon(i, "cooldownRemaining", Number(e.target.value) || 0)}
-									style={{ width: 60 }}
-								/>
-							</Flex>
-						</Flex>
-					</Card>
-				))
-			)}
-		</Flex>
-	);
-};
 
 // ===== 主面板 =====
 

@@ -94,18 +94,16 @@
 	transform: scale(1.08);
 }
 
-.player-avatar--ready {
-	border: 2px solid rgba(87, 227, 141, 0.6);
-	box-shadow: 0 0 6px rgba(87, 227, 141, 0.3);
+.player-avatar--player_alliance {
+	border: 2px solid rgba(74, 158, 255, 0.4);
 }
 
-.player-avatar--waiting {
+.player-avatar--fate_grip {
+	border: 2px solid rgba(255, 74, 74, 0.4);
+}
+
+.player-avatar--none {
 	border: 2px solid rgba(128, 128, 128, 0.3);
-}
-
-.player-avatar--active {
-	border: 2px solid rgba(255, 111, 143, 0.6);
-	box-shadow: 0 0 6px rgba(255, 111, 143, 0.3);
 }
 
 .player-avatar__inner {
@@ -119,6 +117,7 @@
 	font-weight: 600;
 }
 
+/* 指示灯 - 始终显示 */
 .player-avatar__dot {
 	position: absolute;
 	bottom: -2px;
@@ -126,10 +125,38 @@
 	width: 8px;
 	height: 8px;
 	border-radius: 50%;
-	background: #2ecc71;
 	border: 1px solid rgba(10, 20, 35, 0.8);
+	transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
-.player-avatar__dot--not-ready {
+/* 默认灰色（非 PLAYER_ACTION 阶段） */
+.player-avatar__dot--default {
 	background: #6b7280;
+	box-shadow: none;
+}
+
+/* 当前玩家回合，未准备：蓝色 */
+.player-avatar__dot--current-not-ready {
+	background: #4a9eff;
+	box-shadow: 0 0 4px rgba(74, 158, 255, 0.5);
+}
+
+/* 当前玩家回合，已准备：绿色 */
+.player-avatar__dot--current-ready {
+	background: #2ecc71;
+	box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
+}
+
+/* 不在当前玩家回合：红色 */
+.player-avatar__dot--other-turn {
+	background: #ff4a4a;
+	box-shadow: 0 0 4px rgba(255, 74, 74, 0.3);
+}
+
+/* 阵营分隔线 */
+.top-bar__avatar-divider {
+	width: 1px;
+	height: 24px;
+	background: rgba(128, 128, 128, 0.2);
+	margin: 0 4px;
 }

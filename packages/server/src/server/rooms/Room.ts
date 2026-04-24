@@ -7,6 +7,7 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, Faction, GamePhase, TokenRuntime } from "@vt/data";
+import { TURN_ORDER } from "@vt/data";
 import { processTokenTurnEnd } from "../../core/engine/rules/turnEnd.js";
 
 export interface RoomOptions {
@@ -170,7 +171,7 @@ export class Room {
 
 		this.callbacks.broadcast({
 			type: "GAME_STARTED",
-			payload: { startedAt: Date.now(), turn: 1, activeFaction: "PLAYER" },
+			payload: { startedAt: Date.now(), turn: 1, activeFaction: "PLAYER_ALLIANCE" },
 		});
 	}
 
@@ -181,17 +182,21 @@ export class Room {
 		let incrementTurn = false;
 
 		switch (currentPhase) {
-			case "PLAYER_ACTION":
-				nextPhase = "DM_ACTION";
-				break;
-			case "DM_ACTION":
+			case "DEPLOYMENT":
 				nextPhase = "PLAYER_ACTION";
-				incrementTurn = true;
 				break;
-			case "TURN_END":
+			case "PLAYER_ACTION": {
+				// PLAYER_ACTION 内：推进到 TURN_ORDER 中的下一个派系
+				const currentFaction = this.stateManager.getState().activeFaction;
+				const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
+				const nextIndex = currentIndex + 1;
+				if (nextIndex >= TURN_ORDER.length) {
+					// 最后一个派系，回到第一个并递增回合
+					incrementTurn = true;
+				}
 				nextPhase = "PLAYER_ACTION";
-				incrementTurn = true;
 				break;
+			}
 			default:
 				nextPhase = "PLAYER_ACTION";
 		}
@@ -203,26 +208,6 @@ export class Room {
 			const newTurn = this.stateManager.getState().turnCount + 1;
 			this.stateManager.changeTurn(newTurn);
 		}
-
-		const newState = this.stateManager.getState();
-		this.callbacks.broadcast({
-			type: "TURN_CHANGED",
-			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
-		});
-	}
-
-	nextTurn(): void {
-		const currentPhase = this.stateManager.getState().phase;
-
-		if (currentPhase !== "TURN_END") {
-			this.stateManager.changePhase("TURN_END");
-		}
-
-		this.processTurnEndLogic();
-
-		const newTurn = this.stateManager.getState().turnCount + 1;
-		this.stateManager.changeTurn(newTurn);
-		this.stateManager.changePhase("PLAYER_ACTION");
 
 		const newState = this.stateManager.getState();
 		this.callbacks.broadcast({
@@ -302,7 +287,7 @@ export class Room {
 				id: player?.sessionId,
 				name: player?.nickname,
 				role: player?.role,
-				faction: "PLAYER",
+				faction: player?.faction ?? undefined,
 				ready: player?.isReady,
 				connected: player?.connected,
 			};
@@ -391,7 +376,7 @@ export class Room {
 					this.callbacks.sendToPlayer(playerId, { type: "START_GAME_SUCCESS", payload: { startedAt: Date.now() }, requestId });
 					break;
 				case "NEXT_TURN":
-					this.nextTurn();
+					this.advancePhase();
 					this.callbacks.sendToPlayer(playerId, { type: "NEXT_TURN_SUCCESS", payload: { turn: this.stateManager.getState().turnCount }, requestId });
 					break;
 				default:

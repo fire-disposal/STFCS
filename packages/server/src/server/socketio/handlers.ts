@@ -16,7 +16,7 @@ import { angleBetween, findCollidingShips } from "@vt/data";
 import { validateMovement, validateRotation, validatePhaseAdvance, processMovement, processRotation, advancePhase } from "../../core/engine/modules/movement.js";
 import { toggleShield, validateShieldToggle, validateShieldRotate } from "../../core/engine/modules/shield.js";
 import { ventFlux, canVent } from "../../core/engine/modules/flux.js";
-import { Faction, type PlayerInfo } from "@vt/data";
+import { Faction, TURN_ORDER, type PlayerInfo } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken, InventoryToken, WeaponJSON } from "@vt/data";
 import { generateShortId } from "../utils/shortId.js";
 
@@ -478,15 +478,11 @@ rpc.namespace("game", {
     const room = ctx.room!;
     const phase = room.getStateManager().getState().phase;
 
-    if (phase !== "PLAYER_ACTION" && phase !== "DM_ACTION") {
+    if (phase !== "PLAYER_ACTION") {
       throw err("当前阶段不允许操作", "INVALID_PHASE");
     }
 
-    if (phase === "DM_ACTION" && room.creatorId !== ctx.playerId) {
-      throw err("DM回合只有房主可操作", "DM_ONLY");
-    }
-
-    if (phase === "PLAYER_ACTION" && room.creatorId !== ctx.playerId) {
+    if (room.creatorId !== ctx.playerId) {
       ctx.requireTokenControl(p.tokenId);
     }
 
@@ -789,7 +785,7 @@ rpc.namespace("edit", {
             ...p.token.runtime,
             position: p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 },
             heading: p.token.runtime?.heading ?? 0,
-            faction: p.faction ?? p.token.runtime?.faction ?? Faction.NEUTRAL,
+            faction: p.faction ?? p.token.runtime?.faction ?? Faction.PLAYER_ALLIANCE,
             displayName,
             ...(hasShield && !p.token.runtime?.shield ? {
               shield: {
@@ -915,28 +911,20 @@ rpc.namespace("edit", {
         const room = ctx.room!;
         const currentPhase = room.getStateManager().getState().phase;
 
-        let nextPhase: typeof currentPhase;
-        let incrementTurn = false;
-
-        switch (currentPhase) {
-          case "PLAYER_ACTION":
-            nextPhase = "DM_ACTION";
-            break;
-          case "DM_ACTION":
-            nextPhase = "PLAYER_ACTION";
-            incrementTurn = true;
-            break;
-          case "TURN_END":
-            nextPhase = "PLAYER_ACTION";
-            incrementTurn = true;
-            break;
-          default:
-            nextPhase = "PLAYER_ACTION";
+        if (currentPhase !== "PLAYER_ACTION") {
+          throw err("当前阶段不允许强制结束回合", "INVALID_PHASE");
         }
 
-        ctx.state.changePhase(nextPhase);
+        // 推进到 TURN_ORDER 中的下一个派系
+        const currentFaction = room.getStateManager().getState().activeFaction;
+        const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
+        const nextIndex = currentIndex + 1;
+        const incrementTurn = nextIndex >= TURN_ORDER.length;
 
-        // 回合推进时重置所有玩家的准备状态
+        // 保持 PLAYER_ACTION 阶段，changePhase 会自动更新 activeFaction
+        ctx.state.changePhase("PLAYER_ACTION");
+
+        // 重置所有玩家的准备状态
         ctx.state.resetAllPlayersReady();
 
         if (incrementTurn) {
@@ -955,6 +943,12 @@ rpc.namespace("edit", {
       case "set_turn": {
         if (!p.turn) throw err("需要 turn", "TURN_REQUIRED");
         ctx.state.changeTurn(p.turn);
+        return;
+      }
+      case "set_faction": {
+        if (!p.playerId) throw err("需要 playerId", "PLAYER_ID_REQUIRED");
+        if (!p.faction) throw err("需要 faction", "FACTION_REQUIRED");
+        ctx.state.updatePlayer(p.playerId, { faction: p.faction });
         return;
       }
       default:
