@@ -6,7 +6,7 @@
 		"author": "STFCS"
 	},
 	"spec": {
-		"size": "BATTLESHIP",
+		"size": "CAPITAL",
 		"class": "ASSAULT",
 		"width": 100,
 		"length": 160,

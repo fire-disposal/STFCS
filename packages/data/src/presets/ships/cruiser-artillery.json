@@ -109,7 +109,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 5,
-						"tags": ["BALLISTIC", "ANTI_SMALL"]
+						"tags": ["BALLISTIC"]
 					}
 				}
 			},
@@ -131,7 +131,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 5,
-						"tags": ["BALLISTIC", "ANTI_SMALL"]
+						"tags": ["BALLISTIC"]
 					}
 				}
 			}
