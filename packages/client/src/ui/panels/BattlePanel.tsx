@@ -32,7 +32,7 @@ export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs, defaultActiveTab
 			<Tabs.Root value={safeActiveTab} onValueChange={setActiveTab}>
 				<Flex className="battle-bar__header" align="center" gap="2">
 					<Tooltip content={collapsed ? "展开面板" : "折叠面板"}>
-						<IconButton variant="ghost" size="1" onClick={() => setCollapsed(!collapsed)}>
+						<IconButton variant="ghost" size="1" onClick={() => setCollapsed(!collapsed)} data-magnetic>
 							{collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
 						</IconButton>
 					</Tooltip>
@@ -42,7 +42,7 @@ export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs, defaultActiveTab
 					) : (
 						<Tabs.List className="battle-bar__tabs">
 							{enabledTabs.map((tab) => (
-								<Tabs.Trigger key={tab.id} value={tab.id}>
+								<Tabs.Trigger key={tab.id} value={tab.id} data-magnetic>
 									<Flex align="center" gap="1">
 										{tab.icon}
 										<Text size="1">{tab.label}</Text>

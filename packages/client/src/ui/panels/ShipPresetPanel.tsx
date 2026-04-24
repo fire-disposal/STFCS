@@ -152,13 +152,13 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 
 	return (
 		<Flex className="panel-row" gap="3" style={{ minWidth: 0, flex: 1 }}>
-			<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 140 }}>
+			<Flex className="panel-section" align="center" gap="3" style={{ minWidth: 240 }}>
 				<TextField.Root
 					size="1"
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					placeholder="搜索舰船..."
-					style={{ width: 100 }}
+					style={{ width: 130 }}
 				>
 					<TextField.Slot>
 						<Search size={12} />
@@ -166,24 +166,24 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 				</TextField.Root>
 
 				<Select.Root value={filterSize} onValueChange={setFilterSize}>
-					<Select.Trigger style={{ minWidth: 70 }}>
+					<Select.Trigger style={{ minWidth: 80 }}>
 						<Filter size={12} />
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="all">全部</Select.Item>
-						<Select.Item value="FRIGATE">护卫</Select.Item>
-						<Select.Item value="DESTROYER">驱逐</Select.Item>
-						<Select.Item value="CRUISER">巡洋</Select.Item>
-						<Select.Item value="CAPITAL">主力</Select.Item>
+						<Select.Item value="FRIGATE">护卫舰</Select.Item>
+						<Select.Item value="DESTROYER">驱逐舰</Select.Item>
+						<Select.Item value="CRUISER">巡洋舰</Select.Item>
+						<Select.Item value="CAPITAL">主力舰</Select.Item>
 					</Select.Content>
 				</Select.Root>
 			</Flex>
 
 			<Box className="panel-divider" />
 
-			<Box style={{ flex: 1, minWidth: 0, maxWidth: 400 }}>
-				<ScrollArea style={{ height: 120 }}>
-					<Flex gap="2" style={{ paddingRight: 8, flexWrap: "wrap" }}>
+			<Box style={{ flex: 1, minWidth: 0 }}>
+				<ScrollArea style={{ height: 140 }}>
+					<Flex gap="3" style={{ paddingRight: 8, flexWrap: "wrap" }}>
 						{filteredPresets.length === 0 ? (
 							<Text size="1" color="gray">暂无预设舰船</Text>
 						) : (
@@ -194,26 +194,26 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 									align="center"
 									gap="1"
 									style={{
-										padding: 4,
+										padding: 6,
 										background: selectedId === preset.id
 											? "rgba(74, 158, 255, 0.2)"
 											: "rgba(26, 45, 66, 0.4)",
 										border: selectedId === preset.id
 											? "1px solid rgba(74, 158, 255, 0.6)"
 											: "1px solid rgba(43, 66, 97, 0.4)",
-										borderRadius: 4,
+										borderRadius: 6,
 										cursor: "pointer",
-										minWidth: 72,
+										minWidth: 90,
 									}}
 									onClick={() => setSelectedId(preset.id)}
 								>
 									<ShipPreviewCanvas
 										token={preset.token}
-										size={50}
+										size={60}
 										selected={selectedId === preset.id}
 									/>
 									<Text size="1" style={{
-										maxWidth: 68,
+										maxWidth: 80,
 										overflow: "hidden",
 										textOverflow: "ellipsis",
 										whiteSpace: "nowrap",
@@ -255,6 +255,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 				color="green"
 				onClick={handleDeploy}
 				disabled={!selectedPreset}
+				data-magnetic
 			>
 				<Rocket size={12} /> 部署
 			</Button>

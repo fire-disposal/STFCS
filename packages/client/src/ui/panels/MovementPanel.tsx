@@ -103,8 +103,8 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 
 	const handleDirectionSelect = (direction: Direction) => {
 		if (phase === "A" && phaseALocked) {
-			const lockedDir = phaseALocked === "FORWARD_BACKWARD" ? 
-				(direction === "forward" || direction === "backward" ? direction : null) : 
+			const lockedDir = phaseALocked === "FORWARD_BACKWARD" ?
+				(direction === "forward" || direction === "backward" ? direction : null) :
 				(direction === "left" || direction === "right" ? direction : null);
 			if (!lockedDir) return;
 			setSelectedDirection(lockedDir);
@@ -191,7 +191,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 	const canExecuteTranslation = isAvailableShip && selectedDirection && translateValue > 0;
 	const canExecuteRotation = isAvailableShip && phase === "B" && rotateValue !== 0;
 
-	const resourceExhausted = phase === "DONE" || 
+	const resourceExhausted = phase === "DONE" ||
 		(phase === "A" && phaseARemaining <= 0) ||
 		(phase === "B" && turnRemaining <= 0) ||
 		(phase === "C" && phaseCRemaining <= 0);
@@ -211,38 +211,41 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 			{(phase === "A" || phase === "C") && (
 				<>
 					<Flex className="panel-section" align="center" gap="1">
-						<Button 
-							size="1" 
+						<Button
+							size="1"
 							variant={selectedDirection === "forward" ? "solid" : "soft"}
 							color="green"
 							onClick={() => handleDirectionSelect("forward")}
 							disabled={!isAvailableShip || !canSelectForwardBackward}
 							style={{ width: 32, height: 32 }}
+							data-magnetic
 						>
 							<ArrowUp size={14} />
 						</Button>
-						<Button 
-							size="1" 
+						<Button
+							size="1"
 							variant={selectedDirection === "backward" ? "solid" : "soft"}
 							color="red"
 							onClick={() => handleDirectionSelect("backward")}
 							disabled={!isAvailableShip || !canSelectForwardBackward}
 							style={{ width: 32, height: 32 }}
+							data-magnetic
 						>
 							<ArrowDown size={14} />
 						</Button>
-						<Button 
-							size="1" 
+						<Button
+							size="1"
 							variant={selectedDirection === "left" ? "solid" : "soft"}
 							color="blue"
 							onClick={() => handleDirectionSelect("left")}
 							disabled={!isAvailableShip || !canSelectLeftRight}
 							style={{ width: 32, height: 32 }}
+							data-magnetic
 						>
 							<ArrowLeft size={14} />
 						</Button>
-						<Button 
-							size="1" 
+						<Button
+							size="1"
 							variant={selectedDirection === "right" ? "solid" : "soft"}
 							color="blue"
 							onClick={() => handleDirectionSelect("right")}
@@ -259,9 +262,9 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 
 							<Flex className="panel-section" align="center" gap="2">
 								<Text size="1" color="gray">
-									{selectedDirection === "forward" ? "前进" : 
-									 selectedDirection === "backward" ? "后退" :
-									 selectedDirection === "left" ? "左移" : "右移"}
+									{selectedDirection === "forward" ? "前进" :
+										selectedDirection === "backward" ? "后退" :
+											selectedDirection === "left" ? "左移" : "右移"}
 								</Text>
 								<input
 									type="range"
@@ -284,7 +287,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 
 							<Box className="panel-divider" />
 
-							<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteTranslation}>
+							<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteTranslation} data-magnetic>
 								<Check size={12} /> 执行
 							</Button>
 						</>
@@ -321,7 +324,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 
 					<Box className="panel-divider" />
 
-					<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteRotation}>
+					<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteRotation} data-magnetic>
 						<Check size={12} /> 执行
 					</Button>
 				</>
@@ -335,7 +338,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 				</Text>
 			</Flex>
 
-			<Button size="1" variant="soft" color="orange" onClick={handleAdvancePhase} disabled={!isAvailableShip || resourceExhausted}>
+			<Button size="1" variant="soft" color="orange" onClick={handleAdvancePhase} disabled={!isAvailableShip || resourceExhausted} data-magnetic>
 				<ChevronRight size={12} /> 推进
 			</Button>
 		</Flex>

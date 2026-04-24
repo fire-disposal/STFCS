@@ -361,6 +361,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 					color="red"
 					onClick={handleFire}
 					disabled={selectedTargetIds.length === 0 || !currentWeapon?.canFire}
+					data-magnetic
 				>
 					<Flex direction="column" align="center" gap="1">
 						{currentWeapon?.canFire ? <Bomb size={18} /> : <Loader2 size={18} className="spin" />}

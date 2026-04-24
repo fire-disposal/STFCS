@@ -25,10 +25,10 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 	const hasShip = ship && ship.runtime;
 	const hasShieldSpec = Boolean(hasShip && ship.spec?.shield);
-	
+
 	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
 	const shieldDirection = hasShip ? (ship.runtime.shield?.direction ?? 0) : 0;
-	
+
 	const [previewDirection, setPreviewDirection] = useState(shieldDirection);
 	const [pendingDirection, setPendingDirection] = useState<number | null>(null);
 
@@ -102,7 +102,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 					<Box className="panel-divider" />
 
-					<Button size="1" variant="solid" color={shieldActive ? "gray" : "blue"} onClick={handleToggleShield} disabled={!canToggleShield}>
+					<Button size="1" variant="solid" color={shieldActive ? "gray" : "blue"} onClick={handleToggleShield} disabled={!canToggleShield} data-magnetic>
 						<Shield size={12} /> {shieldActive ? "关闭" : "开启"}
 					</Button>
 
@@ -139,10 +139,10 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 							{hasDirectionChange && (
 								<>
-									<Button size="1" variant="solid" color="green" onClick={handleConfirmDirection}>
+									<Button size="1" variant="solid" color="green" onClick={handleConfirmDirection} data-magnetic>
 										<Check size={12} /> 确认
 									</Button>
-									<Button size="1" variant="soft" color="gray" onClick={handleCancelDirection}>
+									<Button size="1" variant="soft" color="gray" onClick={handleCancelDirection} data-magnetic>
 										取消
 									</Button>
 								</>
@@ -174,7 +174,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ ship, canControl }) =>
 
 			<Box className="panel-divider" />
 
-			<Button size="1" variant="soft" color="purple" onClick={handleVent} disabled={!canAct || fluxTotal === 0 || venting}>
+			<Button size="1" variant="soft" color="purple" onClick={handleVent} disabled={!canAct || fluxTotal === 0 || venting} data-magnetic>
 				<Zap size={12} /> 散辐
 			</Button>
 		</Flex>

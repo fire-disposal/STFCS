@@ -135,14 +135,6 @@ interface UIActions {
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
 
-	// 磁性吸附配置
-	snapRadius: number;
-	snapToShips: boolean;
-	snapToMounts: boolean;
-	toggleSnapToShips: () => void;
-	toggleSnapToMounts: () => void;
-	setSnapRadius: (radius: number) => void;
-
 	// 血条配置
 	setHpPerBar: (value: number) => void;
 
@@ -201,9 +193,6 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showWeaponTextures: true,         // 默认显示武器贴图
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
-	snapRadius: 50,                  // 默认吸附半径50像素
-	snapToShips: true,               // 默认吸附舰船
-	snapToMounts: true,              // 默认吸附挂载点
 	hpPerBar: 200,                    // 默认每个|代表20HP
 
 	// 地图游标初始状态
@@ -272,9 +261,6 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
-	toggleSnapToShips: () => set((state) => ({ snapToShips: !state.snapToShips })),
-	toggleSnapToMounts: () => set((state) => ({ snapToMounts: !state.snapToMounts })),
-	setSnapRadius: (radius) => set({ snapRadius: Math.max(10, Math.min(200, radius)) }),
 	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(100, value)) }),
 
 	// 游标设置

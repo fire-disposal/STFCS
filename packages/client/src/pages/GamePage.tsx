@@ -41,7 +41,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
 	// 设置表单本地状态（保存按钮确认后才写入全局 store）
 	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
-	const [draftSnapRadius, setDraftSnapRadius] = useState(50);
 	const socket = networkManager.getSocket();
 	const assetSocket = useAssetSocket(socket);
 
@@ -55,13 +54,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
-	const snapRadius = useUIStore((state) => state.snapRadius);
-	const snapToShips = useUIStore((state) => state.snapToShips);
-	const snapToMounts = useUIStore((state) => state.snapToMounts);
 	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
-	const setSnapRadius = useUIStore((state) => state.setSnapRadius);
-	const toggleSnapToShips = useUIStore((state) => state.toggleSnapToShips);
-	const toggleSnapToMounts = useUIStore((state) => state.toggleSnapToMounts);
 
 	const tokens = useTokens(room);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
@@ -252,7 +245,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				if (!open) {
 					// 关闭时重置草稿为当前全局值
 					setDraftHpPerBar(hpPerBar);
-					setDraftSnapRadius(snapRadius);
 				}
 				setShowSettings(open);
 			}}>
@@ -275,49 +267,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						</Flex>
 						<Text size="1" color="gray">每个 | 符号代表的HP数量</Text>
 
-						<Box style={{ height: 1, background: "rgba(74, 158, 255, 0.2)", marginTop: 8, marginBottom: 8 }} />
-
-						<Text size="1" weight="bold" color="gray">磁性吸附</Text>
-						<Flex align="center" justify="between">
-							<Text size="2">吸附舰船</Text>
-							<Button
-								size="1"
-								variant={snapToShips ? "solid" : "outline"}
-								color={snapToShips ? "blue" : "gray"}
-								onClick={toggleSnapToShips}
-							>
-								{snapToShips ? "开启" : "关闭"}
-							</Button>
-						</Flex>
-						<Flex align="center" justify="between">
-							<Text size="2">吸附挂载点</Text>
-							<Button
-								size="1"
-								variant={snapToMounts ? "solid" : "outline"}
-								color={snapToMounts ? "blue" : "gray"}
-								onClick={toggleSnapToMounts}
-							>
-								{snapToMounts ? "开启" : "关闭"}
-							</Button>
-						</Flex>
-						<Flex align="center" justify="between">
-							<Text size="2">吸附半径</Text>
-							<TextField.Root
-								size="1"
-								value={draftSnapRadius.toString()}
-								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftSnapRadius(Number(e.target.value) || 50)}
-								style={{ width: 60 }}
-							/>
-						</Flex>
-						<Text size="1" color="gray">光标靠近目标时的吸附范围（像素）</Text>
-
-						<Box style={{ height: 1, background: "rgba(74, 158, 255, 0.2)", marginTop: 8, marginBottom: 8 }} />
-
 						<Flex justify="end" gap="2">
 							<Button size="1" variant="soft" color="gray" onClick={() => {
 								// 取消：重置草稿并关闭
 								setDraftHpPerBar(hpPerBar);
-								setDraftSnapRadius(snapRadius);
 								setShowSettings(false);
 							}}>
 								取消
@@ -325,7 +278,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							<Button size="1" variant="solid" onClick={() => {
 								// 保存：将草稿值写入全局 store
 								setHpPerBar(draftHpPerBar);
-								setSnapRadius(draftSnapRadius);
 								setShowSettings(false);
 							}}>
 								保存
