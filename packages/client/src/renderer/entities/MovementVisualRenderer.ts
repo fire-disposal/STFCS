@@ -284,8 +284,7 @@ function drawMovementIndicators(
 		drawTranslationLines(
 			directionGraphics,
 			targetGraphics,
-			remainingForward,
-			remainingStrafe,
+			phase === "A" ? remainingForward : remainingStrafe,
 			preview?.mode ?? "forward",
 			preview?.value ?? 0,
 			preview?.directionLocked ?? false
@@ -303,15 +302,16 @@ function drawMovementIndicators(
 function drawTranslationLines(
 	directionGraphics: Graphics,
 	targetGraphics: Graphics,
-	remainingForward: number,
-	remainingStrafe: number,
+	remaining: number,
 	mode: MoveMode,
 	value: number,
 	directionLocked: boolean
 ): void {
+	if (remaining <= 0) return;
+
 	const isForwardActive = mode === "forward";
 	directionGraphics.moveTo(0, 0);
-	directionGraphics.lineTo(0, -remainingForward);
+	directionGraphics.lineTo(0, -remaining);
 	directionGraphics.stroke({
 		color: COLORS.forwardLine,
 		width: LINE_WIDTH.direction,
@@ -320,14 +320,14 @@ function drawTranslationLines(
 
 	drawDashedLine(
 		directionGraphics,
-		0, 0, 0, remainingForward,
+		0, 0, 0, remaining,
 		COLORS.backwardLine,
 		isForwardActive && value < 0 ? ALPHA.lineActive : ALPHA.lineInactive
 	);
 
 	const isLeftActive = mode === "strafe" && value > 0;
 	directionGraphics.moveTo(0, 0);
-	directionGraphics.lineTo(-remainingStrafe, 0);
+	directionGraphics.lineTo(-remaining, 0);
 	directionGraphics.stroke({
 		color: COLORS.leftLine,
 		width: LINE_WIDTH.direction,
@@ -336,7 +336,7 @@ function drawTranslationLines(
 
 	const isRightActive = mode === "strafe" && value < 0;
 	directionGraphics.moveTo(0, 0);
-	directionGraphics.lineTo(remainingStrafe, 0);
+	directionGraphics.lineTo(remaining, 0);
 	directionGraphics.stroke({
 		color: COLORS.rightLine,
 		width: LINE_WIDTH.direction,
@@ -383,6 +383,8 @@ function drawRotationArc(
 	remainingTurn: number,
 	turn: number
 ): void {
+	if (remainingTurn <= 0) return;
+
 	const baseAngle = -Math.PI / 2;
 	const turnRad = (remainingTurn * Math.PI) / 180;
 	const startAngle = baseAngle - turnRad;
