@@ -31,6 +31,8 @@ interface WeaponArcCache {
 	arcGraphics: Graphics;
 	rangeGraphics: Graphics;
 	lastData?: {
+		worldX: number;
+		worldY: number;
 		range: number;
 		minRange: number;
 		arc: number;
@@ -153,7 +155,7 @@ export function useWeaponArcRendering(
 			const cached = arcCacheRef.current.get(mount.id);
 			if (!cached) {
 				createWeaponArc(layers, arcCacheRef.current, mount.id, worldX, worldY, mountFacing, range, minRange, arc);
-			} else if (shouldUpdateArc(cached, range, minRange, arc, mountFacing)) {
+			} else if (shouldUpdateArc(cached, worldX, worldY, range, minRange, arc, mountFacing)) {
 				updateWeaponArc(cached, worldX, worldY, mountFacing, range, minRange, arc);
 			}
 
@@ -260,9 +262,19 @@ function normalizeAngle(angle: number): number {
 	return ((angle + 180) % 360) - 180;
 }
 
-function shouldUpdateArc(cached: WeaponArcCache, range: number, minRange: number, arc: number, mountFacing: number): boolean {
+function shouldUpdateArc(
+	cached: WeaponArcCache,
+	worldX: number,
+	worldY: number,
+	range: number,
+	minRange: number,
+	arc: number,
+	mountFacing: number
+): boolean {
 	if (!cached.lastData) return true;
 	return (
+		worldX !== cached.lastData.worldX ||
+		worldY !== cached.lastData.worldY ||
 		range !== cached.lastData.range ||
 		minRange !== cached.lastData.minRange ||
 		arc !== cached.lastData.arc ||
@@ -296,7 +308,7 @@ function createWeaponArc(
 		root,
 		arcGraphics,
 		rangeGraphics: arcGraphics,
-		lastData: { range, minRange, arc, mountFacing },
+		lastData: { worldX, worldY, range, minRange, arc, mountFacing },
 	});
 }
 
@@ -314,7 +326,7 @@ function updateWeaponArc(
 
 	drawWeaponArc(cached.arcGraphics, arc, range, minRange);
 
-	cached.lastData = { range, minRange, arc, mountFacing };
+	cached.lastData = { worldX, worldY, range, minRange, arc, mountFacing };
 }
 
 function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange: number = 0): void {
