@@ -28,7 +28,8 @@
 **PixiJS rotation 转换：**
 - PixiJS 正角度逆时针旋转
 - 航海角度顺时针增加
-- 因此 `sprite.rotation = -heading * π / 180`
+- 两者恰好抵消，因此 `sprite.rotation = heading * π / 180`（正数）
+- 注意：贴图设计需船头朝上（未旋转状态）
 
 **屏幕坐标系 vs 航海坐标系：**
 - 屏幕坐标系：Y向下（左上角为原点）
@@ -50,36 +51,39 @@
 
 ---
 
-## Coordinate System Inversion Status (TODO)
+## Unified Geometry Functions
 
-**问题描述：** 屏幕坐标系 Y 向下，航海坐标系 Y 向上，需要反转处理。
+**统一坐标函数模块：** `@vt/data/geometry.ts`
 
-### 当前反转状态记录
+提供以下函数：
 
-| 模块 | 文件 | 反转方式 | 状态 |
-|------|------|----------|------|
-| **后端 angleBetween** | `packages/server/src/core/engine/geometry/angle.ts:32` | `dy = p1.y - p2.y` | ✅ 已修复 |
-| **前端瞄准线计算** | `packages/client/src/renderer/entities/WeaponArcRenderer.ts:229` | `dy = mountWorldY - targetPos.y` | ✅ 已正确 |
-| **前端 angleBetween** | `packages/client/src/utils/math.ts:20-25` | `atan2(dy, dx)` - **未反转** | ⚠️ 需检查 |
-| **挂载点世界坐标** | 多处 | 公式一致 | ✅ 正确 |
-| **PixiJS 绘制** | `packages/client/src/renderer/entities/WeaponArcRenderer.ts` | 使用航海角度直接绘制 | ✅ 正确 |
-| **damage.ts hitAngle** | `packages/server/src/core/engine/rules/damage.ts:82,114` | 使用 angleBetween | ✅ 依赖 angleBetween |
+```typescript
+// 基础角度
+normalizeAngle, normalizeAngleSigned, toRadians, toDegrees
 
-### 统一方案建议（待讨论）
+// 角度计算
+angleBetween(from, to)          // 两点间航海角度（dy反转）
+nauticalToMath, mathToNautical  // 航海/数学角度转换
+angleDifference, calculateTurnAngle, lerpAngle
 
-**方案 A：全系统使用航海角度，angle/atan2 统一反转**
-- 所有 `angleBetween` 使用 `dy = p1.y - p2.y`（航海坐标系）
-- 前端绘制直接使用航海角度，无需额外转换
-- 优点：概念统一，减少混乱
-- 缺点：需要检查所有使用 atan2 的地方
+// 坐标转换
+getMountWorldPosition(shipPos, heading, offset)  // 挂载点世界坐标
+getMovementVector(heading, forward, strafe)       // 移动向量
+applyMovement(position, heading, forward, strafe) // 应用移动
 
-**方案 B：底层用屏幕角度，绘制时转换**
-- `angleBetween` 返回屏幕角度（atan2(dy, dx)）
-- 绘制时转换为航海角度
-- 优点：符合数学惯例
-- 缺点：需要多处转换，容易遗漏
+// 几何检测
+distanceBetween, isAngleInArc
+isPointInAnnularSector  // 点在环形扇形内（瞄准判定）
+isPointInCircle, isPointInRect
 
-**当前状态：** 采用方案 A，后端已修复，前端需检查 `utils/math.ts`
+// PixiJS 辅助
+toPixiRotation(nauticalAngle)  // heading * PI/180
+```
+
+**使用约定：**
+- 所有角度计算使用 `@vt/data` 导入
+- 后端：`import { angleBetween, getMountWorldPosition } from "@vt/data"`
+- 前端：`import { toPixiRotation, nauticalToMath } from "@vt/data"`
 
 ---
 
@@ -117,9 +121,10 @@
 - `/packages/client/src/ui/panels/ShipInfoPanel.tsx` - 两行布局 + 护甲象限
 
 **坐标系统：**
-- `/packages/server/src/core/engine/geometry/angle.ts` - angleBetween 函数
-- `/packages/client/src/utils/math.ts` - 前端角度计算（待检查）
-- `/packages/client/src/utils/coordinateSystem.ts` - 坐标系统工具
+- `/packages/data/src/core/geometry.ts` - 统一几何函数模块
+- `/packages/server/src/core/engine/geometry/sector.ts` - 扇形边界计算
+- `/packages/server/src/core/engine/geometry/quadrant.ts` - 象限计算
+- `/packages/server/src/core/engine/rules/armor.ts` - 护甲象限
 
 **武器渲染：**
 - `/packages/client/src/renderer/entities/WeaponArcRenderer.ts` - 武器弧和瞄准线
@@ -137,7 +142,5 @@
 
 ## Next steps
 
-1. 检查前端 `utils/math.ts` 的 angleBetween 是否需要同步修复
-2. 讨论并统一坐标系统反转策略
-3. 添加 targeting.test.ts 的射界测试用例
-4. 修复 movement.test.ts 的测试数据结构（ship.spec vs shipJson.ship）
+1. 添加 targeting.test.ts 的射界测试用例
+2. 考虑迁移 MagneticSnap.ts 使用 getMountWorldPosition（可选）

@@ -15,6 +15,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { Graphics } from "pixi.js";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
+import { getMountWorldPosition, distanceBetween } from "@vt/data";
 import { useUIStore } from "@/state/stores/uiStore";
 
 interface SnapTarget {
@@ -82,9 +83,7 @@ export function useMagneticSnap(
 		if (opts.snapToShips) {
 			for (const ship of ships) {
 				if (!ship.runtime?.position) continue;
-				const dx = ship.runtime.position.x - worldX;
-				const dy = ship.runtime.position.y - worldY;
-				const dist = Math.sqrt(dx * dx + dy * dy);
+				const dist = distanceBetween(ship.runtime.position, { x: worldX, y: worldY });
 
 				if (dist <= opts.snapRadius * camera.zoom) {
 					targets.push({
@@ -98,22 +97,21 @@ export function useMagneticSnap(
 				}
 
 				if (opts.snapToMounts && ship.spec.mounts) {
-					const headingRad = (ship.runtime.heading * Math.PI) / 180;
 					for (const mount of ship.spec.mounts) {
-						const mountOffsetX = mount.position?.x ?? 0;
-						const mountOffsetY = mount.position?.y ?? 0;
-						const mountWorldX = ship.runtime.position.x - mountOffsetX * Math.cos(headingRad) + mountOffsetY * Math.sin(headingRad);
-						const mountWorldY = ship.runtime.position.y - mountOffsetX * Math.sin(headingRad) - mountOffsetY * Math.cos(headingRad);
-						const mountDist = Math.sqrt(
-							Math.pow(mountWorldX - worldX, 2) + Math.pow(mountWorldY - worldY, 2)
+						const mountOffset = mount.position ?? { x: 0, y: 0 };
+						const mountWorldPos = getMountWorldPosition(
+							ship.runtime.position,
+							ship.runtime.heading,
+							mountOffset
 						);
+						const mountDist = distanceBetween(mountWorldPos, { x: worldX, y: worldY });
 
 						if (mountDist <= opts.snapRadius * camera.zoom * 0.5) {
 							targets.push({
 								type: mount.weapon ? "weaponMount" : "shieldMount",
 								id: `${ship.$id}:${mount.id}`,
-								x: mountWorldX,
-								y: mountWorldY,
+								x: mountWorldPos.x,
+								y: mountWorldPos.y,
 								distance: mountDist,
 								data: { ship, mountId: mount.id },
 							});
@@ -126,7 +124,7 @@ export function useMagneticSnap(
 		if ((gridSnap || opts.snapToGrid) && gridSize > 0) {
 			const gridX = Math.round(worldX / gridSize) * gridSize;
 			const gridY = Math.round(worldY / gridSize) * gridSize;
-			const gridDist = Math.sqrt(Math.pow(gridX - worldX, 2) + Math.pow(gridY - worldY, 2));
+			const gridDist = distanceBetween({ x: gridX, y: gridY }, { x: worldX, y: worldY });
 
 			if (gridDist <= opts.snapRadius * camera.zoom * 0.3) {
 				targets.push({
