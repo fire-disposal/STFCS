@@ -14,7 +14,7 @@ import { calculateWeaponAttack } from "../../core/engine/rules/weapon.js";
 import { calculateDamage } from "../../core/engine/rules/damage.js";
 import { angleBetween } from "@vt/data";
 import { validateMovement, validateRotation, validatePhaseAdvance, processMovement, processRotation, advancePhase } from "../../core/engine/modules/movement.js";
-import { toggleShield, validateShieldToggle } from "../../core/engine/modules/shield.js";
+import { toggleShield, validateShieldToggle, validateShieldRotate } from "../../core/engine/modules/shield.js";
 import { ventFlux, canVent } from "../../core/engine/modules/flux.js";
 import { Faction, type PlayerInfo } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken, InventoryToken, WeaponJSON } from "@vt/data";
@@ -521,8 +521,15 @@ rpc.namespace("game", {
         const active = p.active ?? false;
         const direction = p.direction;
 
+        // 护盾开启/关闭验证
         const shieldValidation = validateShieldToggle(token, active);
         if (!shieldValidation.valid) throw err(shieldValidation.error ?? "护盾切换验证失败", "INVALID_SHIELD");
+
+        // 护盾转向验证（如果提供 direction）
+        if (direction !== undefined) {
+          const rotateValidation = validateShieldRotate(token, direction);
+          if (!rotateValidation.valid) throw err(rotateValidation.error ?? "护盾转向验证失败", "INVALID_SHIELD_ROTATE");
+        }
 
         const shieldResult = toggleShield(token, active);
         if (!shieldResult.success) throw err(shieldResult.reason ?? "护盾切换失败", "SHIELD_TOGGLE_FAILED");

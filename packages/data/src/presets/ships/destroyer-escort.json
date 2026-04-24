@@ -22,7 +22,7 @@
 			"arc": 240,
 			"radius": 70,
 			"efficiency": 1.0,
-			"upkeep": 2
+			"upkeep": 5
 		},
 		"mounts": [
 			{

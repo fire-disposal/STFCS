@@ -19,9 +19,9 @@
 		"maxSpeed": 180,
 		"maxTurnRate": 40,
 		"shield": {
-			"arc": 180,
-			"radius": 50,
-			"efficiency": 1.0,
+			"arc": 120,
+			"radius": 45,
+			"efficiency": 0.7,
 			"upkeep": 0
 		},
 		"mounts": [

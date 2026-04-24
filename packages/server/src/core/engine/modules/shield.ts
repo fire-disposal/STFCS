@@ -105,6 +105,16 @@ export function isAngleInShieldArc(
 
 /**
  * 判断攻击是否命中护盾
+ * 
+ * @param ship - 目标舰船
+ * @param attackerPosition - 攻击者位置
+ * @returns 命中结果和攻击角度
+ * 
+ * 护盾朝向（shield.direction）使用航海坐标系：
+ * - 0° = 船头方向（北）
+ * - 90° = 右舷方向（东）
+ * - 180° = 船尾方向（南）
+ * - 270° = 左舷方向（西）
  */
 export function isShieldHit(
 	ship: CombatToken,
@@ -129,9 +139,10 @@ export function isShieldHit(
 		return { hit: true, shieldAngle: attackAngle };
 	}
 
+	const shieldDirection = shield.direction ?? 0;
 	const inArc = isAngleInShieldArc(
 		runtime?.heading ?? 0,
-		0,
+		shieldDirection,
 		shieldArc,
 		attackAngle
 	);
@@ -312,15 +323,15 @@ export function checkShieldHit(
 		return { hit: false, angleDiff: 0 };
 	}
 
-	if (spec.shield.type === "OMNI") {
+	const shieldArc = spec.shield.arc || 360;
+	if (shieldArc >= 360) {
 		return { hit: true, angleDiff: 0 };
 	}
 
 	const shipAngle = runtime.heading || 0;
+	const shieldDirection = runtime.shield?.direction ?? 0;
+	
 	const relativeAttackAngle = ((attackAngle - shipAngle + 360) % 360);
-
-	const shieldDirection = spec.shield.direction || 0;
-	const shieldArc = spec.shield.arc || 360;
 
 	const angleDiff = Math.abs(((relativeAttackAngle - shieldDirection + 180) % 360) - 180);
 
@@ -355,6 +366,38 @@ export function validateShieldToggle(ship: any, newActive: boolean): { valid: bo
 
 	if (newActive && runtime?.venting) {
 		return { valid: false, error: "Cannot activate shield while venting" };
+	}
+
+	return { valid: true };
+}
+
+/**
+ * 检查护盾转向合法性
+ * 
+ * 在自己的回合内，护盾可以任意调整方向（0-360°）
+ */
+export function validateShieldRotate(ship: any, newDirection: number): { valid: boolean; error?: string } {
+	const runtime = ship.runtime;
+	const spec = ship.spec;
+
+	if (runtime?.destroyed) {
+		return { valid: false, error: "Ship is destroyed" };
+	}
+
+	if (!spec.shield) {
+		return { valid: false, error: "Ship has no shield" };
+	}
+
+	if (spec.shield.arc >= 360) {
+		return { valid: false, error: "Omni shield does not need direction control" };
+	}
+
+	if (!runtime?.shield?.active) {
+		return { valid: false, error: "Shield must be active to rotate" };
+	}
+
+	if (newDirection < 0 || newDirection > 360) {
+		return { valid: false, error: "Direction must be between 0 and 360" };
 	}
 
 	return { valid: true };

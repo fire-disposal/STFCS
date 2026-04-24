@@ -21,8 +21,8 @@
 		"shield": {
 			"arc": 360,
 			"radius": 55,
-			"efficiency": 0.8,
-			"upkeep": 0
+			"efficiency": 0.6,
+			"upkeep": 2
 		},
 		"mounts": [
 			{

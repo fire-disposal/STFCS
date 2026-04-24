@@ -20,9 +20,9 @@
 		"maxTurnRate": 18,
 		"shield": {
 			"arc": 180,
-			"radius": 100,
-			"efficiency": 0.9,
-			"upkeep": 5
+			"radius": 95,
+			"efficiency": 0.85,
+			"upkeep": 8
 		},
 		"mounts": [
 			{
