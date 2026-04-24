@@ -39,6 +39,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const room = useSocketRoom(networkManager, onLeaveRoom);
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+	// 设置表单本地状态（保存按钮确认后才写入全局 store）
+	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
+	const [draftSnapRadius, setDraftSnapRadius] = useState(50);
 	const socket = networkManager.getSocket();
 	const assetSocket = useAssetSocket(socket);
 
@@ -124,7 +127,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ShieldPanel ship={selectedShip} canControl={true} />,
 			enabled: true,
 		},
-{
+		{
 			id: "reality-edit",
 			label: "现实修改",
 			icon: <Edit size={14} />,
@@ -245,7 +248,14 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Dialog.Content>
 			</Dialog.Root>
 
-<Dialog.Root open={showSettings} onOpenChange={setShowSettings}>
+			<Dialog.Root open={showSettings} onOpenChange={(open) => {
+				if (!open) {
+					// 关闭时重置草稿为当前全局值
+					setDraftHpPerBar(hpPerBar);
+					setDraftSnapRadius(snapRadius);
+				}
+				setShowSettings(open);
+			}}>
 				<Dialog.Content style={{ maxWidth: 400 }}>
 					<Dialog.Title>
 						<Flex align="center" gap="2">
@@ -258,8 +268,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							<Text size="2">血条单位HP</Text>
 							<TextField.Root
 								size="1"
-								value={hpPerBar.toString()}
-								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHpPerBar(Number(e.target.value) || 20)}
+								value={draftHpPerBar.toString()}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftHpPerBar(Number(e.target.value) || 20)}
 								style={{ width: 60 }}
 							/>
 						</Flex>
@@ -294,12 +304,33 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							<Text size="2">吸附半径</Text>
 							<TextField.Root
 								size="1"
-								value={snapRadius.toString()}
-								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSnapRadius(Number(e.target.value) || 50)}
+								value={draftSnapRadius.toString()}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftSnapRadius(Number(e.target.value) || 50)}
 								style={{ width: 60 }}
 							/>
 						</Flex>
 						<Text size="1" color="gray">光标靠近目标时的吸附范围（像素）</Text>
+
+						<Box style={{ height: 1, background: "rgba(74, 158, 255, 0.2)", marginTop: 8, marginBottom: 8 }} />
+
+						<Flex justify="end" gap="2">
+							<Button size="1" variant="soft" color="gray" onClick={() => {
+								// 取消：重置草稿并关闭
+								setDraftHpPerBar(hpPerBar);
+								setDraftSnapRadius(snapRadius);
+								setShowSettings(false);
+							}}>
+								取消
+							</Button>
+							<Button size="1" variant="solid" onClick={() => {
+								// 保存：将草稿值写入全局 store
+								setHpPerBar(draftHpPerBar);
+								setSnapRadius(draftSnapRadius);
+								setShowSettings(false);
+							}}>
+								保存
+							</Button>
+						</Flex>
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>

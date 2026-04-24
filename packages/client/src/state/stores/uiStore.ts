@@ -204,7 +204,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	snapRadius: 50,                  // 默认吸附半径50像素
 	snapToShips: true,               // 默认吸附舰船
 	snapToMounts: true,              // 默认吸附挂载点
-	hpPerBar: 20,                    // 默认每个|代表20HP
+	hpPerBar: 200,                    // 默认每个|代表20HP
 
 	// 地图游标初始状态
 	mapCursor: null,

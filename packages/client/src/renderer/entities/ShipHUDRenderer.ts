@@ -32,7 +32,6 @@ import { useUIStore } from "@/state/stores/uiStore";
 const HP_BAR_OFFSET_Y = -40;
 const LABEL_OFFSET_Y = 25;
 const DEFAULT_HULL_MAX = 100;
-const MAX_BARS_PER_SIDE = 15;
 
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
@@ -252,12 +251,13 @@ export class ShipHUDManager {
 	private updateHpBarContainer(container: Container, currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean, hpPerBar: number): void {
 		container.removeChildren();
 
-		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar), MAX_BARS_PER_SIDE);
+		// 血条数量由 hpPerBar（全局可配置）和舰船 maxHitPoints 决定
+		const barWidth = 8;
+		const totalBars = Math.max(1, Math.ceil(maxHp / hpPerBar));
 		const filledBars = Math.min(Math.ceil(currentHp / hpPerBar), totalBars);
 		const emptyBars = totalBars - filledBars;
 
 		const hpColor = getHpColor(hpPercent);
-		const barWidth = 8;
 		const baseAlpha = isSelected ? 1.0 : 0.85;
 
 		const filledStyle = new TextStyle({
@@ -281,38 +281,21 @@ export class ShipHUDManager {
 			fontWeight: "600",
 		});
 
+		// 整体居中：计算 [数字] + ||||| 的总宽度，整体偏移使中心对齐
 		const centerText = new Text({
 			text: `[${this.formatHpNumber(Math.round(currentHp), Math.round(maxHp))}/${Math.round(maxHp)}]`,
 			style: centerStyle,
 		});
-		centerText.anchor.set(0.5, 0.5);
+		centerText.anchor.set(0, 0.5);
 		centerText.alpha = baseAlpha;
+
+		const totalBarWidth = (filledBars + emptyBars) * barWidth;
+		const totalWidth = centerText.width + 4 + totalBarWidth;
+		centerText.x = -totalWidth / 2;
 		container.addChild(centerText);
 
-		const centerWidth = centerText.width + 4;
-
-		// 左侧：filledBars + emptyBars（从中心向外）
-		let x = -centerWidth / 2;
-		for (let i = 0; i < filledBars; i++) {
-			const bar = new Text({ text: "|", style: filledStyle });
-			bar.anchor.set(1, 0.5);
-			bar.x = x;
-			bar.alpha = baseAlpha;
-			container.addChild(bar);
-			x -= barWidth;
-		}
-
-		for (let i = 0; i < emptyBars; i++) {
-			const bar = new Text({ text: "|", style: emptyStyle });
-			bar.anchor.set(1, 0.5);
-			bar.x = x;
-			bar.alpha = isSelected ? 0.5 : 0.35;
-			container.addChild(bar);
-			x -= barWidth;
-		}
-
-		// 右侧：filledBars + emptyBars（从中心向外）
-		x = centerWidth / 2;
+		// 条从数字右侧开始排列
+		let x = centerText.x + centerText.width + 4;
 		for (let i = 0; i < filledBars; i++) {
 			const bar = new Text({ text: "|", style: filledStyle });
 			bar.anchor.set(0, 0.5);

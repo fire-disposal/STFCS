@@ -1,6 +1,6 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned, toPixiRotation } from "@vt/data";
+import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
@@ -142,10 +142,15 @@ export function useWeaponArcRendering(
 			if (!weapon) continue;
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
+			// 对齐 ShipRenderer 的挂载点偏移处理：左舷/船头为正 → 绘制时取负
+			// ShipRenderer: offsetX = -(mount.position.x), offsetY = -(mount.position.y)
+			const mountOffset = { x: -mountPos.x, y: -mountPos.y };
 			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
-			const mountFacing = toPixiRotation(mountFacingNautical);
+			// 对齐 ShipRenderer 的挂载点朝向计算方式：(facing - 90) * PI/180
+			// 在挂载点世界坐标的 Container 中，扇形朝右绘制，通过 rotation 旋转到正确方向
+			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
 
-			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountPos);
+			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountOffset);
 			const worldX = worldPos.x;
 			const worldY = worldPos.y;
 
