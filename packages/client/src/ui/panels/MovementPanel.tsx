@@ -88,6 +88,9 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 				setModeLocked(true);
 			}
 		}
+		
+		setTranslateValue(0);
+		setRotateValue(0);
 	};
 
 	const handleAdvancePhase = async () => {

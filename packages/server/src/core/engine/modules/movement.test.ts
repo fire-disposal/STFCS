@@ -9,6 +9,7 @@ import {
 	validatePhaseAdvance,
 	getMovementStatus,
 	applyMovement,
+	processMovement,
 } from "./movement.js";
 
 function createTestShip(
@@ -17,12 +18,10 @@ function createTestShip(
 	maxTurnRate = 60
 ) {
 	return {
-		id: "ship1",
-		shipJson: {
-			ship: {
-				maxSpeed,
-				maxTurnRate,
-			},
+		$id: "ship1",
+		spec: {
+			maxSpeed,
+			maxTurnRate,
 		},
 		runtime: {
 			position: { x: 0, y: 0 },
@@ -168,6 +167,53 @@ describe("Movement Module - ABC Phase System", () => {
 			expect(status.turnAngleAvailable).toBe(45);
 			expect(status.phaseCAvailable).toBe(100);
 			expect(status.canMove).toBe(true);
+		});
+	});
+
+	describe("processMovement - nautical coordinates", () => {
+		it("should move north when heading=0 and forward>0", () => {
+			const ship = createTestShip({}, 100, 60);
+			ship.runtime.heading = 0;
+			ship.runtime.position = { x: 100, y: 100 };
+			const result = processMovement(ship, { forwardDistance: 50, strafeDistance: 0 });
+			expect(result.newPosition.x).toBeCloseTo(100);
+			expect(result.newPosition.y).toBeCloseTo(50);
+		});
+
+		it("should move east when heading=90 and forward>0", () => {
+			const ship = createTestShip({}, 100, 60);
+			ship.runtime.heading = 90;
+			ship.runtime.position = { x: 100, y: 100 };
+			const result = processMovement(ship, { forwardDistance: 50, strafeDistance: 0 });
+			expect(result.newPosition.x).toBeCloseTo(150);
+			expect(result.newPosition.y).toBeCloseTo(100);
+		});
+
+		it("should move west (left) when heading=0 and strafe>0", () => {
+			const ship = createTestShip({}, 100, 60);
+			ship.runtime.heading = 0;
+			ship.runtime.position = { x: 100, y: 100 };
+			const result = processMovement(ship, { forwardDistance: 0, strafeDistance: 50 });
+			expect(result.newPosition.x).toBeCloseTo(150);
+			expect(result.newPosition.y).toBeCloseTo(100);
+		});
+
+		it("should move east (right) when heading=0 and strafe<0", () => {
+			const ship = createTestShip({}, 100, 60);
+			ship.runtime.heading = 0;
+			ship.runtime.position = { x: 100, y: 100 };
+			const result = processMovement(ship, { forwardDistance: 0, strafeDistance: -50 });
+			expect(result.newPosition.x).toBeCloseTo(50);
+			expect(result.newPosition.y).toBeCloseTo(100);
+		});
+
+		it("should move south when heading=0 and forward<0 (backward)", () => {
+			const ship = createTestShip({}, 100, 60);
+			ship.runtime.heading = 0;
+			ship.runtime.position = { x: 100, y: 100 };
+			const result = processMovement(ship, { forwardDistance: -50, strafeDistance: 0 });
+			expect(result.newPosition.x).toBeCloseTo(100);
+			expect(result.newPosition.y).toBeCloseTo(150);
 		});
 	});
 });

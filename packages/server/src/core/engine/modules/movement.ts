@@ -158,18 +158,19 @@ function processMovement(ship: any, payload: any) {
   let newPosition = { ...currentPos };
   const rad = (heading * Math.PI) / 180;
 
+  // 航海坐标系：0°=船头（上），顺时针增加
+  // 屏幕坐标系：Y向下
+  // 前进方向向量：(sin(θ), -cos(θ))，即 0°→(0,-1)向上，90°→(1,0)向右
   if (forwardDistance !== 0) {
-    newPosition.x += Math.cos(rad) * forwardDistance;
-    newPosition.y += Math.sin(rad) * forwardDistance;
+    newPosition.x += Math.sin(rad) * forwardDistance;
+    newPosition.y -= Math.cos(rad) * forwardDistance;
   }
 
+  // 侧移：左舷为正（heading+90°），右舷为负（heading-90°）
+  // 左舷方向向量：(cos(θ), sin(θ))，即 0°→(1,0)左，90°→(0,1)上
   if (strafeDistance !== 0) {
-    const strafeRad = strafeDistance > 0
-      ? rad + Math.PI / 2
-      : rad - Math.PI / 2;
-    const absStrafe = Math.abs(strafeDistance);
-    newPosition.x += Math.cos(strafeRad) * absStrafe;
-    newPosition.y += Math.sin(strafeRad) * absStrafe;
+    newPosition.x += Math.cos(rad) * strafeDistance;
+    newPosition.y += Math.sin(rad) * strafeDistance;
   }
 
   const isStrafe = strafeDistance !== 0;
