@@ -9,7 +9,7 @@
  * 渲染层：hud.shipBars / hud.shipNames
  *
  * 血条设计：
- * - 格式：|||||[050/300]|||||（对称）
+ * - 格式：[050/300]|||||
  * - 每20 HP 一个|（配置项 hpPerBar）
  * - 外侧|为白色半透明（空血），内侧|为有血颜色
  * - 中间数字 [current/max] 补位显示，随血量变色
@@ -38,7 +38,7 @@ const DEFAULT_HULL_MAX = 100;
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
 	fontSize: 15,
-	fontFamily: "Arial, sans-serif",
+	fontFamily: '"Fira Code", "Arial", sans-serif',
 	fontWeight: "600",
 	stroke: { color: 0x081423, width: 2 },
 	dropShadow: {
@@ -52,7 +52,7 @@ const labelStyle = new TextStyle({
 /** 所有者标签样式选项（纯对象，避免 spread TextStyle 实例丢失属性） */
 const ownerLabelStyleOptions = {
 	fontSize: 13,
-	fontFamily: "Arial, sans-serif",
+	fontFamily: '"Fira Code", "Arial", sans-serif',
 	fontWeight: "600",
 	stroke: { color: 0x081423, width: 2 },
 	dropShadow: {
@@ -365,7 +365,7 @@ export class ShipHUDManager {
 		container.removeChildren();
 
 		// 血条数量由 hpPerBar（全局可配置）和舰船 maxHitPoints 决定
-		const barWidth = 8;
+		const barWidth = 10;
 		const totalBars = Math.max(1, Math.ceil(maxHp / hpPerBar));
 		const filledBars = Math.min(Math.ceil(currentHp / hpPerBar), totalBars);
 		const emptyBars = totalBars - filledBars;
@@ -375,26 +375,26 @@ export class ShipHUDManager {
 
 		const filledStyle = new TextStyle({
 			fill: hpColor,
-			fontSize: 13,
-			fontFamily: "monospace",
-			fontWeight: "700",
+			fontSize: 19,
+			fontFamily: '"Fira Code", monospace',
+			fontWeight: "500",
 		});
 
 		const emptyStyle = new TextStyle({
 			fill: 0xffffff,
-			fontSize: 13,
-			fontFamily: "monospace",
-			fontWeight: "700",
+			fontSize: 19,
+			fontFamily: '"Fira Code", monospace',
+			fontWeight: "500",
 		});
 
 		const centerStyle = new TextStyle({
 			fill: hpColor,
-			fontSize: 16,
-			fontFamily: "monospace",
-			fontWeight: "600",
+			fontSize: 19,
+			fontFamily: '"Fira Code", monospace',
+			fontWeight: "500",
 		});
 
-		// 整体居中：计算 [数字] + ||||| 的总宽度，整体偏移使中心对齐
+		// 整体居中：计算 [数字] + ▐▐▐▐▐ 的总宽度，整体偏移使中心对齐
 		const centerText = new Text({
 			text: `[${this.formatHpNumber(Math.round(currentHp), Math.round(maxHp))}/${Math.round(maxHp)}]`,
 			style: centerStyle,
@@ -410,7 +410,7 @@ export class ShipHUDManager {
 		// 条从数字右侧开始排列
 		let x = centerText.x + centerText.width + 4;
 		for (let i = 0; i < filledBars; i++) {
-			const bar = new Text({ text: "|", style: filledStyle });
+			const bar = new Text({ text: "▐", style: filledStyle });
 			bar.anchor.set(0, 0.5);
 			bar.x = x;
 			bar.alpha = baseAlpha;
@@ -419,7 +419,7 @@ export class ShipHUDManager {
 		}
 
 		for (let i = 0; i < emptyBars; i++) {
-			const bar = new Text({ text: "|", style: emptyStyle });
+			const bar = new Text({ text: "▐", style: emptyStyle });
 			bar.anchor.set(0, 0.5);
 			bar.x = x;
 			bar.alpha = isSelected ? 0.5 : 0.35;

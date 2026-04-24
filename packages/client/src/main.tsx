@@ -11,6 +11,7 @@ import "@radix-ui/themes/styles.css";
 import "./styles/fonts.css";
 import "./styles.css";
 import { NotificationContainer } from "@/ui/shared/Notification";
+import { ensureFontsReady } from "@/utils/fontLoader";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -22,26 +23,33 @@ const queryClient = new QueryClient({
 	},
 });
 
-const root = ReactDOM.createRoot(
-	document.getElementById("root") as HTMLElement,
-);
+async function main() {
+	// 预加载 Fira Code 字体，确保 PixiJS Text 渲染前字体已就绪
+	await ensureFontsReady();
 
-root.render(
-	<React.StrictMode>
-		<I18nextProvider i18n={i18n}>
-			<QueryClientProvider client={queryClient}>
-				<Theme appearance="dark" accentColor="blue" grayColor="slate" radius="none">
-					<BrowserRouter
-						future={{
-							v7_startTransition: true,
-							v7_relativeSplatPath: true,
-						}}
-					>
-						<App />
-						<NotificationContainer />
-					</BrowserRouter>
-				</Theme>
-			</QueryClientProvider>
-		</I18nextProvider>
-	</React.StrictMode>,
-);
+	const root = ReactDOM.createRoot(
+		document.getElementById("root") as HTMLElement,
+	);
+
+	root.render(
+		<React.StrictMode>
+			<I18nextProvider i18n={i18n}>
+				<QueryClientProvider client={queryClient}>
+					<Theme appearance="dark" accentColor="blue" grayColor="slate" radius="none">
+						<BrowserRouter
+							future={{
+								v7_startTransition: true,
+								v7_relativeSplatPath: true,
+							}}
+						>
+							<App />
+							<NotificationContainer />
+						</BrowserRouter>
+					</Theme>
+				</QueryClientProvider>
+			</I18nextProvider>
+		</React.StrictMode>,
+	);
+}
+
+main();
