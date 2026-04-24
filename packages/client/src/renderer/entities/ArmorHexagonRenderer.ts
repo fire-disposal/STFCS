@@ -11,6 +11,7 @@
 
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
+import { nauticalToPixiSectorRotation } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -176,7 +177,7 @@ function drawArmorHexagon(graphics: Graphics, ship: CombatToken, armorMax: numbe
 	const armor = ship.runtime?.armor || [];
 
 	const vertices: { x: number; y: number }[] = HEX_VERTEX_ANGLES.map((angleDeg) => {
-		const rad = (angleDeg - 90) * Math.PI / 180;
+		const rad = nauticalToPixiSectorRotation(angleDeg);
 		return {
 			x: radius * Math.cos(rad),
 			y: radius * Math.sin(rad),

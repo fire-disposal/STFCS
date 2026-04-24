@@ -17,7 +17,7 @@
 import type { EngineContext } from "../context.js";
 import { applyStateUpdates, createMoveEvent, createRotateEvent } from "../context.js";
 import { calculateModifiedValue } from "./modifier.js";
-import { getMovementVector } from "@vt/data";
+import { getMovementVector, findCollidingShips } from "@vt/data";
 
 /** 移动阶段 */
 export type MovementPhase = "A" | "B" | "C" | "DONE";
@@ -77,7 +77,7 @@ function getTranslationType(isStrafe: boolean): TranslationLock {
 export function applyMovement(context: EngineContext): { newState: any; events: any[] } {
   const { state, action, ship } = context;
   const payload = action.payload as any;
-  
+
   if (!ship) {
     throw new Error("Ship not found for movement");
   }
@@ -85,9 +85,27 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
   const events = [];
   const updates = new Map<string, any>();
 
+  // 获取所有舰船用于碰撞检测
+  const allShips = Array.from(state.tokens.values());
+
   if (action.type === "MOVE") {
+    // ===== 碰撞检测 =====
+    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
+    const heading = ship.runtime?.heading ?? 0;
+    const vector = getMovementVector(heading, payload.forwardDistance ?? 0, payload.strafeDistance ?? 0);
+    const newPos = {
+      x: currentPos.x + vector.x,
+      y: currentPos.y + vector.y,
+    };
+    const halfWidth = (ship.spec?.width ?? 30) / 2;
+    const halfLength = (ship.spec?.length ?? 50) / 2;
+    const collidingIds = findCollidingShips(newPos, heading, halfWidth, halfLength, ship.$id, allShips);
+    if (collidingIds.length > 0) {
+      throw new Error(`移动会导致与 ${collidingIds.length} 艘舰船碰撞`);
+    }
+
     const moveResult = processMovement(ship, payload);
-    
+
     updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
@@ -104,8 +122,21 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
     ));
 
   } else if (action.type === "ROTATE") {
+    // ===== 碰撞检测：旋转后新朝向是否与其他舰船碰撞 =====
+    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
+    const currentHeading = ship.runtime?.heading ?? 0;
+    const angle = payload.angle ?? 0;
+    let newHeading = (currentHeading + angle) % 360;
+    if (newHeading < 0) newHeading += 360;
+    const halfWidth = (ship.spec?.width ?? 30) / 2;
+    const halfLength = (ship.spec?.length ?? 50) / 2;
+    const collidingIds = findCollidingShips(currentPos, newHeading, halfWidth, halfLength, ship.$id, allShips);
+    if (collidingIds.length > 0) {
+      throw new Error(`旋转会导致与 ${collidingIds.length} 艘舰船碰撞`);
+    }
+
     const rotateResult = processRotation(ship, payload);
-    
+
     updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
@@ -122,7 +153,7 @@ export function applyMovement(context: EngineContext): { newState: any; events: 
     ));
   } else if (action.type === "ADVANCE_PHASE") {
     const phaseResult = advancePhase(ship);
-    
+
     updates.set(`ship:${ship.$id}`, {
       runtime: {
         ...ship.runtime,
@@ -266,14 +297,15 @@ export { advancePhase };
  *   - 两者不能同时非零
  */
 export function validateMovement(
-	ship: any,
-	forwardDistance: number,
-	strafeDistance: number
+  ship: any,
+  forwardDistance: number,
+  strafeDistance: number,
+  allShips?: any[]
 ): { valid: boolean; error?: string } {
-	// 应用 speed modifier
-	const baseMaxSpeed = ship.spec.maxSpeed || 0;
-	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
-	const movement = getMovementState(ship);
+  // 应用 speed modifier
+  const baseMaxSpeed = ship.spec.maxSpeed || 0;
+  const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
+  const movement = getMovementState(ship);
 
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {
@@ -312,7 +344,7 @@ export function validateMovement(
 
   // 检查方向锁定
   const currentLock = movement.currentPhase === "A" ? movement.phaseALock : movement.phaseCLock;
-  
+
   if (currentLock && currentLock !== directionType) {
     return {
       valid: false,
@@ -326,6 +358,30 @@ export function validateMovement(
     return { valid: false, error: `Exceeds available move distance in phase ${movement.currentPhase}` };
   }
 
+  // ===== 碰撞检测 =====
+  if (allShips && allShips.length > 0) {
+    // 计算移动后的新位置
+    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
+    const heading = ship.runtime?.heading ?? 0;
+    const vector = getMovementVector(heading, forwardDistance, strafeDistance);
+    const newPos = {
+      x: currentPos.x + vector.x,
+      y: currentPos.y + vector.y,
+    };
+
+    const halfWidth = (ship.spec?.width ?? 30) / 2;
+    const halfLength = (ship.spec?.length ?? 50) / 2;
+
+    const collidingIds = findCollidingShips(
+      newPos, heading, halfWidth, halfLength,
+      ship.$id, allShips
+    );
+
+    if (collidingIds.length > 0) {
+      return { valid: false, error: `移动会导致与 ${collidingIds.length} 艘舰船碰撞` };
+    }
+  }
+
   return { valid: true };
 }
 
@@ -333,13 +389,14 @@ export function validateMovement(
  * 检查旋转合法性（B阶段）
  */
 export function validateRotation(
-	ship: any,
-	angle: number
+  ship: any,
+  angle: number,
+  allShips?: any[]
 ): { valid: boolean; error?: string } {
-	// 应用 turnRate modifier
-	const baseMaxTurn = ship.spec.maxTurnRate || 0;
-	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
-	const movement = getMovementState(ship);
+  // 应用 turnRate modifier
+  const baseMaxTurn = ship.spec.maxTurnRate || 0;
+  const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
+  const movement = getMovementState(ship);
 
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {
@@ -366,6 +423,26 @@ export function validateRotation(
     return { valid: false, error: `Exceeds available turn angle (${maxTurn} degrees)` };
   }
 
+  // ===== 碰撞检测：旋转后新朝向是否与其他舰船碰撞 =====
+  if (allShips && allShips.length > 0) {
+    const currentPos = ship.runtime?.position ?? { x: 0, y: 0 };
+    const currentHeading = ship.runtime?.heading ?? 0;
+    let newHeading = (currentHeading + angle) % 360;
+    if (newHeading < 0) newHeading += 360;
+
+    const halfWidth = (ship.spec?.width ?? 30) / 2;
+    const halfLength = (ship.spec?.length ?? 50) / 2;
+
+    const collidingIds = findCollidingShips(
+      currentPos, newHeading, halfWidth, halfLength,
+      ship.$id, allShips
+    );
+
+    if (collidingIds.length > 0) {
+      return { valid: false, error: `旋转会导致与 ${collidingIds.length} 艘舰船碰撞` };
+    }
+  }
+
   return { valid: true };
 }
 
@@ -386,28 +463,28 @@ export function validatePhaseAdvance(ship: any): { valid: boolean; error?: strin
  * 获取移动状态摘要（用于前端显示）
  */
 export function getMovementStatus(ship: any): {
-	currentPhase: MovementPhase;
-	phaseAAvailable: number;
-	phaseCAvailable: number;
-	turnAngleAvailable: number;
-	phaseALock: TranslationLock;
-	phaseCLock: TranslationLock;
-	canMove: boolean;
+  currentPhase: MovementPhase;
+  phaseAAvailable: number;
+  phaseCAvailable: number;
+  turnAngleAvailable: number;
+  phaseALock: TranslationLock;
+  phaseCLock: TranslationLock;
+  canMove: boolean;
 } {
-	// 应用 speed 和 turnRate modifier
-	const baseMaxSpeed = ship.spec?.maxSpeed || 0;
-	const baseMaxTurn = ship.spec?.maxTurnRate || 0;
-	const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
-	const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
-	const movement = getMovementState(ship);
+  // 应用 speed 和 turnRate modifier
+  const baseMaxSpeed = ship.spec?.maxSpeed || 0;
+  const baseMaxTurn = ship.spec?.maxTurnRate || 0;
+  const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
+  const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
+  const movement = getMovementState(ship);
 
-	return {
-		currentPhase: movement.currentPhase,
-		phaseAAvailable: maxMove - movement.phaseAUsed,
-		phaseCAvailable: maxMove - movement.phaseCUsed,
-		turnAngleAvailable: maxTurn - movement.turnAngleUsed,
-		phaseALock: movement.phaseALock,
-		phaseCLock: movement.phaseCLock,
-		canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
-	};
+  return {
+    currentPhase: movement.currentPhase,
+    phaseAAvailable: maxMove - movement.phaseAUsed,
+    phaseCAvailable: maxMove - movement.phaseCUsed,
+    turnAngleAvailable: maxTurn - movement.turnAngleUsed,
+    phaseALock: movement.phaseALock,
+    phaseCLock: movement.phaseCLock,
+    canMove: !movement.hasMoved && movement.currentPhase !== "DONE" && !ship.runtime.overloaded,
+  };
 }

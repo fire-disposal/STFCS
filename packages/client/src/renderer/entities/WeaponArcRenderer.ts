@@ -1,6 +1,6 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned } from "@vt/data";
+import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned, getMountSectorRotation, mountOffsetToScreen } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
@@ -142,15 +142,12 @@ export function useWeaponArcRendering(
 			if (!weapon) continue;
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
-			// 对齐 ShipRenderer 的挂载点偏移处理：左舷/船头为正 → 绘制时取负
-			// ShipRenderer: offsetX = -(mount.position.x), offsetY = -(mount.position.y)
-			const mountOffset = { x: -mountPos.x, y: -mountPos.y };
-			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
-			// 对齐 ShipRenderer 的挂载点朝向计算方式：(facing - 90) * PI/180
-			// 在挂载点世界坐标的 Container 中，扇形朝右绘制，通过 rotation 旋转到正确方向
-			const mountFacing = (mountFacingNautical - 90) * Math.PI / 180;
+			// 使用统一函数：挂载点偏移 → PixiJS 屏幕偏移
+			const mountScreenOffset = mountOffsetToScreen(mountPos);
+			// 使用统一函数：计算挂载点扇形 PixiJS rotation
+			const mountFacing = getMountSectorRotation(shipHeading, mount.facing ?? 0);
 
-			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountOffset);
+			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountScreenOffset);
 			const worldX = worldPos.x;
 			const worldY = worldPos.y;
 
@@ -229,8 +226,11 @@ function calculateValidTargets(
 	const attackerPos = attacker.runtime?.position ?? { x: 0, y: 0 };
 	const attackerHeading = attacker.runtime?.heading ?? 0;
 
-	const mountOffset = mount.position ?? { x: 0, y: 0 };
-	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountOffset);
+	// 使用 mountOffsetToScreen 取反偏移后计算挂载点世界坐标
+	// 与渲染侧保持一致（getMountWorldPosition 将 offsetY 视为屏幕 +Y 向下，
+	// 但挂载点数据中 offsetY 正值为船头方向/航海北，需要取反）
+	const mountScreenOffset = mountOffsetToScreen(mount.position ?? { x: 0, y: 0 });
+	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountScreenOffset);
 
 	const results: WeaponTargetInfo[] = [];
 

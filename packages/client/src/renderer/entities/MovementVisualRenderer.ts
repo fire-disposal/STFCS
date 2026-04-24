@@ -24,6 +24,7 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { MovementPreviewState, MoveMode } from "../types";
 import type { CombatToken, MovementState, MovementPhase } from "@vt/data";
+import { findCollidingShips, getMovementVector } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -39,6 +40,7 @@ const COLORS = {
 	turnFill: 0x4a9eff,
 	diamondTarget: 0xffd700,
 	aimLine: 0xffd700,
+	collisionWarning: 0xff3333,
 };
 
 const ALPHA = {
@@ -162,7 +164,8 @@ function createMovementGraphics(
 	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
-	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
+	maxTurnRate: number = DEFAULT_MAX_TURN_RATE,
+	allShips?: CombatToken[]
 ): void {
 	if (!ship.runtime?.position) return;
 
@@ -182,7 +185,8 @@ function createMovementGraphics(
 		ship,
 		preview,
 		maxSpeed,
-		maxTurnRate
+		maxTurnRate,
+		allShips
 	);
 
 	cache.set(ship.$id, {
@@ -198,7 +202,8 @@ function updateMovementGraphics(
 	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
-	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
+	maxTurnRate: number = DEFAULT_MAX_TURN_RATE,
+	allShips?: CombatToken[]
 ): void {
 	if (!ship.runtime?.position) return;
 
@@ -215,7 +220,8 @@ function updateMovementGraphics(
 			ship,
 			preview,
 			maxSpeed,
-			maxTurnRate
+			maxTurnRate,
+			allShips
 		);
 		cached.lastState = newState;
 	}
@@ -279,7 +285,8 @@ function drawMovementIndicators(
 	ship: CombatToken,
 	preview?: MovementPreviewState,
 	maxSpeed: number = DEFAULT_MAX_SPEED,
-	maxTurnRate: number = DEFAULT_MAX_TURN_RATE
+	maxTurnRate: number = DEFAULT_MAX_TURN_RATE,
+	allShips?: CombatToken[]
 ): void {
 	directionGraphics.clear();
 	targetGraphics.clear();
@@ -289,6 +296,29 @@ function drawMovementIndicators(
 	const remainingStrafe = preview?.remaining.strafe ?? maxSpeed;
 	const remainingTurn = preview?.remaining.turn ?? maxTurnRate;
 
+	// 碰撞检测：计算预览移动/旋转后的新位置/朝向
+	let hasCollision = false;
+	if (preview && allShips && allShips.length > 0 && ship.runtime?.position) {
+		const shipPos = ship.runtime.position;
+		const shipHeading = ship.runtime.heading ?? 0;
+		const halfWidth = (ship.spec.width ?? 30) / 2;
+		const halfLength = (ship.spec.length ?? 50) / 2;
+
+		if (phase === "A" || phase === "C") {
+			const forward = preview.mode === "forward" ? preview.value : 0;
+			const strafe = preview.mode === "strafe" ? preview.value : 0;
+			const vector = getMovementVector(shipHeading, forward, strafe);
+			const newPos = { x: shipPos.x + vector.x, y: shipPos.y + vector.y };
+			const colliding = findCollidingShips(newPos, shipHeading, halfWidth, halfLength, ship.$id, allShips);
+			hasCollision = colliding.length > 0;
+		} else if (phase === "B" && preview.turn !== 0) {
+			let newHeading = (shipHeading + preview.turn) % 360;
+			if (newHeading < 0) newHeading += 360;
+			const colliding = findCollidingShips(shipPos, newHeading, halfWidth, halfLength, ship.$id, allShips);
+			hasCollision = colliding.length > 0;
+		}
+	}
+
 	if (phase === "A" || phase === "C") {
 		drawTranslationLines(
 			directionGraphics,
@@ -296,14 +326,16 @@ function drawMovementIndicators(
 			phase === "A" ? remainingForward : remainingStrafe,
 			preview?.mode ?? "forward",
 			preview?.value ?? 0,
-			preview?.directionLocked ?? false
+			preview?.directionLocked ?? false,
+			hasCollision
 		);
 	} else if (phase === "B") {
 		drawRotationArc(
 			directionGraphics,
 			targetGraphics,
 			remainingTurn,
-			preview?.turn ?? 0
+			preview?.turn ?? 0,
+			hasCollision
 		);
 	}
 }
@@ -314,7 +346,8 @@ function drawTranslationLines(
 	remaining: number,
 	mode: MoveMode,
 	value: number,
-	directionLocked: boolean
+	directionLocked: boolean,
+	hasCollision: boolean = false
 ): void {
 	if (remaining <= 0) return;
 
@@ -365,19 +398,23 @@ function drawTranslationLines(
 			color = value >= 0 ? COLORS.rightLine : COLORS.leftLine;
 		}
 
+		// 碰撞警告：将目标标记变为红色
+		const finalColor = hasCollision ? COLORS.collisionWarning : color;
+		const aimColor = hasCollision ? COLORS.collisionWarning : COLORS.aimLine;
+
 		targetGraphics.moveTo(0, 0);
 		targetGraphics.lineTo(targetX, targetY);
 		targetGraphics.stroke({
-			color: COLORS.aimLine,
+			color: aimColor,
 			width: LINE_WIDTH.aim,
 			alpha: ALPHA.aimLine,
 		});
 
 		targetGraphics.circle(targetX, targetY, 5);
-		targetGraphics.fill({ color: COLORS.aimLine, alpha: ALPHA.aimDotFill });
+		targetGraphics.fill({ color: aimColor, alpha: ALPHA.aimDotFill });
 
 		const diamondSize = 10;
-		drawDiamond(targetGraphics, targetX, targetY, diamondSize, color);
+		drawDiamond(targetGraphics, targetX, targetY, diamondSize, finalColor);
 	}
 
 	if (directionLocked) {
@@ -390,7 +427,8 @@ function drawRotationArc(
 	directionGraphics: Graphics,
 	targetGraphics: Graphics,
 	remainingTurn: number,
-	turn: number
+	turn: number,
+	hasCollision: boolean = false
 ): void {
 	if (remainingTurn <= 0) return;
 
@@ -439,10 +477,13 @@ function drawRotationArc(
 		const headX = arcRadius * Math.cos(baseAngle);
 		const headY = arcRadius * Math.sin(baseAngle);
 
+		const aimColor = hasCollision ? COLORS.collisionWarning : COLORS.aimLine;
+		const targetColor = hasCollision ? COLORS.collisionWarning : COLORS.targetPreview;
+
 		targetGraphics.moveTo(0, 0);
 		targetGraphics.lineTo(tipX, tipY);
 		targetGraphics.stroke({
-			color: COLORS.aimLine,
+			color: aimColor,
 			width: LINE_WIDTH.aim,
 			alpha: ALPHA.aimLine,
 		});
@@ -450,13 +491,13 @@ function drawRotationArc(
 		targetGraphics.moveTo(headX, headY);
 		targetGraphics.lineTo(tipX, tipY);
 		targetGraphics.stroke({
-			color: COLORS.targetPreview,
+			color: targetColor,
 			width: LINE_WIDTH.target,
 			alpha: ALPHA.targetStroke,
 		});
 
 		targetGraphics.circle(tipX, tipY, 6);
-		targetGraphics.fill({ color: COLORS.targetPreview, alpha: ALPHA.targetFill });
+		targetGraphics.fill({ color: targetColor, alpha: ALPHA.targetFill });
 	}
 }
 
@@ -505,7 +546,7 @@ function drawDiamond(
 		x, y + size,        // 下
 		x - size, y,        // 左
 	];
-	
+
 	graphics.poly(points);
 	graphics.fill({ color, alpha: ALPHA.diamondFill });
 	graphics.poly(points);

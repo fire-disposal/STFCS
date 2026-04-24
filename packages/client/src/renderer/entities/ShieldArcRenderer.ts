@@ -20,7 +20,7 @@
 
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { Faction } from "@vt/data";
+import { Faction, nauticalToPixiSectorRotation } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -57,7 +57,7 @@ function drawShieldArc(
 ): void {
 	graphics.clear();
 
-	const screenOrientation = (orientation - 90) * Math.PI / 180;
+	const screenOrientation = nauticalToPixiSectorRotation(orientation);
 	const arcRad = (arc * Math.PI) / 180;
 	const startAngle = screenOrientation - arcRad / 2;
 	const endAngle = screenOrientation + arcRad / 2;

@@ -24,7 +24,7 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipRenderOptions } from "../types";
 import type { CombatToken, WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
-import { Faction } from "@vt/data";
+import { Faction, toPixiRotation, nauticalToPixiSectorRotation, mountOffsetToScreen } from "@vt/data";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -185,7 +185,7 @@ function updateShipToken(
 	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 
 	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
-	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
+	cached.root.rotation = toPixiRotation(ship.runtime.heading);
 
 	if (cached.isSelected !== isSelected) {
 		cached.isSelected = isSelected;
@@ -224,7 +224,7 @@ function createShipToken(
 
 	const root = new Container();
 	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
-	root.rotation = (ship.runtime.heading * Math.PI) / 180;
+	root.rotation = toPixiRotation(ship.runtime.heading);
 	root.eventMode = "static";
 	root.cursor = "pointer";
 	root.hitArea = new Circle(0, 0, hitRadius);
@@ -366,29 +366,29 @@ function drawMountSlotShape(
 	arc: number = 360
 ): void {
 	const r = slotRadius;
-	const nauticalRad = (facing - 90) * Math.PI / 180;
-	
+	const nauticalRad = nauticalToPixiSectorRotation(facing);
+
 	target.poly([
 		x + Math.cos(nauticalRad) * r * 0.6, y + Math.sin(nauticalRad) * r * 0.6,
 		x, y,
 	]);
 	target.stroke({ color: 0xffffff, width: 1.5, alpha: alpha * 0.8 });
-	
+
 	if (arc < 360) {
 		const arcRad = (arc * Math.PI) / 180;
 		const leftRad = nauticalRad - arcRad / 2;
 		const rightRad = nauticalRad + arcRad / 2;
 		const lineLen = r * 1.8;
-		
+
 		target.moveTo(x, y);
 		target.lineTo(x + Math.cos(leftRad) * lineLen, y + Math.sin(leftRad) * lineLen);
 		target.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
-		
+
 		target.moveTo(x, y);
 		target.lineTo(x + Math.cos(rightRad) * lineLen, y + Math.sin(rightRad) * lineLen);
 		target.stroke({ color: 0x5a6a8a, width: 1, alpha: alpha * 0.5 });
 	}
-	
+
 	switch (size) {
 		case "SMALL":
 			target.rect(x - r, y - r, r * 2, r * 2);
@@ -437,11 +437,10 @@ function drawMountMarkers(
 	const alpha = isSelected ? 0.85 : 0.5;
 
 	for (const mount of mounts) {
-		// 挂载点偏移坐标系：
-		// X轴：左舷为正 → 绘制时在 -X 方向（Container内）
-		// Y轴：船头为正 → 绘制时在 -Y 方向（Container内）
-		const offsetX = -(mount.position?.x ?? 0);
-		const offsetY = -(mount.position?.y ?? 0);
+		// 使用统一函数：挂载点偏移 → PixiJS 屏幕偏移
+		const screenOffset = mountOffsetToScreen(mount.position ?? { x: 0, y: 0 });
+		const offsetX = screenOffset.x;
+		const offsetY = screenOffset.y;
 		const mountSize = mount.size;
 		const slotRadius = MOUNT_SLOT_SIZE[mountSize];
 		const mountFacing = mount.facing ?? 0;
@@ -477,10 +476,11 @@ function drawSingleWeaponMarker(
 	const spec = mount.weapon.spec;
 	if (!spec) return;
 
-	// 挂载点偏移坐标系：左舷/船头为正 → 绘制时取负
-	const offsetX = -(mount.position?.x ?? 0);
-	const offsetY = -(mount.position?.y ?? 0);
-	const nauticalRad = ((mount.facing ?? 0) - 90) * Math.PI / 180;
+	// 使用统一函数：挂载点偏移 → PixiJS 屏幕偏移
+	const screenOffset = mountOffsetToScreen(mount.position ?? { x: 0, y: 0 });
+	const offsetX = screenOffset.x;
+	const offsetY = screenOffset.y;
+	const nauticalRad = nauticalToPixiSectorRotation(mount.facing ?? 0);
 
 	const weaponColor = DAMAGE_TYPE_COLORS[spec.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? 0x7b68ee;
 	const iconSize = MOUNT_SLOT_SIZE[spec.size];

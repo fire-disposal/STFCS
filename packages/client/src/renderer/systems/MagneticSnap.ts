@@ -15,7 +15,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { Graphics } from "pixi.js";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { getMountWorldPosition, distanceBetween } from "@vt/data";
+import { getMountWorldPosition, distanceBetween, mountOffsetToScreen } from "@vt/data";
 import { useUIStore } from "@/state/stores/uiStore";
 
 interface SnapTarget {
@@ -99,10 +99,11 @@ export function useMagneticSnap(
 				if (opts.snapToMounts && ship.spec.mounts) {
 					for (const mount of ship.spec.mounts) {
 						const mountOffset = mount.position ?? { x: 0, y: 0 };
+						const mountScreenOffset = mountOffsetToScreen(mountOffset);
 						const mountWorldPos = getMountWorldPosition(
 							ship.runtime.position,
 							ship.runtime.heading,
-							mountOffset
+							mountScreenOffset
 						);
 						const mountDist = distanceBetween(mountWorldPos, { x: worldX, y: worldY });
 
@@ -181,8 +182,8 @@ export function useMagneticSnap(
 		const radius = target.distance < opts.snapRadius * 0.3 ? 30 : 20;
 		const color = target.type === "ship" ? 0x4a9eff
 			: target.type === "weaponMount" ? 0xff6b35
-			: target.type === "shieldMount" ? 0x9b59b6
-			: 0x6b7280;
+				: target.type === "shieldMount" ? 0x9b59b6
+					: 0x6b7280;
 
 		highlight.circle(0, 0, radius).stroke({ color, width: 2, alpha: 0.8 });
 		highlight.circle(0, 0, radius * 0.5).fill({ color, alpha: 0.3 });

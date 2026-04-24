@@ -14,7 +14,7 @@ import { Sprite } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { getMountWorldPosition, toPixiRotation } from "@vt/data";
+import { getMountWorldPosition, toPixiRotation, mountOffsetToScreen } from "@vt/data";
 import type { TextureCache } from "../systems/useTextureLoader";
 
 interface WeaponTextureCacheItem {
@@ -61,10 +61,11 @@ export function useWeaponTextureRendering(
 				const weaponOffsetY = weapon.spec.texture.offsetY ?? 0;
 				const weaponScale = weapon.spec.texture.scale ?? 1;
 
+				const mountScreenOffset = mountOffsetToScreen({ x: mountOffsetX, y: mountOffsetY });
 				const mountWorldPos = getMountWorldPosition(
 					ship.runtime.position,
 					ship.runtime.heading,
-					{ x: mountOffsetX, y: mountOffsetY }
+					mountScreenOffset
 				);
 
 				const worldX = mountWorldPos.x - weaponOffsetX;

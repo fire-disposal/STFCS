@@ -12,7 +12,7 @@ import { AssetService } from "../../services/AssetService.js";
 import { calculateShipWeaponTargets, validateAttackAllocations, type WeaponAllocation } from "../../core/engine/rules/targeting.js";
 import { calculateWeaponAttack } from "../../core/engine/rules/weapon.js";
 import { calculateDamage } from "../../core/engine/rules/damage.js";
-import { angleBetween } from "@vt/data";
+import { angleBetween, findCollidingShips } from "@vt/data";
 import { validateMovement, validateRotation, validatePhaseAdvance, processMovement, processRotation, advancePhase } from "../../core/engine/modules/movement.js";
 import { toggleShield, validateShieldToggle, validateShieldRotate } from "../../core/engine/modules/shield.js";
 import { ventFlux, canVent } from "../../core/engine/modules/flux.js";
@@ -499,7 +499,8 @@ rpc.namespace("game", {
         if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
         const forward = p.forward ?? 0;
         const strafe = p.strafe ?? 0;
-        const moveValidation = validateMovement(token, forward, strafe);
+        const allTokens = room.getCombatTokens();
+        const moveValidation = validateMovement(token, forward, strafe, allTokens);
         if (!moveValidation.valid) throw err(moveValidation.error ?? "移动验证失败", "INVALID_MOVE");
         const moveResult = processMovement(token, { forwardDistance: forward, strafeDistance: strafe });
         ctx.state.updateTokenRuntime(p.tokenId, { position: moveResult.newPosition, movement: moveResult.newMovementState });
@@ -509,7 +510,8 @@ rpc.namespace("game", {
         const token = room.getCombatToken(p.tokenId);
         if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
         const angle = p.angle ?? 0;
-        const rotateValidation = validateRotation(token, angle);
+        const allTokens = room.getCombatTokens();
+        const rotateValidation = validateRotation(token, angle, allTokens);
         if (!rotateValidation.valid) throw err(rotateValidation.error ?? "旋转验证失败", "INVALID_ROTATE");
         const rotateResult = processRotation(token, { angle });
         ctx.state.updateTokenRuntime(p.tokenId, { heading: rotateResult.newHeading, movement: rotateResult.newMovementState });
@@ -769,6 +771,20 @@ rpc.namespace("edit", {
         const shieldSpec = spec?.shield;
         const hasShield = Boolean(shieldSpec);
 
+        // ===== 碰撞检测：部署位置不能与现有舰船重叠 =====
+        const deployPos = p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 };
+        const deployHeading = p.token.runtime?.heading ?? 0;
+        const deployHalfW = (spec?.width ?? 30) / 2;
+        const deployHalfL = (spec?.length ?? 50) / 2;
+
+        const collidingIds = findCollidingShips(
+          deployPos, deployHeading, deployHalfW, deployHalfL,
+          "__deploying__", existingTokens
+        );
+        if (collidingIds.length > 0) {
+          throw err("部署位置与现有舰船碰撞", "DEPLOY_COLLISION");
+        }
+
         const createToken: CombatToken = {
           ...p.token,
           $id: tokenId,
@@ -901,10 +917,10 @@ rpc.namespace("edit", {
       case "force_end_turn": {
         const room = ctx.room!;
         const currentPhase = room.getStateManager().getState().phase;
-        
+
         let nextPhase: typeof currentPhase;
         let incrementTurn = false;
-        
+
         switch (currentPhase) {
           case "PLAYER_ACTION":
             nextPhase = "DM_ACTION";
@@ -920,18 +936,18 @@ rpc.namespace("edit", {
           default:
             nextPhase = "PLAYER_ACTION";
         }
-        
+
         ctx.state.changePhase(nextPhase);
-        
+
         // 回合推进时重置所有玩家的准备状态
         ctx.state.resetAllPlayersReady();
-        
+
         if (incrementTurn) {
           const newTurn = room.getStateManager().getState().turnCount + 1;
           ctx.state.changeTurn(newTurn);
           room.processTurnEndLogic();
         }
-        
+
         return;
       }
       case "set_phase": {

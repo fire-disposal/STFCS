@@ -6,7 +6,7 @@
  */
 
 import type { CombatToken } from "../../state/Token.js";
-import { distanceBetween, angleBetween, normalizeAngleSigned, getMountWorldPosition } from "@vt/data";
+import { distanceBetween, angleBetween, normalizeAngleSigned, getMountWorldPosition, mountOffsetToScreen } from "@vt/data";
 import { type MountSpec, type WeaponRuntime, type WeaponSpec } from "@vt/data";
 
 /**
@@ -186,13 +186,17 @@ function calculateWeaponTargets(
 	const mountOffset = mount.position || { x: 0, y: 0 };
 	const attackerPos = attacker.runtime?.position || { x: 0, y: 0 };
 	const attackerHeading = attacker.runtime?.heading || 0;
-	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountOffset);
+	// 使用 mountOffsetToScreen 取反偏移后计算挂载点世界坐标
+	// getMountWorldPosition 将 offsetY 视为屏幕 +Y 向下，
+	// 但挂载点数据中 offsetY 正值为船头方向（航海北），需要取反
+	const mountScreenOffset = mountOffsetToScreen(mountOffset);
+	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountScreenOffset);
 
 	const arc = mount.arc;
 
 	// ===== UI 状态判断 =====
 	// 优先级：已开火 > 不可用 > 待命有目标 > 待命无目标
-	
+
 	let uiStatus: WeaponUIStatus;
 	let uiStatusLabel: string;
 	let isAvailable = true;
@@ -262,7 +266,7 @@ function calculateWeaponTargets(
 		// 跳过已摧毁目标
 		if (target.runtime?.destroyed) continue;
 
-const dist = distanceBetween(mountWorldPos, target.runtime?.position ?? { x: 0, y: 0 });
+		const dist = distanceBetween(mountWorldPos, target.runtime?.position ?? { x: 0, y: 0 });
 
 		const inRange = dist >= minRange && dist <= effectiveRange;
 
@@ -301,7 +305,7 @@ const dist = distanceBetween(mountWorldPos, target.runtime?.position ?? { x: 0, 
 
 	// 检查是否有真正可行的目标（在射程内且在射界内）
 	const hasValidTargets = result.validTargets.some(t => t.inRange && t.inArc);
-	
+
 	if (!hasValidTargets) {
 		result.isAvailable = false;
 		Object.assign(result, { unavailableReason: "No valid targets in range/arc" });
