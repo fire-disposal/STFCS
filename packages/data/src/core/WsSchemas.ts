@@ -313,7 +313,7 @@ export const PresetGetWeaponDef = {
 
 export const GameActionDef = {
   payload: z.object({
-    action: z.enum(["move", "rotate", "attack", "shield", "vent", "end_turn", "advance_phase"]),
+    action: z.enum(["move", "rotate", "attack", "shield_toggle", "shield_rotate", "vent", "end_turn", "advance_phase"]),
     tokenId: z.string(),
     forward: z.number().optional(),
     strafe: z.number().optional(),

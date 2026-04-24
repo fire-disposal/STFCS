@@ -515,21 +515,13 @@ rpc.namespace("game", {
         ctx.state.updateTokenRuntime(p.tokenId, { heading: rotateResult.newHeading, movement: rotateResult.newMovementState });
         break;
       }
-      case "shield": {
+      case "shield_toggle": {
         const token = room.getCombatToken(p.tokenId);
         if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
         const active = p.active ?? false;
-        const direction = p.direction;
 
-        // 护盾开启/关闭验证
         const shieldValidation = validateShieldToggle(token, active);
         if (!shieldValidation.valid) throw err(shieldValidation.error ?? "护盾切换验证失败", "INVALID_SHIELD");
-
-        // 护盾转向验证（如果提供 direction）
-        if (direction !== undefined) {
-          const rotateValidation = validateShieldRotate(token, direction);
-          if (!rotateValidation.valid) throw err(rotateValidation.error ?? "护盾转向验证失败", "INVALID_SHIELD_ROTATE");
-        }
 
         const shieldResult = toggleShield(token, active);
         if (!shieldResult.success) throw err(shieldResult.reason ?? "护盾切换失败", "SHIELD_TOGGLE_FAILED");
@@ -541,7 +533,6 @@ rpc.namespace("game", {
           shield: {
             ...shieldRuntime,
             active: shieldResult.newActive,
-            direction: direction ?? shieldRuntime?.direction ?? 0,
           },
         };
 
@@ -550,6 +541,26 @@ rpc.namespace("game", {
           updates["fluxSoft"] = newFluxSoft;
         }
         ctx.state.updateTokenRuntime(p.tokenId, updates);
+        break;
+      }
+      case "shield_rotate": {
+        const token = room.getCombatToken(p.tokenId);
+        if (!token) throw err("舰船不存在", "TOKEN_NOT_FOUND");
+        const direction = p.direction ?? 0;
+
+        const rotateValidation = validateShieldRotate(token, direction);
+        if (!rotateValidation.valid) throw err(rotateValidation.error ?? "护盾转向验证失败", "INVALID_SHIELD_ROTATE");
+
+        const runtime = token.runtime;
+        const shieldRuntime = runtime?.shield;
+
+        ctx.state.updateTokenRuntime(p.tokenId, {
+          shield: {
+            active: shieldRuntime?.active ?? false,
+            value: shieldRuntime?.value ?? 0,
+            direction,
+          },
+        });
         break;
       }
       case "vent": {

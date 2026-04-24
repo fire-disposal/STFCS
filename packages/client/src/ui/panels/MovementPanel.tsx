@@ -1,58 +1,97 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronRight, Play } from "lucide-react";
+/**
+ * 移动面板 - 方向选择 + 滑动条预览 + 执行
+ * 
+ * Phase A/C：选择方向（前/后/左/右），调整距离，确认执行
+ * Phase B：旋转滑动条 + 执行
+ */
+
+import React, { useState, useCallback, useEffect } from "react";
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCw, Check, ChevronRight } from "lucide-react";
 import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, TextField, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
+type Direction = "forward" | "backward" | "left" | "right" | null;
+
 export interface MovementPanelProps {
 	ship: CombatToken | null;
 	canControl: boolean;
 }
 
-type TranslateMode = "forward" | "strafe";
-
 export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }) => {
-	const [translateMode, setTranslateMode] = useState<TranslateMode>("forward");
-	const [translateValue, setTranslateValue] = useState(0);
-	const [rotateValue, setRotateValue] = useState(0);
-	const [modeLocked, setModeLocked] = useState(false);
-
 	const { isAvailable, sendMove, sendRotate, sendAdvancePhase } = useGameAction();
-	const setMovementPreview = useUIStore((state) => state.setMovementPreview);
+	const { setMovementPreview } = useUIStore();
 
 	const hasShip = ship && ship.runtime;
-	const movement = hasShip ? ship.runtime.movement : undefined;
-	const phase = movement?.currentPhase ?? "A";
-	const hasMoved = movement?.hasMoved ?? false;
-	const maxSpeed = hasShip ? (ship.spec.maxSpeed ?? 100) : 100;
-	const maxTurnRate = hasShip ? (ship.spec.maxTurnRate ?? 30) : 30;
+	const movement = hasShip ? ship.runtime.movement : null;
+	const phase = movement?.currentPhase ?? "DONE";
 
 	const phaseAUsed = movement?.phaseAUsed ?? 0;
 	const phaseCUsed = movement?.phaseCUsed ?? 0;
-	const turnAngleUsed = movement?.turnAngleUsed ?? 0;
+	const turnUsed = movement?.turnAngleUsed ?? 0;
+
+	const maxSpeed = hasShip ? (ship.spec.maxSpeed ?? 100) : 100;
+	const maxTurnRate = hasShip ? (ship.spec.maxTurnRate ?? 60) : 60;
 
 	const phaseARemaining = maxSpeed - phaseAUsed;
 	const phaseCRemaining = maxSpeed - phaseCUsed;
-	const turnRemaining = maxTurnRate - turnAngleUsed;
+	const turnRemaining = maxTurnRate - turnUsed;
 
-	const phaseALocked = movement?.phaseALock ?? false;
-	const phaseCLocked = movement?.phaseCLock ?? false;
+	const modeLocked = Boolean(movement?.phaseALock || movement?.phaseCLock);
+	const phaseALocked = movement?.phaseALock;
+	const phaseCLocked = movement?.phaseCLock;
 
-	const canAct = canControl && hasShip && isAvailable && phase !== "DONE";
+	const isAvailableShip = canControl && hasShip && isAvailable && phase !== "DONE";
 
-	const updatePreview = useCallback((mode: TranslateMode | "turn", value: number) => {
+	const [selectedDirection, setSelectedDirection] = useState<Direction>(null);
+	const [translateValue, setTranslateValue] = useState(0);
+	const [rotateValue, setRotateValue] = useState(0);
+
+	useEffect(() => {
+		setSelectedDirection(null);
+		setTranslateValue(0);
+		setRotateValue(0);
+	}, [phase, ship?.$id]);
+
+	useEffect(() => {
+		return () => setMovementPreview(null);
+	}, [setMovementPreview]);
+
+	const clearPreview = useCallback(() => {
+		setMovementPreview(null);
+	}, [setMovementPreview]);
+
+	const updatePreview = useCallback((direction: Direction, value: number) => {
 		if (!hasShip) {
-			setMovementPreview(null);
+			clearPreview();
 			return;
 		}
+
+		let mode: "forward" | "strafe" = "forward";
+		let actualValue = value;
+
+		if (direction === "forward") {
+			mode = "forward";
+			actualValue = Math.abs(value);
+		} else if (direction === "backward") {
+			mode = "forward";
+			actualValue = -Math.abs(value);
+		} else if (direction === "right") {
+			mode = "strafe";
+			actualValue = Math.abs(value);
+		} else if (direction === "left") {
+			mode = "strafe";
+			actualValue = -Math.abs(value);
+		}
+
 		setMovementPreview({
 			shipId: ship.$id,
 			phase,
-			mode: mode === "turn" ? translateMode : mode,
-			value: mode === "turn" ? 0 : value,
-			turn: mode === "turn" ? value : 0,
+			mode,
+			value: actualValue,
+			turn: 0,
 			remaining: {
 				forward: phaseARemaining,
 				strafe: phaseCRemaining,
@@ -60,244 +99,245 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 			},
 			directionLocked: Boolean(modeLocked || phaseALocked || phaseCLocked),
 		});
-	}, [hasShip, ship, phase, translateMode, phaseARemaining, phaseCRemaining, turnRemaining, modeLocked, phaseALocked, phaseCLocked, setMovementPreview]);
+	}, [hasShip, ship, phase, phaseARemaining, phaseCRemaining, turnRemaining, modeLocked, phaseALocked, phaseCLocked, setMovementPreview, clearPreview]);
 
-	const clearPreview = useCallback(() => {
-		setMovementPreview(null);
-	}, [setMovementPreview]);
-
-	useEffect(() => {
-		return () => clearPreview();
-	}, [clearPreview]);
-
-	// 执行当前阶段的操作
-	const handleExecute = async () => {
-		if (!canAct) return;
-		clearPreview();
-		
-		if (phase === "A") {
-			await sendMove(ship.$id, translateValue, 0);
-			if (!modeLocked && translateValue !== 0) {
-				setModeLocked(true);
-			}
-		} else if (phase === "B") {
-			await sendRotate(ship.$id, rotateValue);
-		} else if (phase === "C") {
-			await sendMove(ship.$id, 0, translateValue);
-			if (!modeLocked && translateValue !== 0) {
-				setModeLocked(true);
-			}
+	const handleDirectionSelect = (direction: Direction) => {
+		if (phase === "A" && phaseALocked) {
+			const lockedDir = phaseALocked === "FORWARD_BACKWARD" ? 
+				(direction === "forward" || direction === "backward" ? direction : null) : 
+				(direction === "left" || direction === "right" ? direction : null);
+			if (!lockedDir) return;
+			setSelectedDirection(lockedDir);
+		} else if (phase === "C" && phaseCLocked) {
+			const lockedDir = phaseCLocked === "FORWARD_BACKWARD" ?
+				(direction === "forward" || direction === "backward" ? direction : null) :
+				(direction === "left" || direction === "right" ? direction : null);
+			if (!lockedDir) return;
+			setSelectedDirection(lockedDir);
+		} else {
+			setSelectedDirection(direction);
 		}
-		
 		setTranslateValue(0);
-		setRotateValue(0);
+		updatePreview(direction, 0);
+	};
+
+	const handleTranslateChange = (value: number) => {
+		const maxRemaining = phase === "A" ? phaseARemaining : phaseCRemaining;
+		const clamped = Math.max(0, Math.min(maxRemaining, value));
+		setTranslateValue(clamped);
+		updatePreview(selectedDirection, clamped);
+	};
+
+	const handleRotateChange = (value: number) => {
+		const clamped = Math.max(-turnRemaining, Math.min(turnRemaining, value));
+		setRotateValue(clamped);
+		if (!hasShip) return;
+		setMovementPreview({
+			shipId: ship.$id,
+			phase: "B",
+			mode: "forward",
+			value: 0,
+			turn: clamped,
+			remaining: {
+				forward: phaseARemaining,
+				strafe: phaseCRemaining,
+				turn: turnRemaining,
+			},
+			directionLocked: false,
+		});
+	};
+
+	const handleExecute = async () => {
+		if (!isAvailableShip) return;
+		clearPreview();
+
+		if (phase === "A" || phase === "C") {
+			if (!selectedDirection || translateValue === 0) return;
+
+			let forward = 0;
+			let strafe = 0;
+
+			if (selectedDirection === "forward") {
+				forward = translateValue;
+			} else if (selectedDirection === "backward") {
+				forward = -translateValue;
+			} else if (selectedDirection === "right") {
+				strafe = translateValue;
+			} else if (selectedDirection === "left") {
+				strafe = -translateValue;
+			}
+
+			await sendMove(ship.$id, forward, strafe);
+			setSelectedDirection(null);
+			setTranslateValue(0);
+		} else if (phase === "B") {
+			if (rotateValue === 0) return;
+			await sendRotate(ship.$id, rotateValue);
+			setRotateValue(0);
+		}
 	};
 
 	const handleAdvancePhase = async () => {
-		if (!canAct) return;
+		if (!isAvailableShip) return;
 		clearPreview();
-		setModeLocked(false);
+		setSelectedDirection(null);
 		setTranslateValue(0);
 		setRotateValue(0);
 		await sendAdvancePhase(ship.$id);
 	};
 
-	const handleTranslateModeChange = (newMode: TranslateMode) => {
-		if (modeLocked) return;
-		setTranslateMode(newMode);
-		setTranslateValue(0);
-		updatePreview(newMode, 0);
-	};
+	const canSelectForwardBackward = phase === "A" && (!modeLocked || phaseALocked === "FORWARD_BACKWARD");
+	const canSelectLeftRight = phase === "C" && (!modeLocked || phaseCLocked === "LEFT_RIGHT") || phase === "A" && (!modeLocked || phaseALocked === "LEFT_RIGHT");
+	const canExecuteTranslation = isAvailableShip && selectedDirection && translateValue > 0;
+	const canExecuteRotation = isAvailableShip && phase === "B" && rotateValue !== 0;
 
-	const handleTranslateValueChange = (value: number | string) => {
-		const num = typeof value === "string" ? Number(value) || 0 : value;
-		const maxRemaining = phase === "A" ? phaseARemaining : phaseCRemaining;
-		const clamped = Math.max(-maxRemaining, Math.min(maxRemaining, num));
-		setTranslateValue(clamped);
-		updatePreview(translateMode, clamped);
-	};
-
-	const handleRotateValueChange = (value: number | string) => {
-		const num = typeof value === "string" ? Number(value) || 0 : value;
-		const clamped = Math.max(-turnRemaining, Math.min(turnRemaining, num));
-		setRotateValue(clamped);
-		updatePreview("turn", clamped);
-	};
-
-	// 执行按钮是否可用（资源耗尽时不可交互）
-	const canExecute = useMemo(() => {
-		if (!canAct) return false;
-		if (phase === "A") return phaseARemaining > 0 && translateValue !== 0;
-		if (phase === "B") return turnRemaining > 0 && rotateValue !== 0;
-		if (phase === "C") return phaseCRemaining > 0 && translateValue !== 0;
-		return false;
-	}, [canAct, phase, phaseARemaining, phaseCRemaining, turnRemaining, translateValue, rotateValue]);
-
-	// 当前阶段资源是否耗尽
-	const resourceExhausted = useMemo(() => {
-		if (phase === "A") return phaseARemaining <= 0;
-		if (phase === "B") return turnRemaining <= 0;
-		if (phase === "C") return phaseCRemaining <= 0;
-		return false;
-	}, [phase, phaseARemaining, phaseCRemaining, turnRemaining]);
+	const resourceExhausted = phase === "DONE" || 
+		(phase === "A" && phaseARemaining <= 0) ||
+		(phase === "B" && turnRemaining <= 0) ||
+		(phase === "C" && phaseCRemaining <= 0);
 
 	return (
-		<Flex className="panel-row" gap="3" wrap="wrap">
+		<Flex className="panel-row" gap="3">
 			<Flex className="panel-section" align="center" gap="2">
 				<Text size="2" weight="bold">{hasShip ? (ship.metadata?.name ?? ship.$id.slice(-6)) : "请选择舰船"}</Text>
-				{hasMoved && <Badge size="1" color="amber">已移动</Badge>}
+				<Badge size="1" color={phase === "DONE" ? "gray" : phase === "B" ? "orange" : "green"}>
+					Phase {phase}
+				</Badge>
+				{modeLocked && <Badge size="1" color="amber">锁定</Badge>}
 			</Flex>
 
 			<Box className="panel-divider" />
 
-			{/* 三阶段指示器 */}
-			<Flex className="panel-section" align="center" gap="3">
-				<Flex direction="column" gap="1" align="center" style={{ minWidth: 80 }}>
-					<Box 
-						style={{
-							width: 12,
-							height: 12,
-							borderRadius: 2,
-							background: phase === "A" ? "#4a9eff" : "rgba(74, 158, 255, 0.3)",
-							boxShadow: phase === "A" ? "0 0 6px #4a9eff" : "none",
-						}}
-					/>
-					<Text size="1" color={phase === "A" ? "blue" : "gray"}>A</Text>
-					<Text size="1">{phaseARemaining}/{maxSpeed}</Text>
-				</Flex>
-				
-				<Flex direction="column" gap="1" align="center" style={{ minWidth: 80 }}>
-					<Box 
-						style={{
-							width: 12,
-							height: 12,
-							borderRadius: 2,
-							background: phase === "B" ? "#ffb347" : "rgba(255, 179, 71, 0.3)",
-							boxShadow: phase === "B" ? "0 0 6px #ffb347" : "none",
-						}}
-					/>
-					<Text size="1" color={phase === "B" ? "amber" : "gray"}>B</Text>
-					<Text size="1">{turnRemaining}°/{maxTurnRate}°</Text>
-				</Flex>
-				
-				<Flex direction="column" gap="1" align="center" style={{ minWidth: 80 }}>
-					<Box 
-						style={{
-							width: 12,
-							height: 12,
-							borderRadius: 2,
-							background: phase === "C" ? "#9b59b6" : "rgba(155, 89, 182, 0.3)",
-							boxShadow: phase === "C" ? "0 0 6px #9b59b6" : "none",
-						}}
-					/>
-					<Text size="1" color={phase === "C" ? "purple" : "gray"}>C</Text>
-					<Text size="1">{phaseCRemaining}/{maxSpeed}</Text>
-				</Flex>
-			</Flex>
-
-			<Box className="panel-divider" />
-
-			{/* A/C 阶段：平移操作 */}
 			{(phase === "A" || phase === "C") && (
 				<>
-					<Flex className="panel-section" align="center" gap="2">
-						<Text size="1" className="panel-section__label">模式</Text>
+					<Flex className="panel-section" align="center" gap="1">
 						<Button 
 							size="1" 
-							variant={translateMode === "forward" ? "solid" : "soft"} 
+							variant={selectedDirection === "forward" ? "solid" : "soft"}
+							color="green"
+							onClick={() => handleDirectionSelect("forward")}
+							disabled={!isAvailableShip || !canSelectForwardBackward}
+							style={{ width: 32, height: 32 }}
+						>
+							<ArrowUp size={14} />
+						</Button>
+						<Button 
+							size="1" 
+							variant={selectedDirection === "backward" ? "solid" : "soft"}
+							color="red"
+							onClick={() => handleDirectionSelect("backward")}
+							disabled={!isAvailableShip || !canSelectForwardBackward}
+							style={{ width: 32, height: 32 }}
+						>
+							<ArrowDown size={14} />
+						</Button>
+						<Button 
+							size="1" 
+							variant={selectedDirection === "left" ? "solid" : "soft"}
 							color="blue"
-							onClick={() => handleTranslateModeChange("forward")}
-							disabled={!canAct || (modeLocked && translateMode !== "forward")}
+							onClick={() => handleDirectionSelect("left")}
+							disabled={!isAvailableShip || !canSelectLeftRight}
+							style={{ width: 32, height: 32 }}
 						>
-							前后
+							<ArrowLeft size={14} />
 						</Button>
 						<Button 
 							size="1" 
-							variant={translateMode === "strafe" ? "solid" : "soft"} 
-							color="purple"
-							onClick={() => handleTranslateModeChange("strafe")}
-							disabled={!canAct || (modeLocked && translateMode !== "strafe")}
+							variant={selectedDirection === "right" ? "solid" : "soft"}
+							color="blue"
+							onClick={() => handleDirectionSelect("right")}
+							disabled={!isAvailableShip || !canSelectLeftRight}
+							style={{ width: 32, height: 32 }}
 						>
-							左右
+							<ArrowRight size={14} />
 						</Button>
-						{modeLocked && <Badge size="1" color="gray">锁定</Badge>}
 					</Flex>
 
-					<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
-						<Text size="1" className="panel-section__label">
-							{translateMode === "forward" ? "前后" : "左右"}
-						</Text>
+					{selectedDirection && (
+						<>
+							<Box className="panel-divider" />
+
+							<Flex className="panel-section" align="center" gap="2">
+								<Text size="1" color="gray">
+									{selectedDirection === "forward" ? "前进" : 
+									 selectedDirection === "backward" ? "后退" :
+									 selectedDirection === "left" ? "左移" : "右移"}
+								</Text>
+								<input
+									type="range"
+									min={0}
+									max={phase === "A" ? phaseARemaining : phaseCRemaining}
+									step={5}
+									value={translateValue}
+									onChange={(e) => handleTranslateChange(Number(e.target.value))}
+									disabled={!isAvailableShip}
+									style={{ width: 100 }}
+								/>
+								<TextField.Root
+									size="1"
+									value={translateValue.toString()}
+									onChange={(e) => handleTranslateChange(Number(e.target.value) || 0)}
+									style={{ width: 50 }}
+									disabled={!isAvailableShip}
+								/>
+							</Flex>
+
+							<Box className="panel-divider" />
+
+							<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteTranslation}>
+								<Check size={12} /> 执行
+							</Button>
+						</>
+					)}
+				</>
+			)}
+
+			{phase === "B" && (
+				<>
+					<Flex className="panel-section" align="center" gap="2">
+						<RotateCw size={14} />
+						<Text size="1" className="panel-section__label">转向</Text>
 						<input
 							type="range"
-							min={phase === "A" ? -(phaseARemaining) : phaseCRemaining}
-							max={phase === "A" ? phaseARemaining : -(phaseCRemaining)}
+							min={-turnRemaining}
+							max={turnRemaining}
 							step={5}
-							value={translateValue}
-							onChange={(e) => handleTranslateValueChange(e.target.value)}
-							disabled={!canAct}
+							value={rotateValue}
+							onChange={(e) => handleRotateChange(Number(e.target.value))}
+							disabled={!isAvailableShip}
 							style={{ width: 100 }}
 						/>
 						<TextField.Root
 							size="1"
-							value={translateValue.toString()}
-							onChange={(e) => handleTranslateValueChange(e.target.value)}
+							value={rotateValue.toString()}
+							onChange={(e) => handleRotateChange(Number(e.target.value) || 0)}
 							style={{ width: 50 }}
-							disabled={!canAct}
+							disabled={!isAvailableShip}
 						/>
 						<Text size="1" color="gray">
-							{translateMode === "forward" 
-								? (translateValue > 0 ? "前进" : translateValue < 0 ? "后退" : "")
-								: (translateValue > 0 ? "左移" : translateValue < 0 ? "右移" : "")
-							}
+							{rotateValue > 0 ? "右转" : rotateValue < 0 ? "左转" : ""}
 						</Text>
 					</Flex>
+
+					<Box className="panel-divider" />
+
+					<Button size="1" variant="solid" color="green" onClick={handleExecute} disabled={!canExecuteRotation}>
+						<Check size={12} /> 执行
+					</Button>
 				</>
 			)}
 
-			{/* B 阶段：旋转操作 */}
-			{phase === "B" && (
-				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
-					<Text size="1" className="panel-section__label">转向</Text>
-					<input
-						type="range"
-						min={-turnRemaining}
-						max={turnRemaining}
-						step={5}
-						value={rotateValue}
-						onChange={(e) => handleRotateValueChange(e.target.value)}
-						disabled={!canAct}
-						style={{ width: 100 }}
-					/>
-					<TextField.Root
-						size="1"
-						value={rotateValue.toString()}
-						onChange={(e) => handleRotateValueChange(e.target.value)}
-						style={{ width: 50 }}
-						disabled={!canAct}
-					/>
-					<Text size="1" color="gray">
-						{rotateValue > 0 ? "右转" : rotateValue < 0 ? "左转" : ""}
-					</Text>
-				</Flex>
-			)}
+			<Box className="panel-divider" />
 
-			{/* 通用执行按钮 */}
-			<Button 
-				size="1" 
-				variant="solid" 
-				color={resourceExhausted ? "gray" : "green"}
-				onClick={handleExecute}
-				disabled={!canExecute}
-			>
-				<Play size={12} /> {resourceExhausted ? "资源耗尽" : "执行"}
+			<Flex className="panel-section" align="center" gap="2">
+				<Text size="1" color="gray">
+					剩余: {phase === "A" ? phaseARemaining : phase === "B" ? turnRemaining : phaseCRemaining}
+				</Text>
+			</Flex>
+
+			<Button size="1" variant="soft" color="orange" onClick={handleAdvancePhase} disabled={!isAvailableShip || resourceExhausted}>
+				<ChevronRight size={12} /> 推进
 			</Button>
-
-			{/* 通用推进按钮 */}
-			{phase !== "DONE" && (
-				<Button size="1" variant="soft" color="blue" onClick={handleAdvancePhase} disabled={!canAct}>
-					<ChevronRight size={12} /> 推进
-				</Button>
-			)}
 		</Flex>
 	);
 };

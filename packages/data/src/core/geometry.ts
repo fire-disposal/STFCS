@@ -73,14 +73,20 @@ export function angleBetween(from: Point, to: Point): number {
 /**
  * 航海角度 → 数学角度（用于 PixiJS 绘制）
  * 
- * 航海坐标系：0°=北/Y正，顺时针
- * 数学坐标系：0°=东/X正，逆时针
+ * 航海坐标系：0°=北/Y负（屏幕上方），顺时针增加
+ * PixiJS：0°=东/X正（屏幕右侧），逆时针增加
  * 
- * 转换：mathAngle = 90° - nauticalAngle
- * - 北(0°) → 数学90°
- * - 东(90°) → 数学0°
- * - 南(180°) → 数学-90°
- * - 西(270°) → 数学-180°
+ * PixiJS rotation 规则：
+ * - 0° 指向右（东）
+ * - 90°（逆时针）指向上（北）
+ * - 180° 指向左（西）
+ * - -90°（顺时针）指向下（南）
+ * 
+ * 转换公式：pixiAngle = 90° - nauticalAngle
+ * - 航海 0°（北）→ PixiJS 90°
+ * - 航海 90°（东）→ PixiJS 0°
+ * - 航海 180°（南）→ PixiJS -90°
+ * - 航海 270°（西）→ PixiJS -180°
  */
 export function nauticalToMath(nauticalAngle: number): number {
 	return 90 - nauticalAngle;

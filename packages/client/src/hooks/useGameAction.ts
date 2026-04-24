@@ -88,7 +88,7 @@ export function useGameAction() {
 		active: boolean
 	): Promise<boolean> => {
 		const result = await send("game:action", {
-			action: "shield",
+			action: "shield_toggle",
 			tokenId,
 			active,
 		}, active ? "护盾开启" : "护盾关闭");
@@ -100,9 +100,8 @@ export function useGameAction() {
 		direction: number
 	): Promise<boolean> => {
 		const result = await send("game:action", {
-			action: "shield",
+			action: "shield_rotate",
 			tokenId,
-			active: true,
 			direction,
 		}, `护盾朝向 ${direction}°`);
 		return result !== null;

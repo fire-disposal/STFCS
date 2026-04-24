@@ -317,8 +317,18 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				const dragState = dragStateRef.current;
 				const screen = getScreenCoords(event);
 
+				event.preventDefault();
+				event.stopPropagation();
+
 				if (button === 2) {
-					event.preventDefault();
+					dragState.active = true;
+					dragState.mode = "pan";
+					dragState.startX = screen.x;
+					dragState.startY = screen.y;
+					dragState.lastX = dragState.startX;
+					dragState.lastY = dragState.startY;
+					dragState.moved = false;
+					stage.cursor = "grabbing";
 					return;
 				}
 
