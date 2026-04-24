@@ -115,7 +115,7 @@ export function getMountWorldPosition(
  * @returns 移动向量（屏幕坐标系）
  * 
  * 前进方向向量：(sin(θ), -cos(θ))
- * 侧移方向向量：(cos(θ), sin(θ))
+ * 侧移方向向量：(cos(θ), sin(θ))（正值向左舷）
  */
 export function getMovementVector(
 	heading: number,

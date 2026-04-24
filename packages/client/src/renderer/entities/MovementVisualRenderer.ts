@@ -325,7 +325,7 @@ function drawTranslationLines(
 		isForwardActive && value < 0 ? ALPHA.lineActive : ALPHA.lineInactive
 	);
 
-	const isLeftActive = mode === "strafe" && value < 0;
+	const isLeftActive = mode === "strafe" && value > 0;
 	directionGraphics.moveTo(0, 0);
 	directionGraphics.lineTo(-remaining, 0);
 	directionGraphics.stroke({
@@ -334,7 +334,7 @@ function drawTranslationLines(
 		alpha: isLeftActive ? ALPHA.lineActive : ALPHA.lineInactive,
 	});
 
-	const isRightActive = mode === "strafe" && value > 0;
+	const isRightActive = mode === "strafe" && value < 0;
 	directionGraphics.moveTo(0, 0);
 	directionGraphics.lineTo(remaining, 0);
 	directionGraphics.stroke({
@@ -352,8 +352,8 @@ function drawTranslationLines(
 			targetY = -value;
 			color = value >= 0 ? COLORS.forwardLine : COLORS.backwardLine;
 		} else {
-			targetX = value;
-			color = value >= 0 ? COLORS.rightLine : COLORS.leftLine;
+			targetX = -value;
+			color = value >= 0 ? COLORS.leftLine : COLORS.rightLine;
 		}
 
 		targetGraphics.moveTo(0, 0);
