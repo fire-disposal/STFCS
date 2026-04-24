@@ -111,6 +111,9 @@ export function useMovementVisualRendering(
 		for (const [id, item] of cache) {
 			if (id !== selectedShipId) {
 				layers.movementVisuals.removeChild(item.root);
+				item.directionGraphics.destroy();
+				item.targetGraphics.destroy();
+				item.root.destroy();
 				cache.delete(id);
 			}
 		}
@@ -142,9 +145,15 @@ export function useMovementVisualRendering(
 
 	useEffect(() => {
 		return () => {
+			for (const item of cacheRef.current.values()) {
+				layers?.movementVisuals.removeChild(item.root);
+				item.directionGraphics.destroy();
+				item.targetGraphics.destroy();
+				item.root.destroy();
+			}
 			cacheRef.current.clear();
 		};
-	}, []);
+	}, [layers]);
 }
 
 function createMovementGraphics(

@@ -191,10 +191,21 @@ export function useWeaponArcRendering(
 
 	useEffect(() => {
 		return () => {
+			for (const cache of arcCacheRef.current.values()) {
+				layers?.weaponArcs.removeChild(cache.root);
+				cache.arcGraphics.destroy();
+				cache.root.destroy();
+			}
+			for (const cache of aimLineCacheRef.current.values()) {
+				layers?.weaponArcs.removeChild(cache.graphics);
+				layers?.weaponArcs.removeChild(cache.arrow);
+				cache.graphics.destroy();
+				cache.arrow.destroy();
+			}
 			arcCacheRef.current.clear();
 			aimLineCacheRef.current.clear();
 		};
-	}, []);
+	}, [layers]);
 }
 
 function calculateValidTargets(

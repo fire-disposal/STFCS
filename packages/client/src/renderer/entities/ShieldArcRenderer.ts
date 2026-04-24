@@ -141,6 +141,8 @@ export function useShieldArcRendering(
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
 				layers.shieldArcs.removeChild(item.root);
+				item.graphics.destroy();
+				item.root.destroy();
 				cache.delete(id);
 			}
 		}
@@ -170,9 +172,14 @@ export function useShieldArcRendering(
 
 	useEffect(() => {
 		return () => {
+			for (const item of cacheRef.current.values()) {
+				layers?.shieldArcs.removeChild(item.root);
+				item.graphics.destroy();
+				item.root.destroy();
+			}
 			cacheRef.current.clear();
 		};
-	}, []);
+	}, [layers]);
 }
 
 function shouldUpdateShield(

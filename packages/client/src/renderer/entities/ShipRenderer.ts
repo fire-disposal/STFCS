@@ -97,6 +97,11 @@ export function useShipRendering(
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
 				layers.tacticalTokens.removeChild(item.root);
+				item.tacticalToken.destroy();
+				item.hitbox.destroy();
+				item.mountMarkers.destroy();
+				item.weaponMarkers.destroy();
+				item.root.destroy();
 				cache.delete(id);
 			}
 		}
@@ -121,9 +126,17 @@ export function useShipRendering(
 
 	useEffect(() => {
 		return () => {
+			for (const item of cacheRef.current.values()) {
+				layers?.tacticalTokens.removeChild(item.root);
+				item.tacticalToken.destroy();
+				item.hitbox.destroy();
+				item.mountMarkers.destroy();
+				item.weaponMarkers.destroy();
+				item.root.destroy();
+			}
 			cacheRef.current.clear();
 		};
-	}, []);
+	}, [layers]);
 }
 
 function computeMountsHash(mounts: MountSpec[] | undefined): string {

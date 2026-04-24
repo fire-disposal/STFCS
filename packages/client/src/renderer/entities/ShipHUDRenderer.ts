@@ -250,10 +250,10 @@ export class ShipHUDManager {
 	}
 
 	private updateHpBarContainer(container: Container, currentHp: number, maxHp: number, hpPercent: number, isSelected: boolean, hpPerBar: number): void {
-		container.removeChildren().forEach((child) => child.destroy());
+		container.removeChildren();
 
-		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar / 2), MAX_BARS_PER_SIDE);
-		const filledBars = Math.ceil(hpPercent * totalBars);
+		const totalBars = Math.min(Math.ceil(maxHp / hpPerBar), MAX_BARS_PER_SIDE);
+		const filledBars = Math.min(Math.ceil(currentHp / hpPerBar), totalBars);
 		const emptyBars = totalBars - filledBars;
 
 		const hpColor = getHpColor(hpPercent);
@@ -291,6 +291,7 @@ export class ShipHUDManager {
 
 		const centerWidth = centerText.width + 4;
 
+		// 左侧：filledBars + emptyBars（从中心向外）
 		let x = -centerWidth / 2;
 		for (let i = 0; i < filledBars; i++) {
 			const bar = new Text({ text: "|", style: filledStyle });
@@ -310,6 +311,7 @@ export class ShipHUDManager {
 			x -= barWidth;
 		}
 
+		// 右侧：filledBars + emptyBars（从中心向外）
 		x = centerWidth / 2;
 		for (let i = 0; i < filledBars; i++) {
 			const bar = new Text({ text: "|", style: filledStyle });
