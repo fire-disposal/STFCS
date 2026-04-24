@@ -1,18 +1,25 @@
 /**
- * 舰船 HUD 渲染 Hook（血条/标签）
+ * 舰船 HUD 渲染 Hook（血条/标签/辐能条）
  *
  * 职责：
  * 1. 渲染舰船血条（文本样式，|符号组成）
  * 2. 渲染舰船名称标签
- * 3. 实时更新 HUD 元素位置（世界坐标 -> 屏幕坐标）
+ * 3. 渲染辐能条（显示硬/软辐能百分比）
+ * 4. 实时更新 HUD 元素位置（世界坐标 -> 屏幕坐标）
  *
  * 渲染层：hud.shipBars / hud.shipNames
  *
  * 血条设计：
- * - 格式：[050/300]|||||
+ * - 格式：[050/300] ██████████
  * - 每20 HP 一个|（配置项 hpPerBar）
  * - 外侧|为白色半透明（空血），内侧|为有血颜色
  * - 中间数字 [current/max] 补位显示，随血量变色
+ *
+ * 辐能条设计：
+ * - 格式：[N] ====================（固定20格）
+ * - [N] 普通 / [O] 过载 / [E] 排散
+ * - 硬辐能（左）橙色，软辐能（右）黄色，空槽白色半透明
+ * - 过载时所有填充格变为红色
  *
  * 颜色规则：
  * - 高血量 (>=60%): 绿色
@@ -31,9 +38,11 @@ import { worldToScreen } from "../core/useLayerSystem";
 import { useUIStore } from "@/state/stores/uiStore";
 
 const HP_BAR_OFFSET_Y = -60;
+const FLUX_BAR_OFFSET_Y = -38; // 血条下方
 const LABEL_OFFSET_Y = 45;
 const OWNER_LABEL_OFFSET_Y = 60;
 const DEFAULT_HULL_MAX = 100;
+const FLUX_BAR_SEGMENTS = 20; // 辐能条固定20格
 
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
@@ -69,8 +78,28 @@ const getHpColor = (hpPercent: number): number => {
 	return 0xff5d7e;
 };
 
+/** 辐能状态指示字符 */
+type FluxStatusChar = "N" | "O" | "E";
+
+/** 获取辐能状态字符 */
+function getFluxStatusChar(ship: CombatToken): FluxStatusChar {
+	const runtime = ship.runtime;
+	if (runtime?.overloaded) return "O";
+	if (runtime?.venting) return "E";
+	return "N";
+}
+
+/** 辐能条颜色常量 */
+const FLUX_COLORS = {
+	hard: 0xff8c42,      // 橙色 - 硬辐能
+	soft: 0xffce66,      // 黄色 - 软辐能
+	overload: 0xff5d7e,  // 红色 - 过载填充
+	empty: 0xffffff,     // 白色 - 空槽（与空血条一致）
+} as const;
+
 interface ShipHUDCache {
 	hpBarContainer: Container;
+	fluxBarContainer: Container;
 	label: Text;
 	ownerLabel: Text | null;
 	lastUpdate: {
@@ -79,6 +108,10 @@ interface ShipHUDCache {
 		hpPercent: number;
 		currentHp: number;
 		maxHp: number;
+		fluxHard: number;
+		fluxSoft: number;
+		fluxCapacity: number;
+		fluxStatusChar: FluxStatusChar;
 		name: string;
 		displayName: string;
 		ownerName: string;
@@ -123,8 +156,14 @@ export class ShipHUDManager {
 		for (const [id, cached] of this.cache) {
 			if (!currentIds.has(id)) {
 				this.hpBarLayer.removeChild(cached.hpBarContainer);
+				this.hpBarLayer.removeChild(cached.fluxBarContainer);
 				this.labelLayer.removeChild(cached.label);
+				if (cached.ownerLabel) {
+					this.labelLayer.removeChild(cached.ownerLabel);
+					cached.ownerLabel.destroy();
+				}
 				cached.hpBarContainer.destroy();
+				cached.fluxBarContainer.destroy();
 				cached.label.destroy();
 				this.cache.delete(id);
 			}
@@ -168,6 +207,10 @@ export class ShipHUDManager {
 		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
 		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 
+		// 辐能条
+		const fluxBarContainer = this.createFluxBarContainer(ship, isSelected);
+		fluxBarContainer.position.set(screenX, screenY + FLUX_BAR_OFFSET_Y);
+
 		const label = new Text({
 			text: this.formatLabel(ship),
 			style: labelStyle,
@@ -176,6 +219,7 @@ export class ShipHUDManager {
 		label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 
 		this.hpBarLayer.addChild(hpBarContainer);
+		this.hpBarLayer.addChild(fluxBarContainer);
 		this.labelLayer.addChild(label);
 
 		// 所有者标签（有 ownerId 时显示）
@@ -196,8 +240,13 @@ export class ShipHUDManager {
 			this.labelLayer.addChild(ownerLabel);
 		}
 
+		const fluxHard = ship.runtime.fluxHard ?? 0;
+		const fluxSoft = ship.runtime.fluxSoft ?? 0;
+		const fluxCapacity = ship.spec.fluxCapacity ?? 100;
+
 		this.cache.set(ship.$id, {
 			hpBarContainer,
+			fluxBarContainer,
 			label,
 			ownerLabel,
 			lastUpdate: {
@@ -206,6 +255,10 @@ export class ShipHUDManager {
 				hpPercent,
 				currentHp: ship.runtime.hull,
 				maxHp: hullMax,
+				fluxHard,
+				fluxSoft,
+				fluxCapacity,
+				fluxStatusChar: getFluxStatusChar(ship),
 				name: ship.metadata?.name || ship.$id,
 				displayName: this.getDisplayName(ship),
 				ownerName: ownerName ?? "",
@@ -247,6 +300,7 @@ export class ShipHUDManager {
 				canvasSize
 			);
 			cached.hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
+			cached.fluxBarContainer.position.set(screenX, screenY + FLUX_BAR_OFFSET_Y);
 			cached.label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 			if (cached.ownerLabel) {
 				cached.ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
@@ -259,6 +313,18 @@ export class ShipHUDManager {
 
 		if (hpChanged || selectedChanged) {
 			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
+		}
+
+		// 辐能条更新
+		const fluxHard = ship.runtime.fluxHard ?? 0;
+		const fluxSoft = ship.runtime.fluxSoft ?? 0;
+		const fluxCapacity = ship.spec.fluxCapacity ?? 100;
+		const fluxStatusChar = getFluxStatusChar(ship);
+		const fluxChanged = fluxHard !== last.fluxHard || fluxSoft !== last.fluxSoft ||
+			fluxCapacity !== last.fluxCapacity || fluxStatusChar !== last.fluxStatusChar;
+
+		if (fluxChanged || selectedChanged) {
+			this.updateFluxBarContainer(cached.fluxBarContainer, fluxHard, fluxSoft, fluxCapacity, fluxStatusChar, isSelected);
 		}
 
 		const newName = ship.metadata?.name || ship.$id;
@@ -307,6 +373,10 @@ export class ShipHUDManager {
 			hpPercent,
 			currentHp: ship.runtime.hull,
 			maxHp: hullMax,
+			fluxHard,
+			fluxSoft,
+			fluxCapacity,
+			fluxStatusChar,
 			name: newName,
 			displayName: newDisplayName,
 			ownerName: newOwnerName ?? "",
@@ -433,15 +503,118 @@ export class ShipHUDManager {
 		return current.toString().padStart(maxDigits, "0");
 	}
 
+	// ============================================================
+	// 辐能条
+	// ============================================================
+
+	/**
+	 * 创建辐能条容器
+	 * 格式：[N] ====================（固定20格）
+	 * - [N] 普通 / [O] 过载 / [E] 排散
+	 * - 硬辐能（左）橙色 =，软辐能（右）黄色 =，空槽白色半透明 =
+	 * - 过载时所有填充格变为红色
+	 */
+	private createFluxBarContainer(ship: CombatToken, isSelected: boolean): Container {
+		const container = new Container();
+		const fluxHard = ship.runtime.fluxHard ?? 0;
+		const fluxSoft = ship.runtime.fluxSoft ?? 0;
+		const fluxCapacity = ship.spec.fluxCapacity ?? 100;
+		const fluxStatusChar = getFluxStatusChar(ship);
+		this.updateFluxBarContainer(container, fluxHard, fluxSoft, fluxCapacity, fluxStatusChar, isSelected);
+		return container;
+	}
+
+	private updateFluxBarContainer(
+		container: Container,
+		fluxHard: number,
+		fluxSoft: number,
+		fluxCapacity: number,
+		fluxStatusChar: FluxStatusChar,
+		isSelected: boolean
+	): void {
+		container.removeChildren();
+
+		const totalFlux = fluxHard + fluxSoft;
+		const ratio = fluxCapacity > 0 ? Math.min(totalFlux / fluxCapacity, 1) : 0;
+		const filledSegments = Math.round(ratio * FLUX_BAR_SEGMENTS);
+		const hardSegments = fluxCapacity > 0 ? Math.round((fluxHard / fluxCapacity) * FLUX_BAR_SEGMENTS) : 0;
+		const emptySegments = FLUX_BAR_SEGMENTS - filledSegments;
+
+		const baseAlpha = isSelected ? 1.0 : 0.85;
+		const isOverloaded = fluxStatusChar === "O";
+
+		// 状态指示器样式
+		const statusStyle = new TextStyle({
+			fontFamily: '"Fira Code", monospace',
+			fontSize: 16,
+			fontWeight: "600",
+			fill: isOverloaded ? FLUX_COLORS.overload : 0xcfe8ff,
+		});
+
+		// [N] / [O] / [E]
+		const statusText = new Text({
+			text: `[${fluxStatusChar}]`,
+			style: statusStyle,
+		});
+		statusText.anchor.set(0, 0.5);
+		statusText.alpha = baseAlpha;
+
+		// 计算总宽度用于居中
+		const segWidth = 8;
+		const totalWidth = statusText.width + 4 + FLUX_BAR_SEGMENTS * segWidth;
+		statusText.x = -totalWidth / 2;
+		container.addChild(statusText);
+
+		// 等号条
+		let x = statusText.x + statusText.width + 4;
+
+		for (let i = 0; i < FLUX_BAR_SEGMENTS; i++) {
+			let fillColor: number;
+			let alpha: number;
+
+			if (i < hardSegments) {
+				// 硬辐能段（左）— 橙色，过载时红色
+				fillColor = isOverloaded ? FLUX_COLORS.overload : FLUX_COLORS.hard;
+				alpha = baseAlpha;
+			} else if (i < filledSegments) {
+				// 软辐能段（中）— 黄色，过载时红色
+				fillColor = isOverloaded ? FLUX_COLORS.overload : FLUX_COLORS.soft;
+				alpha = baseAlpha;
+			} else {
+				// 空槽（右）— 白色半透明
+				fillColor = FLUX_COLORS.empty;
+				alpha = isSelected ? 0.5 : 0.35;
+			}
+
+			// 每次创建新的 TextStyle 实例（避免 spread 丢失属性）
+			const seg = new Text({
+				text: "=",
+				style: {
+					fontFamily: '"Fira Code", monospace',
+					fontSize: 16,
+					fontWeight: "500",
+					fill: fillColor,
+				},
+			});
+			seg.anchor.set(0, 0.5);
+			seg.x = x;
+			seg.alpha = alpha;
+			container.addChild(seg);
+			x += segWidth;
+		}
+	}
+
 	clear(): void {
 		for (const cached of this.cache.values()) {
 			this.hpBarLayer.removeChild(cached.hpBarContainer);
+			this.hpBarLayer.removeChild(cached.fluxBarContainer);
 			this.labelLayer.removeChild(cached.label);
 			if (cached.ownerLabel) {
 				this.labelLayer.removeChild(cached.ownerLabel);
 				cached.ownerLabel.destroy();
 			}
 			cached.hpBarContainer.destroy();
+			cached.fluxBarContainer.destroy();
 			cached.label.destroy();
 		}
 		this.cache.clear();
