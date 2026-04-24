@@ -1,19 +1,19 @@
 {
 	"$id": "preset:missile-large",
 	"metadata": {
-		"name": "大型导弹发射器",
-		"description": "重型高爆导弹，高伤害低射速",
+		"name": "大型反舰导弹",
+		"description": "制导高爆导弹，超远程高伤害打击",
 		"author": "STFCS"
 	},
 	"spec": {
 		"damageType": "HIGH_EXPLOSIVE",
 		"size": "LARGE",
-		"damage": 500,
+		"damage": 400,
 		"projectilesPerShot": 1,
 		"range": 1000,
 		"minRange": 200,
-		"cooldown": 0,
+		"cooldown": 3,
 		"fluxCostPerShot": 100,
-		"tags": ["GUIDED", "HE", "ANTI_SHIP"]
+		"tags": ["GUIDED", "HE", "ANTI_SHIP", "LONG_RANGE"]
 	}
 }

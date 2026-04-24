@@ -1,0 +1,19 @@
+{
+	"$id": "preset:cannon-medium",
+	"metadata": {
+		"name": "中型加农炮",
+		"description": "重型动能武器，高穿透高伤害",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "KINETIC",
+		"size": "MEDIUM",
+		"damage": 150,
+		"projectilesPerShot": 1,
+		"range": 600,
+		"minRange": 0,
+		"cooldown": 1,
+		"fluxCostPerShot": 30,
+		"tags": ["BALLISTIC", "ANTI_SHIP", "HIGH_PENETRATION"]
+	}
+}

@@ -2,16 +2,20 @@
  * 预设舰船数据导出
  */
 
-import frigateBasic from "./frigate-basic.json";
-import destroyerStandard from "./destroyer-standard.json";
-import cruiserAssault from "./cruiser-assault.json";
+import frigateStrike from "./frigate-strike.json";
+import frigateSupport from "./frigate-support.json";
+import destroyerEscort from "./destroyer-escort.json";
+import cruiserArtillery from "./cruiser-artillery.json";
+import battleshipDominant from "./battleship-dominant.json";
 
 import type { InventoryToken } from "../../core/GameSchemas.js";
 
 export const presetShips: InventoryToken[] = [
-	frigateBasic as InventoryToken,
-	destroyerStandard as InventoryToken,
-	cruiserAssault as InventoryToken,
+	frigateStrike as InventoryToken,
+	frigateSupport as InventoryToken,
+	destroyerEscort as InventoryToken,
+	cruiserArtillery as InventoryToken,
+	battleshipDominant as InventoryToken,
 ];
 
 export type PresetShip = InventoryToken;

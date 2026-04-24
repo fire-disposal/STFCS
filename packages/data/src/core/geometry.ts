@@ -1,20 +1,29 @@
 /**
- * 几何计算工具 - 航海坐标系统一实现
+ * 几何计算工具 - 权威航海坐标系实现
  * 
- * 航海坐标系约定：
- * - 0° = 船头（屏幕上方/Y负方向）
- * - 90° = 右舷（屏幕右侧/X正方向）
- * - 180° = 船尾（屏幕下方/Y正方向）
- * - 270° = 左舷（屏幕左侧/X负方向）
- * - 顺时针增加
+ * 北东坐标系（Navigation/Bearing System）：
+ * - 北(North, 0°) = 船头方向 = Y轴正向（屏幕Y减小）
+ * - 东(East, 90°) = 右舷方向 = X轴正向（屏幕X增大）
+ * - 南(South, 180°) = 船尾方向 = Y轴负向（屏幕Y增大）
+ * - 西(West, 270°) = 左舷方向 = X轴负向（屏幕X减小）
+ * - 角度顺时针增加（北→东→南→西）
  * 
  * 屏幕坐标系：
- * - Y 向下（左上角为原点）
- * - 航海角度需要 dy 反转处理
+ * - 原点左上角
+ * - X向右为正（对应航海坐标系东）
+ * - Y向下为正（航海坐标系北对应屏幕Y减小）
  * 
- * 挂载点偏移坐标系：
- * - offsetX：左舷为正（heading=0时指向-X）
- * - offsetY：船头为正（heading=0时指向-Y）
+ * 偏移坐标系（与航海坐标系一致）：
+ * - offsetX 正值 = 右舷（东，屏幕+X）
+ * - offsetX 负值 = 左舷（西，屏幕-X）
+ * - offsetY 正值 = 船头（北，屏幕-Y）
+ * - offsetY 负值 = 船尾（南，屏幕+Y）
+ * 
+ * 移动命令：
+ * - forward 正值 = 前进（北/船头，屏幕Y减小）
+ * - forward 负值 = 后退（南/船尾，屏幕Y增大）
+ * - strafe 正值 = 右移（东/右舷，屏幕X增大）
+ * - strafe 负值 = 左移（西/左舷，屏幕X减小）
  */
 
 import type { Point } from "./GameSchemas.js";
@@ -43,19 +52,20 @@ export function toDegrees(radians: number): number {
 // ==================== 角度计算 ====================
 
 /**
- * 计算两点间的航海角度
+ * 计算两点间的航海角度（北东坐标系）
  * 
  * @param from - 起点
  * @param to - 终点
- * @returns 航海角度（0-360），0°指向屏幕上方
+ * @returns 航海角度（0-360），0°=北/船头方向
  * 
- * 实现：dy 反转 + atan2(dx, dy) 参数顺序
- * - dy = from.y - to.y（反转：屏幕Y向下，航海Y向上）
- * - atan2(dx, dy) 以 Y 轴为基准，dx 正值 → 90°（右舷）
+ * 北东坐标系：
+ * - 屏幕Y减小 = 北方向
+ * - 屏幕X增大 = 东方向
+ * - angleBetween 返回从 from 到 to 的方向
  */
 export function angleBetween(from: Point, to: Point): number {
 	const dx = to.x - from.x;
-	const dy = from.y - to.y;
+	const dy = from.y - to.y;  // 反转：屏幕Y向下，航海Y向上
 	const angle = toDegrees(Math.atan2(dx, dy));
 	return normalizeAngle(angle);
 }
@@ -63,33 +73,49 @@ export function angleBetween(from: Point, to: Point): number {
 /**
  * 航海角度 → 数学角度（用于 PixiJS 绘制）
  * 
- * 航海 0°（上）→ 数学 -90°
- * 航海 90°（右）→ 数学 0°
+ * 航海坐标系：0°=北/Y正，顺时针
+ * 数学坐标系：0°=东/X正，逆时针
+ * 
+ * 转换：mathAngle = 90° - nauticalAngle
+ * - 北(0°) → 数学90°
+ * - 东(90°) → 数学0°
+ * - 南(180°) → 数学-90°
+ * - 西(270°) → 数学-180°
  */
 export function nauticalToMath(nauticalAngle: number): number {
-	return nauticalAngle - 90;
+	return 90 - nauticalAngle;
 }
 
 /**
  * 数学角度 → 航海角度
  */
 export function mathToNautical(mathAngle: number): number {
-	return normalizeAngle(mathAngle + 90);
+	return normalizeAngle(90 - mathAngle);
 }
 
 // ==================== 坐标转换 ====================
 
 /**
- * 计算挂载点世界坐标
+ * 计算挂载点世界坐标（北东坐标系）
  * 
- * @param shipPos - 舰船位置
- * @param shipHeading - 舰船朝向（航海角度）
- * @param mountOffset - 挂载点偏移（左舷/船头为正）
- * @returns 挂载点世界坐标
+ * @param shipPos - 舰船屏幕位置
+ * @param shipHeading - 舰船朝向（航海角度，0°=北/船头）
+ * @param mountOffset - 挂载点偏移（北东坐标系：正X=东/右舷，正Y=北/船头）
+ * @returns 挂载点屏幕坐标
  * 
- * 标准公式：
- * worldX = shipX - offsetX*cos(heading) + offsetY*sin(heading)
- * worldY = shipY - offsetX*sin(heading) - offsetY*cos(heading)
+ * 偏移定义：
+ * - offsetX 正值 = 右舷位置（heading=0时在屏幕+X）
+ * - offsetY 正值 = 船头位置（heading=0时在屏幕-Y）
+ * 
+ * 公式推导：
+ * - heading=0°（船头向上）：mount在(offsetX, -offsetY)
+ * - heading=90°（船头向右）：mount在(offsetY, offsetX)
+ * 
+ * 世界坐标：
+ * worldX = shipX + offsetX*cos(heading) - offsetY*sin(heading)
+ * worldY = shipY + offsetX*sin(heading) + offsetY*cos(heading)
+ * 
+ * 注意：屏幕Y向下，所以船头(offsetY正)对应屏幕Y减小
  */
 export function getMountWorldPosition(
 	shipPos: Point,
@@ -101,21 +127,37 @@ export function getMountWorldPosition(
 	const sin = Math.sin(rad);
 	
 	return {
-		x: shipPos.x - mountOffset.x * cos + mountOffset.y * sin,
-		y: shipPos.y - mountOffset.x * sin - mountOffset.y * cos
+		x: shipPos.x + mountOffset.x * cos - mountOffset.y * sin,
+		y: shipPos.y + mountOffset.x * sin + mountOffset.y * cos
 	};
 }
 
 /**
- * 计算移动向量（前进 + 侧移）
+ * 计算移动向量（北东坐标系）
  * 
- * @param heading - 舰船朝向（航海角度）
- * @param forward - 前进距离（正=前，负=后）
- * @param strafe - 侧移距离（正=左，负=右）
- * @returns 移动向量（屏幕坐标系）
+ * @param heading - 舰船朝向（航海角度，0°=北/船头）
+ * @param forward - 前进距离（正值=北/前进，负值=南/后退）
+ * @param strafe - 侧移距离（正值=东/右移，负值=西/左移）
+ * @returns 移动向量（屏幕坐标系：X向右正，Y向下正）
  * 
- * 前进方向向量：(sin(θ), -cos(θ))
- * 侧移方向向量：(cos(θ), sin(θ))（正值向左舷）
+ * 方向向量（heading角度）：
+ * - 前进方向（北）：屏幕(-sin, cos) → heading=0时(0,-1)向上
+ * - 右舷方向（东）：屏幕(cos, sin) → heading=0时(1,0)向右
+ * 
+ * 公式：
+ * Δx = strafe * cos(θ) - forward * sin(θ)
+ * Δy = strafe * sin(θ) + forward * cos(θ)
+ * 
+ * 验证（heading=0°）：
+ * - forward=100 → Δx=0, Δy=100 → 屏幕Y增大100（向下）← 错误！应该是向上
+ * 
+ * 正确公式（考虑屏幕Y反转）：
+ * Δx = strafe * cos(θ) + forward * sin(θ)
+ * Δy = strafe * sin(θ) - forward * cos(θ)
+ * 
+ * 验证（heading=0°，cos=1, sin=0）：
+ * - forward=100 → Δx=0, Δy=-100 → 屏幕Y减小100（向上）✓
+ * - strafe=100 → Δx=100, Δy=0 → 屏幕X增大100（向右）✓
  */
 export function getMovementVector(
 	heading: number,
@@ -123,17 +165,17 @@ export function getMovementVector(
 	strafe: number
 ): Point {
 	const rad = toRadians(heading);
-	const sin = Math.sin(rad);
 	const cos = Math.cos(rad);
+	const sin = Math.sin(rad);
 	
 	return {
-		x: forward * sin + strafe * cos,
-		y: -forward * cos + strafe * sin
+		x: strafe * cos + forward * sin,
+		y: strafe * sin - forward * cos
 	};
 }
 
 /**
- * 应用移动向量到位置
+ * 应用移动到位置
  */
 export function applyMovement(
 	position: Point,
@@ -153,15 +195,24 @@ export function applyMovement(
 /**
  * 航海角度 → PixiJS rotation
  * 
- * PixiJS 正角度逆时针旋转
- * 航海角度顺时针增加
- * 使用正数：rotation = heading * PI/180
+ * PixiJS：正角度逆时针旋转
+ * 航海坐标系：顺时针增加（北→东→南→西）
  * 
- * 注意：假设贴图设计船头朝上（未旋转）
+ * 旋转关系：
+ * - 船头朝北(0°)：贴图不旋转，rotation=0
+ * - 船头朝东(90°)：贴图顺时针转90°，PixiJS rotation=-90°或270°
+ * 
+ * 公式：rotation = -heading（弧度）
+ * 或者：rotation = heading（弧度）← 取决于贴图设计方向
+ * 
+ * 约定：贴图船头朝上（未旋转），使用正数rotation
+ * 因为 PixiJS逆时针 与 航海顺时针 恰好抵消
  */
 export function toPixiRotation(nauticalAngle: number): number {
 	return toRadians(nauticalAngle);
 }
+
+// ==================== 几何检测 ====================
 
 /**
  * 计算两点距离
@@ -174,18 +225,12 @@ export function distanceBetween(from: Point, to: Point): number {
 
 /**
  * 检查角度是否在弧度范围内
- * 
- * @param angle - 目标角度（航海角度）
- * @param center - 弧中心角度（航海角度）
- * @param arc - 弧宽度（度）
  */
 export function isAngleInArc(angle: number, center: number, arc: number): boolean {
 	const halfArc = arc / 2;
 	const diff = normalizeAngleSigned(angle - center);
 	return Math.abs(diff) <= halfArc;
 }
-
-// ==================== 扩展几何函数 ====================
 
 /**
  * 计算角度差（0-180度）
@@ -197,14 +242,14 @@ export function angleDifference(angle1: number, angle2: number): number {
 }
 
 /**
- * 计算从起始角度到目标角度的最短转向角度（带方向）
+ * 计算最短转向角度（带方向）
  */
 export function calculateTurnAngle(startAngle: number, targetAngle: number): number {
 	return normalizeAngleSigned(targetAngle - startAngle);
 }
 
 /**
- * 角度插值（考虑360度环绕）
+ * 角度插值
  */
 export function lerpAngle(startAngle: number, targetAngle: number, t: number): number {
 	const diff = calculateTurnAngle(startAngle, targetAngle);
@@ -212,14 +257,14 @@ export function lerpAngle(startAngle: number, targetAngle: number, t: number): n
 }
 
 /**
- * 检查点是否在圆形区域内
+ * 点是否在圆内
  */
 export function isPointInCircle(point: Point, center: Point, radius: number): boolean {
 	return distanceBetween(point, center) <= radius;
 }
 
 /**
- * 检查点是否在矩形区域内
+ * 点是否在矩形内
  */
 export function isPointInRect(
 	point: Point,
@@ -234,14 +279,7 @@ export function isPointInRect(
 }
 
 /**
- * 检查点是否在环形扇形区域内（用于瞄准判定）
- * 
- * @param point - 待检测点
- * @param center - 扇形中心
- * @param centerAngle - 扇形中心角度（航海角度）
- * @param arcWidth - 扇形角度宽度（度）
- * @param outerRadius - 外半径
- * @param innerRadius - 内半径（最小射程，默认0）
+ * 点是否在环形扇形内（用于瞄准判定）
  */
 export function isPointInAnnularSector(
 	point: Point,

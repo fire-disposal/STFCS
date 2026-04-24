@@ -1,0 +1,185 @@
+{
+	"$id": "preset:battleship-dominant",
+	"metadata": {
+		"name": "主宰级战列舰",
+		"description": "全方位重火力旗舰，装甲厚重但机动缓慢",
+		"author": "STFCS"
+	},
+	"spec": {
+		"size": "BATTLESHIP",
+		"class": "ASSAULT",
+		"width": 100,
+		"length": 160,
+		"maxHitPoints": 4500,
+		"armorMaxPerQuadrant": 350,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.95,
+		"fluxCapacity": 1000,
+		"fluxDissipation": 50,
+		"maxSpeed": 60,
+		"maxTurnRate": 12,
+		"shield": {
+			"arc": 360,
+			"radius": 140,
+			"efficiency": 0.7,
+			"upkeep": 15
+		},
+		"mounts": [
+			{
+				"id": "mount-front-main",
+				"displayName": "前主炮",
+				"position": { "x": 0, "y": 70 },
+				"facing": 0,
+				"arc": 90,
+				"size": "LARGE",
+				"weapon": {
+					"$id": "preset:missile-large",
+					"spec": {
+						"damageType": "HIGH_EXPLOSIVE",
+						"size": "LARGE",
+						"damage": 400,
+						"projectilesPerShot": 1,
+						"range": 1000,
+						"minRange": 200,
+						"cooldown": 3,
+						"fluxCostPerShot": 100,
+						"tags": ["GUIDED", "HE", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-left",
+				"displayName": "左前炮群",
+				"position": { "x": -40, "y": 55 },
+				"facing": 30,
+				"arc": 150,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:plasma-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 120,
+						"projectilesPerShot": 1,
+						"range": 700,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 25,
+						"tags": ["ENERGY", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-right",
+				"displayName": "右前炮群",
+				"position": { "x": 40, "y": 55 },
+				"facing": -30,
+				"arc": 150,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:plasma-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 120,
+						"projectilesPerShot": 1,
+						"range": 700,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 25,
+						"tags": ["ENERGY", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-broadside-left-1",
+				"displayName": "左舷主炮",
+				"position": { "x": -45, "y": 20 },
+				"facing": 90,
+				"arc": 180,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:cannon-medium",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "MEDIUM",
+						"damage": 150,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 30,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-broadside-left-2",
+				"displayName": "左舷副炮",
+				"position": { "x": -45, "y": -20 },
+				"facing": 90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 70,
+						"projectilesPerShot": 1,
+						"range": 500,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 8,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-broadside-right-1",
+				"displayName": "右舷主炮",
+				"position": { "x": 45, "y": 20 },
+				"facing": -90,
+				"arc": 180,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:cannon-medium",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "MEDIUM",
+						"damage": 150,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 30,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-broadside-right-2",
+				"displayName": "右舷副炮",
+				"position": { "x": 45, "y": -20 },
+				"facing": -90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 70,
+						"projectilesPerShot": 1,
+						"range": 500,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 8,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

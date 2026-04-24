@@ -1,19 +1,19 @@
 {
 	"$id": "preset:railgun-small",
 	"metadata": {
-		"name": "小型轨道炮",
-		"description": "标准小型动能武器，高射速低伤害",
+		"name": "小型电磁轨道炮",
+		"description": "高射速动能武器，穿透力强，对护盾效果弱",
 		"author": "STFCS"
 	},
 	"spec": {
 		"damageType": "KINETIC",
 		"size": "SMALL",
-		"damage": 50,
+		"damage": 70,
 		"projectilesPerShot": 1,
-		"range": 400,
-		"minRange": 50,
+		"range": 500,
+		"minRange": 0,
 		"cooldown": 0,
-		"fluxCostPerShot": 5,
-		"tags": ["BALLISTIC", "ANTI_SHIP"]
+		"fluxCostPerShot": 8,
+		"tags": ["BALLISTIC", "ANTI_SHIP", "HIGH_PENETRATION"]
 	}
 }

@@ -1,0 +1,19 @@
+{
+	"$id": "preset:pulse-laser-small",
+	"metadata": {
+		"name": "小型脉冲激光",
+		"description": "均衡能量武器，持续输出稳定",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "ENERGY",
+		"size": "SMALL",
+		"damage": 60,
+		"projectilesPerShot": 1,
+		"range": 450,
+		"minRange": 0,
+		"cooldown": 0,
+		"fluxCostPerShot": 10,
+		"tags": ["ENERGY", "BEAM", "SUSTAINED"]
+	}
+}

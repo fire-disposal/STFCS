@@ -1,0 +1,97 @@
+{
+	"$id": "preset:frigate-support",
+	"metadata": {
+		"name": "晨曦级支援护卫舰",
+		"description": "辐能管理系统优化，适合持续作战支援",
+		"author": "STFCS"
+	},
+	"spec": {
+		"size": "FRIGATE",
+		"class": "SUPPORT",
+		"width": 45,
+		"length": 55,
+		"maxHitPoints": 700,
+		"armorMaxPerQuadrant": 60,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.75,
+		"fluxCapacity": 300,
+		"fluxDissipation": 25,
+		"maxSpeed": 140,
+		"maxTurnRate": 35,
+		"shield": {
+			"arc": 360,
+			"radius": 55,
+			"efficiency": 0.8,
+			"upkeep": 0
+		},
+		"mounts": [
+			{
+				"id": "mount-front",
+				"displayName": "前炮塔",
+				"position": { "x": 0, "y": 25 },
+				"facing": 0,
+				"arc": 120,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 70,
+						"projectilesPerShot": 1,
+						"range": 500,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 8,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-left",
+				"displayName": "左侧炮",
+				"position": { "x": -20, "y": 0 },
+				"facing": 90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:grenade-small",
+					"spec": {
+						"damageType": "FRAGMENTATION",
+						"size": "SMALL",
+						"damage": 40,
+						"projectilesPerShot": 3,
+						"range": 350,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SMALL"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-right",
+				"displayName": "右侧炮",
+				"position": { "x": 20, "y": 0 },
+				"facing": -90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:grenade-small",
+					"spec": {
+						"damageType": "FRAGMENTATION",
+						"size": "SMALL",
+						"damage": 40,
+						"projectilesPerShot": 3,
+						"range": 350,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SMALL"]
+					}
+				}
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

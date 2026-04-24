@@ -171,7 +171,7 @@ describe("Movement Module - ABC Phase System", () => {
 	});
 
 	describe("processMovement - nautical coordinates", () => {
-		it("should move north when heading=0 and forward>0", () => {
+		it("should move north (forward) when heading=0 and forward>0", () => {
 			const ship = createTestShip({}, 100, 60);
 			ship.runtime.heading = 0;
 			ship.runtime.position = { x: 100, y: 100 };
@@ -189,7 +189,7 @@ describe("Movement Module - ABC Phase System", () => {
 			expect(result.newPosition.y).toBeCloseTo(100);
 		});
 
-		it("should move west (left) when heading=0 and strafe>0", () => {
+		it("should move east (right) when heading=0 and strafe>0", () => {
 			const ship = createTestShip({}, 100, 60);
 			ship.runtime.heading = 0;
 			ship.runtime.position = { x: 100, y: 100 };
@@ -198,7 +198,7 @@ describe("Movement Module - ABC Phase System", () => {
 			expect(result.newPosition.y).toBeCloseTo(100);
 		});
 
-		it("should move east (right) when heading=0 and strafe<0", () => {
+		it("should move west (left) when heading=0 and strafe<0", () => {
 			const ship = createTestShip({}, 100, 60);
 			ship.runtime.heading = 0;
 			ship.runtime.position = { x: 100, y: 100 };
@@ -207,7 +207,7 @@ describe("Movement Module - ABC Phase System", () => {
 			expect(result.newPosition.y).toBeCloseTo(100);
 		});
 
-		it("should move south when heading=0 and forward<0 (backward)", () => {
+		it("should move south (backward) when heading=0 and forward<0", () => {
 			const ship = createTestShip({}, 100, 60);
 			ship.runtime.heading = 0;
 			ship.runtime.position = { x: 100, y: 100 };

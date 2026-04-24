@@ -3,12 +3,18 @@
  */
 
 import railgunSmall from "./railgun-small.json";
-import laserMedium from "./laser-medium.json";
+import pulseLaserSmall from "./pulse-laser-small.json";
+import grenadeSmall from "./grenade-small.json";
+import cannonMedium from "./cannon-medium.json";
+import plasmaMedium from "./plasma-medium.json";
 import missileLarge from "./missile-large.json";
 
 export const presetWeapons = [
 	railgunSmall,
-	laserMedium,
+	pulseLaserSmall,
+	grenadeSmall,
+	cannonMedium,
+	plasmaMedium,
 	missileLarge,
 ] as const;
 

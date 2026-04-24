@@ -1,0 +1,141 @@
+{
+	"$id": "preset:cruiser-artillery",
+	"metadata": {
+		"name": "天火级重炮巡洋舰",
+		"description": "前向重火力配置，远程打击能力突出",
+		"author": "STFCS"
+	},
+	"spec": {
+		"size": "CRUISER",
+		"class": "ASSAULT",
+		"width": 80,
+		"length": 130,
+		"maxHitPoints": 2500,
+		"armorMaxPerQuadrant": 200,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.9,
+		"fluxCapacity": 700,
+		"fluxDissipation": 35,
+		"maxSpeed": 80,
+		"maxTurnRate": 18,
+		"shield": {
+			"arc": 180,
+			"radius": 100,
+			"efficiency": 0.9,
+			"upkeep": 5
+		},
+		"mounts": [
+			{
+				"id": "mount-front-main",
+				"displayName": "前主炮",
+				"position": { "x": 0, "y": 55 },
+				"facing": 0,
+				"arc": 60,
+				"size": "LARGE",
+				"weapon": {
+					"$id": "preset:missile-large",
+					"spec": {
+						"damageType": "HIGH_EXPLOSIVE",
+						"size": "LARGE",
+						"damage": 400,
+						"projectilesPerShot": 1,
+						"range": 1000,
+						"minRange": 200,
+						"cooldown": 3,
+						"fluxCostPerShot": 100,
+						"tags": ["GUIDED", "HE", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-left",
+				"displayName": "左前炮",
+				"position": { "x": -30, "y": 45 },
+				"facing": 25,
+				"arc": 120,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:cannon-medium",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "MEDIUM",
+						"damage": 150,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 30,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-right",
+				"displayName": "右前炮",
+				"position": { "x": 30, "y": 45 },
+				"facing": -25,
+				"arc": 120,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:cannon-medium",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "MEDIUM",
+						"damage": 150,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 30,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-left",
+				"displayName": "左侧防御炮",
+				"position": { "x": -35, "y": 0 },
+				"facing": 90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:grenade-small",
+					"spec": {
+						"damageType": "FRAGMENTATION",
+						"size": "SMALL",
+						"damage": 40,
+						"projectilesPerShot": 3,
+						"range": 350,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SMALL"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-right",
+				"displayName": "右侧防御炮",
+				"position": { "x": 35, "y": 0 },
+				"facing": -90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:grenade-small",
+					"spec": {
+						"damageType": "FRAGMENTATION",
+						"size": "SMALL",
+						"damage": 40,
+						"projectilesPerShot": 3,
+						"range": 350,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 5,
+						"tags": ["BALLISTIC", "ANTI_SMALL"]
+					}
+				}
+			}
+		],
+		"rangeModifier": 1.2
+	}
+}

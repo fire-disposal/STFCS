@@ -325,22 +325,22 @@ function drawTranslationLines(
 		isForwardActive && value < 0 ? ALPHA.lineActive : ALPHA.lineInactive
 	);
 
-	const isLeftActive = mode === "strafe" && value > 0;
-	directionGraphics.moveTo(0, 0);
-	directionGraphics.lineTo(-remaining, 0);
-	directionGraphics.stroke({
-		color: COLORS.leftLine,
-		width: LINE_WIDTH.direction,
-		alpha: isLeftActive ? ALPHA.lineActive : ALPHA.lineInactive,
-	});
-
-	const isRightActive = mode === "strafe" && value < 0;
+	const isRightActive = mode === "strafe" && value > 0;
 	directionGraphics.moveTo(0, 0);
 	directionGraphics.lineTo(remaining, 0);
 	directionGraphics.stroke({
 		color: COLORS.rightLine,
 		width: LINE_WIDTH.direction,
 		alpha: isRightActive ? ALPHA.lineActive : ALPHA.lineInactive,
+	});
+
+	const isLeftActive = mode === "strafe" && value < 0;
+	directionGraphics.moveTo(0, 0);
+	directionGraphics.lineTo(-remaining, 0);
+	directionGraphics.stroke({
+		color: COLORS.leftLine,
+		width: LINE_WIDTH.direction,
+		alpha: isLeftActive ? ALPHA.lineActive : ALPHA.lineInactive,
 	});
 
 	if (value !== 0) {
@@ -352,8 +352,8 @@ function drawTranslationLines(
 			targetY = -value;
 			color = value >= 0 ? COLORS.forwardLine : COLORS.backwardLine;
 		} else {
-			targetX = -value;
-			color = value >= 0 ? COLORS.leftLine : COLORS.rightLine;
+			targetX = value;
+			color = value >= 0 ? COLORS.rightLine : COLORS.leftLine;
 		}
 
 		targetGraphics.moveTo(0, 0);

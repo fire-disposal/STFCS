@@ -1,0 +1,19 @@
+{
+	"$id": "preset:plasma-medium",
+	"metadata": {
+		"name": "中型等离子炮",
+		"description": "高伤害能量武器，对护甲和护盾均有良好效果",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "ENERGY",
+		"size": "MEDIUM",
+		"damage": 120,
+		"projectilesPerShot": 1,
+		"range": 700,
+		"minRange": 0,
+		"cooldown": 1,
+		"fluxCostPerShot": 25,
+		"tags": ["ENERGY", "ANTI_SHIP", "VERSATILE"]
+	}
+}

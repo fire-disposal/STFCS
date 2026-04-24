@@ -1,0 +1,141 @@
+{
+	"$id": "preset:destroyer-escort",
+	"metadata": {
+		"name": "护航级驱逐舰",
+		"description": "均衡配置，多方向火力覆盖，适合舰队护航任务",
+		"author": "STFCS"
+	},
+	"spec": {
+		"size": "DESTROYER",
+		"class": "COMBAT",
+		"width": 60,
+		"length": 90,
+		"maxHitPoints": 1200,
+		"armorMaxPerQuadrant": 120,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.85,
+		"fluxCapacity": 350,
+		"fluxDissipation": 20,
+		"maxSpeed": 110,
+		"maxTurnRate": 25,
+		"shield": {
+			"arc": 240,
+			"radius": 70,
+			"efficiency": 1.0,
+			"upkeep": 2
+		},
+		"mounts": [
+			{
+				"id": "mount-front-main",
+				"displayName": "前主炮",
+				"position": { "x": 0, "y": 40 },
+				"facing": 0,
+				"arc": 90,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:plasma-medium",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "MEDIUM",
+						"damage": 120,
+						"projectilesPerShot": 1,
+						"range": 700,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 25,
+						"tags": ["ENERGY", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-left",
+				"displayName": "左前炮",
+				"position": { "x": -25, "y": 32 },
+				"facing": 30,
+				"arc": 120,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 70,
+						"projectilesPerShot": 1,
+						"range": 500,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 8,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-right",
+				"displayName": "右前炮",
+				"position": { "x": 25, "y": 32 },
+				"facing": -30,
+				"arc": 120,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:railgun-small",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "SMALL",
+						"damage": 70,
+						"projectilesPerShot": 1,
+						"range": 500,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 8,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-left",
+				"displayName": "左侧炮",
+				"position": { "x": -28, "y": -5 },
+				"facing": 90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:pulse-laser-small",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "SMALL",
+						"damage": 60,
+						"projectilesPerShot": 1,
+						"range": 450,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 10,
+						"tags": ["ENERGY", "BEAM"]
+					}
+				}
+			},
+			{
+				"id": "mount-side-right",
+				"displayName": "右侧炮",
+				"position": { "x": 28, "y": -5 },
+				"facing": -90,
+				"arc": 180,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:pulse-laser-small",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "SMALL",
+						"damage": 60,
+						"projectilesPerShot": 1,
+						"range": 450,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 10,
+						"tags": ["ENERGY", "BEAM"]
+					}
+				}
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}

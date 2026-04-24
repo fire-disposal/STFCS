@@ -1,0 +1,19 @@
+{
+	"$id": "preset:grenade-small",
+	"metadata": {
+		"name": "小型榴弹发射器",
+		"description": "低伤害高射速破片武器，对小型目标高效",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "FRAGMENTATION",
+		"size": "SMALL",
+		"damage": 40,
+		"projectilesPerShot": 3,
+		"range": 350,
+		"minRange": 0,
+		"cooldown": 0,
+		"fluxCostPerShot": 5,
+		"tags": ["BALLISTIC", "ANTI_SMALL", "HIGH_ROF"]
+	}
+}

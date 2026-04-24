@@ -1,0 +1,97 @@
+{
+	"$id": "preset:frigate-strike",
+	"metadata": {
+		"name": "疾风级突击护卫舰",
+		"description": "高速突击舰，前向火力集中，适合快速切入战场",
+		"author": "STFCS"
+	},
+	"spec": {
+		"size": "FRIGATE",
+		"class": "STRIKE",
+		"width": 40,
+		"length": 60,
+		"maxHitPoints": 600,
+		"armorMaxPerQuadrant": 80,
+		"armorMinReduction": 0.1,
+		"armorMaxReduction": 0.8,
+		"fluxCapacity": 150,
+		"fluxDissipation": 15,
+		"maxSpeed": 180,
+		"maxTurnRate": 40,
+		"shield": {
+			"arc": 180,
+			"radius": 50,
+			"efficiency": 1.0,
+			"upkeep": 0
+		},
+		"mounts": [
+			{
+				"id": "mount-front-main",
+				"displayName": "主炮塔",
+				"position": { "x": 0, "y": 28 },
+				"facing": 0,
+				"arc": 60,
+				"size": "MEDIUM",
+				"weapon": {
+					"$id": "preset:cannon-medium",
+					"spec": {
+						"damageType": "KINETIC",
+						"size": "MEDIUM",
+						"damage": 150,
+						"projectilesPerShot": 1,
+						"range": 600,
+						"minRange": 0,
+						"cooldown": 1,
+						"fluxCostPerShot": 30,
+						"tags": ["BALLISTIC", "ANTI_SHIP"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-left",
+				"displayName": "左前炮",
+				"position": { "x": -18, "y": 22 },
+				"facing": 20,
+				"arc": 90,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:pulse-laser-small",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "SMALL",
+						"damage": 60,
+						"projectilesPerShot": 1,
+						"range": 450,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 10,
+						"tags": ["ENERGY", "BEAM"]
+					}
+				}
+			},
+			{
+				"id": "mount-front-right",
+				"displayName": "右前炮",
+				"position": { "x": 18, "y": 22 },
+				"facing": -20,
+				"arc": 90,
+				"size": "SMALL",
+				"weapon": {
+					"$id": "preset:pulse-laser-small",
+					"spec": {
+						"damageType": "ENERGY",
+						"size": "SMALL",
+						"damage": 60,
+						"projectilesPerShot": 1,
+						"range": 450,
+						"minRange": 0,
+						"cooldown": 0,
+						"fluxCostPerShot": 10,
+						"tags": ["ENERGY", "BEAM"]
+					}
+				}
+			}
+		],
+		"rangeModifier": 1.0
+	}
+}
