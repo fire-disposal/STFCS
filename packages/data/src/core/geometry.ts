@@ -184,3 +184,83 @@ export function isAngleInArc(angle: number, center: number, arc: number): boolea
 	const diff = normalizeAngleSigned(angle - center);
 	return Math.abs(diff) <= halfArc;
 }
+
+// ==================== 扩展几何函数 ====================
+
+/**
+ * 计算角度差（0-180度）
+ */
+export function angleDifference(angle1: number, angle2: number): number {
+	let diff = Math.abs(angle1 - angle2) % 360;
+	if (diff > 180) diff = 360 - diff;
+	return diff;
+}
+
+/**
+ * 计算从起始角度到目标角度的最短转向角度（带方向）
+ */
+export function calculateTurnAngle(startAngle: number, targetAngle: number): number {
+	return normalizeAngleSigned(targetAngle - startAngle);
+}
+
+/**
+ * 角度插值（考虑360度环绕）
+ */
+export function lerpAngle(startAngle: number, targetAngle: number, t: number): number {
+	const diff = calculateTurnAngle(startAngle, targetAngle);
+	return normalizeAngle(startAngle + diff * t);
+}
+
+/**
+ * 检查点是否在圆形区域内
+ */
+export function isPointInCircle(point: Point, center: Point, radius: number): boolean {
+	return distanceBetween(point, center) <= radius;
+}
+
+/**
+ * 检查点是否在矩形区域内
+ */
+export function isPointInRect(
+	point: Point,
+	rect: { x: number; y: number; width: number; height: number }
+): boolean {
+	return (
+		point.x >= rect.x &&
+		point.x <= rect.x + rect.width &&
+		point.y >= rect.y &&
+		point.y <= rect.y + rect.height
+	);
+}
+
+/**
+ * 检查点是否在环形扇形区域内（用于瞄准判定）
+ * 
+ * @param point - 待检测点
+ * @param center - 扇形中心
+ * @param centerAngle - 扇形中心角度（航海角度）
+ * @param arcWidth - 扇形角度宽度（度）
+ * @param outerRadius - 外半径
+ * @param innerRadius - 内半径（最小射程，默认0）
+ */
+export function isPointInAnnularSector(
+	point: Point,
+	center: Point,
+	centerAngle: number,
+	arcWidth: number,
+	outerRadius: number,
+	innerRadius: number = 0
+): boolean {
+	const dist = distanceBetween(point, center);
+	
+	if (dist > outerRadius || dist < innerRadius) {
+		return false;
+	}
+	
+	if (arcWidth >= 360) {
+		return true;
+	}
+	
+	const angleToPoint = angleBetween(center, point);
+	return isAngleInArc(angleToPoint, centerAngle, arcWidth);
+}

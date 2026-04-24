@@ -5,10 +5,8 @@
  * 此模块仅计算命中率和辐能，详细伤害计算由 damage.ts 处理
  */
 
-import type { WeaponSpec, WeaponRuntime, TokenSpec, TokenRuntime } from "@vt/data";
-
-import type { Point } from "../../types/common.js";
-import { distance } from "../geometry/index.js";
+import type { WeaponSpec, WeaponRuntime, TokenSpec, TokenRuntime, Point } from "@vt/data";
+import { distanceBetween } from "@vt/data";
 
 /**
  * 武器攻击结果
@@ -56,7 +54,7 @@ export function calculateWeaponAttack(
 	}
 
 	// 1. 检查射程
-	const dist = distance(attackerPosition, targetPosition);
+	const dist = distanceBetween(attackerPosition, targetPosition);
 	const effectiveRange = weaponSpec.range * (attackerSpec.rangeModifier || 1.0);
 
 	if (dist > effectiveRange) {

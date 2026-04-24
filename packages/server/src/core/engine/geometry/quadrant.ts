@@ -1,21 +1,32 @@
 /**
  * 象限计算模块
  * 基于六象限护甲系统设计
+ * 
+ * 航海坐标系：
+ * - 0° = 船头（屏幕上方）
+ * - 90° = 右舷（屏幕右侧）
+ * - 顺时针增加
  */
 
-import type { Point } from "../../types/common.js";
-import { normalizeAngle } from "./angle.js";
+import type { Point } from "@vt/data";
+import { normalizeAngle } from "@vt/data";
 
 /**
- * 六象限定义
+ * 六象限定义（航海坐标系）
+ * - 0-60°: FRONT (前上/前下)
+ * - 60-120°: RIGHT (右上/右下)
+ * - 120-180°: RIGHT_BOTTOM 继续到后右
+ * - 180-240°: 后方区域
+ * - 240-300°: LEFT (左上/左下)
+ * - 300-360°: LEFT 继续到前左
  */
 export const QUADRANTS = [
-  "FRONT_TOP",     // 0: 前上
-  "FRONT_BOTTOM",  // 1: 前下  
-  "RIGHT_TOP",     // 2: 右上
-  "RIGHT_BOTTOM",  // 3: 右下
-  "LEFT_TOP",      // 4: 左上
-  "LEFT_BOTTOM",   // 5: 左下
+  "FRONT_TOP",     // 0: 前上（相对角度 0-60°）
+  "FRONT_BOTTOM",  // 1: 前下（相对角度 60-120°，实际是右前）
+  "RIGHT_TOP",     // 2: 右上（相对角度 120-180°）
+  "RIGHT_BOTTOM",  // 3: 右下（相对角度 180-240°）
+  "LEFT_TOP",      // 4: 左上（相对角度 240-300°）
+  "LEFT_BOTTOM",   // 5: 左下（相对角度 300-360°）
 ] as const;
 
 export type Quadrant = typeof QUADRANTS[number];
@@ -24,34 +35,34 @@ export type Quadrant = typeof QUADRANTS[number];
  * 获取象限索引
  */
 export function getQuadrantIndex(quadrant: Quadrant): number {
-  return QUADRANTS.indexOf(quadrant);
+	return QUADRANTS.indexOf(quadrant);
 }
 
 /**
  * 获取象限名称
  */
 export function getQuadrantName(index: number): Quadrant {
-  return QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
+	return QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
 }
 
 /**
  * 根据攻击角度计算受击象限
- * @param attackAngle 攻击方向角度（0-360度，0度为正右方，90度为正上方）
- * @param targetHeading 目标朝向角度（0-360度）
+ * 
+ * @param attackAngle 攻击方向角度（航海角度，0°=船头/上，90°=右舷/右）
+ * @param targetHeading 目标朝向角度（航海角度）
  * @returns 象限索引（0-5）
+ * 
+ * 计算方式：
+ * - 相对角度 = attackAngle - targetHeading（归一化到0-360）
+ * - 每60度一个象限，顺时针划分
  */
 export function calculateHitQuadrant(
-  attackAngle: number,
-  targetHeading: number
+	attackAngle: number,
+	targetHeading: number
 ): number {
-  // 计算相对角度（攻击方向相对于目标船头）
-  const relativeAngle = normalizeAngle(attackAngle - targetHeading);
-  
-  // 六象限划分：每60度一个象限
-  // 0度方向为船头正前方，象限按顺时针排列
-  const quadrant = Math.floor(relativeAngle / 60) % 6;
-  
-  return quadrant;
+	const relativeAngle = normalizeAngle(attackAngle - targetHeading);
+	const quadrant = Math.floor(relativeAngle / 60) % 6;
+	return quadrant;
 }
 
 /**

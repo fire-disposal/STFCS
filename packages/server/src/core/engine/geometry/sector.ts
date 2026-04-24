@@ -1,33 +1,32 @@
 /**
  * 扇形区域计算模块
+ * 
+ * 核心检测函数已迁移至 @vt/data/geometry.ts:
+ * - isPointInAnnularSector: 点在环形扇形内检测
  */
 
-import type { Point } from "../../types/common.js";
-import { distance } from "./distance.js";
-import { angleBetween, isAngleInArc } from "./angle.js";
+import type { Point } from "@vt/data";
+import { distanceBetween, angleBetween, isPointInAnnularSector } from "@vt/data";
 
 /** 扇形区域定义 */
 export interface Sector {
-  center: Point;
-  centerAngle: number;
-  arcWidth: number; // 角度宽度
-  radius: number;
-  innerRadius?: number; // 最小射程（内半径），默认为0
+	center: Point;
+	centerAngle: number;
+	arcWidth: number;
+	radius: number;
+	innerRadius?: number;
 }
 
 /** 检查点是否在扇形区域内 */
 export function isPointInSector(point: Point, sector: Sector): boolean {
-  const dist = distance(point, sector.center);
-  const innerRadius = sector.innerRadius ?? 0;
-  
-  // 检查距离范围
-  if (dist > sector.radius || dist < innerRadius) {
-    return false;
-  }
-
-  // 检查角度
-  const angleToPoint = angleBetween(sector.center, point);
-  return isAngleInArc(angleToPoint, sector.centerAngle, sector.arcWidth);
+	return isPointInAnnularSector(
+		point,
+		sector.center,
+		sector.centerAngle,
+		sector.arcWidth,
+		sector.radius,
+		sector.innerRadius ?? 0
+	);
 }
 
 /** 计算扇形区域的边界点（用于可视化） */
@@ -69,7 +68,7 @@ export function calculateSectorBoundaryPoints(
 /** 计算两个扇形是否相交 */
 export function doSectorsIntersect(sector1: Sector, sector2: Sector): boolean {
   // 首先检查中心距离
-  const centerDist = distance(sector1.center, sector2.center);
+  const centerDist = distanceBetween(sector1.center, sector2.center);
   if (centerDist > sector1.radius + sector2.radius) {
     return false; // 距离太远，不可能相交
   }
@@ -99,7 +98,7 @@ export function distanceToSector(point: Point, sector: Sector): number {
     return 0;
   }
 
-  const distToCenter = distance(point, sector.center);
+  const distToCenter = distanceBetween(point, sector.center);
   const innerRadius = sector.innerRadius ?? 0;
   
   // 计算点到扇形中心的角度
@@ -129,7 +128,7 @@ export function distanceToSector(point: Point, sector: Sector): number {
   let minDist = Infinity;
   
   for (const boundaryPoint of boundaryPoints) {
-    const dist = distance(point, boundaryPoint);
+    const dist = distanceBetween(point, boundaryPoint);
     if (dist < minDist) {
       minDist = dist;
     }

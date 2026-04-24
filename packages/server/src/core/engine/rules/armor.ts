@@ -1,41 +1,39 @@
 /**
  * 护甲计算规则
+ * 
+ * 六象限护甲系统（航海坐标系）：
+ * - 0° = 船头，每60度一个象限，顺时针划分
  */
-
-
 
 /** 六象限护甲系统 */
 export const ARMOR_QUADRANTS = [
-  "FRONT_TOP",
-  "FRONT_BOTTOM", 
-  "RIGHT_TOP",
-  "RIGHT_BOTTOM",
-  "LEFT_TOP",
-  "LEFT_BOTTOM",
+	"FRONT_TOP",     // 0: 前上（相对角度 0-60°）
+	"FRONT_BOTTOM",  // 1: 前下（相对角度 60-120°）
+	"RIGHT_TOP",     // 2: 右上（相对角度 120-180°）
+	"RIGHT_BOTTOM",  // 3: 右下（相对角度 180-240°）
+	"LEFT_TOP",      // 4: 左上（相对角度 240-300°）
+	"LEFT_BOTTOM",   // 5: 左下（相对角度 300-360°）
 ] as const;
 
 export type ArmorQuadrant = typeof ARMOR_QUADRANTS[number];
 
 /** 获取指定象限的索引 */
 export function getQuadrantIndex(quadrant: ArmorQuadrant): number {
-  return ARMOR_QUADRANTS.indexOf(quadrant);
+	return ARMOR_QUADRANTS.indexOf(quadrant);
 }
 
-/** 根据攻击角度计算受击象限 */
+/** 根据攻击角度计算受击象限（航海坐标系） */
 export function calculateHitQuadrant(
-  attackAngle: number, // 攻击方向角度（0-360度）
-  targetHeading: number // 目标朝向角度（0-360度）
+	attackAngle: number, // 攻击方向角度（航海角度，0°=船头）
+	targetHeading: number // 目标朝向角度（航海角度）
 ): number {
-  // 计算相对角度
-  const relativeAngle = ((attackAngle - targetHeading + 360) % 360);
-  
-  // 六象限划分：每60度一个象限
-  return Math.floor(relativeAngle / 60) % 6;
+	const relativeAngle = ((attackAngle - targetHeading + 360) % 360);
+	return Math.floor(relativeAngle / 60) % 6;
 }
 
 /** 获取象限名称 */
 export function getQuadrantName(index: number): ArmorQuadrant {
-  return ARMOR_QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
+	return ARMOR_QUADRANTS[Math.max(0, Math.min(5, index))] ?? "FRONT_TOP";
 }
 
 /** 计算护甲值（考虑损坏） */
