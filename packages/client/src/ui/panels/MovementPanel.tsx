@@ -83,7 +83,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 		} else if (phase === "B") {
 			await sendRotate(ship.$id, rotateValue);
 		} else if (phase === "C") {
-			await sendMove(ship.$id, 0, translateValue);
+			await sendMove(ship.$id, 0, -translateValue);
 			if (!modeLocked && translateValue !== 0) {
 				setModeLocked(true);
 			}
@@ -247,7 +247,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ ship, canControl }
 						<Text size="1" color="gray">
 							{translateMode === "forward" 
 								? (translateValue > 0 ? "前进" : translateValue < 0 ? "后退" : "")
-								: (translateValue > 0 ? "左移" : translateValue < 0 ? "右移" : "")
+								: (translateValue > 0 ? "右移" : translateValue < 0 ? "左移" : "")
 							}
 						</Text>
 					</Flex>
