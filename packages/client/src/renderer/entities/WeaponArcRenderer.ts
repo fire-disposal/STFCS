@@ -1,6 +1,6 @@
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { getMountWorldPosition, nauticalToMath, toRadians, distanceBetween, angleBetween, normalizeAngleSigned } from "@vt/data";
+import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned, toPixiRotation } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
@@ -143,7 +143,7 @@ export function useWeaponArcRendering(
 
 			const mountPos = mount.position ?? { x: 0, y: 0 };
 			const mountFacingNautical = shipHeading + (mount.facing ?? 0);
-			const mountFacing = toRadians(nauticalToMath(mountFacingNautical));
+			const mountFacing = toPixiRotation(mountFacingNautical);
 
 			const worldPos = getMountWorldPosition(shipPosition, shipHeading, mountPos);
 			const worldX = worldPos.x;
