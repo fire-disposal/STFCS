@@ -214,6 +214,8 @@ rpc.namespace("room", {
       case "start":
         ctx.requireHost();
         ctx.state.changeTurn(1);
+        // 游戏开始时执行一次回合结束逻辑，赋予所有单位初始资源（辐能消散、武器状态初始化等）
+        room.processTurnEndLogic();
         ctx.state.changePhase("PLAYER_ACTION");
         return;
       case "kick":

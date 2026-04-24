@@ -176,10 +176,10 @@ export class Room {
 
 	advancePhase(): void {
 		const currentPhase = this.stateManager.getState().phase;
-		
+
 		let nextPhase: typeof currentPhase;
 		let incrementTurn = false;
-		
+
 		switch (currentPhase) {
 			case "PLAYER_ACTION":
 				nextPhase = "DM_ACTION";
@@ -195,9 +195,9 @@ export class Room {
 			default:
 				nextPhase = "PLAYER_ACTION";
 		}
-		
+
 		this.stateManager.changePhase(nextPhase);
-		
+
 		if (incrementTurn) {
 			this.processTurnEndLogic();
 			const newTurn = this.stateManager.getState().turnCount + 1;
@@ -213,17 +213,17 @@ export class Room {
 
 	nextTurn(): void {
 		const currentPhase = this.stateManager.getState().phase;
-		
+
 		if (currentPhase !== "TURN_END") {
 			this.stateManager.changePhase("TURN_END");
 		}
-		
+
 		this.processTurnEndLogic();
-		
+
 		const newTurn = this.stateManager.getState().turnCount + 1;
 		this.stateManager.changeTurn(newTurn);
 		this.stateManager.changePhase("PLAYER_ACTION");
-		
+
 		const newState = this.stateManager.getState();
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
@@ -250,6 +250,8 @@ export class Room {
 						phaseAUsed: 0,
 						turnAngleUsed: 0,
 						phaseCUsed: 0,
+						phaseALock: null,
+						phaseCLock: null,
 					},
 					hasFired: false,
 				};

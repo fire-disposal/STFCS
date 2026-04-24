@@ -82,7 +82,7 @@ export class MutativeStateManager {
 			{ enablePatches: true }
 		)
 		this.state = newState
-		
+
 		if (saveHistory && patches.length > 0) {
 			this.history.push({
 				patches,
@@ -94,7 +94,7 @@ export class MutativeStateManager {
 				this.history.shift()
 			}
 		}
-		
+
 		return { patches, inversePatches }
 	}
 
@@ -110,17 +110,17 @@ export class MutativeStateManager {
 		saveHistory = true
 	): MutateResult {
 		const result = this.mutate(mutator, saveHistory, logContext.reason)
-		
+
 		this.broadcastPatches(result.patches)
 		this.broadcastEditLogs(result, logContext)
-		
+
 		return result
 	}
 
 	undo(): boolean {
 		const lastEntry = this.history.pop()
 		if (!lastEntry) return false
-		
+
 		const [newState] = create(
 			this.state,
 			(draft) => {
@@ -145,35 +145,35 @@ export class MutativeStateManager {
 
 	broadcastPatches(patches: Patch[]): void {
 		if (patches.length === 0 || !this.io) return
-		
+
 		const statePatches: StatePatch[] = patches.map(p => ({
 			op: this.patchOpToStateOp(p.op),
 			path: p.path as (string | number)[],
 			value: p.value,
 		}))
-		
+
 		const payload: StatePatchPayload = {
 			patches: statePatches,
 			timestamp: Date.now(),
 		}
-		
+
 		this.io.to(this.roomId).emit("state:patch", payload)
 	}
 
 	private broadcastEditLogs(result: MutateResult, logContext: EditLogContext): void {
 		if (!this.io) return
-		
+
 		for (const invPatch of result.inversePatches) {
 			const invPath = invPatch.path as (string | number)[]
 			const correspondingPatch = result.patches.find(
 				p => this.pathsEqual((p.path as (string | number)[]), invPath)
 			)
-			
+
 			if (invPath.length >= 2 && invPath[0] === "tokens") {
 				const tokenId = String(invPath[1])
 				const token = this.state.tokens[tokenId]
 				const pathStr = invPath.slice(2).map(String).join("/")
-				
+
 				const log: BattleLogEdit = {
 					type: "edit",
 					playerId: logContext.playerId,
@@ -186,7 +186,7 @@ export class MutativeStateManager {
 					reason: logContext.reason,
 					timestamp: Date.now(),
 				}
-				
+
 				this.io.to(this.roomId).emit("battle:log", { log } as BattleLogPayload)
 			}
 		}
@@ -198,9 +198,9 @@ export class MutativeStateManager {
 			if (path.length === 0) continue
 			const target = this.resolvePath(draft, path.slice(0, -1))
 			const key = path[path.length - 1]
-			
+
 			if (key === undefined) continue
-			
+
 			if (patch.op === "add") {
 				delete target[key]
 			} else if (patch.op === "remove") {
@@ -247,15 +247,25 @@ export class MutativeStateManager {
 		const mutator = (draft: Draft<GameRoomState>) => {
 			if (token.spec?.shield && !token.runtime?.shield) {
 				token.runtime = token.runtime || {} as any
-				;(token.runtime as any).shield = {
-					active: false,
-					value: token.spec.shield.radius,
-					direction: 0,
-				}
+					; (token.runtime as any).shield = {
+						active: false,
+						value: token.spec.shield.radius,
+						direction: 0,
+					}
+			}
+			// 初始化武器运行时状态（所有武器初始为 READY）
+			if (!token.runtime?.weapons && token.spec?.mounts) {
+				token.runtime = token.runtime || {} as any
+					; (token.runtime as any).weapons = token.spec.mounts
+						.filter((m: any) => m.weapon)
+						.map((m: any) => ({
+							mountId: m.id,
+							state: "READY",
+						}))
 			}
 			draft.tokens[tokenId] = token
 		}
-		
+
 		if (logContext) {
 			this.mutateWithLog(mutator, logContext)
 		} else {
@@ -268,11 +278,11 @@ export class MutativeStateManager {
 			const num = Number(p)
 			return Number.isNaN(num) ? p : num
 		})
-		
+
 		const mutator = (draft: Draft<GameRoomState>) => {
 			const token = draft.tokens[tokenId]
 			if (!token) return
-			
+
 			if (pathParts.length === 0) return
 			const target = this.resolvePath(token, pathParts.slice(0, -1))
 			const key = pathParts[pathParts.length - 1]
@@ -280,7 +290,7 @@ export class MutativeStateManager {
 				target[key] = value
 			}
 		}
-		
+
 		if (logContext) {
 			this.mutateWithLog(mutator, logContext)
 		} else {
@@ -304,7 +314,7 @@ export class MutativeStateManager {
 				Object.assign(token.spec, specUpdates)
 			}
 		}
-		
+
 		if (logContext) {
 			this.mutateWithLog(mutator, logContext)
 		} else {
@@ -316,7 +326,7 @@ export class MutativeStateManager {
 		const mutator = (draft: Draft<GameRoomState>) => {
 			delete draft.tokens[tokenId]
 		}
-		
+
 		if (logContext) {
 			this.mutateWithLog(mutator, logContext)
 		} else {

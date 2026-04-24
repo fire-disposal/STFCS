@@ -214,6 +214,18 @@ export class SocketNetworkManager {
 		return fullState;
 	}
 
+	async logout(): Promise<void> {
+		try {
+			await this.request("auth:logout", {});
+		} catch {
+			// 忽略超时等错误，本地清理优先
+		}
+		this.playerId = null;
+		this.playerName = null;
+		this.currentRoomId = null;
+		this.setGameState(null);
+	}
+
 	leaveRoom(): void {
 		if (this.currentRoomId) {
 			logger.info("leaveRoom", { roomId: this.currentRoomId });

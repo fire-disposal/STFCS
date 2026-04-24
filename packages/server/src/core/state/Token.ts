@@ -10,6 +10,8 @@ import type {
 	InventoryToken as InventoryTokenSchema,
 	TokenSpec,
 	TokenRuntime,
+	WeaponRuntime,
+	WeaponState,
 	Faction,
 	Point,
 	MovementState,
@@ -55,6 +57,14 @@ export function createCombatToken(
 ): CombatToken {
 	const spec = inventoryToken.spec;
 
+	// 初始化武器运行时状态（所有武器初始为 READY）
+	const weapons: WeaponRuntime[] = (spec.mounts ?? [])
+		.filter((m) => m.weapon)
+		.map((m) => ({
+			mountId: m.id,
+			state: "READY" as WeaponState,
+		}));
+
 	const runtime: TokenRuntime = {
 		position,
 		heading,
@@ -76,6 +86,7 @@ export function createCombatToken(
 		faction: faction ?? FactionEnum.NEUTRAL,
 		...(ownerId !== undefined ? { ownerId } : {}),
 		...(spec.shield ? { shield: { active: false, value: spec.shield.radius, direction: 0 } } : {}),
+		weapons,
 	};
 
 	return {

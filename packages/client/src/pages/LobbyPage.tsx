@@ -91,10 +91,10 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 		[rooms]
 	);
 
-const isOwnRoom = useCallback(
-    (room: RoomInfo) => playerId !== null && room.ownerId === playerId,
-    [playerId]
-  );
+	const isOwnRoom = useCallback(
+		(room: RoomInfo) => playerId !== null && room.ownerId === playerId,
+		[playerId]
+	);
 
 	const visibleRooms = useMemo(() => {
 		if (roomTab === "joinable") {
@@ -187,7 +187,7 @@ const isOwnRoom = useCallback(
 								<UserCircle size={16} /> 玩家档案
 							</Button>
 							<Button color="red" variant="soft" onClick={onLogout} data-magnetic>
-								<LogOut size={16} /> 退出
+								<LogOut size={16} /> 退出登录
 							</Button>
 						</Flex>
 					</Flex>

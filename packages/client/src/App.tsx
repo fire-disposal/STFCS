@@ -88,8 +88,8 @@ const App: React.FC = () => {
 		setUserName("");
 		setPlayerId(null);
 		setAppState("auth");
-		networkManagerRef.current?.leaveRoom();
-		notify.info("已退出");
+		networkManagerRef.current?.logout();
+		notify.info("已退出登录");
 	}, []);
 
 	const handleCreateRoom = useCallback(async () => {
