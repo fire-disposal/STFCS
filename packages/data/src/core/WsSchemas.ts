@@ -151,6 +151,15 @@ export const RoomLeaveDef = {
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
 
+export const RoomRejoinDef = {
+  payload: z.object({ roomId: z.string() }),
+  response: z.object({
+    success: z.boolean(),
+    state: GameRoomStateSchema.optional(),
+    role: z.enum(["HOST", "PLAYER"]).optional(),
+  }),
+} as const satisfies WsEventDef<any, any>
+
 export const RoomActionDef = {
   payload: z.object({
     action: z.enum(["ready", "start", "kick", "transfer_host"]),
@@ -463,6 +472,7 @@ export const WsEventDefinitions = {
   "room:list": RoomListDef,
   "room:join": RoomJoinDef,
   "room:leave": RoomLeaveDef,
+  "room:rejoin": RoomRejoinDef,
   "room:action": RoomActionDef,
   "room:get_assets": RoomGetAssetsDef,
   "room:delete": RoomDeleteDef,

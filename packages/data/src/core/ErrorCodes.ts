@@ -19,6 +19,8 @@ export const ErrorCodes = {
     ROOM_CREATE_FAILED: "ROOM_CREATE_FAILED",
     ROOM_NOT_FOUND: "ROOM_NOT_FOUND",
     JOIN_FAILED: "JOIN_FAILED",
+    NOT_IN_ROOM: "NOT_IN_ROOM",
+    RECONNECT_FAILED: "RECONNECT_FAILED",
 
     // ==================== 参数验证 ====================
     TARGET_REQUIRED: "TARGET_REQUIRED",

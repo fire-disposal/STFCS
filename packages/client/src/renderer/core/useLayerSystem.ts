@@ -1,7 +1,7 @@
 /**
  * Layer 系统 - 管理渲染层级
  *
- * 层级结构设计（参考 RTS 游戏）：
+ * 层级结构：
  *
  * Stage
  * ├── world (游戏世界层，有 zoom/rotation/pivot)
@@ -12,29 +12,19 @@
  * │   ├── [zIndex 3] starfieldNear (近层星空，视差)
  * │   ├── [zIndex 4] grid (网格)
  * │   ├── [zIndex 5] cursor (世界坐标系光标)
-* │   ├── [zIndex 7] tacticalTokens (舰船战术标记 - 箭头)
-* │   ├── [zIndex 8] effects (特效 - 爆炸、粒子等)
-* │   ├── [zIndex 9] weaponArcs (武器射界可视化)
-* │   ├── [zIndex 10] movementVisuals (移动预览箭头)
-* │   ├── [zIndex 11] shipIcons (舰船图标层)
-* │   ├── [zIndex 12] shieldArcs (护盾辉光弧线)
-* │   ├── [zIndex 13] hexagonArmor (护甲六边形)
-* │   ├── [zIndex 14] fluxIndicators (辐能/过载状态指示器)
-* │   └── [zIndex 15] shipSprites (舰船贴图精灵 - 最高层)
+ * │   ├── [zIndex 7] tacticalTokens (舰船战术标记+挂载点+武器标记)
+ * │   ├── [zIndex 8] weaponArcs (武器射界)
+ * │   ├── [zIndex 9] movementVisuals (移动预览)
+ * │   ├── [zIndex 10] shieldArcs (护盾弧)
+ * │   ├── [zIndex 11] hexagonArmor (护甲六边形)
+ * │   ├── [zIndex 13] shipSprites (舰船贴图)
+ * │   └── [zIndex 14] weaponSprites (武器贴图)
  * │
  * └── hud (HUD层，独立于世界，固定像素大小，无变换)
- *     ├── [zIndex 0] shipBars (舰船血条 - 固定像素大小)
- *     ├── [zIndex 1] shipNames (舰船名称标签 - 固定像素大小)
- *     └── [zIndex 2] targetMarkers (目标标记 - 瞄准模式)
- *
- * 设计原则：
- * 1. world 层：所有游戏世界元素，统一受 zoom/rotation 变换
- * 2. hud 层：UI 元素，固定像素大小，通过坐标转换跟随世界元素
- * 3. 视差星空：不直接跟随 world 层变换，而是使用独立的位置计算
- *
- * 文本清晰度：
- * - hud 层的文本使用 resolution: 2，确保在高 DPI 屏幕上清晰
- * - 文本元素不继承任何缩放变换
+ *     ├── [zIndex 0] shipBars (舰船血条)
+ *     ├── [zIndex 1] fluxBars (辐能条)
+ *     ├── [zIndex 2] shipNames (舰船名称)
+ *     └── [zIndex 3] ownerLabels (所有者标签)
  */
 
 import { Container, Rectangle } from "pixi.js";
@@ -68,25 +58,19 @@ export interface LayerRegistry {
 	grid: Container;
 	/** [zIndex 5] 世界坐标系光标 */
 	cursor: Container;
-	/** [zIndex 7] 舰船战术标记（箭头 token） */
+	/** [zIndex 7] 舰船战术标记（箭头 token + 挂载点 + 武器标记） */
 	tacticalTokens: Container;
-	/** [zIndex 8] 特效层 */
-	effects: Container;
-	/** [zIndex 9] 武器射界可视化 */
+	/** [zIndex 8] 武器射界可视化 */
 	weaponArcs: Container;
-	/** [zIndex 10] 移动预览箭头 */
+	/** [zIndex 9] 移动预览箭头 */
 	movementVisuals: Container;
-	/** [zIndex 11] 舰船图标层 */
-	shipIcons: Container;
-	/** [zIndex 12] 护盾辉光弧线 */
+	/** [zIndex 10] 护盾辉光弧线 */
 	shieldArcs: Container;
-	/** [zIndex 13] 护甲六边形 */
+	/** [zIndex 11] 护甲六边形 */
 	hexagonArmor: Container;
-	/** [zIndex 14] 辐能/过载状态指示器 */
-	fluxIndicators: Container;
-	/** [zIndex 15] 舰船贴图精灵层 */
+	/** [zIndex 13] 舰船贴图精灵层 */
 	shipSprites: Container;
-	/** [zIndex 16] 武器贴图精灵层（最高层） */
+	/** [zIndex 14] 武器贴图精灵层（最高层） */
 	weaponSprites: Container;
 
 	// === HUD 层（独立于世界） ===
@@ -94,10 +78,12 @@ export interface LayerRegistry {
 	hud: Container;
 	/** [zIndex 0] 舰船血条（固定像素大小） */
 	shipBars: Container;
-	/** [zIndex 1] 舰船名称标签（固定像素大小） */
+	/** [zIndex 1] 辐能条（固定像素大小） */
+	fluxBars: Container;
+	/** [zIndex 2] 舰船名称标签（固定像素大小） */
 	shipNames: Container;
-	/** [zIndex 2] 目标标记（瞄准模式） */
-	targetMarkers: Container;
+	/** [zIndex 3] 所有者标签（固定像素大小） */
+	ownerLabels: Container;
 }
 
 export interface UseLayerSystemResult {

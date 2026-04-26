@@ -57,6 +57,7 @@ function extractRuntimeDraft(ship: CombatToken): TokenRuntime {
 		hasFired: r.hasFired ?? false,
 		weapons: r.weapons ? clone(r.weapons) : undefined,
 		modifiers: r.modifiers ? clone(r.modifiers) : undefined,
+		actionSequence: r.actionSequence ?? 0,
 		faction: r.faction,
 		venting: r.venting ?? false,
 		displayName: r.displayName,

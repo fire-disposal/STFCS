@@ -1,26 +1,21 @@
 /**
  * 舰船信息面板 - 两行布局
  * 支持战斗实例重命名
+ * 
+ * 使用 useSelectedShip hook 统一获取选中舰船
  */
 
 import React, { useState, useCallback } from "react";
 import { Anchor, Zap, AlertTriangle, Edit2, Check, X } from "lucide-react";
-import type { CombatToken } from "@vt/data";
 import { FactionColors } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
-import type { SocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
+import { useSelectedShip } from "@/hooks/useSelectedShip";
+import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel.css";
 
-// 象限名称（顺时针，从船头开始）
 const QUADRANT_NAMES = ["前", "右前", "右后", "后", "左后", "左前"];
 
-export interface ShipInfoPanelProps {
-	ship: CombatToken | null;
-	room?: SocketRoom | null;
-}
-
-// 护甲健康程度颜色
 function getArmorColor(percent: number): string {
 	if (percent >= 0.8) return "#2ecc71";
 	if (percent >= 0.5) return "#f1c40f";
@@ -28,7 +23,10 @@ function getArmorColor(percent: number): string {
 	return "#8b0000";
 }
 
-export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
+export const ShipInfoPanel: React.FC = () => {
+	const ship = useSelectedShip();
+	const { send } = useGameAction();
+	
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editingName, setEditingName] = useState("");
 
@@ -48,20 +46,11 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	const fluxHardPct = fluxMax > 0 ? Math.min(100, (fluxHard / fluxMax) * 100) : 0;
 	const fluxTotalPct = Math.min(100, fluxSoftPct + fluxHardPct);
 
-	// 护甲数据
-	const armor = hasShip ? (ship.runtime.armor ?? []) : [];
-	const armorMax = hasShip ? (ship.spec.armorMaxPerQuadrant ?? 100) : 100;
-	const shieldActive = hasShip ? (ship.runtime.shield?.active ?? false) : false;
-
-	const phase = hasShip ? (ship.runtime.movement?.currentPhase ?? "A") : "-";
-	const overloaded = hasShip ? ship.runtime.overloaded : false;
-	const destroyed = hasShip ? ship.runtime.destroyed : false;
-
 	const handleStartEdit = useCallback(() => {
 		if (!hasShip) return;
-		setEditingName(displayName);
+		setEditingName(ship.runtime.displayName ?? ship.metadata?.name ?? "");
 		setIsEditingName(true);
-	}, [hasShip, displayName]);
+	}, [hasShip, ship]);
 
 	const handleCancelEdit = useCallback(() => {
 		setIsEditingName(false);
@@ -69,10 +58,10 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 	}, []);
 
 	const handleSaveName = useCallback(async () => {
-		if (!hasShip || !room || !editingName.trim()) return;
+		if (!hasShip || !editingName.trim()) return;
 
 		try {
-			await room.send("edit:token", {
+			await send("edit:token", {
 				action: "rename",
 				tokenId: ship.$id,
 				displayName: editingName.trim(),
@@ -83,7 +72,13 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "更名失败");
 		}
-	}, [hasShip, room, ship?.$id, editingName]);
+	}, [hasShip, ship?.$id, editingName, send]);
+
+	const overloaded = hasShip ? ship.runtime.overloaded : false;
+	const shieldActive = hasShip ? ship.runtime.shield?.active : false;
+	const destroyed = hasShip ? ship.runtime.destroyed : false;
+	const armor = hasShip ? (ship.runtime.armor ?? []) : [];
+	const armorMax = hasShip ? ship.spec.armorMaxPerQuadrant : 1;
 
 	return (
 		<Flex direction="column" gap="2" className="panel-content">
@@ -123,7 +118,7 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 							<Text size="3" weight="bold" style={{ color: "#cfe8ff", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}>
 								{hasShip ? displayName : "请选择舰船"}
 							</Text>
-							{hasShip && room && (
+							{hasShip && (
 								<IconButton size="1" variant="ghost" onClick={handleStartEdit}>
 									<Edit2 size={12} />
 								</IconButton>
@@ -138,7 +133,6 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 					{overloaded && <Badge color="red" size="2"><AlertTriangle size={12} /> 过载</Badge>}
 					{shieldActive && <Badge color="blue" size="2">护盾</Badge>}
 					{destroyed && <Badge color="gray" size="2">损毁</Badge>}
-					<Badge size="2" variant="soft" color={phase === "DONE" ? "gray" : "green"}>Phase {phase}</Badge>
 				</Flex>
 
 				<Box className="panel-divider" />
@@ -231,33 +225,39 @@ export const ShipInfoPanel: React.FC<ShipInfoPanelProps> = ({ ship, room }) => {
 
 				<Box className="panel-divider" />
 
-				{/* 护甲象限 */}
-				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 200 }}>
-					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>护甲</Text>
+				{/* 护甲象限 - 紧凑一行 */}
+				<Flex className="panel-section" align="center" gap="1">
+					<Text size="1" style={{ color: "#6b8aaa", fontWeight: 600, marginRight: 4 }}>护甲</Text>
 					{armor.length === 6 ? (
-						<Flex gap="2" align="center">
+						<Flex gap="1">
 							{armor.map((val, idx) => {
 								const pct = val / armorMax;
 								return (
-									<Flex key={idx} direction="column" gap="1" align="center" style={{ minWidth: 28 }}>
-										<Text size="1" style={{ color: "#6b8aaa", fontSize: 10 }}>{QUADRANT_NAMES[idx]}</Text>
-										<Box style={{
-											width: 20,
-											height: 20,
+									<Box
+										key={idx}
+										style={{
+											width: 24,
+											height: 24,
 											borderRadius: 3,
 											background: getArmorColor(pct),
 											opacity: pct > 0 ? 1 : 0.3,
-											border: "1px solid rgba(255,255,255,0.15)",
-										}} />
-										<Text size="1" weight="bold" style={{ color: "#cfe8ff", fontSize: 11, fontFamily: "'Fira Code', monospace" }}>
-											{val}
-										</Text>
-									</Flex>
+											border: "1px solid rgba(255,255,255,0.1)",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											fontSize: 10,
+											fontWeight: 600,
+											color: "#fff",
+										}}
+										title={`${QUADRANT_NAMES[idx]}: ${val}/${armorMax}`}
+									>
+										{val}
+									</Box>
 								);
 							})}
 						</Flex>
 					) : (
-						<Text size="2" style={{ color: "#4a5568" }}>无护甲</Text>
+						<Text size="1" style={{ color: "#4a5568" }}>无</Text>
 					)}
 				</Flex>
 			</Flex>

@@ -80,8 +80,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
 		<Flex align="center" gap="3">
 			<Box>
 				<Avatar
-					src={previewData}
-					assetId={previewData ? null : value}
+					src={previewData || value}
 					size="large"
 					userName={userName}
 				/>

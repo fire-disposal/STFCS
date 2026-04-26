@@ -15,6 +15,7 @@
  */
 
 import { create, type Draft, type Patch } from "mutative"
+import { cloneDeep, merge } from "lodash"
 import type { Server as IOServer, Socket } from "socket.io"
 import type {
 	GameRoomState,
@@ -77,7 +78,7 @@ export class MutativeStateManager {
 	 * 注意：不会生成增量 patches。
 	 */
 	loadSnapshot(snapshot: GameRoomState): void {
-		this.state = { ...snapshot }
+		this.state = cloneDeep(snapshot)
 		this.history = []
 		this.broadcastFull()
 	}
@@ -368,7 +369,9 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			const token = draft.tokens[tokenId]
 			if (token?.runtime) {
-				Object.assign(token.runtime, runtimeUpdates)
+				const currentSequence = token.runtime.actionSequence ?? 0
+				token.runtime.actionSequence = currentSequence + 1
+				merge(token.runtime, runtimeUpdates)
 			}
 		})
 	}
@@ -434,12 +437,22 @@ export class MutativeStateManager {
 		connected: boolean
 		tokenIds: string[]
 		avatar: string
+		avatarAssetId: string
 		faction: string
 	}>): void {
 		this.mutateAndBroadcast((draft) => {
 			const player = draft.players[playerId]
 			if (player) {
-				Object.assign(player, updates)
+				merge(player, updates)
+			}
+		})
+	}
+
+	updatePlayerConnection(playerId: string, connected: boolean): void {
+		this.mutateAndBroadcast((draft) => {
+			const player = draft.players[playerId]
+			if (player) {
+				player.connected = connected
 			}
 		})
 	}

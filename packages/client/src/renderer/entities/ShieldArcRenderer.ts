@@ -6,10 +6,10 @@
  * 2. 显示护盾覆盖范围（arc 角度）
  * 3. 支持滑动条预览方向
  *
- * 渲染层：world.shieldArcs (zIndex 12)
+ * 渲染层：world.shieldArcs (zIndex 10)
  *
  * 护盾样式：
- * - 简洁弧线 + 辉光特效（内外两层辉光）
+ * - 简洁弧线 + GlowFilter 发光特效
  * - 颜色：根据 faction 区分（玩家蓝色，敌人粉色）
  *
  * 坐标系说明：
@@ -22,15 +22,21 @@ import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
 import { FactionColors, nauticalToPixiSectorRotation } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
+import { GlowFilter } from "pixi-filters";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
 
 const SHIELD_ARC_RADIUS_OFFSET = 15;
 const SHIELD_ARC_WIDTH = 2;
-const SHIELD_GLOW_OUTER_WIDTH = 12;
-const SHIELD_GLOW_INNER_WIDTH = 5;
 const DEFAULT_SHIELD_RADIUS = 40;
 const DEFAULT_SHIELD_ARC = 120;
+
+const GLOW_FILTER_CONFIG = {
+	distance: 15,
+	outerStrength: 2,
+	innerStrength: 0.5,
+	quality: 0.5,
+};
 
 function getShieldColor(faction?: string): number {
 	return FactionColors[faction as keyof typeof FactionColors] ?? 0x4fc3ff;
@@ -56,37 +62,13 @@ function drawShieldArc(
 	const endAngle = screenOrientation + arcRad / 2;
 
 	if (arc >= 360) {
-		// 360度全向护盾：外层辉光
-		graphics.circle(0, 0, radius + SHIELD_GLOW_OUTER_WIDTH);
-		graphics.stroke({ color, width: SHIELD_GLOW_OUTER_WIDTH, alpha: alpha * 0.15 });
-
-		// 内层辉光
-		graphics.circle(0, 0, radius + SHIELD_GLOW_INNER_WIDTH);
-		graphics.stroke({ color, width: SHIELD_GLOW_INNER_WIDTH, alpha: alpha * 0.4 });
-
-		// 主弧线
+		// 360度全向护盾：完整圆
 		graphics.circle(0, 0, radius);
 		graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
 		return;
 	}
 
-	// 外层辉光（大范围低透明度）
-	graphics.moveTo(
-		(radius + SHIELD_GLOW_OUTER_WIDTH) * Math.cos(startAngle),
-		(radius + SHIELD_GLOW_OUTER_WIDTH) * Math.sin(startAngle)
-	);
-	graphics.arc(0, 0, radius + SHIELD_GLOW_OUTER_WIDTH, startAngle, endAngle);
-	graphics.stroke({ color, width: SHIELD_GLOW_OUTER_WIDTH, alpha: alpha * 0.12 });
-
-	// 内层辉光（小范围中透明度）
-	graphics.moveTo(
-		(radius + SHIELD_GLOW_INNER_WIDTH) * Math.cos(startAngle),
-		(radius + SHIELD_GLOW_INNER_WIDTH) * Math.sin(startAngle)
-	);
-	graphics.arc(0, 0, radius + SHIELD_GLOW_INNER_WIDTH, startAngle, endAngle);
-	graphics.stroke({ color, width: SHIELD_GLOW_INNER_WIDTH, alpha: alpha * 0.35 });
-
-	// 主弧线（清晰轮廓）
+	// 弧线绘制
 	graphics.moveTo(radius * Math.cos(startAngle), radius * Math.sin(startAngle));
 	graphics.arc(0, 0, radius, startAngle, endAngle);
 	graphics.stroke({ color, width: SHIELD_ARC_WIDTH, alpha });
@@ -95,6 +77,7 @@ function drawShieldArc(
 export interface ShieldArcCacheItem {
 	root: Container;
 	graphics: Graphics;
+	glowFilter: GlowFilter;
 	lastState?: {
 		x: number;
 		y: number;
@@ -109,7 +92,6 @@ export interface ShieldArcOptions {
 	show?: boolean;
 	shieldRadius?: number;
 	shieldArc?: number;
-	shieldMax?: number;
 }
 
 export function useShieldArcRendering(
@@ -123,7 +105,6 @@ export function useShieldArcRendering(
 	const show = options.show ?? showShieldArc;
 	const defaultRadius = options.shieldRadius ?? DEFAULT_SHIELD_RADIUS;
 	const defaultArc = options.shieldArc ?? DEFAULT_SHIELD_ARC;
-	const defaultMax = options.shieldMax ?? 100;
 
 	useEffect(() => {
 		if (!layers) return;
@@ -135,6 +116,7 @@ export function useShieldArcRendering(
 			if (!currentIds.has(id)) {
 				layers.shieldArcs.removeChild(item.root);
 				item.graphics.destroy();
+				item.glowFilter.destroy();
 				item.root.destroy();
 				cache.delete(id);
 			}
@@ -151,23 +133,24 @@ export function useShieldArcRendering(
 
 			const cached = cache.get(ship.$id);
 			if (!cached) {
-				createShieldArc(layers, cache, ship, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview);
+				createShieldArc(layers, cache, ship, defaultRadius, defaultArc, shieldDirectionPreview);
 				continue;
 			}
 
-			if (shouldUpdateShield(cached, ship, defaultRadius, defaultMax)) {
-				updateShieldArc(cached, ship, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview);
+			if (shouldUpdateShield(cached, ship, defaultRadius)) {
+				updateShieldArc(cached, ship, defaultRadius, defaultArc, shieldDirectionPreview);
 			}
 		}
 
 		layers.shieldArcs.visible = show;
-	}, [layers, ships, show, defaultRadius, defaultArc, defaultMax, shieldDirectionPreview]);
+	}, [layers, ships, show, defaultRadius, defaultArc, shieldDirectionPreview]);
 
 	useEffect(() => {
 		return () => {
 			for (const item of cacheRef.current.values()) {
 				layers?.shieldArcs.removeChild(item.root);
 				item.graphics.destroy();
+				item.glowFilter.destroy();
 				item.root.destroy();
 			}
 			cacheRef.current.clear();
@@ -178,8 +161,7 @@ export function useShieldArcRendering(
 function shouldUpdateShield(
 	cached: ShieldArcCacheItem,
 	ship: CombatToken,
-	_defaultRadius: number,
-	_defaultMax: number
+	_defaultRadius: number
 ): boolean {
 	if (!cached.lastState || !ship.runtime?.position) return true;
 
@@ -203,17 +185,26 @@ function createShieldArc(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number,
 	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.position) return;
 
+	const color = getShieldColor(ship.runtime.faction);
 	const root = new Container();
 	root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 	root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
 	const graphics = new Graphics();
-	drawShieldArcForShip(graphics, ship, defaultRadius, defaultArc, defaultMax, previewDirections);
+	const glowFilter = new GlowFilter({
+		distance: GLOW_FILTER_CONFIG.distance,
+		outerStrength: GLOW_FILTER_CONFIG.outerStrength,
+		innerStrength: GLOW_FILTER_CONFIG.innerStrength,
+		color,
+		quality: GLOW_FILTER_CONFIG.quality,
+	});
+	graphics.filters = [glowFilter];
+
+	drawShieldArcForShip(graphics, ship, defaultRadius, defaultArc, previewDirections);
 	root.addChild(graphics);
 
 	layers.shieldArcs.addChild(root);
@@ -221,6 +212,7 @@ function createShieldArc(
 	cache.set(ship.$id, {
 		root,
 		graphics,
+		glowFilter,
 		lastState: {
 			x: ship.runtime.position.x,
 			y: ship.runtime.position.y,
@@ -237,7 +229,6 @@ function updateShieldArc(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number,
 	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.position) return;
@@ -245,7 +236,13 @@ function updateShieldArc(
 	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 	cached.root.rotation = (ship.runtime.heading * Math.PI) / 180;
 
-	drawShieldArcForShip(cached.graphics, ship, defaultRadius, defaultArc, defaultMax, previewDirections);
+	// 更新发光滤镜颜色（派系可能变化）
+	const color = getShieldColor(ship.runtime.faction);
+	if (cached.glowFilter.color !== color) {
+		cached.glowFilter.color = color;
+	}
+
+	drawShieldArcForShip(cached.graphics, ship, defaultRadius, defaultArc, previewDirections);
 
 	cached.lastState = {
 		x: ship.runtime.position.x,
@@ -262,7 +259,6 @@ function drawShieldArcForShip(
 	ship: CombatToken,
 	defaultRadius: number,
 	defaultArc: number,
-	defaultMax: number,
 	previewDirections: Record<string, number | undefined>
 ): void {
 	if (!ship.runtime?.shield?.active || ship.runtime.overloaded) {

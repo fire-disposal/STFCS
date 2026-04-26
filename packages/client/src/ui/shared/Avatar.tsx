@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect } from "react";
 
 interface AvatarProps {
 	src?: string | null;
-	assetId?: string | null;
 	size?: "small" | "medium" | "large" | number;
 	className?: string;
 	fallback?: React.ReactNode;
@@ -13,7 +12,6 @@ interface AvatarProps {
 
 export const Avatar: React.FC<AvatarProps> = ({
 	src,
-	assetId,
 	size = "medium",
 	className = "",
 	fallback,
@@ -23,35 +21,17 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
 	const [loading, setLoading] = useState(false);
 	const [errorState, setErrorState] = useState(false);
-	const [assetData, setAssetData] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (assetId && !src) {
-			setLoading(true);
-			setErrorState(false);
-			fetchAssetData(assetId)
-				.then((data) => {
-					setAssetData(data);
-					setLoading(false);
-					onLoad?.();
-				})
-				.catch(() => {
-					setErrorState(true);
-					setLoading(false);
-					onError?.();
-				});
-		} else {
-			setAssetData(null);
-			setLoading(false);
-		}
-	}, [assetId, src, onLoad, onError]);
+		setLoading(false);
+		setErrorState(false);
+	}, [src, onLoad, onError]);
 
 	const imageSrc = useMemo(() => {
 		if (src && src.startsWith("data:image/")) return src;
 		if (src && src.startsWith("http")) return src;
-		if (assetData) return `data:image/png;base64,${assetData}`;
 		return null;
-	}, [src, assetData]);
+	}, [src]);
 
 	const generatedFallback = useMemo(() => {
 		if (fallback) return fallback;
@@ -123,33 +103,6 @@ export const Avatar: React.FC<AvatarProps> = ({
 		</div>
 	);
 };
-
-async function fetchAssetData(assetId: string): Promise<string> {
-	const socket = window.__STFCS_SOCKET__;
-	if (!socket) throw new Error("Socket not available");
-
-	return new Promise((resolve, reject) => {
-		const requestId = crypto.randomUUID();
-		const timeout = setTimeout(() => reject(new Error("Timeout")), 5000);
-
-		socket.once("response", (data: { requestId: string; success: boolean; data?: any }) => {
-			if (data.requestId === requestId) {
-				clearTimeout(timeout);
-				if (data.success && data.data?.results?.[0]?.data) {
-					resolve(data.data.results[0].data);
-				} else {
-					reject(new Error("Asset not found"));
-				}
-			}
-		});
-
-		socket.emit("request", {
-			event: "asset:action",
-			requestId,
-			payload: { action: "batch_get", assetIds: [assetId], includeData: true },
-		});
-	});
-}
 
 declare global {
 	interface Window {

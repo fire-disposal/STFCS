@@ -34,6 +34,10 @@ export const gameHandlers = {
         const state = room.getStateManager().getState();
         const result = applyAction(state, actionType, ctx.playerId, p);
 
+        if (result.error) {
+            throw err(result.error.message, result.error.code);
+        }
+
         // 执行 Engine 层返回的更新指令
         for (const update of result.runtimeUpdates) {
             ctx.state.updateTokenRuntime(update.tokenId, update.updates as Record<string, unknown>);

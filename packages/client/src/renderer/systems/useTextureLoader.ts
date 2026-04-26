@@ -1,17 +1,6 @@
-/**
- * 贴图预加载 Hook
- *
- * 职责：
- * 1. 预加载贴图 assetId 到 PixiJS Texture 缓存
- * 2. 返回 Map<assetId, Texture | null>
- * 3. 处理加载失败情况
- */
-
 import { Assets, Texture } from "pixi.js";
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { AssetListItem } from "@vt/data";
-
-export type TextureCache = Map<string, Texture | null>;
 
 interface AssetBatchGetResult {
 	assetId: string;
@@ -24,76 +13,145 @@ interface UseTextureLoaderOptions {
 	fetchAssets: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
 }
 
-export function useTextureLoader(options: UseTextureLoaderOptions): TextureCache {
+interface CacheEntry {
+	status: "pending" | "loaded" | "failed";
+	texture: Texture | null;
+	retryCount: number;
+	lastAttemptAt: number;
+}
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000;
+
+export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, Texture | null> {
 	const { assetIds, fetchAssets } = options;
-	const cacheRef = useRef<TextureCache>(new Map());
+	const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
+	const loadingRef = useRef<Set<string>>(new Set());
 	const [, forceUpdate] = useState({});
+
+	const shouldRetry = useCallback((entry: CacheEntry | undefined): boolean => {
+		if (!entry) return true;
+		if (entry.status === "loaded") return false;
+		if (entry.status === "pending") return false;
+		if (entry.retryCount >= MAX_RETRIES) return false;
+		return Date.now() - entry.lastAttemptAt >= RETRY_DELAY;
+	}, []);
 
 	const loadTextures = useCallback(async (ids: string[]) => {
 		if (ids.length === 0) return;
 
-		const toLoad = ids.filter((id) => !cacheRef.current.has(id));
+		const toLoad = ids.filter((id) => {
+			if (loadingRef.current.has(id)) return false;
+			return shouldRetry(cacheRef.current.get(id));
+		});
+
 		if (toLoad.length === 0) return;
 
 		console.log("[useTextureLoader] Loading textures:", toLoad);
 
+		for (const id of toLoad) {
+			loadingRef.current.add(id);
+			const existing = cacheRef.current.get(id);
+			cacheRef.current.set(id, {
+				status: "pending",
+				texture: null,
+				retryCount: existing?.retryCount ?? 0,
+				lastAttemptAt: Date.now(),
+			});
+		}
+
 		try {
 			const results = await fetchAssets(toLoad, true);
-			console.log("[useTextureLoader] Results:", results.length, results.map(r => ({ id: r.assetId, hasData: !!r.data, mimeType: r.info?.mimeType })));
 
 			for (const result of results) {
+				loadingRef.current.delete(result.assetId);
+
 				if (!result.data || !result.info?.mimeType) {
-					console.warn("[useTextureLoader] No data or mimeType for:", result.assetId);
-					cacheRef.current.set(result.assetId, null);
+					console.warn("[useTextureLoader] No data for:", result.assetId);
+					const existing = cacheRef.current.get(result.assetId);
+					cacheRef.current.set(result.assetId, {
+						status: "failed",
+						texture: null,
+						retryCount: (existing?.retryCount ?? 0) + 1,
+						lastAttemptAt: Date.now(),
+					});
 					continue;
 				}
 
 				try {
 					const dataUrl = `data:${result.info.mimeType};base64,${result.data}`;
-					console.log("[useTextureLoader] Loading texture from dataUrl, length:", result.data.length);
 					const texture = await Assets.load({ src: dataUrl, alias: result.assetId });
-					console.log("[useTextureLoader] Texture loaded:", result.assetId, texture ? "success" : "failed");
-					cacheRef.current.set(result.assetId, texture);
+					cacheRef.current.set(result.assetId, {
+						status: "loaded",
+						texture,
+						retryCount: 0,
+						lastAttemptAt: Date.now(),
+					});
 				} catch (err) {
-					console.error("[useTextureLoader] Failed to load texture:", result.assetId, err);
-					cacheRef.current.set(result.assetId, null);
+					console.error("[useTextureLoader] Texture load failed:", result.assetId, err);
+					const existing = cacheRef.current.get(result.assetId);
+					cacheRef.current.set(result.assetId, {
+						status: "failed",
+						texture: null,
+						retryCount: (existing?.retryCount ?? 0) + 1,
+						lastAttemptAt: Date.now(),
+					});
 				}
 			}
 
 			for (const id of toLoad) {
 				if (!results.some((r) => r.assetId === id)) {
-					console.warn("[useTextureLoader] Missing result for:", id);
-					cacheRef.current.set(id, null);
+					loadingRef.current.delete(id);
+					const existing = cacheRef.current.get(id);
+					cacheRef.current.set(id, {
+						status: "failed",
+						texture: null,
+						retryCount: (existing?.retryCount ?? 0) + 1,
+						lastAttemptAt: Date.now(),
+					});
 				}
 			}
 
 			forceUpdate({});
 		} catch (error) {
-			console.error("[useTextureLoader] Failed to load textures:", error);
+			console.error("[useTextureLoader] Batch request failed:", error);
 			for (const id of toLoad) {
-				cacheRef.current.set(id, null);
+				loadingRef.current.delete(id);
+				const existing = cacheRef.current.get(id);
+				cacheRef.current.set(id, {
+					status: "failed",
+					texture: null,
+					retryCount: (existing?.retryCount ?? 0) + 1,
+					lastAttemptAt: Date.now(),
+				});
 			}
 			forceUpdate({});
 		}
-	}, [fetchAssets]);
+	}, [fetchAssets, shouldRetry]);
 
 	useEffect(() => {
-		console.log("[useTextureLoader] assetIds changed:", assetIds);
 		loadTextures(assetIds);
 	}, [assetIds.join(","), loadTextures]);
 
 	useEffect(() => {
 		return () => {
-			for (const [id, texture] of cacheRef.current) {
-				if (texture) {
+			for (const [id, entry] of cacheRef.current) {
+				if (entry.texture) {
 					try {
 						Assets.unload(id);
 					} catch {}
 				}
 			}
 			cacheRef.current.clear();
+			loadingRef.current.clear();
 		};
 	}, []);
 
-	return cacheRef.current;
+	const resultCache = new Map<string, Texture | null>();
+	for (const [id, entry] of cacheRef.current) {
+		resultCache.set(id, entry.texture);
+	}
+	return resultCache;
 }
+
+export type TextureCache = Map<string, Texture | null>;

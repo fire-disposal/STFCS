@@ -134,6 +134,48 @@ export const roomHandlers = {
         }
     },
 
+    rejoin: async (payload: unknown, ctx: RpcContext) => {
+        ctx.requireAuth();
+        const p = payload as WsPayload<"room:rejoin">;
+        const room = ctx.roomManager.getRoom(p.roomId);
+        if (!room) throw err("房间不存在", ErrorCodes.ROOM_NOT_FOUND);
+
+        if (!room.wasPlayerInRoom(ctx.playerId)) {
+            throw err("您不在此房间中", ErrorCodes.NOT_IN_ROOM);
+        }
+
+        const playerInfo = await playerInfoService.findByPlayerId(ctx.playerId);
+        const avatar = playerInfo?.file.info.avatar ?? undefined;
+
+        const reconnectSuccess = room.reconnectPlayer(ctx.socket.id, ctx.playerId, ctx.playerName, avatar);
+        if (!reconnectSuccess) throw err("重连失败", ErrorCodes.JOIN_FAILED);
+
+        ctx.socket.join(p.roomId);
+        ctx.socket.data.roomId = p.roomId;
+        const isHost = room.creatorId === ctx.playerId;
+        const role = isHost ? PlayerRole.HOST : PlayerRole.PLAYER;
+        ctx.socket.data.role = role;
+
+        ctx.io.emit("room:list_updated", {
+            action: "updated",
+            room: {
+                roomId: p.roomId,
+                name: room.name,
+                ownerId: room.creatorId,
+                ownerName: room.creatorName,
+                playerCount: room.getPlayerCount(),
+                maxPlayers: room.maxPlayers,
+                phase: room.phase,
+            }
+        });
+
+        return {
+            success: true,
+            state: room.getGameState(),
+            role,
+        };
+    },
+
     action: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireRoom();
         const p = payload as WsPayload<"room:action">;

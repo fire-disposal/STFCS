@@ -403,7 +403,7 @@ export function applyMove(context: EngineContext): EngineResult {
   const allTokens = Object.values(context.state.tokens);
 
   const validation = validateMovement(ship, forward, strafe, allTokens);
-  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+  if (!validation.valid) return { runtimeUpdates: [], events: [], error: { code: "INVALID_MOVE", message: validation.error || "移动无效" } };
 
   const result = processMovement(ship, { forwardDistance: forward, strafeDistance: strafe });
 
@@ -433,7 +433,7 @@ export function applyRotate(context: EngineContext): EngineResult {
   const allTokens = Object.values(context.state.tokens);
 
   const validation = validateRotation(ship, angle, allTokens);
-  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+  if (!validation.valid) return { runtimeUpdates: [], events: [], error: { code: "INVALID_ROTATE", message: validation.error || "旋转无效" } };
 
   const result = processRotation(ship, { angle });
 

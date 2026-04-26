@@ -93,7 +93,6 @@ export const ENDPOINTS = {
       LIST: `${ENV[CURRENT_ENV].API_BASE_URL}/api/assets`,
       GET: (assetId: string) => `${ENV[CURRENT_ENV].API_BASE_URL}/api/assets/${assetId}`,
       DELETE: (assetId: string) => `${ENV[CURRENT_ENV].API_BASE_URL}/api/assets/${assetId}`,
-      AVATARS: `${ENV[CURRENT_ENV].API_BASE_URL}/api/assets/avatars`,
       TEXTURES: `${ENV[CURRENT_ENV].API_BASE_URL}/api/assets/textures`,
     },
     
@@ -116,9 +115,7 @@ export const ENDPOINTS = {
   
   // 静态资源端点
   ASSETS: {
-    // 图片资源
     IMAGES: {
-      AVATARS: `${ENV[CURRENT_ENV].ASSETS_BASE_URL}/images/avatars`,
       TEXTURES: `${ENV[CURRENT_ENV].ASSETS_BASE_URL}/images/textures`,
       ICONS: `${ENV[CURRENT_ENV].ASSETS_BASE_URL}/images/icons`,
       BACKGROUNDS: `${ENV[CURRENT_ENV].ASSETS_BASE_URL}/images/backgrounds`,

@@ -3,7 +3,8 @@ import type { CombatToken } from "@vt/data";
 import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSigned, getMountSectorRotation, mountOffsetToScreen } from "@vt/data";
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
-import { useUIStore, gameStateRef } from "@/state/stores/uiStore";
+import { useUIStore } from "@/state/stores/uiStore";
+import { useGameRoom } from "@/state/stores/gameStore";
 
 interface WeaponTargetInfo {
 	targetId: string;
@@ -67,8 +68,9 @@ export function useWeaponArcRendering(
 
 	const selectedShip = ships.find((s) => s.$id === selectedShipId) ?? null;
 
+	const room = useGameRoom();
+
 	const fetchTargets = useCallback(async (shipId: string) => {
-		const room = gameStateRef.room;
 		if (!room || !room.send || pendingQueryRef.current) return;
 
 		pendingQueryRef.current = true;
@@ -80,7 +82,7 @@ export function useWeaponArcRendering(
 		} finally {
 			pendingQueryRef.current = false;
 		}
-	}, []);
+	}, [room]);
 
 	useEffect(() => {
 		if (!selectedShipId || !show) {

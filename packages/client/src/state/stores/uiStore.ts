@@ -1,6 +1,4 @@
-import { GamePhase } from "@vt/data";
-import type { GameRoomState, PlayerRole, WsEventName, WsPayload, WsResponseData, MovementPhase } from "@vt/data";
-import type { SocketRoom } from "@/network";
+import type { PlayerRole, WsEventName, WsPayload, WsResponseData, MovementPhase } from "@vt/data";
 import { create } from "zustand";
 
 export type MoveMode = "forward" | "strafe";
@@ -35,11 +33,6 @@ export interface GameActionSender {
 }
 
 // Default empty sender
-const emptySender: GameActionSender = {
-	send: async () => { throw new Error("Room not available"); },
-	isAvailable: () => false,
-};
-
 interface UIState {
 	// 连接状态
 	isConnected: boolean;
@@ -66,16 +59,23 @@ interface UIState {
 	showWeaponArcs: boolean;
 	showMovementRange: boolean;
 	showLabels: boolean;
-	showEffects: boolean;
-	showShipIcons: boolean;
 	showHexagonArmor: boolean;
 	showShieldArc: boolean;           // 护盾辉光弧线显示
-	showFluxIndicators: boolean;      // 辐能/过载状态指示器显示
 	showShipTextures: boolean;        // 舰船贴图显示
 	showWeaponTextures: boolean;      // 武器贴图显示
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 	hpPerBar: number;                  // 血条每个|代表的HP数量
+	
+	// HUD 图层开关（新增）
+	showHpBars: boolean;              // 血条显示
+	showFluxBars: boolean;            // 辐能条显示
+	showShipNames: boolean;           // 舰船名显示
+	showOwnerLabels: boolean;         // 所有者标签显示
+
+	// 战术对象组图层开关（新增）
+	showMountMarkers: boolean;        // 挂载点标记显示
+	showWeaponMarkers: boolean;       // 武器标记显示
 
 	// 地图游标状态 (世界坐标，真实朝向)
 	mapCursor: { x: number; y: number; r: number } | null;
@@ -128,15 +128,22 @@ interface UIActions {
 	toggleWeaponArcs: () => void;
 	toggleMovementRange: () => void;
 	toggleLabels: () => void;
-	toggleEffects: () => void;
-	toggleShipIcons: () => void;
 	toggleHexagonArmor: () => void;
 	toggleShieldArc: () => void;
-	toggleFluxIndicators: () => void;
 	toggleShipTextures: () => void;
 	toggleWeaponTextures: () => void;
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
+	
+	// HUD 图层开关 toggle
+	toggleHpBars: () => void;
+	toggleFluxBars: () => void;
+	toggleShipNames: () => void;
+	toggleOwnerLabels: () => void;
+
+	// 战术对象组图层开关 toggle
+	toggleMountMarkers: () => void;
+	toggleWeaponMarkers: () => void;
 
 	// 血条配置
 	setHpPerBar: (value: number) => void;
@@ -190,16 +197,23 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showWeaponArcs: true,
 	showMovementRange: true,
 	showLabels: true,
-	showEffects: true,
-	showShipIcons: true,
 	showHexagonArmor: false,
 	showShieldArc: true,              // 默认显示护盾弧线
-	showFluxIndicators: true,         // 默认显示辐能指示器
 	showShipTextures: true,           // 默认显示舰船贴图
 	showWeaponTextures: true,         // 默认显示武器贴图
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
 	hpPerBar: 200,                    // 默认每个|代表20HP
+	
+	// HUD 图层开关（默认全部显示）
+	showHpBars: true,
+	showFluxBars: true,
+	showShipNames: true,
+	showOwnerLabels: true,
+
+	// 战术对象组图层开关（默认全部显示）
+	showMountMarkers: true,
+	showWeaponMarkers: true,
 
 	// 地图游标初始状态
 	mapCursor: null,
@@ -258,17 +272,24 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleWeaponArcs: () => set((state) => ({ showWeaponArcs: !state.showWeaponArcs })),
 	toggleMovementRange: () => set((state) => ({ showMovementRange: !state.showMovementRange })),
 	toggleLabels: () => set((state) => ({ showLabels: !state.showLabels })),
-	toggleEffects: () => set((state) => ({ showEffects: !state.showEffects })),
-	toggleShipIcons: () => set((state) => ({ showShipIcons: !state.showShipIcons })),
 	toggleHexagonArmor: () => set((state) => ({ showHexagonArmor: !state.showHexagonArmor })),
 	toggleShieldArc: () => set((state) => ({ showShieldArc: !state.showShieldArc })),
-	toggleFluxIndicators: () => set((state) => ({ showFluxIndicators: !state.showFluxIndicators })),
 	toggleShipTextures: () => set((state) => ({ showShipTextures: !state.showShipTextures })),
 	toggleWeaponTextures: () => set((state) => ({ showWeaponTextures: !state.showWeaponTextures })),
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(100, value)) }),
+	
+	// HUD 图层开关 toggle
+	toggleHpBars: () => set((state) => ({ showHpBars: !state.showHpBars })),
+	toggleFluxBars: () => set((state) => ({ showFluxBars: !state.showFluxBars })),
+	toggleShipNames: () => set((state) => ({ showShipNames: !state.showShipNames })),
+	toggleOwnerLabels: () => set((state) => ({ showOwnerLabels: !state.showOwnerLabels })),
+
+	// 战术对象组图层开关 toggle
+	toggleMountMarkers: () => set((state) => ({ showMountMarkers: !state.showMountMarkers })),
+	toggleWeaponMarkers: () => set((state) => ({ showWeaponMarkers: !state.showWeaponMarkers })),
 
 	// 游标设置
 	setMapCursor: (x: number, y: number, r: number) =>
@@ -301,39 +322,3 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 			},
 		})),
 }));
-
-/**
- * 游戏状态引用存储
- * 用于在React组件外访问同步的游戏状态
- */
-export interface GameStateRef {
-	state: GameRoomState | null;
-	currentPhase: GamePhase;
-	turnCount: number;
-	room: SocketRoom | null;
-	actionSender: GameActionSender;
-}
-
-export const gameStateRef: GameStateRef = {
-	state: null,
-	currentPhase: GamePhase.DEPLOYMENT,
-	turnCount: 1,
-	room: null,
-	actionSender: emptySender,
-};
-
-export function setGameRoomRef(room: SocketRoom | null): void {
-	gameStateRef.room = room;
-	if (room && room.send) {
-		gameStateRef.actionSender = {
-			send: room.send,
-			isAvailable: () => true,
-		};
-	} else {
-		gameStateRef.actionSender = emptySender;
-	}
-}
-
-export function getGameActionSender(): GameActionSender {
-	return gameStateRef.actionSender;
-}

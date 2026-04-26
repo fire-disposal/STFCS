@@ -50,6 +50,10 @@ export interface TokenRuntimeUpdate {
 export interface EngineResult {
   runtimeUpdates: TokenRuntimeUpdate[];
   events: EngineEvent[];
+  error?: {
+    code: string;
+    message: string;
+  };
 }
 
 /**

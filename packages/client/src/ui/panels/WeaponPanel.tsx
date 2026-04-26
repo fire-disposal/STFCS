@@ -1,17 +1,14 @@
 /**
- * WeaponPanel - 武器火控面板（参考主分支四列布局）
+ * WeaponPanel - 武器火控面板
  * 
- * 数据流设计：
- * 1. 火控数据通过 game:query { type: "targets" } 获取（服务端权威）
- * 2. UI 状态通过 useState 存储（仅 ID）
- * 3. 支持多目标选择、武器状态指示、距离显示
+ * 使用 useSelectedShip hook 统一获取选中舰船
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Crosshair, Bomb, CheckCircle, XCircle, Swords, Loader2 } from "lucide-react";
-import type { CombatToken } from "@vt/data";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
+import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { notify } from "@/ui/shared/Notification";
 import { UI_CONFIG } from "@/config/constants";
 import "./weapon-panel.css";
@@ -54,11 +51,10 @@ interface WeaponTargetingData {
 }
 
 export interface WeaponPanelProps {
-	ship: CombatToken | null;
-	canControl: boolean;
+	canControl?: boolean;
 }
 
-export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) => {
+export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) => {
 	const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
 	const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +62,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ ship, canControl }) =>
 
 	const { isAvailable, sendAttack, sendQuery } = useGameAction();
 
+	const ship = useSelectedShip();
 	const hasShip = ship && ship.runtime;
 	const canAct = canControl && hasShip && isAvailable;
 

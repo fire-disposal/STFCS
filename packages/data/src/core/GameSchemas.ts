@@ -467,6 +467,7 @@ export const TokenRuntimeSchema = z.object({
 	hasFired: z.boolean().optional(),
 	weapons: z.array(WeaponRuntimeSchema).optional(),
 	modifiers: z.array(TokenModifierSchema).optional(),
+	actionSequence: z.number().default(0),
 	faction: FactionSchema.optional(),
 	ownerId: z.string().optional(),
 	venting: z.boolean().optional(),
@@ -551,6 +552,7 @@ export const RoomPlayerStateSchema = z.object({
 	connected: z.boolean().default(true),
 	tokenIds: z.array(z.string()).optional(),
 	avatar: z.string().optional(),
+	avatarAssetId: z.string().optional(),
 });
 export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 

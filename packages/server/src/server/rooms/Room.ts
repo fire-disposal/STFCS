@@ -39,6 +39,7 @@ export class Room {
 
 	private options: Required<RoomOptions>;
 	private playerConnections = new Map<string, string>();
+	private playerHistory = new Set<string>();
 	private isActive = true;
 
 	constructor(
@@ -89,7 +90,12 @@ export class Room {
 	joinPlayer(connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
 		if (!this.isActive) return false;
 		if (this.playerConnections.size >= this.options.maxPlayers) return false;
-		if (this.playerConnections.has(playerId)) return false;
+
+		const existingPlayer = this.stateManager.getPlayer(playerId);
+		if (existingPlayer) {
+			if (existingPlayer.connected) return false;
+			return this.reconnectPlayer(connectionId, playerId, playerName, avatar);
+		}
 
 		this.emptiedAt = null;
 
@@ -105,6 +111,7 @@ export class Room {
 		this.stateManager.addPlayer(playerId, playerData);
 
 		this.playerConnections.set(playerId, connectionId);
+		this.playerHistory.add(playerId);
 
 		this.logger.info("Player joined", { playerId, playerName, totalPlayers: this.playerConnections.size });
 
@@ -116,11 +123,34 @@ export class Room {
 		return true;
 	}
 
+	reconnectPlayer(connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
+		const existingPlayer = this.stateManager.getPlayer(playerId);
+		if (!existingPlayer) return false;
+
+		this.emptiedAt = null;
+
+		this.stateManager.updatePlayerConnection(playerId, true);
+		this.stateManager.updatePlayer(playerId, { sessionId: connectionId, nickname: playerName });
+		if (avatar) this.stateManager.updatePlayer(playerId, { avatar });
+
+		this.playerConnections.set(playerId, connectionId);
+
+		this.logger.info("Player reconnected", { playerId, playerName });
+
+		this.callbacks.broadcast({
+			type: "PLAYER_RECONNECTED",
+			payload: { playerId, playerName, reconnectedAt: Date.now() },
+		});
+
+		return true;
+	}
+
 	leavePlayer(playerId: string): boolean {
 		if (!this.playerConnections.has(playerId)) return false;
 
 		this.stateManager.removePlayer(playerId);
 		this.playerConnections.delete(playerId);
+		this.playerHistory.delete(playerId);
 
 		this.logger.info("Player left", { playerId, totalPlayers: this.playerConnections.size });
 
@@ -134,6 +164,59 @@ export class Room {
 		}
 
 		return true;
+	}
+
+	disconnectPlayer(playerId: string): boolean {
+		if (!this.playerConnections.has(playerId)) return false;
+
+		this.stateManager.updatePlayerConnection(playerId, false);
+		this.playerConnections.delete(playerId);
+
+		this.logger.info("Player disconnected (kept in state)", { playerId });
+
+		this.callbacks.broadcast({
+			type: "PLAYER_DISCONNECTED",
+			payload: { playerId, disconnectedAt: Date.now() },
+		});
+
+		if (this.options.creatorSessionId === playerId && this.playerConnections.size > 0) {
+			this.transferHostOnDisconnect();
+		}
+
+		if (this.playerConnections.size === 0) {
+			this.emptiedAt = Date.now();
+		}
+
+		return true;
+	}
+
+	private transferHostOnDisconnect(): void {
+		const remainingPlayers = Array.from(this.playerConnections.keys());
+		if (remainingPlayers.length === 0) return;
+
+		const newHostId = remainingPlayers[0]!;
+		const newHostState = this.stateManager.getPlayer(newHostId);
+
+		this.options.creatorSessionId = newHostId;
+		this.stateManager.changeHost(newHostId);
+		if (newHostState) {
+			this.stateManager.updatePlayer(newHostId, { role: "HOST" });
+		}
+
+		this.logger.info("Host transferred due to disconnect", { newHostId });
+
+		this.callbacks.broadcast({
+			type: "HOST_CHANGED",
+			payload: { newHostId, previousHostDisconnected: true },
+		});
+	}
+
+	wasPlayerInRoom(playerId: string): boolean {
+		return this.playerHistory.has(playerId);
+	}
+
+	getPlayerHistory(): string[] {
+		return Array.from(this.playerHistory);
 	}
 
 	togglePlayerReady(playerId: string): boolean {

@@ -1,34 +1,13 @@
 /**
- * 舰船 HUD 渲染 Hook（血条/标签/辐能条）
+ * 舰船 HUD 渲染 Hook（血条/辐能条/舰船名/所有者）
  *
- * 职责：
- * 1. 渲染舰船血条（文本样式，|符号组成）
- * 2. 渲染舰船名称标签
- * 3. 渲染辐能条（显示硬/软辐能百分比）
- * 4. 实时更新 HUD 元素位置（世界坐标 -> 屏幕坐标）
+ * 四个独立图层：
+ * - shipBars: 血条 [zIndex 0]
+ * - fluxBars: 辐能条 [zIndex 1]
+ * - shipNames: 舰船名 [zIndex 2]
+ * - ownerLabels: 所有者 [zIndex 3]
  *
- * 渲染层：hud.shipBars / hud.shipNames
- *
- * 血条设计：
- * - 格式：[050/300] ██████████
- * - 每20 HP 一个|（配置项 hpPerBar）
- * - 外侧|为白色半透明（空血），内侧|为有血颜色
- * - 中间数字 [current/max] 补位显示，随血量变色
- *
- * 辐能条设计：
- * - 格式：[N] ====================（固定20格）
- * - [N] 普通 / [O] 过载 / [E] 排散
- * - 硬辐能（左）橙色，软辐能（右）黄色，空槽白色半透明
- * - 过载时所有填充格变为红色
- *
- * 颜色规则：
- * - 高血量 (>=60%): 绿色
- * - 中血量 (>=30%): 黄色
- * - 低血量 (<30%): 红色
- *
- * 选中状态：
- * - selected=true: 完全可见（alpha=1.0）
- * - selected=false: 半透明（alpha=0.85）
+ * 每个图层可独立开关
  */
 
 import type { CombatToken, RoomPlayerState } from "@vt/data";
@@ -127,16 +106,28 @@ interface CameraSnapshot {
 	viewRotation: number;
 }
 
+/** HUD 图层集合 */
+interface HUDLayers {
+	shipBars: Container;
+	fluxBars: Container;
+	shipNames: Container;
+	ownerLabels: Container;
+}
+
 export class ShipHUDManager {
 	private cache = new Map<string, ShipHUDCache>();
 	private hpBarLayer: Container;
+	private fluxBarLayer: Container;
 	private labelLayer: Container;
+	private ownerLabelLayer: Container;
 	private lastCamera: CameraSnapshot | null = null;
 	private players: Record<string, RoomPlayerState> = {};
 
-	constructor(hudLayers: { shipBars: Container; shipNames: Container }) {
+	constructor(hudLayers: HUDLayers) {
 		this.hpBarLayer = hudLayers.shipBars;
+		this.fluxBarLayer = hudLayers.fluxBars;
 		this.labelLayer = hudLayers.shipNames;
+		this.ownerLabelLayer = hudLayers.ownerLabels;
 	}
 
 	setPlayers(players: Record<string, RoomPlayerState>): void {
@@ -156,10 +147,10 @@ export class ShipHUDManager {
 		for (const [id, cached] of this.cache) {
 			if (!currentIds.has(id)) {
 				this.hpBarLayer.removeChild(cached.hpBarContainer);
-				this.hpBarLayer.removeChild(cached.fluxBarContainer);
+				this.fluxBarLayer.removeChild(cached.fluxBarContainer);
 				this.labelLayer.removeChild(cached.label);
 				if (cached.ownerLabel) {
-					this.labelLayer.removeChild(cached.ownerLabel);
+					this.ownerLabelLayer.removeChild(cached.ownerLabel);
 					cached.ownerLabel.destroy();
 				}
 				cached.hpBarContainer.destroy();
@@ -219,7 +210,7 @@ export class ShipHUDManager {
 		label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 
 		this.hpBarLayer.addChild(hpBarContainer);
-		this.hpBarLayer.addChild(fluxBarContainer);
+		this.fluxBarLayer.addChild(fluxBarContainer);
 		this.labelLayer.addChild(label);
 
 		// 所有者标签（有 ownerId 时显示）
@@ -237,7 +228,7 @@ export class ShipHUDManager {
 			});
 			ownerLabel.anchor.set(0.5, 0);
 			ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
-			this.labelLayer.addChild(ownerLabel);
+			this.ownerLabelLayer.addChild(ownerLabel);
 		}
 
 		const fluxHard = ship.runtime.fluxHard ?? 0;
@@ -342,7 +333,7 @@ export class ShipHUDManager {
 		const ownerChanged = newOwnerName !== last.ownerName || newOwnerColor !== last.ownerColor;
 		if (ownerChanged) {
 			if (cached.ownerLabel) {
-				this.labelLayer.removeChild(cached.ownerLabel);
+				this.ownerLabelLayer.removeChild(cached.ownerLabel);
 				cached.ownerLabel.destroy();
 				cached.ownerLabel = null;
 			}
@@ -363,7 +354,7 @@ export class ShipHUDManager {
 					canvasSize
 				);
 				cached.ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
-				this.labelLayer.addChild(cached.ownerLabel);
+				this.ownerLabelLayer.addChild(cached.ownerLabel);
 			}
 		}
 
@@ -606,10 +597,10 @@ export class ShipHUDManager {
 	clear(): void {
 		for (const cached of this.cache.values()) {
 			this.hpBarLayer.removeChild(cached.hpBarContainer);
-			this.hpBarLayer.removeChild(cached.fluxBarContainer);
+			this.fluxBarLayer.removeChild(cached.fluxBarContainer);
 			this.labelLayer.removeChild(cached.label);
 			if (cached.ownerLabel) {
-				this.labelLayer.removeChild(cached.ownerLabel);
+				this.ownerLabelLayer.removeChild(cached.ownerLabel);
 				cached.ownerLabel.destroy();
 			}
 			cached.hpBarContainer.destroy();
@@ -629,7 +620,9 @@ import type { LayerRegistry } from "../core/useLayerSystem";
 
 export interface ShipHUDRenderOptions {
 	showHpBars?: boolean;
-	showLabels?: boolean;
+	showFluxBars?: boolean;
+	showShipNames?: boolean;
+	showOwnerLabels?: boolean;
 	hullMax?: number;
 }
 
@@ -651,7 +644,9 @@ export function useShipHUDRendering(
 
 		managerRef.current = new ShipHUDManager({
 			shipBars: layers.shipBars,
+			fluxBars: layers.fluxBars,
 			shipNames: layers.shipNames,
+			ownerLabels: layers.ownerLabels,
 		});
 
 		return () => {
@@ -664,9 +659,11 @@ export function useShipHUDRendering(
 		if (!managerRef.current || !layers) return;
 
 		layers.shipBars.visible = options.showHpBars ?? true;
-		layers.shipNames.visible = options.showLabels ?? true;
+		layers.fluxBars.visible = options.showFluxBars ?? true;
+		layers.shipNames.visible = options.showShipNames ?? true;
+		layers.ownerLabels.visible = options.showOwnerLabels ?? true;
 
 		managerRef.current.setPlayers(players);
 		managerRef.current.update(ships, camera, canvasSize, selectedShipId, hpPerBar, defaultHullMax);
-	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showLabels, defaultHullMax, hpPerBar, players]);
+	}, [layers, ships, camera, canvasSize, selectedShipId, options.showHpBars, options.showFluxBars, options.showShipNames, options.showOwnerLabels, defaultHullMax, hpPerBar, players]);
 }

@@ -6,12 +6,12 @@
  */
 
 import { useCallback } from "react";
-import { getGameActionSender } from "@/state/stores/uiStore";
+import { useGameActionSender } from "@/state/stores/gameStore";
 import type { WsEventName, WsPayload, WsResponseData } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
 
 export function useGameAction() {
-	const sender = getGameActionSender();
+	const sender = useGameActionSender();
 
 	const send = useCallback(async <E extends WsEventName>(
 		event: E,

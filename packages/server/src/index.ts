@@ -115,10 +115,12 @@ export class STFCServer {
 			this.httpServer = createServer((req, res) => {
 				void handleHttpRequest(req, res);
 			});
-			this.io = new IOServer(this.httpServer, {
-				cors: { origin: this.config.corsOrigin },
-				maxHttpBufferSize: 10 * 1024 * 1024,
-			});
+      this.io = new IOServer(this.httpServer, {
+        cors: { origin: this.config.corsOrigin },
+        maxHttpBufferSize: 10 * 1024 * 1024,
+        pingTimeout: 10000,
+        pingInterval: 5000,
+      });
 
 			setupSocketIO(this.io, this.roomManager);
 

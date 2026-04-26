@@ -28,10 +28,6 @@ export interface ShieldArcOptions {
 	defaultArc?: number;
 }
 
-export interface FluxIndicatorOptions {
-	defaultCapacity?: number;
-}
-
 export type MoveMode = "forward" | "strafe";
 
 export interface MovementPreviewState {

@@ -179,40 +179,28 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			tacticalTokensLayer.eventMode = "static";
 			tacticalTokensLayer.hitArea = new Rectangle(-10000, -10000, 20000, 20000);
 
-			const effects = new Container();
-			effects.zIndex = 8;
-			effects.eventMode = "none";
-
 			const weaponArcsLayer = new Container();
-			weaponArcsLayer.zIndex = 9;
+			weaponArcsLayer.zIndex = 8;
 			weaponArcsLayer.eventMode = "none";
 
 			const movementVisualsLayer = new Container();
-			movementVisualsLayer.zIndex = 10;
+			movementVisualsLayer.zIndex = 9;
 			movementVisualsLayer.eventMode = "none";
 
-			const shipIconsLayer = new Container();
-			shipIconsLayer.zIndex = 11;
-			shipIconsLayer.eventMode = "none";
-
 			const shieldArcsLayer = new Container();
-			shieldArcsLayer.zIndex = 12;
+			shieldArcsLayer.zIndex = 10;
 			shieldArcsLayer.eventMode = "none";
 
 			const hexagonArmorLayer = new Container();
-			hexagonArmorLayer.zIndex = 13;
+			hexagonArmorLayer.zIndex = 11;
 			hexagonArmorLayer.eventMode = "none";
 
-			const fluxIndicatorsLayer = new Container();
-			fluxIndicatorsLayer.zIndex = 14;
-			fluxIndicatorsLayer.eventMode = "none";
-
 			const shipSpritesLayer = new Container();
-			shipSpritesLayer.zIndex = 15;
+			shipSpritesLayer.zIndex = 13;
 			shipSpritesLayer.eventMode = "none";
 
 			const weaponSpritesLayer = new Container();
-			weaponSpritesLayer.zIndex = 16;
+			weaponSpritesLayer.zIndex = 14;
 			weaponSpritesLayer.eventMode = "none";
 
 			world.addChild(
@@ -224,13 +212,10 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				grid,
 				cursorLayer,
 				tacticalTokensLayer,
-				effects,
 				weaponArcsLayer,
 				movementVisualsLayer,
-				shipIconsLayer,
 				shieldArcsLayer,
 				hexagonArmorLayer,
-				fluxIndicatorsLayer,
 				shipSpritesLayer,
 				weaponSpritesLayer
 			);
@@ -244,15 +229,23 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			shipBarsLayer.zIndex = 0;
 			shipBarsLayer.eventMode = "none";
 
+			const fluxBarsLayer = new Container();
+			fluxBarsLayer.zIndex = 1;
+			fluxBarsLayer.eventMode = "none";
+
 			const shipNamesLayer = new Container();
-			shipNamesLayer.zIndex = 1;
+			shipNamesLayer.zIndex = 2;
 			shipNamesLayer.eventMode = "none";
 
+			const ownerLabelsLayer = new Container();
+			ownerLabelsLayer.zIndex = 3;
+			ownerLabelsLayer.eventMode = "none";
+
 			const targetMarkersLayer = new Container();
-			targetMarkersLayer.zIndex = 2;
+			targetMarkersLayer.zIndex = 4;
 			targetMarkersLayer.eventMode = "none";
 
-			hud.addChild(shipBarsLayer, shipNamesLayer, targetMarkersLayer);
+			hud.addChild(shipBarsLayer, fluxBarsLayer, shipNamesLayer, ownerLabelsLayer);
 
 			// 添加到舞台
 			app.stage.addChild(world);
@@ -270,18 +263,16 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				shipSprites: shipSpritesLayer,
 				weaponSprites: weaponSpritesLayer,
 				tacticalTokens: tacticalTokensLayer,
-				effects,
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,
-				shipIcons: shipIconsLayer,
 				shieldArcs: shieldArcsLayer,
 				hexagonArmor: hexagonArmorLayer,
-				fluxIndicators: fluxIndicatorsLayer,
 				// HUD 层
 				hud,
 				shipBars: shipBarsLayer,
+				fluxBars: fluxBarsLayer,
 				shipNames: shipNamesLayer,
-				targetMarkers: targetMarkersLayer,
+				ownerLabels: ownerLabelsLayer,
 			};
 
 			const shipsLayerRef = newLayers.tacticalTokens;

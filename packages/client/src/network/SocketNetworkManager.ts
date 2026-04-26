@@ -69,8 +69,10 @@ export class SocketNetworkManager {
 		this.socket = io(this.serverUrl, {
 			transports: ["websocket"],
 			reconnection: true,
-			reconnectionAttempts: 5,
+			reconnectionAttempts: 15,
 			reconnectionDelay: 1000,
+			reconnectionDelayMax: 30000,
+			randomizationFactor: 0.5,
 		});
 
 		this.setupEventHandlers();
@@ -303,11 +305,37 @@ export class SocketNetworkManager {
 		this.stateListeners.forEach(listener => listener(state));
 	}
 
+	private wasInRoom = false;
+	private lastRoomId: string | null = null;
+
 	private setupEventHandlers(): void {
 		if (!this.socket) return;
 
 		this.socket.on("disconnect", () => {
 			logger.warn("Disconnected from server");
+			this.wasInRoom = this.currentRoomId !== null;
+			this.lastRoomId = this.currentRoomId;
+			this.notifyDisconnect();
+		});
+
+		this.socket.io.on("reconnect_attempt", (attempt) => {
+			logger.info("Reconnect attempt", { attempt });
+			this.notifyReconnecting(attempt);
+		});
+
+		this.socket.io.on("reconnect", async (attempt) => {
+			logger.info("Reconnected", { attempt });
+			this.notifyReconnected();
+			if (this.wasInRoom && this.lastRoomId) {
+				await this.attemptRejoinRoom();
+			}
+		});
+
+		this.socket.io.on("reconnect_failed", () => {
+			logger.error("Reconnect failed");
+			this.notifyReconnectFailed();
+			this.wasInRoom = false;
+			this.lastRoomId = null;
 			this.currentRoomId = null;
 			this.setGameState(null);
 		});
@@ -385,6 +413,44 @@ export class SocketNetworkManager {
 			// add / replace：递归进入子路径
 			this.applyPatchAt(target[key], rest, patch);
 		}
+	}
+
+	private async attemptRejoinRoom(): Promise<void> {
+		if (!this.lastRoomId) return;
+		try {
+			const data = await this.request("room:rejoin", { roomId: this.lastRoomId });
+			if (data.success && data.state) {
+				this.currentRoomId = this.lastRoomId;
+				this.setGameState(data.state);
+				logger.info("Rejoined room successfully", { roomId: this.lastRoomId });
+			}
+		} catch (e) {
+			logger.error("Failed to rejoin room", { error: e });
+			this.wasInRoom = false;
+			this.lastRoomId = null;
+		}
+	}
+
+	private notifyDisconnect(): void {
+		this.emitGlobalNotification("warning", "连接断开，正在重连...");
+	}
+
+	private notifyReconnecting(attempt: number): void {
+		this.emitGlobalNotification("info", `重连中... (${attempt}/15)`);
+	}
+
+	private notifyReconnected(): void {
+		this.emitGlobalNotification("success", "已重新连接");
+	}
+
+	private notifyReconnectFailed(): void {
+		this.emitGlobalNotification("error", "重连失败，请刷新页面");
+	}
+
+	private emitGlobalNotification(type: "success" | "error" | "warning" | "info", message: string): void {
+		window.dispatchEvent(new CustomEvent("stfcs-notification", {
+			detail: { type, message, duration: 3000 }
+		}));
 	}
 }
 

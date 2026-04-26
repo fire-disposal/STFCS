@@ -47,7 +47,6 @@ import { useArmorHexagonRendering } from "../entities/ArmorHexagonRenderer";
 import { useMovementVisualRendering } from "../entities/MovementVisualRenderer";
 import { useWeaponArcRendering } from "../entities/WeaponArcRenderer";
 import { useShieldArcRendering } from "../entities/ShieldArcRenderer";
-import { useFluxIndicatorRendering } from "../entities/FluxIndicatorRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 import { useTextureLoader } from "../systems/useTextureLoader";
@@ -124,9 +123,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		showGrid,
 		showBackground,
 		showMovementRange,
-		showLabels,
-		showEffects,
-		showShipIcons,
 		showShipTextures,
 		showWeaponTextures,
 		selectedShipId,
@@ -135,6 +131,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		mapCursor,
 		selectShip,
 		movementPreview,
+		showHpBars,
+		showFluxBars,
+		showShipNames,
+		showOwnerLabels,
+		showMountMarkers,
+		showWeaponMarkers,
 	} = useUIStore();
 
 	const cameraPositionRef = useRef(cameraPosition);
@@ -190,7 +192,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 			canvasHeight: canvasSize.height,
 			viewRotation,
 		},
-		{ onSelectShip: selectShip, storeSelectShip: selectShip }
+		{ onSelectShip: selectShip, storeSelectShip: selectShip },
+		{ showMountMarkers, showWeaponMarkers }
 	);
 
 	useShipHUDRendering(
@@ -199,13 +202,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		{ x: cameraPosition.x, y: cameraPosition.y, zoom, viewRotation },
 		canvasSize,
 		selectedShipId ?? null,
-		{ showHpBars: showLabels, showLabels: showLabels },
+		{ showHpBars, showFluxBars, showShipNames, showOwnerLabels },
 		players ?? {}
 	);
 
 	useArmorHexagonRendering(layerSystem.layers, ships);
 	useShieldArcRendering(layerSystem.layers, ships);
-	useFluxIndicatorRendering(layerSystem.layers, ships);
 	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview ?? undefined, {
 		show: showMovementRange,
 	});
@@ -215,11 +217,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useEffect(() => {
 		if (!layerSystem.layers) return;
 		layerSystem.layers.tacticalTokens.visible = true;
-		layerSystem.layers.effects.visible = showEffects;
-		layerSystem.layers.shipIcons.visible = showShipIcons;
 		layerSystem.layers.shipSprites.visible = showShipTextures;
 		layerSystem.layers.weaponSprites.visible = showWeaponTextures;
-	}, [layerSystem.layers, showEffects, showShipIcons, showShipTextures, showWeaponTextures]);
+	}, [layerSystem.layers, showShipTextures, showWeaponTextures]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;

@@ -1,7 +1,16 @@
 import { GamePhase } from "@vt/data";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useSocketRoom, useTokens } from "@/network";
+import {
+	useGameState,
+	useGamePlayers,
+	useGamePhase,
+	useGameTurnCount,
+	useGameActiveFaction,
+	useGameRoomId,
+	useAllTokens,
+} from "@/state/stores/gameStore";
+import { useSocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import type { TabConfig } from "@/ui/panels/BattlePanel";
 import {
@@ -12,7 +21,7 @@ import {
 	Dialog,
 	TextField,
 } from "@radix-ui/themes";
-import { Crown, Settings, Users, CheckCircle, XCircle, Info, Edit, Move, Crosshair, Shield, Eye, Rocket } from "lucide-react";
+import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
@@ -20,11 +29,9 @@ import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
 import MovementPanel from "@/ui/panels/MovementPanel";
 import WeaponPanel from "@/ui/panels/WeaponPanel";
 import ShieldPanel from "@/ui/panels/ShieldPanel";
-import RealityEditPanel from "@/ui/panels/RealityEditPanel";
-import ViewControlPanel from "@/ui/panels/ViewControlPanel";
-import ShipPresetPanel from "@/ui/panels/ShipPresetPanel";
 import DMControlPanel from "@/ui/panels/DMControlPanel";
 import TopBar from "@/ui/panels/TopBar";
+import RightSidebar from "@/ui/panels/RightSidebar";
 import { useGameAction } from "@/hooks/useGameAction";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -36,11 +43,12 @@ interface GamePageProps {
 }
 
 export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom }) => {
-	const room = useSocketRoom(networkManager, onLeaveRoom);
+	useSocketRoom(networkManager, onLeaveRoom);
+
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
-	// 设置表单本地状态（保存按钮确认后才写入全局 store）
 	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
+
 	const socket = networkManager.getSocket();
 	const assetSocket = useAssetSocket(socket);
 
@@ -52,86 +60,72 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		};
 	}, [socket, assetSocket.handleResponse]);
 
-	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
 	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
 
-	const tokens = useTokens(room);
-	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
+	// 从统一状态管理获取数据
+	const gameState = useGameState();
+	const players = useGamePlayers();
+	const tokens = useAllTokens();
+	const phase = useGamePhase();
+	const turnCount = useGameTurnCount();
+	const activeFaction = useGameActiveFaction();
+	const roomId = useGameRoomId();
+
 	const { send } = useGameAction();
 
+	const playerId = networkManager.getPlayerId();
+	const currentPlayer = playerId ? players[playerId] : undefined;
+	const isHost = currentPlayer?.role === "HOST";
+	const isReady = currentPlayer?.isReady ?? false;
+
 	const handleAdvancePhase = useCallback(async () => {
-		const currentPhase = room?.state?.currentPhase;
-		if (!currentPhase) {
+		if (!phase) {
 			notify.error("无法获取当前阶段");
 			return;
 		}
 
 		try {
-			if (currentPhase === "DEPLOYMENT") {
+			if (phase === "DEPLOYMENT") {
 				await send("room:action", { action: "start" });
 				notify.success("游戏已开始");
-			} else if (currentPhase === "PLAYER_ACTION") {
+			} else if (phase === "PLAYER_ACTION") {
 				await send("edit:room", { action: "force_end_turn" });
 				notify.success("已推进到下一回合");
 			}
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "操作失败");
 		}
-	}, [send, room?.state?.currentPhase]);
+	}, [send, phase]);
 
-	const playerId = networkManager.getPlayerId();
-	const currentPlayer = playerId ? room?.state?.players[playerId] : undefined;
-	const isHost = currentPlayer?.role === "HOST";
-	const isReady = currentPlayer?.isReady ?? false;
-	const phase = room?.state?.currentPhase ?? "DEPLOYMENT";
-	const turnCount = room?.state?.turnCount ?? 1;
-	const activeFaction = room?.state?.activeFaction ?? undefined;
-
+	// 底部栏仅保留核心战斗Tab
 	const tabs: TabConfig[] = useMemo(() => [
 		{
 			id: "ship-info",
 			label: "舰船信息",
 			icon: <Info size={14} />,
-			component: <ShipInfoPanel ship={selectedShip} room={room} />,
+			component: <ShipInfoPanel />,
 			enabled: true,
 		},
 		{
 			id: "movement",
 			label: "移动控制",
 			icon: <Move size={14} />,
-			component: <MovementPanel ship={selectedShip} canControl={true} />,
+			component: <MovementPanel canControl={true} />,
 			enabled: true,
 		},
 		{
 			id: "weapon",
 			label: "武器火控",
 			icon: <Crosshair size={14} />,
-			component: <WeaponPanel ship={selectedShip} canControl={true} />,
+			component: <WeaponPanel canControl={true} />,
 			enabled: true,
 		},
 		{
 			id: "shield",
 			label: "护盾管理",
 			icon: <Shield size={14} />,
-			component: <ShieldPanel ship={selectedShip} canControl={true} />,
-			enabled: true,
-		},
-		{
-			id: "reality-edit",
-			label: "现实修改",
-			icon: <Edit size={14} />,
-			component: <RealityEditPanel
-				ship={selectedShip}
-				players={room?.state?.players as Record<string, import("@vt/data").RoomPlayerState>}
-			/>,
-			enabled: Boolean(isHost),
-		},
-		{
-			id: "ship-preset",
-			label: "舰船预设",
-			icon: <Rocket size={14} />,
-			component: <ShipPresetPanel room={room} networkManager={networkManager} />,
+			component: <ShieldPanel canControl={true} />,
 			enabled: true,
 		},
 		{
@@ -140,7 +134,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			icon: <Crown size={14} />,
 			component: <DMControlPanel
 				networkManager={networkManager}
-				players={room?.state?.players ?? {}}
+				players={players}
 				isHost={Boolean(isHost)}
 				phase={phase}
 				turnCount={turnCount}
@@ -148,16 +142,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			/>,
 			enabled: Boolean(isHost),
 		},
-		{
-			id: "view-control",
-			label: "视图控制",
-			icon: <Eye size={14} />,
-			component: <ViewControlPanel />,
-			enabled: true,
-		},
-	], [selectedShip, isHost, room, networkManager, phase, turnCount, activeFaction]);
+	], [networkManager, players, isHost, phase, turnCount, activeFaction]);
 
-	if (!room || !room.state || !networkManager.getCurrentRoomId()) {
+	if (!gameState || !roomId) {
 		return (
 			<Box style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
 				<Text color="gray">连接中...</Text>
@@ -166,19 +153,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		);
 	}
 
-	const players = Object.values(room.state.players).filter((p) => p.connected);
+	const connectedPlayers = Object.values(players).filter((p) => p.connected);
 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
 			<TopBar
-				phase={room.state.currentPhase as GamePhase}
-				turnCount={room.state.turnCount}
-				activeFaction={room.state.activeFaction as import("@vt/data").Faction | undefined}
-				players={room.state.players as Record<string, import("@vt/data").RoomPlayerState>}
-				currentPlayerId={room.sessionId ?? networkManager.getPlayerId()}
+				phase={phase as GamePhase}
+				turnCount={turnCount}
+				activeFaction={activeFaction}
+				players={players}
+				currentPlayerId={playerId}
 				isHost={isHost}
 				isReady={isReady}
 				inRoom={true}
+				tokens={tokens}
 				onReadyToggle={() => networkManager.setReady()}
 				onAdvancePhase={handleAdvancePhase}
 				onSettings={() => setShowSettings(true)}
@@ -192,10 +180,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
 					<PixiCanvas
 						ships={tokens}
-						players={room.state.players as Record<string, import("@vt/data").RoomPlayerState>}
+						players={players}
 						fetchAssets={assetSocket.batchGet}
 					/>
 				</Box>
+
+				<RightSidebar
+					networkManager={networkManager}
+					players={players}
+					isHost={Boolean(isHost)}
+				/>
 			</Box>
 
 			<BattlePanel tabs={tabs} defaultActiveTab="ship-info" />
@@ -208,10 +202,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 						</Flex>
 					</Dialog.Title>
 					<div className="room-player-list room-player-list--detailed">
-						{players.map((p) => (
+						{connectedPlayers.map((p) => (
 							<div
 								key={p.sessionId}
-								className={`room-player-item ${p.sessionId === room.sessionId ? "room-player-item--self" : ""}`}
+								className={`room-player-item ${p.sessionId === playerId ? "room-player-item--self" : ""}`}
 							>
 								<Avatar userName={p.nickname} size={32} />
 								<div className="room-player-info">
@@ -231,7 +225,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 					<Flex justify="end" gap="2" mt="4">
 						{isHost && (
 							<Button variant="soft" onClick={() => {
-								navigator.clipboard.writeText(networkManager.buildInviteLink(room.roomId));
+								navigator.clipboard.writeText(networkManager.buildInviteLink(roomId));
 								notify.success("邀请链接已复制");
 							}}>
 								邀请链接
@@ -244,7 +238,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<Dialog.Root open={showSettings} onOpenChange={(open) => {
 				if (!open) {
-					// 关闭时重置草稿为当前全局值
 					setDraftHpPerBar(hpPerBar);
 				}
 				setShowSettings(open);
@@ -270,14 +263,12 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 						<Flex justify="end" gap="2">
 							<Button size="1" variant="soft" color="gray" onClick={() => {
-								// 取消：重置草稿并关闭
 								setDraftHpPerBar(hpPerBar);
 								setShowSettings(false);
 							}}>
 								取消
 							</Button>
 							<Button size="1" variant="solid" onClick={() => {
-								// 保存：将草稿值写入全局 store
 								setHpPerBar(draftHpPerBar);
 								setShowSettings(false);
 							}}>

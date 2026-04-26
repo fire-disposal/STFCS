@@ -72,19 +72,27 @@ export interface ShipRenderContext {
 	viewRotation: number;
 }
 
+export interface ShipVisibilityOptions {
+	showMountMarkers?: boolean;
+	showWeaponMarkers?: boolean;
+}
+
 export function useShipRendering(
 	layers: LayerRegistry | null,
 	ships: CombatToken[],
 	selectedShipId: string | null | undefined,
 	context: Partial<ShipRenderContext>,
-	options: ShipRenderOptions = {}
+	options: ShipRenderOptions = {},
+	visibility: ShipVisibilityOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ShipCacheItem>>(new Map());
 	const optionsRef = useRef(options);
 	const contextRef = useRef(context);
+	const visibilityRef = useRef(visibility);
 
 	optionsRef.current = options;
 	contextRef.current = context;
+	visibilityRef.current = visibility;
 
 	useEffect(() => {
 		if (!layers) return;
@@ -92,6 +100,8 @@ export function useShipRendering(
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.$id));
 		const selectedId = selectedShipId ?? null;
+		const showMount = visibility.showMountMarkers ?? true;
+		const showWeapon = visibility.showWeaponMarkers ?? true;
 
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
@@ -102,6 +112,9 @@ export function useShipRendering(
 				item.weaponMarkers.destroy();
 				item.root.destroy();
 				cache.delete(id);
+			} else {
+				item.mountMarkers.visible = showMount;
+				item.weaponMarkers.visible = showWeapon;
 			}
 		}
 
@@ -111,17 +124,17 @@ export function useShipRendering(
 			const isSelected = ship.$id === selectedId;
 			const cached = cache.get(ship.$id);
 			if (!cached) {
-				createShipToken(layers, cache, ship, isSelected, optionsRef, contextRef);
+				createShipToken(layers, cache, ship, isSelected, optionsRef, contextRef, showMount, showWeapon);
 				continue;
 			}
 
 			if (shouldUpdate(cached, ship, isSelected)) {
-				updateShipToken(cached, ship, isSelected);
+				updateShipToken(cached, ship, isSelected, showMount, showWeapon);
 			}
 		}
 
 		layers.tacticalTokens.visible = true;
-	}, [layers, ships, selectedShipId]);
+	}, [layers, ships, selectedShipId, visibility.showMountMarkers, visibility.showWeaponMarkers]);
 
 	useEffect(() => {
 		return () => {
@@ -175,7 +188,9 @@ function shouldUpdate(
 function updateShipToken(
 	cached: ShipCacheItem,
 	ship: CombatToken,
-	isSelected: boolean
+	isSelected: boolean,
+	showMount: boolean = true,
+	showWeapon: boolean = true
 ): void {
 	if (!ship.runtime?.position) return;
 
@@ -195,6 +210,9 @@ function updateShipToken(
 	drawMountMarkers(cached.mountMarkers, ship.spec.mounts, isSelected);
 	drawWeaponMarkers(cached.weaponMarkers, ship, isSelected);
 
+	cached.mountMarkers.visible = showMount;
+	cached.weaponMarkers.visible = showWeapon;
+
 	const fluxTotal = (ship.runtime.fluxSoft ?? 0) + (ship.runtime.fluxHard ?? 0);
 	cached.lastState = {
 		x: ship.runtime.position.x,
@@ -212,7 +230,9 @@ function createShipToken(
 	ship: CombatToken,
 	isSelected: boolean,
 	optionsRef: React.MutableRefObject<ShipRenderOptions>,
-	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>
+	contextRef: React.MutableRefObject<Partial<ShipRenderContext>>,
+	showMount: boolean = true,
+	showWeapon: boolean = true
 ): void {
 	if (!ship.runtime?.position) return;
 
@@ -238,10 +258,12 @@ function createShipToken(
 
 	const mountMarkers = new Graphics();
 	drawMountMarkers(mountMarkers, ship.spec.mounts, isSelected);
+	mountMarkers.visible = showMount;
 	root.addChild(mountMarkers);
 
 	const weaponMarkers = new Graphics();
 	drawWeaponMarkers(weaponMarkers, ship, isSelected);
+	weaponMarkers.visible = showWeapon;
 	root.addChild(weaponMarkers);
 
 	root.on("pointertap", () => {

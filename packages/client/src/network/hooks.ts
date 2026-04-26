@@ -9,8 +9,8 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
-import type { CombatToken } from "@vt/data";
-import { setGameRoomRef } from "@/state/stores/uiStore";
+import type { CombatToken, GameRoomState } from "@vt/data";
+import { useGameStore } from "@/state/stores/gameStore";
 
 const log = (...args: unknown[]) => console.log("[useSocketRoom]", ...args);
 
@@ -186,7 +186,24 @@ export function useSocketRoom(
 	}, [roomState, send, leave]);
 
 	useEffect(() => {
-		setGameRoomRef(socketRoom);
+		if (socketRoom) {
+			useGameStore.getState().setRoom({
+				roomId: socketRoom.roomId,
+				state: {
+					roomId: socketRoom.state.roomId,
+					phase: socketRoom.state.currentPhase,
+					turnCount: socketRoom.state.turnCount,
+					activeFaction: socketRoom.state.activeFaction,
+					tokens: socketRoom.state.tokens,
+					players: socketRoom.state.players,
+					ownerId: "",
+					createdAt: Date.now(),
+				} as GameRoomState,
+				send: socketRoom.send,
+			});
+		} else {
+			useGameStore.getState().clearRoom();
+		}
 	}, [socketRoom]);
 
 	return socketRoom;

@@ -160,3 +160,126 @@
 	background: rgba(128, 128, 128, 0.2);
 	margin: 0 4px;
 }
+
+/* ===== 舰船状态条 ===== */
+
+.top-bar__ship-status {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin-left: 20px;
+	margin-right: 20px;
+	flex-shrink: 0;
+}
+
+.ship-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 6px 12px;
+	background: rgba(10, 30, 50, 0.5);
+	border: 1px solid rgba(74, 158, 255, 0.25);
+	border-radius: 6px;
+}
+
+.ship-status-bar__header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 80px;
+}
+
+.ship-status-bar__faction-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.ship-status-bar__name {
+	font-size: 13px;
+	font-weight: 600;
+	color: #cfe8ff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100px;
+}
+
+.ship-status-bar__stat {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.ship-status-bar__stat-label {
+	font-size: 11px;
+	color: #6b8aaa;
+	font-weight: 500;
+	min-width: 32px;
+}
+
+.ship-status-bar__stat-bar-container {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.ship-status-bar__stat-bar {
+	width: 80px;
+	height: 12px;
+	background: rgba(0, 0, 0, 0.4);
+	border-radius: 3px;
+	overflow: hidden;
+	position: relative;
+}
+
+.ship-status-bar__stat-bar-fill {
+	height: 100%;
+	border-radius: 2px;
+	transition: width 0.2s ease;
+}
+
+.ship-status-bar__stat-bar-fill--soft {
+	background: linear-gradient(90deg, #4a9eff, #6ab4ff);
+	position: absolute;
+	top: 0;
+	z-index: 2;
+}
+
+.ship-status-bar__stat-bar-fill--hard {
+	background: linear-gradient(90deg, #ff6f8f, #ff8fa8);
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+}
+
+.ship-status-bar__stat-value {
+	font-size: 11px;
+	font-weight: 600;
+	color: #cfe8ff;
+	font-family: "Fira Code", monospace;
+	min-width: 60px;
+}
+
+.ship-status-bar__position {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 100px;
+}
+
+.ship-status-bar__position-value {
+	font-size: 11px;
+	font-weight: 500;
+	color: #8ba4c7;
+	font-family: "Fira Code", monospace;
+}
+
+.ship-status-bar__position-heading {
+	font-size: 11px;
+	font-weight: 600;
+	color: #cfe8ff;
+	font-family: "Fira Code", monospace;
+}

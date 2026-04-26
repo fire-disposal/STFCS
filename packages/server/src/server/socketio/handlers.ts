@@ -67,6 +67,18 @@ rpc.namespace("profile", {
     if (p.avatar !== undefined) patch.avatar = p.avatar;
     const updated = await playerInfoService.updateInfo(ctx.playerId, patch);
     if (!updated) throw err("更新失败", ErrorCodes.UPDATE_FAILED);
+
+    if (ctx.roomId) {
+      const room = ctx.roomManager.getRoom(ctx.roomId);
+      if (room) {
+        const stateUpdates: { nickname?: string; avatar?: string; avatarAssetId?: string } = {};
+        if (p.nickname !== undefined) stateUpdates.nickname = p.nickname;
+        if (p.avatar !== undefined) stateUpdates.avatar = p.avatar;
+        if (p.avatarAssetId !== undefined) stateUpdates.avatarAssetId = p.avatarAssetId;
+        room.getStateManager().updatePlayer(ctx.playerId, stateUpdates);
+      }
+    }
+
     return { profile: { playerId: updated.playerId, nickname: updated.displayName, avatar: updated.avatar } };
   },
 });
@@ -206,8 +218,9 @@ export function setupSocketIO(io: any, roomManager: any): void {
   roomManager.setOnRoomRemove(async (room: any, roomId: string) => {
     const gameState = room.getGameState();
     const creatorId = room.creatorId;
+    const tokenCount = Object.keys(gameState?.tokens ?? {}).length;
 
-    if (gameState && creatorId && gameState.turnCount > 0) {
+    if (gameState && creatorId && tokenCount > 0) {
       const archiveId = `save_${roomId}_${Date.now()}`;
       const archive = {
         id: archiveId,
@@ -216,22 +229,22 @@ export function setupSocketIO(io: any, roomManager: any): void {
         metadata: {
           roomId,
           roomName: room.name,
-          mapWidth: gameState.mapWidth ?? 2000,
-          mapHeight: gameState.mapHeight ?? 2000,
+          mapWidth: gameState.map?.size?.width ?? 2000,
+          mapHeight: gameState.map?.size?.height ?? 2000,
           maxPlayers: room.maxPlayers,
-          playerCount: 0,
-          totalTurns: gameState.turnCount,
+          playerCount: Object.keys(gameState.players ?? {}).length,
+          totalTurns: gameState.turnCount ?? 0,
           gameDuration: Date.now() - room.createdAt,
         },
         playerIds: Object.keys(gameState.players ?? {}),
         isAutoSave: true,
-        tags: ["auto_cleanup"],
+        tags: gameState.turnCount > 0 ? ["auto_cleanup", "game_played"] : ["auto_cleanup", "deployment"],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
 
       await playerInfoService.addRoomSave(creatorId, archive);
-      console.log(`[RoomManager] Auto-saved room ${roomId} to archive ${archiveId} for creator ${creatorId}`);
+      console.log(`[RoomManager] Auto-saved room ${roomId} (tokens: ${tokenCount}, turns: ${gameState.turnCount}) to creator ${creatorId}`);
     }
 
     io.emit("room:list_updated", { action: "removed", roomId });
@@ -243,7 +256,7 @@ export function setupSocketIO(io: any, roomManager: any): void {
     socket.on("disconnect", () => {
       const sd = socket.data as { playerId?: string; roomId?: string; role?: string };
       if (sd.roomId && sd.playerId) {
-        roomManager.leaveRoom(sd.roomId, sd.playerId);
+        roomManager.disconnectPlayer(sd.roomId, sd.playerId);
       }
       socket.data.roomId = undefined;
       socket.data.role = undefined;

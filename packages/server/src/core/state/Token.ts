@@ -75,6 +75,7 @@ export function createCombatToken(
 		overloaded: false,
 		overloadTime: 0,
 		destroyed: false,
+		actionSequence: 0,
 		movement: {
 			currentPhase: MovementPhaseEnum.A,
 			phaseAUsed: 0,

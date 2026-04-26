@@ -20,7 +20,6 @@ export class RoomManager {
 	private rooms = new Map<string, Room>();
 	private logger = createLogger("room-manager");
 	private options: Required<RoomManagerOptions>;
-	private playerSocketMap = new Map<string, string>();
 	private onRoomRemove: RoomRemoveCallback | null = null;
 
 	constructor(options: RoomManagerOptions = {}) {
@@ -31,15 +30,6 @@ export class RoomManager {
 			...options,
 		};
 		this.startCleanupCycle();
-	}
-
-	/** 设置玩家 socket 映射（由 Socket.IO handler 调用） */
-	setPlayerSocket(playerId: string, socketId: string): void {
-		this.playerSocketMap.set(playerId, socketId);
-	}
-
-	removePlayerSocket(playerId: string): void {
-		this.playerSocketMap.delete(playerId);
 	}
 
 	setOnRoomRemove(callback: RoomRemoveCallback): void {
@@ -60,12 +50,8 @@ export class RoomManager {
 			return null;
 		}
 
-		// 构建传输回调（闭包捕获 roomId）
-		const roomIdRef = { current: "" as string };
 		const callbacks: RoomTransportCallbacks = {
-			sendToPlayer: (_playerId, _message) => {
-				// 由外部 Socket.IO handler 覆写
-			},
+			sendToPlayer: (_playerId, _message) => {},
 			broadcast: (_message) => {},
 			broadcastToFaction: (_faction, _message) => {},
 			broadcastExcept: (_excludePlayerId, _message) => {},
@@ -74,7 +60,6 @@ export class RoomManager {
 		};
 
 		const room = new Room(callbacks, options);
-		roomIdRef.current = room.id;
 		this.rooms.set(room.id, room);
 
 		this.logger.info("Room created", {
@@ -86,12 +71,10 @@ export class RoomManager {
 		return room;
 	}
 
-	/** 获取房间 */
 	getRoom(roomId: string): Room | undefined {
 		return this.rooms.get(roomId);
 	}
 
-	/** 移除房间 */
 	async removeRoom(roomId: string): Promise<boolean> {
 		const room = this.rooms.get(roomId);
 		if (!room) return false;
@@ -106,7 +89,6 @@ export class RoomManager {
 		return true;
 	}
 
-	/** 玩家加入房间 */
 	joinRoom(roomId: string, connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
 		const room = this.getRoom(roomId);
 		if (!room) {
@@ -116,21 +98,24 @@ export class RoomManager {
 		return room.joinPlayer(connectionId, playerId, playerName, avatar);
 	}
 
-	/** 玩家离开房间 */
 	leaveRoom(roomId: string, playerId: string): boolean {
 		const room = this.getRoom(roomId);
 		if (!room) return false;
 		return room.leavePlayer(playerId);
 	}
 
-	/** 处理玩家消息 */
+	disconnectPlayer(roomId: string, playerId: string): boolean {
+		const room = this.getRoom(roomId);
+		if (!room) return false;
+		return room.disconnectPlayer(playerId);
+	}
+
 	handlePlayerMessage(roomId: string, playerId: string, message: any): void {
 		const room = this.getRoom(roomId);
 		if (!room) return;
 		room.handlePlayerMessage(playerId, message);
 	}
 
-	/** 获取所有房间列表 */
 	getAllRooms(): Array<{
 		id: string;
 		name: string;
@@ -155,7 +140,6 @@ export class RoomManager {
 		}));
 	}
 
-	/** 获取活跃房间 */
 	getActiveRooms(): Array<{
 		id: string;
 		name: string;
@@ -166,7 +150,6 @@ export class RoomManager {
 		return this.getAllRooms().filter((room) => room.playerCount > 0);
 	}
 
-	/** 搜索房间 */
 	searchRooms(criteria: {
 		name?: string;
 		minPlayers?: number;
@@ -188,7 +171,6 @@ export class RoomManager {
 		});
 	}
 
-	/** 获取房间统计 */
 	getStats(): {
 		totalRooms: number;
 		activeRooms: number;
@@ -209,21 +191,6 @@ export class RoomManager {
 			maxRooms: this.options.maxRooms,
 		};
 	}
-
-	/** 处理连接断开 */
-	handleConnectionDisconnected(connectionId: string): void {
-		for (const room of this.rooms.values()) {
-			const players = room.getPlayers();
-			for (const player of players) {
-				if ((player as any).connectionId === connectionId) {
-					room.leavePlayer(player.id);
-					break;
-				}
-			}
-		}
-	}
-
-	// ==================== 清理 ====================
 
 	private startCleanupCycle(): void {
 		setInterval(() => this.cleanupInactiveRooms(), this.options.roomCleanupDelay);

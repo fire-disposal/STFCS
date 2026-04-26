@@ -13,7 +13,6 @@
  * │   ├── ShipHUDRenderer      - 舰船 HUD（血条/标签）
  * │   ├── ArmorHexagonRenderer - 护甲六边形
  * │   ├── ShieldArcRenderer    - 护盾弧线
- * │   ├── FluxIndicatorRenderer - 辐能指示器
  * │   └── MovementVisualRenderer - 移动预览
  * │
  * ├── systems/  - 系统级渲染
@@ -35,7 +34,6 @@ export type {
 	ShipRenderOptions,
 	ShipHUDRenderOptions,
 	ShieldArcOptions,
-	FluxIndicatorOptions,
 } from "./types";
 
 export { default as PixiCanvas } from "./core/PixiCanvas";
@@ -47,7 +45,6 @@ export { useShipRendering } from "./entities/ShipRenderer";
 export { useShipHUDRendering, ShipHUDManager } from "./entities/ShipHUDRenderer";
 export { useArmorHexagonRendering } from "./entities/ArmorHexagonRenderer";
 export { useShieldArcRendering } from "./entities/ShieldArcRenderer";
-export { useFluxIndicatorRendering } from "./entities/FluxIndicatorRenderer";
 export { useMovementVisualRendering } from "./entities/MovementVisualRenderer";
 export { useWeaponArcRendering } from "./entities/WeaponArcRenderer";
 

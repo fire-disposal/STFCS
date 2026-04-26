@@ -25,22 +25,60 @@ function createLayers(app: any): LayerRegistry {
     world.hitArea = new Rectangle(-10000, -10000, 20000, 20000);
 
     const background = new Container();
+    background.zIndex = 0;
+    background.eventMode = "none";
+
     const starfieldNebula = new Container();
+    starfieldNebula.zIndex = 0;
+    starfieldNebula.eventMode = "none";
+
     const starfieldDeep = new Container();
+    starfieldDeep.zIndex = 1;
+    starfieldDeep.eventMode = "none";
+
     const starfieldMid = new Container();
+    starfieldMid.zIndex = 2;
+    starfieldMid.eventMode = "none";
+
     const starfieldNear = new Container();
+    starfieldNear.zIndex = 3;
+    starfieldNear.eventMode = "none";
+
     const grid = new Container();
+    grid.zIndex = 4;
+    grid.eventMode = "none";
+
     const cursor = new Container();
-    const shipSprites = new Container();
-    const weaponSprites = new Container();
+    cursor.zIndex = 5;
+    cursor.eventMode = "none";
+
     const tacticalTokens = new Container();
-    const effects = new Container();
+    tacticalTokens.zIndex = 7;
+    tacticalTokens.eventMode = "none";
+
     const weaponArcs = new Container();
+    weaponArcs.zIndex = 8;
+    weaponArcs.eventMode = "none";
+
     const movementVisuals = new Container();
-    const shipIcons = new Container();
+    movementVisuals.zIndex = 9;
+    movementVisuals.eventMode = "none";
+
     const shieldArcs = new Container();
+    shieldArcs.zIndex = 10;
+    shieldArcs.eventMode = "none";
+
     const hexagonArmor = new Container();
-    const fluxIndicators = new Container();
+    hexagonArmor.zIndex = 11;
+    hexagonArmor.eventMode = "none";
+
+    const shipSprites = new Container();
+    shipSprites.zIndex = 13;
+    shipSprites.eventMode = "none";
+
+    const weaponSprites = new Container();
+    weaponSprites.zIndex = 14;
+    weaponSprites.eventMode = "none";
 
     world.addChild(
         background,
@@ -50,23 +88,36 @@ function createLayers(app: any): LayerRegistry {
         starfieldNear,
         grid,
         cursor,
-        shipSprites,
-        weaponSprites,
         tacticalTokens,
-        effects,
         weaponArcs,
         movementVisuals,
-        shipIcons,
         shieldArcs,
         hexagonArmor,
-        fluxIndicators
+        shipSprites,
+        weaponSprites
     );
 
     const hud = new Container();
+    hud.sortableChildren = true;
+    hud.eventMode = "none";
+
     const shipBars = new Container();
+    shipBars.zIndex = 0;
+    shipBars.eventMode = "none";
+
+    const fluxBars = new Container();
+    fluxBars.zIndex = 1;
+    fluxBars.eventMode = "none";
+
     const shipNames = new Container();
-    const targetMarkers = new Container();
-    hud.addChild(shipBars, shipNames, targetMarkers);
+    shipNames.zIndex = 2;
+    shipNames.eventMode = "none";
+
+    const ownerLabels = new Container();
+    ownerLabels.zIndex = 3;
+    ownerLabels.eventMode = "none";
+
+    hud.addChild(shipBars, fluxBars, shipNames, ownerLabels);
 
     app.stage.addChild(world);
     app.stage.addChild(hud);
@@ -83,17 +134,15 @@ function createLayers(app: any): LayerRegistry {
         shipSprites,
         weaponSprites,
         tacticalTokens,
-        effects,
         weaponArcs,
         movementVisuals,
-        shipIcons,
         shieldArcs,
         hexagonArmor,
-        fluxIndicators,
         hud,
         shipBars,
+        fluxBars,
         shipNames,
-        targetMarkers,
+        ownerLabels,
     };
 }
 
@@ -116,6 +165,7 @@ function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolea
         overloaded: false,
         overloadTime: 1,
         destroyed: false,
+        actionSequence: 0,
         faction: Faction.PLAYER_ALLIANCE,
     };
 

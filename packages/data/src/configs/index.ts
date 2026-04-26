@@ -90,20 +90,11 @@ export interface AssetLimitsConfig {
 }
 
 export interface AssetConfig {
-	avatar: AssetLimitsConfig;
 	ship_texture: AssetLimitsConfig;
 	weapon_texture: AssetLimitsConfig;
 }
 
 export const DEFAULT_ASSET_CONFIG: AssetConfig = {
-	avatar: {
-		allowedMimeTypes: ["image/png", "image/jpeg", "image/gif"],
-		maxFileSize: 512 * 1024,
-		minWidth: 16,
-		maxWidth: 256,
-		minHeight: 16,
-		maxHeight: 256,
-	},
 	ship_texture: {
 		allowedMimeTypes: ["image/png"],
 		maxFileSize: 2 * 1024 * 1024,
