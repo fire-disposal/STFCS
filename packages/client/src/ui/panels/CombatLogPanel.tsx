@@ -5,7 +5,6 @@
  */
 
 import React from "react";
-import { FileText, Swords, Crosshair, Shield, Zap, Move, RotateCw, Skull, AlertTriangle, Eye, Edit3, Send, Play, Flag } from "lucide-react";
 import { Flex, Text, Box } from "@radix-ui/themes";
 import { useGameLogs, useGameTokens } from "@/state/stores/gameStore";
 import type { BattleLogEvent } from "@vt/data";
@@ -26,24 +25,6 @@ interface LogRendererProps {
 	log: BattleLogEvent;
 	tokens: Record<string, any>;
 }
-
-const LogIcon: Record<string, React.ReactNode> = {
-	attack: <Swords size={12} />,
-	deviation: <Crosshair size={12} />,
-	destroyed: <Skull size={12} />,
-	move: <Move size={12} />,
-	rotate: <RotateCw size={12} />,
-	shield_toggle: <Shield size={12} />,
-	shield_rotate: <Shield size={12} />,
-	vent: <Zap size={12} />,
-	overloaded: <AlertTriangle size={12} />,
-	end_turn: <Send size={12} />,
-	advance_phase: <Send size={12} />,
-	edit: <Edit3 size={12} />,
-	system: <Eye size={12} />,
-	game_started: <Play size={12} />,
-	faction_change: <Flag size={12} />,
-};
 
 const LogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 	const d = log.data as Record<string, unknown>;
@@ -187,7 +168,6 @@ export const CombatLogPanel: React.FC = () => {
 	return (
 		<Flex direction="column" className="combat-log-panel" style={{ height: "100%" }}>
 			<Flex align="center" gap="2" px="3" py="2" className="combat-log-header">
-				<FileText size={14} />
 				<Text size="1" weight="bold">战斗日志</Text>
 				<Text size="1" color="gray">({logs.length})</Text>
 			</Flex>
@@ -197,15 +177,12 @@ export const CombatLogPanel: React.FC = () => {
 				<Text size="1" color="gray">暂无日志</Text>
 			</Flex>
 		) : (
-			reversed.map((log, idx) => (
-						<Flex key={`${log.timestamp}-${idx}`} className="combat-log-entry" gap="2" px="3" py="1">
-							<Box className="combat-log-icon" style={{ flexShrink: 0, width: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
-								{LogIcon[log.type] ?? <Eye size={12} />}
-							</Box>
+				reversed.map((log, idx) => (
+						<Flex key={`${log.timestamp}-${idx}`} className="combat-log-entry" gap="1" px="3" py="1">
 							<Box style={{ flex: 1, minWidth: 0 }}>
 								<LogRenderer log={log} tokens={tokens} />
 							</Box>
-							<Text size="1" color="gray" style={{ flexShrink: 0, fontSize: 10 }}>{formatTime(log.timestamp)}</Text>
+							<Text size="1" color="gray" style={{ flexShrink: 0, fontSize: 10, lineHeight: "18px" }}>{formatTime(log.timestamp)}</Text>
 						</Flex>
 					))
 				)}

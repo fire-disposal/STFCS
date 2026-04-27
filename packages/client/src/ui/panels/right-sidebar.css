@@ -49,6 +49,26 @@
 	border-radius: 4px;
 }
 
+.layer-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4px;
+}
+
+.layer-grid-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.layer-grid-item:hover {
+	background: rgba(74, 158, 255, 0.1);
+}
+
 .sidebar-layer-toggle {
 	padding: 4px 6px;
 	border-radius: 4px;
