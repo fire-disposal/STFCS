@@ -1,12 +1,10 @@
 /**
- * ShipPresetSidebarPanel - 舰船预设面板（右侧栏适配版）
- *
- * 纵向布局，适合在右侧折叠栏中使用
+ * ShipPresetSidebarPanel - 舰船预设面板（简化版）
  */
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Rocket, Search, Filter } from "lucide-react";
-import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea } from "@radix-ui/themes";
+import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea, Card } from "@radix-ui/themes";
 import type { InventoryToken, CombatToken } from "@vt/data";
 import { Faction as FactionEnum, HullSize } from "@vt/data";
 import type { SocketNetworkManager } from "@/network";
@@ -33,6 +31,13 @@ interface ShipPresetItem {
 interface ShipPresetSidebarPanelProps {
 	networkManager: SocketNetworkManager;
 }
+
+const PRESET_ITEM_STYLE: React.CSSProperties = {
+	padding: "6px 8px",
+	borderRadius: 4,
+	cursor: "pointer",
+	transition: "background 0.15s, border-color 0.15s",
+};
 
 export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 	networkManager,
@@ -145,16 +150,16 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 
 	if (loading) {
 		return (
-			<Flex align="center" justify="center" className="sidebar-panel-content" style={{ height: "100%" }}>
+			<Flex align="center" justify="center" style={{ height: "100%" }}>
 				<Text size="2" color="gray">加载预设...</Text>
 			</Flex>
 		);
 	}
 
 	return (
-		<Flex direction="column" gap="2" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+		<Flex direction="column" gap="2" style={{ height: "100%" }}>
 			{/* 搜索和筛选 */}
-			<Flex gap="2">
+			<Flex gap="2" style={{ flexShrink: 0 }}>
 				<TextField.Root
 					size="1"
 					value={searchQuery}
@@ -182,57 +187,58 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 			</Flex>
 
 			{/* 预设列表 */}
-			<Box style={{ flex: 1, minHeight: 0, maxHeight: 240 }}>
-				<ScrollArea style={{ height: "100%" }}>
-					<Flex direction="column" gap="1">
-						{filteredPresets.length === 0 ? (
-							<Text size="1" color="gray" style={{ textAlign: "center", padding: 16 }}>
-								暂无预设舰船
-							</Text>
-						) : (
-							filteredPresets.map((preset) => (
-								<Flex
-									key={preset.id}
-									align="center"
-									gap="2"
-									className="sidebar-preset-item"
-									style={{
-										background: selectedId === preset.id
-											? "rgba(74, 158, 255, 0.15)"
-											: "transparent",
-										border: selectedId === preset.id
-											? "1px solid rgba(74, 158, 255, 0.4)"
-											: "1px solid transparent",
-									}}
-									onClick={() => setSelectedId(preset.id)}
-								>
-									<ShipPreviewCanvas
-										token={preset.token}
-										size={32}
-										selected={selectedId === preset.id}
-									/>
-									<Box style={{ flex: 1, minWidth: 0 }}>
-										<Text size="1" weight="bold" style={{
-											color: selectedId === preset.id ? "#4a9eff" : "#cfe8ff",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-											whiteSpace: "nowrap",
-										}}>
-											{preset.name}
-										</Text>
-										<Text size="1" style={{ color: "#6b8aaa" }}>
-											{HULL_SIZE_NAMES[preset.hullSize] ?? preset.hullSize}
-										</Text>
-									</Box>
-									<Badge size="1" variant="soft">
-										{preset.weaponCount}
-									</Badge>
-								</Flex>
-							))
-						)}
-					</Flex>
-				</ScrollArea>
-			</Box>
+			<Card style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "4px" }}>
+				<Box style={{ flex: 1, minHeight: 0 }}>
+					<ScrollArea style={{ height: "100%" }}>
+						<Flex direction="column" gap="1">
+							{filteredPresets.length === 0 ? (
+								<Text size="1" color="gray" style={{ textAlign: "center", padding: 16 }}>
+									暂无预设舰船
+								</Text>
+							) : (
+								filteredPresets.map((preset) => {
+									const isSelected = selectedId === preset.id;
+									return (
+										<Flex
+											key={preset.id}
+											align="center"
+											gap="2"
+											onClick={() => setSelectedId(preset.id)}
+											style={{
+												...PRESET_ITEM_STYLE,
+												background: isSelected ? "rgba(74, 158, 255, 0.15)" : "transparent",
+												border: isSelected ? "1px solid rgba(74, 158, 255, 0.4)" : "1px solid transparent",
+											}}
+										>
+											<ShipPreviewCanvas
+												token={preset.token}
+												size={32}
+												selected={isSelected}
+											/>
+											<Box style={{ flex: 1, minWidth: 0 }}>
+												<Text size="1" weight="bold" style={{
+													color: isSelected ? "#4a9eff" : "#cfe8ff",
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													whiteSpace: "nowrap",
+												}}>
+													{preset.name}
+												</Text>
+												<Text size="1" color="gray">
+													{HULL_SIZE_NAMES[preset.hullSize] ?? preset.hullSize}
+												</Text>
+											</Box>
+											<Badge size="1" variant="soft">
+												{preset.weaponCount}
+											</Badge>
+										</Flex>
+									);
+								})
+							)}
+						</Flex>
+					</ScrollArea>
+				</Box>
+			</Card>
 
 			{/* 部署按钮 */}
 			<Button
@@ -241,7 +247,7 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 				color="green"
 				onClick={handleDeploy}
 				disabled={!selectedPreset}
-				style={{ width: "100%" }}
+				style={{ width: "100%", flexShrink: 0 }}
 			>
 				<Rocket size={12} /> 部署选中舰船
 			</Button>

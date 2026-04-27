@@ -1,7 +1,5 @@
 /**
- * RealityEditSidebarPanel - 现实修改面板（右侧栏适配版）
- *
- * 纵向布局，使用 useSelectedShip hook 统一获取选中舰船
+ * RealityEditSidebarPanel - 现实修改面板（简化版）
  */
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -16,6 +14,8 @@ import {
 	TextArea,
 	TextField,
 	Separator,
+	ScrollArea,
+	Card,
 } from "@radix-ui/themes";
 import { Save, Trash2, Code, Crosshair, Move, RotateCcw } from "lucide-react";
 import type { CombatToken, TokenRuntime, TokenSpec } from "@vt/data";
@@ -249,28 +249,26 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 
 	if (!ship) {
 		return (
-			<Flex align="center" justify="center" className="sidebar-panel-content" style={{ height: "100%", minHeight: 150 }}>
+			<Flex align="center" justify="center" style={{ height: "100%", minHeight: 150 }}>
 				<Text size="2" color="gray">选择舰船后可编辑</Text>
 			</Flex>
 		);
 	}
 
 	return (
-		<Flex direction="column" gap="2" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+		<Flex direction="column" gap="2" style={{ height: "100%" }}>
 			{/* 锁定/编辑开关 */}
-			<Flex align="center" justify="between" className="sidebar-header-row" style={{ flexShrink: 0 }}>
-				<Flex align="center" gap="2">
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>
+			<Card style={{ padding: "6px 8px", flexShrink: 0 }}>
+				<Flex align="center" justify="between">
+					<Text size="1" weight="bold">
 						{ship.runtime.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6)}
 					</Text>
+					<Flex align="center" gap="2">
+						<Text size="1" color="gray">编辑</Text>
+						<Switch size="1" checked={editMode} onCheckedChange={setEditMode} />
+					</Flex>
 				</Flex>
-				<Flex align="center" gap="2">
-					<Text size="1" style={{ color: "#6b8aaa" }}>编辑</Text>
-					<Switch size="1" checked={editMode} onCheckedChange={setEditMode} />
-				</Flex>
-			</Flex>
-
-			<Separator size="4" style={{ flexShrink: 0 }} />
+			</Card>
 
 			{/* Tab 切换 */}
 			<Tabs.Root value={activeTab} onValueChange={setActiveTab}>
@@ -287,195 +285,197 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				</Tabs.List>
 			</Tabs.Root>
 
-			{/* Tab 内容 + 编辑按钮（一起在滚动区内） */}
-			<Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-				{/* Tab 内容区域 */}
-				{activeTab === "runtime" && runtimeDraft && (
-					<Flex direction="column" gap="2" style={{ flexShrink: 0 }}>
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>基础</Text>
-							<Flex direction="column" gap="1">
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>船体</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.hull}
-										onChange={(e) => updateRuntime("hull", Math.max(0, Number(e.target.value) || 0))}
-										disabled={!editMode}
-										style={{ width: 50 }}
-									/>
-									<Text size="1" style={{ color: "#8ba4c7" }}>/ {ship.spec.maxHitPoints}</Text>
-								</Flex>
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>软辐</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.fluxSoft}
-										onChange={(e) => updateRuntime("fluxSoft", Math.max(0, Number(e.target.value) || 0))}
-										disabled={!editMode}
-										style={{ width: 50 }}
-									/>
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>硬辐</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.fluxHard}
-										onChange={(e) => updateRuntime("fluxHard", Math.max(0, Number(e.target.value) || 0))}
-										disabled={!editMode}
-										style={{ width: 50 }}
-									/>
-								</Flex>
-							</Flex>
-						</Box>
+			{/* Tab 内容（滚动区） */}
+			<Box style={{ flex: 1, minHeight: 0 }}>
+				<ScrollArea style={{ height: "100%" }}>
+					<Flex direction="column" gap="2">
+						{activeTab === "runtime" && runtimeDraft && (
+							<>
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">基础</Text>
+									<Flex direction="column" gap="1">
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 36 }}>船体</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.hull}
+												onChange={(e) => updateRuntime("hull", Math.max(0, Number(e.target.value) || 0))}
+												disabled={!editMode}
+												style={{ width: 50 }}
+											/>
+											<Text size="1" color="gray">/ {ship.spec.maxHitPoints}</Text>
+										</Flex>
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 36 }}>软辐</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.fluxSoft}
+												onChange={(e) => updateRuntime("fluxSoft", Math.max(0, Number(e.target.value) || 0))}
+												disabled={!editMode}
+												style={{ width: 50 }}
+											/>
+											<Text size="1" color="gray" style={{ width: 36 }}>硬辐</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.fluxHard}
+												onChange={(e) => updateRuntime("fluxHard", Math.max(0, Number(e.target.value) || 0))}
+												disabled={!editMode}
+												style={{ width: 50 }}
+											/>
+										</Flex>
+									</Flex>
+								</Card>
 
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>位置</Text>
-							<Flex direction="column" gap="1">
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>X</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.position.x}
-										onChange={(e) => updateRuntimeNested("position", "x", Number(e.target.value) || 0)}
-										disabled={!editMode}
-										style={{ width: 60 }}
-									/>
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>Y</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.position.y}
-										onChange={(e) => updateRuntimeNested("position", "y", Number(e.target.value) || 0)}
-										disabled={!editMode}
-										style={{ width: 60 }}
-									/>
-								</Flex>
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 36 }}>朝向</Text>
-									<TextField.Root
-										size="1"
-										type="number"
-										value={runtimeDraft.heading}
-										onChange={(e) => updateRuntime("heading", Number(e.target.value) || 0)}
-										disabled={!editMode}
-										style={{ width: 60 }}
-									/>
-									<Text size="1" style={{ color: "#6b8aaa" }}>°</Text>
-								</Flex>
-							</Flex>
-						</Box>
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">位置</Text>
+									<Flex direction="column" gap="1">
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 36 }}>X</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.position.x}
+												onChange={(e) => updateRuntimeNested("position", "x", Number(e.target.value) || 0)}
+												disabled={!editMode}
+												style={{ width: 60 }}
+											/>
+											<Text size="1" color="gray" style={{ width: 36 }}>Y</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.position.y}
+												onChange={(e) => updateRuntimeNested("position", "y", Number(e.target.value) || 0)}
+												disabled={!editMode}
+												style={{ width: 60 }}
+											/>
+										</Flex>
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 36 }}>朝向</Text>
+											<TextField.Root
+												size="1"
+												type="number"
+												value={runtimeDraft.heading}
+												onChange={(e) => updateRuntime("heading", Number(e.target.value) || 0)}
+												disabled={!editMode}
+												style={{ width: 60 }}
+											/>
+											<Text size="1" color="gray">°</Text>
+										</Flex>
+									</Flex>
+								</Card>
 
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>状态</Text>
-							<Flex direction="column" gap="1">
-								<Flex align="center" gap="2">
-									<Text size="1" style={{ color: "#6b8aaa" }}>过载</Text>
-									<Switch size="1" checked={runtimeDraft.overloaded} onCheckedChange={(v) => updateRuntime("overloaded", v)} disabled={!editMode} />
-									<Text size="1" style={{ color: "#6b8aaa" }}>摧毁</Text>
-									<Switch size="1" checked={runtimeDraft.destroyed} onCheckedChange={(v) => updateRuntime("destroyed", v)} disabled={!editMode} />
-								</Flex>
-								<Flex align="center" gap="2">
-									<Text size="1" style={{ color: "#6b8aaa" }}>排热</Text>
-									<Switch size="1" checked={runtimeDraft.venting ?? false} onCheckedChange={(v) => updateRuntime("venting", v)} disabled={!editMode} />
-								</Flex>
-							</Flex>
-						</Box>
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">状态</Text>
+									<Flex direction="column" gap="1">
+										<Flex align="center" gap="2">
+											<Text size="1" color="gray">过载</Text>
+											<Switch size="1" checked={runtimeDraft.overloaded} onCheckedChange={(v) => updateRuntime("overloaded", v)} disabled={!editMode} />
+											<Text size="1" color="gray">摧毁</Text>
+											<Switch size="1" checked={runtimeDraft.destroyed} onCheckedChange={(v) => updateRuntime("destroyed", v)} disabled={!editMode} />
+										</Flex>
+										<Flex align="center" gap="2">
+											<Text size="1" color="gray">排热</Text>
+											<Switch size="1" checked={runtimeDraft.venting ?? false} onCheckedChange={(v) => updateRuntime("venting", v)} disabled={!editMode} />
+										</Flex>
+									</Flex>
+								</Card>
 
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>所有者</Text>
-							<Select.Root value={selectedOwnerId} onValueChange={setSelectedOwnerId} disabled={!editMode}>
-								<Select.Trigger style={{ width: "100%" }} />
-								<Select.Content>
-									<Select.Item value="__none__">无所有者</Select.Item>
-									{playerList.map((p) => (
-										<Select.Item key={p.sessionId} value={p.sessionId}>
-											{p.nickname}{p.role === "HOST" && " [DM]"}
-										</Select.Item>
-									))}
-								</Select.Content>
-							</Select.Root>
-						</Box>
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">所有者</Text>
+									<Select.Root value={selectedOwnerId} onValueChange={setSelectedOwnerId} disabled={!editMode}>
+										<Select.Trigger style={{ width: "100%" }} />
+										<Select.Content>
+											<Select.Item value="__none__">无所有者</Select.Item>
+											{playerList.map((p) => (
+												<Select.Item key={p.sessionId} value={p.sessionId}>
+													{p.nickname}{p.role === "HOST" && " [DM]"}
+												</Select.Item>
+											))}
+										</Select.Content>
+									</Select.Root>
+								</Card>
+							</>
+						)}
+
+						{activeTab === "spec" && specDraft && (
+							<>
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">战斗</Text>
+									<Flex direction="column" gap="1">
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 60 }}>最大HP</Text>
+											<TextField.Root size="1" type="number" value={specDraft.maxHitPoints} onChange={(e) => updateSpec("maxHitPoints", Math.max(1, Number(e.target.value) || 1))} disabled={!editMode} style={{ width: 60 }} />
+										</Flex>
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 60 }}>护甲/象限</Text>
+											<TextField.Root size="1" type="number" value={specDraft.armorMaxPerQuadrant} onChange={(e) => updateSpec("armorMaxPerQuadrant", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
+										</Flex>
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 60 }}>辐能容量</Text>
+											<TextField.Root size="1" type="number" value={specDraft.fluxCapacity ?? 0} onChange={(e) => updateSpec("fluxCapacity", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
+										</Flex>
+									</Flex>
+								</Card>
+
+								<Card style={{ padding: "6px 8px" }}>
+									<Text size="1" weight="bold" color="gray" mb="1">机动</Text>
+									<Flex direction="column" gap="1">
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 60 }}>最大速度</Text>
+											<TextField.Root size="1" type="number" value={specDraft.maxSpeed} onChange={(e) => updateSpec("maxSpeed", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
+										</Flex>
+										<Flex align="center" gap="1">
+											<Text size="1" color="gray" style={{ width: 60 }}>最大转向</Text>
+											<TextField.Root size="1" type="number" value={specDraft.maxTurnRate} onChange={(e) => updateSpec("maxTurnRate", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
+										</Flex>
+									</Flex>
+								</Card>
+							</>
+						)}
+
+						{activeTab === "json" && (
+							<>
+								<TextArea
+									size="1"
+									value={jsonText}
+									onChange={(e) => { setJsonText(e.target.value); setJsonError(null); }}
+									disabled={!editMode}
+									style={{
+										width: "100%",
+										minHeight: 120,
+										fontFamily: '"Fira Code", monospace',
+										fontSize: 11,
+									}}
+								/>
+								{jsonError && <Text size="1" color="red">{jsonError}</Text>}
+								<Button size="1" variant="solid" color="green" onClick={handleJsonSave} disabled={!editMode} style={{ width: "100%" }}>
+									<Save size={12} /> 应用JSON
+								</Button>
+							</>
+						)}
+
+						{/* 编辑模式按钮 */}
+						{editMode && (
+							<Flex direction="column" gap="1" style={{ marginTop: 4 }}>
+								<Separator size="4" />
+								<Button size="1" variant="soft" color="green" onClick={handleQuickHeal} style={{ width: "100%" }}>修复</Button>
+								<Button size="1" variant="soft" color="orange" onClick={() => handleQuickDamage(100)} style={{ width: "100%" }}>-100伤害</Button>
+								<Button size="1" variant="soft" color="red" onClick={handleDelete} style={{ width: "100%" }}>
+									<Trash2 size={12} /> 删除
+								</Button>
+								<Button size="1" variant="soft" onClick={handleReset} style={{ width: "100%" }}>
+									<RotateCcw size={12} /> 重置
+								</Button>
+								<Button size="1" variant="solid" color="green" onClick={handleSave} style={{ width: "100%" }}>
+									<Save size={12} /> 保存
+								</Button>
+							</Flex>
+						)}
 					</Flex>
-				)}
-
-				{activeTab === "spec" && specDraft && (
-					<Flex direction="column" gap="2" style={{ flexShrink: 0 }}>
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>战斗</Text>
-							<Flex direction="column" gap="1">
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 60 }}>最大HP</Text>
-									<TextField.Root size="1" type="number" value={specDraft.maxHitPoints} onChange={(e) => updateSpec("maxHitPoints", Math.max(1, Number(e.target.value) || 1))} disabled={!editMode} style={{ width: 60 }} />
-								</Flex>
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 60 }}>护甲/象限</Text>
-									<TextField.Root size="1" type="number" value={specDraft.armorMaxPerQuadrant} onChange={(e) => updateSpec("armorMaxPerQuadrant", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
-								</Flex>
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 60 }}>辐能容量</Text>
-									<TextField.Root size="1" type="number" value={specDraft.fluxCapacity ?? 0} onChange={(e) => updateSpec("fluxCapacity", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
-								</Flex>
-							</Flex>
-						</Box>
-
-						<Box className="sidebar-edit-section">
-							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>机动</Text>
-							<Flex direction="column" gap="1">
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 60 }}>最大速度</Text>
-									<TextField.Root size="1" type="number" value={specDraft.maxSpeed} onChange={(e) => updateSpec("maxSpeed", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
-								</Flex>
-								<Flex align="center" gap="1">
-									<Text size="1" style={{ color: "#6b8aaa", width: 60 }}>最大转向</Text>
-									<TextField.Root size="1" type="number" value={specDraft.maxTurnRate} onChange={(e) => updateSpec("maxTurnRate", Math.max(0, Number(e.target.value) || 0))} disabled={!editMode} style={{ width: 60 }} />
-								</Flex>
-							</Flex>
-						</Box>
-					</Flex>
-				)}
-
-				{activeTab === "json" && (
-					<Flex direction="column" gap="2" style={{ flex: 1, minHeight: 0, display: "flex" }}>
-						<TextArea
-							size="1"
-							value={jsonText}
-							onChange={(e) => { setJsonText(e.target.value); setJsonError(null); }}
-							disabled={!editMode}
-							style={{
-								width: "100%",
-								flex: 1,
-								minHeight: 0,
-								fontFamily: '"Fira Code", monospace',
-								fontSize: 11,
-							}}
-						/>
-						{jsonError && <Text size="1" color="red">{jsonError}</Text>}
-						<Button size="1" variant="solid" color="green" onClick={handleJsonSave} disabled={!editMode} style={{ width: "100%", flexShrink: 0 }}>
-							<Save size={12} /> 应用JSON
-						</Button>
-					</Flex>
-				)}
-
-				{/* 编辑模式按钮（在滚动区内） */}
-				{editMode && (
-					<Flex direction="column" gap="1" style={{ flexShrink: 0, marginTop: 4 }}>
-						<Separator size="4" />
-						<Button size="1" variant="soft" color="green" onClick={handleQuickHeal} style={{ width: "100%" }}>修复</Button>
-						<Button size="1" variant="soft" color="orange" onClick={() => handleQuickDamage(100)} style={{ width: "100%" }}>-100伤害</Button>
-						<Button size="1" variant="soft" color="red" onClick={handleDelete} style={{ width: "100%" }}>
-							<Trash2 size={12} /> 删除
-						</Button>
-						<Button size="1" variant="soft" onClick={handleReset} style={{ width: "100%" }}>
-							<RotateCcw size={12} /> 重置
-						</Button>
-						<Button size="1" variant="solid" color="green" onClick={handleSave} style={{ width: "100%" }}>
-							<Save size={12} /> 保存
-						</Button>
-					</Flex>
-				)}
+				</ScrollArea>
 			</Box>
 		</Flex>
 	);

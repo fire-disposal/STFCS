@@ -16,8 +16,8 @@
 		"armorMaxReduction": 0.95,
 		"fluxCapacity": 1000,
 		"fluxDissipation": 50,
-		"maxSpeed": 60,
-		"maxTurnRate": 12,
+		"maxSpeed": 40,
+		"maxTurnRate": 25,
 		"shield": {
 			"arc": 360,
 			"radius": 130,

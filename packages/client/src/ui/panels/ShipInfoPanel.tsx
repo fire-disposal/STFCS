@@ -1,8 +1,9 @@
 /**
- * 舰船信息面板 - 两行布局
- * 支持战斗实例重命名
+ * 舰船信息面板 - 横向列布局
  * 
- * 使用 useSelectedShip hook 统一获取选中舰船
+ * 向 WeaponPanel 风格靠拢：
+ * - 使用 CSS 类替代 inline style
+ * - 多列布局，每列有 header + content
  */
 
 import React, { useState, useCallback } from "react";
@@ -12,7 +13,7 @@ import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-
 import { notify } from "@/ui/shared/Notification";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useGameAction } from "@/hooks/useGameAction";
-import "./battle-panel.css";
+import "./battle-panel-row.css";
 
 const QUADRANT_NAMES = ["前", "右前", "右后", "后", "左后", "左前"];
 
@@ -59,13 +60,8 @@ export const ShipInfoPanel: React.FC = () => {
 
 	const handleSaveName = useCallback(async () => {
 		if (!hasShip || !editingName.trim()) return;
-
 		try {
-			await send("edit:token", {
-				action: "rename",
-				tokenId: ship.$id,
-				displayName: editingName.trim(),
-			});
+			await send("edit:token", { action: "rename", tokenId: ship.$id, displayName: editingName.trim() });
 			notify.success(`已更名为 ${editingName.trim()}`);
 			setIsEditingName(false);
 			setEditingName("");
@@ -84,207 +80,130 @@ export const ShipInfoPanel: React.FC = () => {
 	const posX = hasShip ? Math.round(ship.runtime.position?.x ?? 0) : 0;
 	const posY = hasShip ? Math.round(ship.runtime.position?.y ?? 0) : 0;
 
-	return (
-		<Flex direction="column" gap="2" className="panel-content">
-			{/* 第一行：舰船名称 + 状态徽章 + 朝向 + 位置 */}
-			<Flex className="panel-row" gap="3" align="center">
-				<Flex className="panel-section" align="center" gap="2">
-					{faction && (
-						<Box
-							style={{
-								width: 10,
-								height: 10,
-								borderRadius: "50%",
-								background: `#${FactionColors[faction]?.toString(16).padStart(6, "0")}`,
-								boxShadow: `0 0 8px #${FactionColors[faction]?.toString(16).padStart(6, "0")}`,
-								flexShrink: 0,
-							}}
-						/>
-					)}
+	if (!hasShip) {
+		return (
+			<Box className="battle-row battle-row--empty">
+				<Text size="2" color="gray">选择舰船后显示信息</Text>
+			</Box>
+		);
+	}
 
+	return (
+		<Box className="battle-row">
+			{/* 列1：舰船名称 + 状态 */}
+			<Box className="battle-col battle-col--fixed">
+				<Box className="battle-col__header">
+					<Box style={{ width: 10, height: 10, borderRadius: "50%", background: faction ? `#${FactionColors[faction]?.toString(16).padStart(6, "0")}` : "#6b8aaa", boxShadow: faction ? `0 0 8px #${FactionColors[faction]?.toString(16).padStart(6, "0")}` : "none", flexShrink: 0 }} />
+					<Text size="1" weight="bold">{displayName}</Text>
 					{isEditingName ? (
 						<Flex align="center" gap="1">
-							<TextField.Root
-								size="2"
-								value={editingName}
-								onChange={(e) => setEditingName(e.target.value)}
-								style={{ width: 140 }}
-							/>
-							<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}>
-								<Check size={14} />
-							</IconButton>
-							<IconButton size="1" variant="ghost" color="red" onClick={handleCancelEdit}>
-								<X size={14} />
-							</IconButton>
+							<TextField.Root size="1" value={editingName} onChange={(e) => setEditingName(e.target.value)} style={{ width: 100 }} />
+							<IconButton size="1" variant="ghost" color="green" onClick={handleSaveName}><Check size={12} /></IconButton>
+							<IconButton size="1" variant="ghost" color="red" onClick={handleCancelEdit}><X size={12} /></IconButton>
 						</Flex>
 					) : (
-						<Flex align="center" gap="1">
-							<Text size="3" weight="bold" style={{ color: "#cfe8ff", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}>
-								{hasShip ? displayName : "请选择舰船"}
-							</Text>
-							{hasShip && (
-								<IconButton size="1" variant="ghost" onClick={handleStartEdit}>
-									<Edit2 size={12} />
-								</IconButton>
-							)}
-						</Flex>
+						<IconButton size="1" variant="ghost" onClick={handleStartEdit}><Edit2 size={12} /></IconButton>
 					)}
-				</Flex>
-
-				<Box className="panel-divider" />
-
-				<Flex className="panel-section" align="center" gap="2">
-					{overloaded && <Badge color="red" size="2"><AlertTriangle size={12} /> 过载</Badge>}
-					{shieldActive && <Badge color="blue" size="2">护盾</Badge>}
-					{destroyed && <Badge color="gray" size="2">损毁</Badge>}
-				</Flex>
-
-				<Box className="panel-divider" />
-
-				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 0 }}>
-					<Text size="1" style={{ color: "#6b8aaa", fontWeight: 600, whiteSpace: "nowrap" }}>坐标</Text>
-					<div className="cursor-coordinate-input__row" style={{ height: 26, gap: 4, flex: 1, maxWidth: 260 }}>
-						<div
-							style={{
-								flex: 1,
-								display: "flex",
-								alignItems: "center",
-								padding: "2px 8px",
-								height: "100%",
-								background: "rgba(6, 16, 26, 0.8)",
-								border: "1px solid rgba(74, 158, 255, 0.2)",
-								color: "#cfe8ff",
-								fontSize: 10,
-								fontFamily: "'Consolas', 'Monaco', monospace",
-							}}
-						>
-							{hasShip ? `${headingDeg}°, ${posX}, ${posY}` : "NA"}
-						</div>
-						<button
-							className="cursor-coordinate-input__btn cursor-coordinate-input__btn--copy"
-							style={{ minWidth: 50, padding: "4px 6px", height: "100%", fontSize: 9 }}
-							onClick={() => navigator.clipboard.writeText(
-								hasShip ? `${headingDeg},${posX},${posY}` : ""
-							)}
-							data-magnetic
-						>
-							<Copy size={10} />
-							<span className="cursor-coordinate-input__btn-text">复制</span>
-						</button>
-					</div>
-				</Flex>
-			</Flex>
-
-			{/* 第二行：船体 | 辐能 | 护甲 */}
-			<Flex className="panel-row" gap="3" align="center">
-				{/* 船体 */}
-				<Flex className="panel-section" align="center" gap="3" style={{ minWidth: 180 }}>
-					<Anchor size={18} style={{ color: "#2ecc71" }} />
-					<Flex direction="column" gap="1" style={{ flex: 1 }}>
-						<Flex justify="between" align="center">
-							<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>船体</Text>
-							<Text size="2" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-								{hasShip ? `${hull}/${hullMax}` : "NA"}
-							</Text>
-						</Flex>
-						<Progress
-							value={hullPct}
-							color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"}
-							style={{ width: "100%", height: 10 }}
-						/>
+				</Box>
+				<Box className="battle-col__content">
+					<Flex gap="1" wrap="wrap">
+						{overloaded && <Badge color="red" size="1"><AlertTriangle size={10} /> 过载</Badge>}
+						{shieldActive && <Badge color="blue" size="1">护盾</Badge>}
+						{destroyed && <Badge color="gray" size="1">损毁</Badge>}
 					</Flex>
-				</Flex>
+				</Box>
+			</Box>
 
-				<Box className="panel-divider" />
+			{/* 分隔线 */}
+			<Box className="battle-divider" />
 
-				{/* 辐能 */}
-				<Flex className="panel-section panel-section--vertical" gap="1" style={{ minWidth: 220, flex: 1 }}>
-					<Flex justify="between" align="center" style={{ width: "100%" }}>
-						<Flex align="center" gap="2">
-							<Zap size={16} style={{ color: overloaded ? "#ff4444" : "#ffaa00" }} />
-							<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>辐能</Text>
-						</Flex>
-						<Flex gap="2" align="center">
-							<Flex gap="1" align="center">
-								<Box style={{ width: 8, height: 8, borderRadius: 2, background: "#6ab4ff" }} />
-								<Text size="1" style={{ color: "#8ba4c7" }}>{fluxSoft}</Text>
-							</Flex>
-							<Flex gap="1" align="center">
-								<Box style={{ width: 8, height: 8, borderRadius: 2, background: "#ff6f8f" }} />
-								<Text size="1" style={{ color: "#8ba4c7" }}>{fluxHard}</Text>
-							</Flex>
-						</Flex>
+			{/* 列2：船体 */}
+			<Box className="battle-col battle-col--auto">
+				<Box className="battle-col__header">
+					<Anchor size={12} style={{ color: "#2ecc71" }} />
+					<Text size="1">船体</Text>
+				</Box>
+				<Box className="battle-col__content battle-col__content--horizontal">
+					<Text size="1" color="gray">HP</Text>
+					<Text size="2" weight="bold" style={{ color: "#cfe8ff" }}>{hull}/{hullMax}</Text>
+					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 80, height: 8 }} />
+				</Box>
+			</Box>
+
+			{/* 分隔线 */}
+			<Box className="battle-divider" />
+
+			{/* 列3：辐能 */}
+			<Box className="battle-col battle-col--wide">
+				<Box className="battle-col__header">
+					<Zap size={12} style={{ color: overloaded ? "#ff4444" : "#ffaa00" }} />
+					<Text size="1">辐能</Text>
+					<Flex gap="1" align="center">
+						<Box style={{ width: 6, height: 6, borderRadius: 2, background: "#6ab4ff" }} />
+						<Text size="1" color="gray">{fluxSoft}</Text>
+						<Box style={{ width: 6, height: 6, borderRadius: 2, background: "#ff6f8f" }} />
+						<Text size="1" color="gray">{fluxHard}</Text>
 					</Flex>
-					<Box className="flux-bar-container" style={{ width: "100%", minWidth: 0 }}>
-						<Box className="flux-bar" style={{ height: 16 }}>
-							{/* 硬辐能（左）— 粉色 */}
-							<Box
-								className="flux-bar__fill--hard"
-								style={{ width: `${fluxHardPct}%` }}
-							/>
-							{/* 软辐能（右）— 蓝色 */}
-							<Box
-								className="flux-bar__fill--soft"
-								style={{ width: `${fluxSoftPct}%`, left: `${fluxHardPct}%` }}
-							/>
-							{/* 过载时全条红色闪烁覆盖 */}
-							{overloaded && (
-								<Box
-									className="flux-bar__fill--overload"
-									style={{ width: `${fluxTotalPct}%` }}
-								/>
-							)}
+				</Box>
+				<Box className="battle-col__content battle-col__content--horizontal">
+					<Box className="flux-bar-container">
+						<Box className="flux-bar">
+							<Box className="flux-bar__fill--hard" style={{ width: `${fluxHardPct}%` }} />
+							<Box className="flux-bar__fill--soft" style={{ width: `${fluxSoftPct}%`, left: `${fluxHardPct}%` }} />
+							{overloaded && <Box className="flux-bar__fill--overload" style={{ width: `${fluxTotalPct}%` }} />}
 						</Box>
-						<Flex justify="between" style={{ width: "100%" }}>
-							<Text size="2" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-								{fluxTotal}/{fluxMax}
-							</Text>
-							<Text size="1" style={{ color: overloaded ? "#ff4444" : "#6b8aaa" }}>
-								{fluxTotalPct.toFixed(0)}%
-							</Text>
+						<Flex justify="between">
+							<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>{fluxTotal}/{fluxMax}</Text>
+							<Text size="1" color="gray">{fluxTotalPct.toFixed(0)}%</Text>
 						</Flex>
 					</Box>
-				</Flex>
+				</Box>
+			</Box>
 
-				<Box className="panel-divider" />
+			{/* 分隔线 */}
+			<Box className="battle-divider" />
 
-				{/* 护甲象限 - 紧凑一行 */}
-				<Flex className="panel-section" align="center" gap="1">
-					<Text size="1" style={{ color: "#6b8aaa", fontWeight: 600, marginRight: 4 }}>护甲</Text>
+			{/* 列4：护甲 */}
+			<Box className="battle-col battle-col--fixed">
+				<Box className="battle-col__header">
+					<Text size="1">护甲</Text>
+				</Box>
+				<Box className="battle-col__content battle-col__content--horizontal">
 					{armor.length === 6 ? (
-						<Flex gap="1">
-							{armor.map((val, idx) => {
-								const pct = val / armorMax;
-								return (
-									<Box
-										key={idx}
-										style={{
-											width: 24,
-											height: 24,
-											borderRadius: 3,
-											background: getArmorColor(pct),
-											opacity: pct > 0 ? 1 : 0.3,
-											border: "1px solid rgba(255,255,255,0.1)",
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											fontSize: 10,
-											fontWeight: 600,
-											color: "#fff",
-										}}
-										title={`${QUADRANT_NAMES[idx]}: ${val}/${armorMax}`}
-									>
-										{val}
-									</Box>
-								);
-							})}
-						</Flex>
+						<Box className="armor-grid">
+							{armor.map((val, idx) => (
+								<Box
+									key={idx}
+									className="armor-cell"
+									style={{ background: getArmorColor(val / armorMax), opacity: val > 0 ? 1 : 0.3 }}
+									title={`${QUADRANT_NAMES[idx]}: ${val}/${armorMax}`}
+								>
+									{val}
+								</Box>
+							))}
+						</Box>
 					) : (
-						<Text size="1" style={{ color: "#4a5568" }}>无</Text>
+						<Text size="1" color="gray">无</Text>
 					)}
-				</Flex>
-			</Flex>
-		</Flex>
+				</Box>
+			</Box>
+
+			{/* 分隔线 */}
+			<Box className="battle-divider" />
+
+			{/* 列5：坐标 */}
+			<Box className="battle-col battle-col--auto">
+				<Box className="battle-col__header">
+					<Text size="1">坐标</Text>
+				</Box>
+				<Box className="battle-col__content battle-col__content--horizontal">
+					<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>{headingDeg}°, {posX}, {posY}</Text>
+					<IconButton size="1" variant="ghost" onClick={() => navigator.clipboard.writeText(`${headingDeg},${posX},${posY}`)}>
+						<Copy size={12} />
+					</IconButton>
+				</Box>
+			</Box>
+		</Box>
 	);
 };
 

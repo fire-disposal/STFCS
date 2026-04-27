@@ -13,6 +13,7 @@
 
 import { Check, Copy, Move, X } from "lucide-react";
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { normalizeAngle } from "@vt/data";
 
 export type CursorState = "IDLE" | "EDITING" | "VALID" | "INVALID";
 
@@ -59,9 +60,11 @@ export const CursorInput: React.FC<CursorInputProps> = ({
     const isExternalChange = useRef(false);
     const lastDisplayValueRef = useRef<string>("");
 
-    // 格式化当前游标坐标
+    // 格式化当前游标坐标（显示航海角度格式）
     const formatCurrentCoords = useCallback(() => {
-        return `${Math.round(cursorX)},${Math.round(cursorY)},${Math.round(cursorR)}`;
+        // 游标存储的是 PixiJS 角度（负值表示顺时针），显示时转换为航海角度（正值）
+        const displayR = normalizeAngle(-cursorR);
+        return `${Math.round(cursorX)},${Math.round(cursorY)},${Math.round(displayR)}`;
     }, [cursorX, cursorY, cursorR]);
 
     // 解析游标坐标字符串
@@ -131,12 +134,16 @@ export const CursorInput: React.FC<CursorInputProps> = ({
 
         isExternalChange.current = true;
 
+        // 用户输入航海角度，转换为 PixiJS 角度存储（负值）
+        const pixiR = -normalizeAngle(parsedCoords.r);
+        const currentPixiR = cursorR;
+
         if (
             parsedCoords.x !== Math.round(cursorX) ||
             parsedCoords.y !== Math.round(cursorY) ||
-            parsedCoords.r !== Math.round(cursorR)
+            pixiR !== currentPixiR
         ) {
-            onCursorChange(parsedCoords.x, parsedCoords.y, parsedCoords.r);
+            onCursorChange(parsedCoords.x, parsedCoords.y, pixiR);
         }
 
         setState("IDLE");

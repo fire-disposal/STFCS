@@ -311,7 +311,7 @@ export class Room {
 				const updates: Partial<TokenRuntime> = {
 					fluxSoft: result.newFluxSoft,
 					fluxHard: result.newFluxHard,
-					venting: false,
+					venting: result.ventingCleared ? false : token.runtime.venting,
 					movement: {
 						currentPhase: "A",
 						hasMoved: false,
@@ -329,11 +329,36 @@ export class Room {
 					updates.overloadTime = 0;
 				}
 
-				if (result.weaponsUpdated && token.runtime.weapons) {
-					updates.weapons = token.runtime.weapons;
+				if (result.overloadTriggered) {
+					updates.overloaded = true;
+					updates.overloadTime = 1;
+					if (token.runtime.shield) {
+						updates.shield = { ...token.runtime.shield, active: false };
+					}
+				}
+
+				if (result.weaponsUpdated && result.updatedWeapons) {
+					updates.weapons = result.updatedWeapons;
 				}
 
 				this.stateManager.updateTokenRuntime(token.$id, updates);
+
+				// 发送回合结算通知
+				if (result.fluxDissipated || result.overloadEnded || result.overloadTriggered) {
+					this.callbacks.broadcast({
+						type: "TURN_END_UPDATE",
+						payload: {
+							tokenId: token.$id,
+							tokenName: token.metadata?.name ?? tokenId,
+							fluxChange: {
+								soft: result.newFluxSoft,
+								hard: result.newFluxHard,
+							},
+							overloadEnded: result.overloadEnded,
+							overloadTriggered: result.overloadTriggered,
+						},
+					});
+				}
 			}
 		}
 	}

@@ -12,7 +12,7 @@
 import type { CombatToken } from "../../state/Token.js";
 import type { WeaponRuntime, MountSpec } from "@vt/data";
 import { updateWeaponStateAtTurnEnd } from "./weapon.js";
-import { getFluxDissipation, endOverload, addSoftFlux } from "../modules/flux.js";
+import { getFluxDissipation } from "../modules/flux.js";
 import { calculateShieldUpkeep } from "../modules/shield.js";
 import type { EngineContext, EngineResult } from "../context.js";
 import { createEngineEvent } from "../context.js";
@@ -20,7 +20,9 @@ import { createEngineEvent } from "../context.js";
 export interface TurnEndResult {
 	fluxDissipated: boolean;
 	overloadEnded: boolean;
+	overloadTriggered?: boolean;
 	weaponsUpdated: boolean;
+	updatedWeapons?: WeaponRuntime[];
 	movementReset: boolean;
 	ventingCleared: boolean;
 	newFluxSoft: number;
@@ -36,6 +38,7 @@ export interface ProcessAllTokensResult {
 
 /**
  * 处理单个舰船的回合结束逻辑
+ * 纯计算：不直接修改 token，返回新值
  */
 export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	const runtime = token.runtime;
@@ -61,26 +64,39 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		newFluxHard: runtime.fluxHard ?? 0,
 	};
 
+	let currentSoft = runtime.fluxSoft ?? 0;
+	let currentHard = runtime.fluxHard ?? 0;
+
 	// 1. 处理排散状态清除
 	if (runtime.venting) {
-		runtime.venting = false;
 		result.ventingCleared = true;
 	}
 
 	// 2. 处理过载恢复时间
 	if (runtime.overloaded && runtime.overloadTime > 0) {
-		runtime.overloadTime = runtime.overloadTime - 1;
-		if (runtime.overloadTime <= 0) {
-			endOverload(token);
+		const newOverloadTime = runtime.overloadTime - 1;
+		if (newOverloadTime <= 0) {
 			result.overloadEnded = true;
 		}
 	}
 
-	// 3. 护盾维持消耗：护盾开启时每回合结束产生 soft flux（含容量检查和过载触发）
+	// 3. 护盾维持消耗：护盾开启时每回合结束产生 soft flux
 	const shieldUpkeep = calculateShieldUpkeep(token);
 	if (shieldUpkeep > 0) {
-		addSoftFlux(token, shieldUpkeep);
-		result.newFluxSoft = token.runtime?.fluxSoft ?? 0;
+		const capacity = token.spec.fluxCapacity ?? 100;
+		const currentTotal = currentSoft + currentHard;
+		const available = capacity - currentTotal;
+		
+		if (available > 0) {
+			const added = Math.min(shieldUpkeep, available);
+			currentSoft += added;
+			result.newFluxSoft = currentSoft;
+			
+			// 检查是否过载
+			if (currentSoft + currentHard >= capacity && !runtime.overloaded) {
+				result.overloadTriggered = true;
+			}
+		}
 	}
 
 	// 4. 处理辐能消散
@@ -88,30 +104,33 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	const shieldActive = runtime.shield?.active ?? false;
 
 	if (dissipation > 0) {
-		const oldSoft = runtime.fluxSoft ?? 0;
-		const oldHard = runtime.fluxHard ?? 0;
-
 		// 软辐能优先消散
-		if (oldSoft > 0) {
-			runtime.fluxSoft = Math.max(0, oldSoft - dissipation);
-			result.fluxDissipated = runtime.fluxSoft < oldSoft;
+		if (currentSoft > 0) {
+			const newSoft = Math.max(0, currentSoft - dissipation);
+			if (newSoft !== currentSoft) {
+				result.fluxDissipated = true;
+			}
+			currentSoft = newSoft;
 		}
 
 		// 护盾关闭时硬辐能也会消散
-		if (!shieldActive && oldHard > 0) {
-			runtime.fluxHard = Math.max(0, oldHard - dissipation);
-			result.fluxDissipated = result.fluxDissipated || runtime.fluxHard < oldHard;
+		if (!shieldActive && currentHard > 0) {
+			const newHard = Math.max(0, currentHard - dissipation);
+			if (newHard !== currentHard) {
+				result.fluxDissipated = true;
+			}
+			currentHard = newHard;
 		}
 
-		result.newFluxSoft = runtime.fluxSoft ?? 0;
-		result.newFluxHard = runtime.fluxHard ?? 0;
+		result.newFluxSoft = currentSoft;
+		result.newFluxHard = currentHard;
 	}
 
-	// 4. 处理武器状态转换
+	// 5. 处理武器状态转换
 	if (runtime.weapons && runtime.weapons.length > 0) {
 		const spec = token.spec;
-		const oldWeapons = runtime.weapons;
-		const updatedWeapons: (WeaponRuntime | undefined)[] = oldWeapons.map((w: WeaponRuntime | undefined) => {
+		const weaponsList = runtime.weapons;
+		const updatedWeapons: (WeaponRuntime | undefined)[] = weaponsList.map((w: WeaponRuntime | undefined) => {
 			if (!w) return w;
 			const mount = spec.mounts?.find((m: MountSpec) => m.id === w.mountId);
 			const weaponSpec = mount?.weapon?.spec;
@@ -122,31 +141,19 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		});
 
 		const hasChanges = updatedWeapons.some(
-			(w: WeaponRuntime | undefined, i: number) => w && oldWeapons[i] && w.state !== oldWeapons[i]?.state
+			(w: WeaponRuntime | undefined, i: number) => w && weaponsList[i] && w.state !== weaponsList[i]?.state
 		);
 
 		if (hasChanges) {
-			runtime.weapons = updatedWeapons as typeof runtime.weapons;
 			result.weaponsUpdated = true;
+			result.updatedWeapons = updatedWeapons.filter((w): w is WeaponRuntime => w !== undefined);
 		}
 	}
 
 	// 6. 重置移动状态
 	if (runtime.movement) {
-		runtime.movement = {
-			currentPhase: "A",
-			phaseAUsed: 0,
-			turnAngleUsed: 0,
-			phaseCUsed: 0,
-			phaseALock: null,
-			phaseCLock: null,
-			hasMoved: false,
-		};
 		result.movementReset = true;
 	}
-
-	// 7. 重置开火标记
-	runtime.hasFired = false;
 
 	return result;
 }

@@ -1,0 +1,356 @@
+/**
+ * 战斗面板行布局 - 统一列组件样式
+ * 
+ * 使用方式：类似于 WeaponPanel 的四列布局
+ * 每列包含 header + content 结构
+ */
+
+/* ====== 行容器 ====== */
+.battle-row {
+	display: flex !important;
+	flex-direction: row !important;
+	gap: 8px;
+	height: 100%;
+	min-height: 180px;
+	min-width: 0;
+	padding: 4px;
+	background: rgba(13, 40, 71, 0.6);
+	border-radius: 4px;
+	border: 1px solid rgba(74, 158, 255, 0.2);
+	align-items: stretch;
+}
+
+.battle-row--empty {
+	min-height: 60px;
+	padding: 16px 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+
+/* ====== 列组件 ====== */
+.battle-col {
+	display: flex !important;
+	flex-direction: column !important;
+	background: rgba(10, 25, 50, 0.5);
+	border: 1px solid rgba(74, 158, 255, 0.15);
+	border-radius: 4px;
+	min-height: 0;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.battle-col__header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	min-height: 24px;
+	font-size: 11px;
+	font-weight: bold;
+	color: #cfe8ff;
+	background: rgba(20, 35, 60, 0.6);
+	border-bottom: 1px solid rgba(74, 158, 255, 0.15);
+	flex-shrink: 0;
+}
+
+.battle-col__content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px 6px;
+	min-height: 0;
+	overflow-y: auto;
+	align-items: center;
+}
+
+/* ====== 列宽度比例 ====== */
+.battle-col--auto {
+	flex: 1;
+	min-width: 60px;
+}
+
+.battle-col--wide {
+	flex: 2;
+	min-width: 120px;
+}
+
+.battle-col--narrow {
+	flex: 0.5;
+	min-width: 40px;
+	max-width: 60px;
+}
+
+.battle-col--fixed {
+	flex: none;
+	min-width: 100px;
+	max-width: 180px;
+}
+
+/* ====== 横向内容 ====== */
+.battle-col__content--horizontal {
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+/* ====== 分隔线 ====== */
+.battle-divider {
+	width: 1px;
+	align-self: stretch;
+	background: linear-gradient(180deg, transparent, rgba(74, 158, 255, 0.2), transparent);
+	flex-shrink: 0;
+}
+
+/* ====== 区块样式 ====== */
+.battle-block {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	background: rgba(10, 30, 50, 0.4);
+	border: 1px solid rgba(43, 66, 97, 0.4);
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+.battle-block--vertical {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+}
+
+.battle-block--active {
+	border-color: rgba(74, 158, 255, 0.4);
+	background: rgba(74, 158, 255, 0.08);
+}
+
+/* ====== D-Pad 网格 ====== */
+.dpad-grid {
+	display: grid;
+	grid-template-columns: 36px 42px 36px;
+	grid-template-rows: 36px 42px 36px;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.dpad-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	background: rgba(10, 30, 50, 0.7);
+	border: 1px solid rgba(43, 66, 97, 0.5);
+	border-radius: 4px;
+	color: #8ba4c7;
+	cursor: pointer;
+	transition: all 0.12s;
+	font-size: 16px;
+}
+
+.dpad-btn:hover:not(:disabled) {
+	border-color: rgba(74, 158, 255, 0.4);
+	background: rgba(74, 158, 255, 0.1);
+	color: #cfe8ff;
+}
+
+.dpad-btn:active:not(:disabled) {
+	transform: scale(0.95);
+}
+
+.dpad-btn--active {
+	border-color: #4a9eff;
+	background: rgba(74, 158, 255, 0.2);
+	color: #4a9eff;
+	box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+}
+
+.dpad-btn:disabled {
+	opacity: 0.25;
+	cursor: not-allowed;
+}
+
+.dpad-center {
+	grid-column: 2;
+	grid-row: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 9px;
+	color: #4a5568;
+}
+
+/* ====== 辐能条 ====== */
+.flux-bar-container {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 120px;
+	flex: 1;
+}
+
+.flux-bar-labels {
+	display: flex;
+	justify-content: space-between;
+	font-size: 10px;
+	color: #6b8aaa;
+}
+
+.flux-bar {
+	height: 12px;
+	background: rgba(10, 30, 50, 0.8);
+	border: 1px solid rgba(43, 66, 97, 0.5);
+	border-radius: 3px;
+	overflow: hidden;
+	position: relative;
+}
+
+.flux-bar__fill {
+	height: 100%;
+	transition: width 0.3s ease;
+	border-radius: 2px;
+}
+
+.flux-bar__fill--soft {
+	background: linear-gradient(90deg, #4a9eff, #6ab4ff);
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 100%;
+	z-index: 2;
+}
+
+.flux-bar__fill--hard {
+	background: linear-gradient(90deg, #ff6f8f, #ff8fa8);
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 100%;
+	z-index: 1;
+}
+
+.flux-bar__fill--overload {
+	background: repeating-linear-gradient(90deg, #ff4444 0px, #ff6f8f 4px, #ff4444 8px);
+	animation: flux-overload-pulse 0.5s ease-in-out infinite;
+	position: absolute;
+	top: 0;
+	height: 100%;
+	z-index: 3;
+}
+
+@keyframes flux-overload-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
+
+.flux-bar__label {
+	font-size: 11px;
+	font-weight: 600;
+	color: #8ba4c7;
+	font-variant-numeric: tabular-nums;
+	font-family: "Fira Code", "Consolas", monospace;
+}
+
+/* ====== 状态指示灯 ====== */
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.status-dot--active {
+	background: #2ecc71;
+	box-shadow: 0 0 6px rgba(46, 204, 113, 0.6);
+}
+
+.status-dot--inactive {
+	background: #4a5568;
+}
+
+.status-dot--warning {
+	background: #f1c40f;
+	box-shadow: 0 0 6px rgba(241, 196, 15, 0.6);
+}
+
+.status-dot--danger {
+	background: #ff6f8f;
+	box-shadow: 0 0 6px rgba(255, 111, 143, 0.6);
+}
+
+/* ====== 护甲象限 ====== */
+.armor-grid {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.armor-cell {
+	width: 22px;
+	height: 22px;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 10px;
+	font-weight: 600;
+	color: #fff;
+	border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ====== 滚动条 ====== */
+.battle-col__content::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+
+.battle-col__content::-webkit-scrollbar-track {
+	background: rgba(10, 30, 50, 0.3);
+	border-radius: 2px;
+}
+
+.battle-col__content::-webkit-scrollbar-thumb {
+	background: rgba(74, 158, 255, 0.3);
+	border-radius: 2px;
+}
+
+.battle-col__content::-webkit-scrollbar-thumb:hover {
+	background: rgba(74, 158, 255, 0.5);
+}
+
+/* ====== 统计行（类似 weapon-stat-row） ====== */
+.battle-stat-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 2px 0;
+	border-bottom: 1px solid rgba(74, 158, 255, 0.08);
+	gap: 8px;
+}
+
+.battle-stat-row:last-child {
+	border-bottom: none;
+}
+
+/* ====== 两列信息布局（类似 weapon-info__cols） ====== */
+.battle-info__cols {
+	display: flex;
+	flex-direction: row;
+	gap: 6px;
+	min-height: 0;
+	flex: 1;
+}
+
+.battle-info__col {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1;
+}

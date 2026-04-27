@@ -182,23 +182,25 @@ export const editHandlers = {
                     throw err("当前阶段不允许强制结束回合", ErrorCodes.INVALID_PHASE);
                 }
 
-                // 推进到 TURN_ORDER 中的下一个派系
                 const currentFaction = room.getStateManager().getState().activeFaction;
                 const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
                 const nextIndex = currentIndex + 1;
                 const incrementTurn = nextIndex >= TURN_ORDER.length;
 
-                // 保持 PLAYER_ACTION 阶段，changePhase 会自动更新 activeFaction
-                ctx.state.changePhase(GamePhase.PLAYER_ACTION);
-
-                // 重置所有玩家的准备状态
-                ctx.state.resetAllPlayersReady();
-
                 if (incrementTurn) {
+                    // 回合末：先结算，再 turn++
+                    room.processTurnEndLogic();
                     const newTurn = room.getStateManager().getState().turnCount + 1;
                     ctx.state.changeTurn(newTurn);
-                    room.processTurnEndLogic();
+                    // changePhase 会用新 turnCount 计算第一个派系
+                    ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+                } else {
+                    // 派系切换：直接设置下一个派系
+                    const nextFaction = TURN_ORDER[nextIndex] as Faction;
+                    ctx.state.changeFaction(nextFaction);
                 }
+
+                ctx.state.resetAllPlayersReady();
 
                 return;
             }

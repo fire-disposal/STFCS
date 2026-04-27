@@ -1,7 +1,7 @@
 /**
- * ShipPresetPanel - 舰船预设面板
- * 横向布局，显示用户存档内的舰船配置
- * 单选卡片 + Pixi预览 + 部署按钮
+ * ShipPresetPanel - 舰船预设面板（重构版）
+ * 
+ * 使用统一 CSS 类布局
  */
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -13,7 +13,7 @@ import type { SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
 import { notify } from "@/ui/shared/Notification";
 import { useUIStore } from "@/state/stores/uiStore";
-import "./battle-panel.css";
+import "./battle-panel-row.css";
 
 const HULL_SIZE_NAMES: Record<string, string> = {
 	[HullSize.FRIGATE]: "护卫舰",
@@ -108,7 +108,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 			venting: false,
 			weapons: (spec.mounts ?? []).map((m) => ({
 				mountId: m.id,
-				state: "READY",
+				state: "READY" as const,
 				cooldownRemaining: 0,
 			})),
 		};
@@ -127,20 +127,13 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 		};
 
 		try {
-			const { getGameActionSender } = await import("@/state/stores/gameStore");
-			const sender = getGameActionSender();
-			if (!sender.isAvailable()) {
-				notify.error("网络未连接");
-				return;
-			}
-			const result = await sender.send("edit:token", {
+			await networkManager.send("edit:token", {
 				action: "create",
 				token: combatToken,
 				faction: FactionEnum.PLAYER_ALLIANCE,
 				position: cursorPosition,
 			});
-			const displayName = (result as { tokenId: string; displayName?: string }).displayName ?? selectedPreset.name;
-			notify.success(`已部署 ${displayName} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
+			notify.success(`已部署 ${selectedPreset.name} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "部署失败");
 		}
@@ -148,122 +141,139 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 
 	if (loading) {
 		return (
-			<Flex align="center" gap="2" className="panel-row">
+			<Box className="battle-row battle-row--empty">
 				<Text size="2" color="gray">加载预设...</Text>
-			</Flex>
+			</Box>
 		);
 	}
 
 	return (
-		<Flex className="panel-row" gap="3" style={{ minWidth: 0, flex: 1 }}>
-			<Flex className="panel-section" align="center" gap="3" style={{ minWidth: 240 }}>
-				<TextField.Root
-					size="1"
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-					placeholder="搜索舰船..."
-					style={{ width: 130 }}
-				>
-					<TextField.Slot>
-						<Search size={12} />
-					</TextField.Slot>
-				</TextField.Root>
-
-				<Select.Root value={filterSize} onValueChange={setFilterSize}>
-					<Select.Trigger style={{ minWidth: 80 }}>
-						<Filter size={12} />
-					</Select.Trigger>
-					<Select.Content>
-						<Select.Item value="all">全部</Select.Item>
-						<Select.Item value="FRIGATE">护卫舰</Select.Item>
-						<Select.Item value="DESTROYER">驱逐舰</Select.Item>
-						<Select.Item value="CRUISER">巡洋舰</Select.Item>
-						<Select.Item value="CAPITAL">主力舰</Select.Item>
-					</Select.Content>
-				</Select.Root>
-			</Flex>
-
-			<Box className="panel-divider" />
-
-			<Box style={{ flex: 1, minWidth: 0 }}>
-				<ScrollArea style={{ height: 140 }}>
-					<Flex gap="3" style={{ paddingRight: 8, flexWrap: "wrap" }}>
-						{filteredPresets.length === 0 ? (
-							<Text size="1" color="gray">暂无预设舰船</Text>
-						) : (
-							filteredPresets.map((preset) => (
-								<Flex
-									key={preset.id}
-									direction="column"
-									align="center"
-									gap="1"
-									style={{
-										padding: 6,
-										background: selectedId === preset.id
-											? "rgba(74, 158, 255, 0.2)"
-											: "rgba(26, 45, 66, 0.4)",
-										border: selectedId === preset.id
-											? "1px solid rgba(74, 158, 255, 0.6)"
-											: "1px solid rgba(43, 66, 97, 0.4)",
-										borderRadius: 6,
-										cursor: "pointer",
-										minWidth: 90,
-									}}
-									onClick={() => setSelectedId(preset.id)}
-								>
-									<ShipPreviewCanvas
-										token={preset.token}
-										size={60}
-										selected={selectedId === preset.id}
-									/>
-									<Text size="1" style={{
-										maxWidth: 80,
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										whiteSpace: "nowrap",
-										color: selectedId === preset.id ? "#4fc3ff" : "#cfe8ff",
-									}}>
-										{preset.name}
-									</Text>
-								</Flex>
-							))
-						)}
+		<Box className="battle-row">
+			{/* 列1：搜索筛选 */}
+			<Box className="battle-col battle-col--fixed">
+				<Box className="battle-col__header">
+					<Search size={12} /> 筛选
+				</Box>
+				<Box className="battle-col__content">
+					<Flex gap="1" direction="column">
+						<TextField.Root
+							size="1"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="搜索..."
+							style={{ width: "100%" }}
+						/>
+						<Select.Root value={filterSize} onValueChange={setFilterSize}>
+							<Select.Trigger style={{ width: "100%" }}>
+								<Filter size={10} />
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="all">全部</Select.Item>
+								<Select.Item value="FRIGATE">护卫舰</Select.Item>
+								<Select.Item value="DESTROYER">驱逐舰</Select.Item>
+								<Select.Item value="CRUISER">巡洋舰</Select.Item>
+								<Select.Item value="CAPITAL">主力舰</Select.Item>
+							</Select.Content>
+						</Select.Root>
 					</Flex>
-				</ScrollArea>
+				</Box>
 			</Box>
 
-			<Box className="panel-divider" />
+			<Box className="battle-divider" />
 
-			<Flex className="panel-section" align="center" gap="2">
-				<Target size={14} />
-				<Text size="1" color="gray">游标</Text>
-				<Text size="1" weight="bold">
-					({Math.round(cursorPosition.x)}, {Math.round(cursorPosition.y)})
-				</Text>
-			</Flex>
+			{/* 列2：预设列表 */}
+			<Box className="battle-col battle-col--wide">
+				<Box className="battle-col__header">
+					<Rocket size={12} /> 预设舰船 ({filteredPresets.length})
+				</Box>
+				<Box className="battle-col__content">
+					<ScrollArea style={{ height: "100%" }}>
+						<Flex gap="2" wrap="wrap">
+							{filteredPresets.length === 0 ? (
+								<Text size="1" color="gray">暂无预设舰船</Text>
+							) : (
+								filteredPresets.map((preset) => {
+									const isSelected = selectedId === preset.id;
+									return (
+										<Box
+											key={preset.id}
+											onClick={() => setSelectedId(preset.id)}
+											style={{
+												padding: 6,
+												background: isSelected ? "rgba(74, 158, 255, 0.2)" : "rgba(26, 45, 66, 0.4)",
+												border: isSelected ? "1px solid rgba(74, 158, 255, 0.6)" : "1px solid rgba(43, 66, 97, 0.4)",
+												borderRadius: 6,
+												cursor: "pointer",
+												minWidth: 80,
+												transition: "all 0.15s",
+											}}
+										>
+											<ShipPreviewCanvas token={preset.token} size={50} selected={isSelected} />
+											<Text size="1" style={{
+												display: "block",
+												maxWidth: 70,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+												color: isSelected ? "#4fc3ff" : "#cfe8ff",
+												textAlign: "center",
+												marginTop: 4,
+											}}>
+												{preset.name}
+											</Text>
+										</Box>
+									);
+								})
+							)}
+						</Flex>
+					</ScrollArea>
+				</Box>
+			</Box>
 
+			<Box className="battle-divider" />
+
+			{/* 列3：游标位置 */}
+			<Box className="battle-col battle-col--fixed">
+				<Box className="battle-col__header">
+					<Target size={12} /> 游标
+				</Box>
+				<Box className="battle-col__content battle-col__content--horizontal">
+					<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>
+						({Math.round(cursorPosition.x)}, {Math.round(cursorPosition.y)})
+					</Text>
+				</Box>
+			</Box>
+
+			{/* 列4：选中信息 */}
 			{selectedPreset && (
-				<Flex className="panel-section" align="center" gap="2">
-					<Badge size="1" variant="soft">
-						{HULL_SIZE_NAMES[selectedPreset.hullSize] ?? selectedPreset.hullSize}
-					</Badge>
-					<Badge size="1" variant="outline">
-						{selectedPreset.weaponCount} 武器
-					</Badge>
-				</Flex>
+				<>
+					<Box className="battle-divider" />
+					<Box className="battle-col battle-col--narrow">
+						<Box className="battle-col__header">选中</Box>
+						<Box className="battle-col__content battle-col__content--horizontal">
+							<Badge size="1" variant="soft">
+								{HULL_SIZE_NAMES[selectedPreset.hullSize] ?? selectedPreset.hullSize}
+							</Badge>
+							<Badge size="1" variant="outline">
+								{selectedPreset.weaponCount} 武器
+							</Badge>
+						</Box>
+					</Box>
+				</>
 			)}
 
+			{/* 部署按钮 */}
 			<Button
-				size="1"
+				size="2"
 				variant="solid"
 				color="green"
 				onClick={handleDeploy}
 				disabled={!selectedPreset}
-				data-magnetic
+				style={{ flexShrink: 0, alignSelf: "center" }}
 			>
-				<Rocket size={12} /> 部署
+				<Rocket size={14} /> 部署
 			</Button>
-		</Flex>
+		</Box>
 	);
 };
 

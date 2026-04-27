@@ -23,6 +23,42 @@ import { useCallback } from "react";
 import type { UseCameraResult } from "../systems/useCamera";
 import type { CanvasSize } from "../core/useCanvasResize";
 
+const UI_SCROLLABLE_SELECTORS = [
+	"[data-radix-scroll-area-viewport]",
+	".rt-ScrollAreaViewport",
+	"[data-scroll-area]",
+	".scroll-area",
+	".right-sidebar",
+	".battle-bar",
+	".collapsible-panel__content",
+	".sidebar-edit-section",
+	".weapon-col__content",
+];
+
+function isUIScrollable(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+
+	for (const selector of UI_SCROLLABLE_SELECTORS) {
+		if (target.closest(selector)) return true;
+	}
+
+	const element = target;
+	const style = window.getComputedStyle(element);
+	if (style.overflowY === "auto" || style.overflowY === "scroll" || style.overflow === "auto" || style.overflow === "scroll") {
+		return true;
+	}
+
+	const parent = element.parentElement;
+	if (parent) {
+		const parentStyle = window.getComputedStyle(parent);
+		if (parentStyle.overflowY === "auto" || parentStyle.overflowY === "scroll" || parentStyle.overflow === "auto" || parentStyle.overflow === "scroll") {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 export interface UseZoomInteractionResult {
 	queueZoom: (event: WheelEvent) => void;
 }
@@ -35,6 +71,10 @@ export function useZoomInteraction(
 
 	const queueZoom = useCallback(
 		(event: WheelEvent) => {
+			if (isUIScrollable(event.target)) {
+				return;
+			}
+
 			event.preventDefault();
 
 			const hostRef = document.getElementById("game-canvas-host");

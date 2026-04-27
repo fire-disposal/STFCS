@@ -10,7 +10,7 @@
 import type { GameRoomState } from "@vt/data";
 import type { EngineContext, EngineResult } from "./context.js";
 import { createEngineContext } from "./context.js";
-import { applyCombat } from "./modules/combat.js";
+import { applyCombat, applyDeviation } from "./modules/combat.js";
 import { applyMove, applyRotate, applyAdvancePhase } from "./modules/movement.js";
 import { applyShieldToggle, applyShieldRotate } from "./modules/shield.js";
 import { applyVent } from "./modules/flux.js";
@@ -34,6 +34,7 @@ export const EngineActionType = {
 	ADVANCE_PHASE: "ADVANCE_PHASE",
 	END_TURN: "END_TURN",
 	ATTACK: "ATTACK",
+	DEVIATION: "DEVIATION",
 } as const;
 
 export type EngineActionType = (typeof EngineActionType)[keyof typeof EngineActionType];
@@ -55,6 +56,7 @@ export const CLIENT_ACTION_MAP: Record<string, EngineActionType> = {
 	advance_phase: EngineActionType.ADVANCE_PHASE,
 	end_turn: EngineActionType.END_TURN,
 	attack: EngineActionType.ATTACK,
+	deviation: EngineActionType.DEVIATION,
 };
 
 /** Action 类型到处理函数的映射表 */
@@ -67,6 +69,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 	[EngineActionType.ADVANCE_PHASE]: applyAdvancePhase,
 	[EngineActionType.END_TURN]: applyEndTurn,
 	[EngineActionType.ATTACK]: applyCombat,
+	[EngineActionType.DEVIATION]: applyDeviation,
 };
 
 /**
