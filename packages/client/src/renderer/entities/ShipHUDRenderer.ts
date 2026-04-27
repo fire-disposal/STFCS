@@ -17,11 +17,9 @@ import { worldToScreen } from "../core/useLayerSystem";
 import { useUIStore } from "@/state/stores/uiStore";
 
 const HP_BAR_OFFSET_Y = -60;
-const FLUX_BAR_OFFSET_Y = -38; // 血条下方
 const LABEL_OFFSET_Y = 45;
 const OWNER_LABEL_OFFSET_Y = 60;
 const DEFAULT_HULL_MAX = 100;
-const FLUX_BAR_SEGMENTS = 20; // 辐能条固定20格
 
 const labelStyle = new TextStyle({
 	fill: 0xcfe8ff,
@@ -68,17 +66,10 @@ function getFluxStatusChar(ship: CombatToken): FluxStatusChar {
 	return "N";
 }
 
-/** 辐能条颜色常量 */
-const FLUX_COLORS = {
-	hard: 0xff8c42,      // 橙色 - 硬辐能
-	soft: 0xffce66,      // 黄色 - 软辐能
-	overload: 0xff5d7e,  // 红色 - 过载填充
-	empty: 0xffffff,     // 白色 - 空槽（与空血条一致）
-} as const;
+
 
 interface ShipHUDCache {
 	hpBarContainer: Container;
-	fluxBarContainer: Container;
 	label: Text;
 	ownerLabel: Text | null;
 	lastUpdate: {
@@ -109,7 +100,6 @@ interface CameraSnapshot {
 /** HUD 图层集合 */
 interface HUDLayers {
 	shipBars: Container;
-	fluxBars: Container;
 	shipNames: Container;
 	ownerLabels: Container;
 }
@@ -117,7 +107,6 @@ interface HUDLayers {
 export class ShipHUDManager {
 	private cache = new Map<string, ShipHUDCache>();
 	private hpBarLayer: Container;
-	private fluxBarLayer: Container;
 	private labelLayer: Container;
 	private ownerLabelLayer: Container;
 	private lastCamera: CameraSnapshot | null = null;
@@ -125,7 +114,6 @@ export class ShipHUDManager {
 
 	constructor(hudLayers: HUDLayers) {
 		this.hpBarLayer = hudLayers.shipBars;
-		this.fluxBarLayer = hudLayers.fluxBars;
 		this.labelLayer = hudLayers.shipNames;
 		this.ownerLabelLayer = hudLayers.ownerLabels;
 	}
@@ -147,14 +135,12 @@ export class ShipHUDManager {
 		for (const [id, cached] of this.cache) {
 			if (!currentIds.has(id)) {
 				this.hpBarLayer.removeChild(cached.hpBarContainer);
-				this.fluxBarLayer.removeChild(cached.fluxBarContainer);
 				this.labelLayer.removeChild(cached.label);
 				if (cached.ownerLabel) {
 					this.ownerLabelLayer.removeChild(cached.ownerLabel);
 					cached.ownerLabel.destroy();
 				}
 				cached.hpBarContainer.destroy();
-				cached.fluxBarContainer.destroy();
 				cached.label.destroy();
 				this.cache.delete(id);
 			}
@@ -198,10 +184,6 @@ export class ShipHUDManager {
 		const hpBarContainer = this.createHpBarContainer(ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
 		hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 
-		// 辐能条
-		const fluxBarContainer = this.createFluxBarContainer(ship, isSelected);
-		fluxBarContainer.position.set(screenX, screenY + FLUX_BAR_OFFSET_Y);
-
 		const destroyed = !!ship.runtime.destroyed;
 		const label = new Text({
 			text: this.formatLabel(ship),
@@ -220,7 +202,6 @@ export class ShipHUDManager {
 		}
 
 		this.hpBarLayer.addChild(hpBarContainer);
-		this.fluxBarLayer.addChild(fluxBarContainer);
 		this.labelLayer.addChild(label);
 
 		// 所有者标签（有 ownerId 时显示）
@@ -247,7 +228,6 @@ export class ShipHUDManager {
 
 		this.cache.set(ship.$id, {
 			hpBarContainer,
-			fluxBarContainer,
 			label,
 			ownerLabel,
 			lastUpdate: {
@@ -300,8 +280,7 @@ export class ShipHUDManager {
 				camera,
 				canvasSize
 			);
-			cached.hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
-			cached.fluxBarContainer.position.set(screenX, screenY + FLUX_BAR_OFFSET_Y);
+					cached.hpBarContainer.position.set(screenX, screenY + HP_BAR_OFFSET_Y);
 			cached.label.position.set(screenX, screenY + LABEL_OFFSET_Y);
 			if (cached.ownerLabel) {
 				cached.ownerLabel.position.set(screenX, screenY + OWNER_LABEL_OFFSET_Y);
@@ -325,7 +304,7 @@ export class ShipHUDManager {
 			fluxCapacity !== last.fluxCapacity || fluxStatusChar !== last.fluxStatusChar;
 
 		if (fluxChanged || selectedChanged) {
-			this.updateFluxBarContainer(cached.fluxBarContainer, fluxHard, fluxSoft, fluxCapacity, fluxStatusChar, isSelected);
+			// flux bar 已隐藏
 		}
 
 		const newName = ship.metadata?.name || ship.$id;
@@ -515,7 +494,7 @@ export class ShipHUDManager {
 	 * - 硬辐能（左）橙色 =，软辐能（右）黄色 =，空槽白色半透明 =
 	 * - 过载时所有填充格变为红色
 	 */
-	private createFluxBarContainer(ship: CombatToken, isSelected: boolean): Container {
+	/*private createFluxBarContainer(ship: CombatToken, isSelected: boolean): Container {
 		const container = new Container();
 		const fluxHard = ship.runtime.fluxHard ?? 0;
 		const fluxSoft = ship.runtime.fluxSoft ?? 0;
@@ -603,18 +582,17 @@ export class ShipHUDManager {
 			x += segWidth;
 		}
 	}
+	*/
 
 	clear(): void {
 		for (const cached of this.cache.values()) {
 			this.hpBarLayer.removeChild(cached.hpBarContainer);
-			this.fluxBarLayer.removeChild(cached.fluxBarContainer);
 			this.labelLayer.removeChild(cached.label);
 			if (cached.ownerLabel) {
 				this.ownerLabelLayer.removeChild(cached.ownerLabel);
 				cached.ownerLabel.destroy();
 			}
 			cached.hpBarContainer.destroy();
-			cached.fluxBarContainer.destroy();
 			cached.label.destroy();
 		}
 		this.cache.clear();
@@ -654,7 +632,6 @@ export function useShipHUDRendering(
 
 		managerRef.current = new ShipHUDManager({
 			shipBars: layers.shipBars,
-			fluxBars: layers.fluxBars,
 			shipNames: layers.shipNames,
 			ownerLabels: layers.ownerLabels,
 		});
