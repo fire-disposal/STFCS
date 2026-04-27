@@ -5,6 +5,7 @@
 import React, { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Box, Flex, IconButton, Tabs, Text, Tooltip } from "@radix-ui/themes";
+import { useUIStore } from "@/state/stores/uiStore";
 import "./battle-panel.css";
 
 export interface TabConfig {
@@ -20,9 +21,10 @@ export interface BattlePanelProps {
 	defaultActiveTab?: string;
 }
 
-export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs, defaultActiveTab }) => {
+export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs }) => {
 	const [collapsed, setCollapsed] = useState(false);
-	const [activeTab, setActiveTab] = useState(defaultActiveTab || "ship-info");
+	const activeTab = useUIStore((state) => state.activeBottomTab);
+	const setActiveTab = useUIStore((state) => state.setActiveBottomTab);
 
 	const enabledTabs = tabs.filter((tab) => tab.enabled !== false);
 	const safeActiveTab = enabledTabs.some((tab) => tab.id === activeTab) ? activeTab : enabledTabs[0]?.id || "";

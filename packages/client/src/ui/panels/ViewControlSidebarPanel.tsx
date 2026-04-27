@@ -17,7 +17,6 @@ import {
 	RotateCcw,
 	RotateCw,
 	Home,
-	Square,
 	Target,
 	Camera,
 } from "lucide-react";
@@ -37,15 +36,13 @@ type LayerKey =
 	| "textures"
 	| "weaponTextures"
 	| "shieldArc"
-	| "mountMarkers"
-	| "weaponMarkers";
+	| "weaponLayer";
 
 const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }> = [
 	{ key: "textures", icon: Layers, label: "舰船贴图" },
 	{ key: "weaponTextures", icon: Crosshair, label: "武器贴图" },
-	{ key: "mountMarkers", icon: Square, label: "挂载点" },
-	{ key: "weaponMarkers", icon: Crosshair, label: "武器标记" },
-	{ key: "arcs", icon: Crosshair, label: "武器弧" },
+	{ key: "weaponLayer", icon: Crosshair, label: "武器图层" },
+	{ key: "arcs", icon: Crosshair, label: "攻击范围" },
 	{ key: "shieldArc", icon: ShieldCheck, label: "护盾弧" },
 	{ key: "move", icon: Navigation2, label: "移动范围" },
 	{ key: "armor", icon: Shield, label: "护甲" },
@@ -75,8 +72,7 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		showShipTextures,
 		showWeaponTextures,
 		showShieldArc,
-		showMountMarkers,
-		showWeaponMarkers,
+		showWeaponLayer,
 		setZoom,
 		setCameraPosition,
 		setViewRotation,
@@ -89,8 +85,7 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		toggleShipTextures,
 		toggleWeaponTextures,
 		toggleShieldArc,
-		toggleMountMarkers,
-		toggleWeaponMarkers,
+		toggleWeaponLayer,
 		mapCursor,
 		setMapCursor,
 	} = useUIStore();
@@ -105,8 +100,7 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		textures: showShipTextures,
 		weaponTextures: showWeaponTextures,
 		shieldArc: showShieldArc,
-		mountMarkers: showMountMarkers,
-		weaponMarkers: showWeaponMarkers,
+		weaponLayer: showWeaponLayer,
 	};
 
 	const layerToggles: Record<LayerKey, () => void> = {
@@ -119,8 +113,7 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		textures: toggleShipTextures,
 		weaponTextures: toggleWeaponTextures,
 		shieldArc: toggleShieldArc,
-		mountMarkers: toggleMountMarkers,
-		weaponMarkers: toggleWeaponMarkers,
+		weaponLayer: toggleWeaponLayer,
 	};
 
 	const cameraAnimation = useCameraAnimation({

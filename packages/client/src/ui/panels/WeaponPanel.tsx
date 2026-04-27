@@ -1,6 +1,6 @@
 /**
  * WeaponPanel - 武器火控面板
- * 
+ *
  * 使用 useSelectedShip hook 统一获取选中舰船
  */
 
@@ -9,6 +9,7 @@ import { Crosshair, Swords, Loader2 } from "lucide-react";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
+import { useUIStore } from "@/state/stores/uiStore";
 import { notify } from "@/ui/shared/Notification";
 import { UI_CONFIG } from "@/config/constants";
 import "./weapon-panel.css";
@@ -56,7 +57,8 @@ export interface WeaponPanelProps {
 }
 
 export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) => {
-	const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
+	const [localSelectedWeaponId, setLocalSelectedWeaponId] = useState<string | null>(null);
+	const setGlobalSelectedWeaponMountId = useUIStore((state) => state.setSelectedWeaponMountId);
 	const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [allWeaponsTargeting, setAllWeaponsTargeting] = useState<Map<string, WeaponTargetingData>>(new Map());
@@ -159,33 +161,38 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 		fetchTargeting();
 	}, [canAct, ship, sendQuery]);
 
+	// 同步本地选中到全局 store
+	useEffect(() => {
+		setGlobalSelectedWeaponMountId(localSelectedWeaponId);
+	}, [localSelectedWeaponId, setGlobalSelectedWeaponMountId]);
+
 	// 默认选中第一个可用武器
 	useEffect(() => {
-		if (weapons.length > 0 && !selectedWeaponId) {
+		if (weapons.length > 0 && !localSelectedWeaponId) {
 			const firstAvailable = weapons.find((w) => w.canFire);
 			if (firstAvailable) {
-				setSelectedWeaponId(firstAvailable.mountId);
+				setLocalSelectedWeaponId(firstAvailable.mountId);
 			} else {
-				setSelectedWeaponId(weapons[0].mountId);
+				setLocalSelectedWeaponId(weapons[0].mountId);
 			}
 		}
-	}, [weapons, selectedWeaponId]);
+	}, [weapons, localSelectedWeaponId]);
 
 	// 当前武器
 	const currentWeapon = useMemo(() => {
-		return weapons.find((w) => w.mountId === selectedWeaponId) ?? null;
-	}, [weapons, selectedWeaponId]);
+		return weapons.find((w) => w.mountId === localSelectedWeaponId) ?? null;
+	}, [weapons, localSelectedWeaponId]);
 
 	// 可攻击目标列表（当前选中武器）
 	const attackableTargets = useMemo(() => {
-		const weaponData = allWeaponsTargeting.get(selectedWeaponId ?? "");
+		const weaponData = allWeaponsTargeting.get(localSelectedWeaponId ?? "");
 		if (!weaponData) return [];
 		return weaponData.validTargets.filter((t) => t.canAttack);
-	}, [allWeaponsTargeting, selectedWeaponId]);
+	}, [allWeaponsTargeting, localSelectedWeaponId]);
 
 	// 选择武器
 	const handleSelectWeapon = useCallback((weapon: WeaponStatus) => {
-		setSelectedWeaponId(weapon.mountId);
+		setLocalSelectedWeaponId(weapon.mountId);
 		setSelectedTargetIds([]);
 	}, []);
 
@@ -200,18 +207,18 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 
 	// 开火
 	const handleFire = useCallback(async () => {
-		if (!canAct || !selectedWeaponId || selectedTargetIds.length === 0) return;
+		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0) return;
 
 		try {
 			await sendAttack(ship!.$id, [{
-				mountId: selectedWeaponId,
+				mountId: localSelectedWeaponId,
 				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
 			}]);
 			setSelectedTargetIds([]);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "开火失败");
 		}
-	}, [canAct, selectedWeaponId, selectedTargetIds, ship, sendAttack]);
+	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack]);
 
 	// 空状态
 	if (!hasShip || weapons.length === 0) {
@@ -253,7 +260,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 						return (
 							<Flex
 								key={w.mountId}
-								className={`weapon-item ${!w.canFire ? "weapon-item--blocked" : ""} ${w.hasFired ? "weapon-item--fired" : ""} ${selectedWeaponId === w.mountId ? "weapon-item--selected" : ""}`}
+								className={`weapon-item ${!w.canFire ? "weapon-item--blocked" : ""} ${w.hasFired ? "weapon-item--fired" : ""} ${localSelectedWeaponId === w.mountId ? "weapon-item--selected" : ""}`}
 								align="center"
 								gap="2"
 								onClick={() => handleSelectWeapon(w)}

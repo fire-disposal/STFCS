@@ -134,8 +134,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		showFluxBars,
 		showShipNames,
 		showOwnerLabels,
-		showMountMarkers,
-		showWeaponMarkers,
+		showWeaponLayer,
 	} = useUIStore();
 
 	const cameraPositionRef = useRef(cameraPosition);
@@ -191,7 +190,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 			viewRotation,
 		},
 		{ onSelectShip: selectShip, storeSelectShip: selectShip },
-		{ showMountMarkers, showWeaponMarkers }
+		{ showWeaponLayer }
 	);
 
 	useShipHUDRendering(

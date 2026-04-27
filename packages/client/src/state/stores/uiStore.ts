@@ -76,9 +76,8 @@ interface UIState {
 	showShipNames: boolean;           // 舰船名显示
 	showOwnerLabels: boolean;         // 所有者标签显示
 
-	// 战术对象组图层开关（新增）
-	showMountMarkers: boolean;        // 挂载点标记显示
-	showWeaponMarkers: boolean;       // 武器标记显示
+	// 武器图层开关
+	showWeaponLayer: boolean;         // 武器图层（挂载点+武器标记）显示
 
 	// 地图游标状态 (世界坐标，真实朝向)
 	mapCursor: { x: number; y: number; r: number } | null;
@@ -98,6 +97,10 @@ interface UIState {
 	// UI面板状态
 	isSidebarOpen: boolean;
 	activePanel: "ships" | "combat" | "dm" | "settings" | null;
+
+	// 底部栏状态
+	activeBottomTab: string;
+	selectedWeaponMountId: string | null;
 
 	// 移动预览状态
 	movementPreview: MovementPreviewState | null;
@@ -147,9 +150,8 @@ interface UIActions {
 	toggleShipNames: () => void;
 	toggleOwnerLabels: () => void;
 
-	// 战术对象组图层开关 toggle
-	toggleMountMarkers: () => void;
-	toggleWeaponMarkers: () => void;
+	// 武器图层开关 toggle
+	toggleWeaponLayer: () => void;
 
 	// 血条配置
 	setHpPerBar: (value: number) => void;
@@ -172,6 +174,10 @@ interface UIActions {
 	// 面板相关
 	toggleSidebar: () => void;
 	setActivePanel: (panel: "ships" | "combat" | "dm" | "settings" | null) => void;
+
+	// 底部栏相关
+	setActiveBottomTab: (tabId: string) => void;
+	setSelectedWeaponMountId: (mountId: string | null) => void;
 
 	// 移动预览相关
 	setMovementPreview: (preview: MovementPreviewState | null) => void;
@@ -219,9 +225,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	showShipNames: true,
 	showOwnerLabels: true,
 
-	// 战术对象组图层开关（默认全部显示）
-	showMountMarkers: true,
-	showWeaponMarkers: true,
+	// 武器图层开关（默认显示）
+	showWeaponLayer: true,
 
 	// 地图游标初始状态
 	mapCursor: null,
@@ -240,6 +245,9 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	isSidebarOpen: true,
 	activePanel: "ships",
+
+	activeBottomTab: "ship-info",
+	selectedWeaponMountId: null,
 
 	movementPreview: null,
 	shieldDirectionPreview: {},
@@ -297,9 +305,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleShipNames: () => set((state) => ({ showShipNames: !state.showShipNames })),
 	toggleOwnerLabels: () => set((state) => ({ showOwnerLabels: !state.showOwnerLabels })),
 
-	// 战术对象组图层开关 toggle
-	toggleMountMarkers: () => set((state) => ({ showMountMarkers: !state.showMountMarkers })),
-	toggleWeaponMarkers: () => set((state) => ({ showWeaponMarkers: !state.showWeaponMarkers })),
+	// 武器图层开关 toggle
+	toggleWeaponLayer: () => set((state) => ({ showWeaponLayer: !state.showWeaponLayer })),
 
 	// 游标设置
 	setMapCursor: (x: number, y: number, r: number) =>
@@ -321,6 +328,9 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 	setActivePanel: (panel) => set({ activePanel: panel }),
+
+	setActiveBottomTab: (tabId: string) => set({ activeBottomTab: tabId }),
+	setSelectedWeaponMountId: (mountId: string | null) => set({ selectedWeaponMountId: mountId }),
 
 	setMovementPreview: (preview) => set({ movementPreview: preview }),
 

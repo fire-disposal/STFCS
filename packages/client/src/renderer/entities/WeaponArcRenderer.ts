@@ -32,6 +32,7 @@ interface WeaponArcCache {
 	root: Container;
 	arcGraphics: Graphics;
 	rangeGraphics: Graphics;
+	lastArcAlpha?: number;
 	lastData?: {
 		worldX: number;
 		worldY: number;
@@ -65,6 +66,12 @@ export function useWeaponArcRendering(
 
 	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
 	const show = options.show ?? showWeaponArcs;
+	const activeBottomTab = useUIStore((state) => state.activeBottomTab);
+	const selectedWeaponMountId = useUIStore((state) => state.selectedWeaponMountId);
+	const isWeaponPanelActive = activeBottomTab === "weapon";
+
+	const HIGHLIGHT_ALPHA = 0.35;
+	const NORMAL_ALPHA = 0.08;
 
 	const selectedShip = ships.find((s) => s.$id === selectedShipId) ?? null;
 
@@ -157,15 +164,22 @@ export function useWeaponArcRendering(
 			const minRange = weapon.spec.minRange ?? 0;
 			const arc = mount.arc ?? 360;
 
+			// 判断是否为选中武器：武器面板激活时，高亮选中的武器范围
+			const isSelected = isWeaponPanelActive && mount.id === selectedWeaponMountId;
+			const arcAlpha = isSelected ? HIGHLIGHT_ALPHA : NORMAL_ALPHA;
+
 			const cached = arcCacheRef.current.get(mount.id);
 			if (!cached) {
-				createWeaponArc(layers, arcCacheRef.current, mount.id, worldX, worldY, mountFacing, range, minRange, arc);
-			} else if (shouldUpdateArc(cached, worldX, worldY, range, minRange, arc, mountFacing)) {
-				updateWeaponArc(cached, worldX, worldY, mountFacing, range, minRange, arc);
+				createWeaponArc(layers, arcCacheRef.current, mount.id, worldX, worldY, mountFacing, range, minRange, arc, arcAlpha);
+			} else if (shouldUpdateArc(cached, worldX, worldY, range, minRange, arc, mountFacing) || cached.lastArcAlpha !== arcAlpha) {
+				updateWeaponArc(cached, worldX, worldY, mountFacing, range, minRange, arc, arcAlpha);
 			}
 
 			const finalCached = arcCacheRef.current.get(mount.id);
-			if (finalCached) finalCached.root.visible = true;
+			if (finalCached) {
+				finalCached.root.visible = true;
+				finalCached.lastArcAlpha = arcAlpha;
+			}
 
 			const validTargets = calculateValidTargets(selectedShip, mount, ships);
 			if (validTargets.length > 0) {
@@ -191,7 +205,7 @@ export function useWeaponArcRendering(
 		}
 
 		layers.weaponArcs.visible = show;
-	}, [layers, selectedShip, ships, show]);
+	}, [layers, selectedShip, ships, show, isWeaponPanelActive, selectedWeaponMountId]);
 
 	useEffect(() => {
 		return () => {
@@ -296,7 +310,8 @@ function createWeaponArc(
 	mountFacing: number,
 	range: number,
 	minRange: number,
-	arc: number
+	arc: number,
+	fillAlpha: number = 0.12
 ): void {
 	const root = new Container();
 	root.position.set(worldX, worldY);
@@ -305,7 +320,7 @@ function createWeaponArc(
 	const arcGraphics = new Graphics();
 	root.addChild(arcGraphics);
 
-	drawWeaponArc(arcGraphics, arc, range, minRange);
+	drawWeaponArc(arcGraphics, arc, range, minRange, fillAlpha);
 
 	layers.weaponArcs.addChild(root);
 
@@ -313,6 +328,7 @@ function createWeaponArc(
 		root,
 		arcGraphics,
 		rangeGraphics: arcGraphics,
+		lastArcAlpha: fillAlpha,
 		lastData: { worldX, worldY, range, minRange, arc, mountFacing },
 	});
 }
@@ -324,17 +340,19 @@ function updateWeaponArc(
 	mountFacing: number,
 	range: number,
 	minRange: number,
-	arc: number
+	arc: number,
+	fillAlpha: number = 0.12
 ): void {
 	cached.root.position.set(worldX, worldY);
 	cached.root.rotation = mountFacing;
 
-	drawWeaponArc(cached.arcGraphics, arc, range, minRange);
+	drawWeaponArc(cached.arcGraphics, arc, range, minRange, fillAlpha);
 
 	cached.lastData = { worldX, worldY, range, minRange, arc, mountFacing };
+	cached.lastArcAlpha = fillAlpha;
 }
 
-function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange: number = 0): void {
+function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange: number = 0, fillAlpha: number = 0.12): void {
 	graphics.clear();
 
 	const arcRad = (arc * Math.PI) / 180;
@@ -344,7 +362,7 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 	if (arc >= 360) {
 		// 360度 = 圆形射程，只画外圈，内圈自然透明
 		graphics.circle(0, 0, range);
-		graphics.fill({ color: ARC_COLOR, alpha: 0.15 });
+		graphics.fill({ color: ARC_COLOR, alpha: fillAlpha });
 		return;
 	}
 
@@ -368,17 +386,18 @@ function drawWeaponArc(graphics: Graphics, arc: number, range: number, minRange:
 		graphics.arc(0, 0, range, startAngle, endAngle);
 		graphics.closePath();
 	}
-	graphics.fill({ color: ARC_COLOR, alpha: 0.12 });
+	graphics.fill({ color: ARC_COLOR, alpha: fillAlpha });
 
 	// 左射界线
+	const lineAlpha = fillAlpha > 0.2 ? 0.9 : 0.7;
 	graphics.moveTo(minRange > 0 ? startX * minRange : 0, minRange > 0 ? startY * minRange : 0);
 	graphics.lineTo(startX * range, startY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
+	graphics.stroke({ color: ARC_COLOR, width: fillAlpha > 0.2 ? 3 : 2, alpha: lineAlpha });
 
 	// 右射界线
 	graphics.moveTo(minRange > 0 ? endX * minRange : 0, minRange > 0 ? endY * minRange : 0);
 	graphics.lineTo(endX * range, endY * range);
-	graphics.stroke({ color: ARC_COLOR, width: 2, alpha: 0.7 });
+	graphics.stroke({ color: ARC_COLOR, width: fillAlpha > 0.2 ? 3 : 2, alpha: lineAlpha });
 }
 
 function drawAimLinesWorld(

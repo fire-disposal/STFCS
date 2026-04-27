@@ -73,8 +73,7 @@ export interface ShipRenderContext {
 }
 
 export interface ShipVisibilityOptions {
-	showMountMarkers?: boolean;
-	showWeaponMarkers?: boolean;
+	showWeaponLayer?: boolean;
 }
 
 export function useShipRendering(
@@ -100,8 +99,7 @@ export function useShipRendering(
 		const cache = cacheRef.current;
 		const currentIds = new Set(ships.map((s) => s.$id));
 		const selectedId = selectedShipId ?? null;
-		const showMount = visibility.showMountMarkers ?? true;
-		const showWeapon = visibility.showWeaponMarkers ?? true;
+		const showWeaponLayer = visibility.showWeaponLayer ?? true;
 
 		for (const [id, item] of cache) {
 			if (!currentIds.has(id)) {
@@ -113,8 +111,8 @@ export function useShipRendering(
 				item.root.destroy();
 				cache.delete(id);
 			} else {
-				item.mountMarkers.visible = showMount;
-				item.weaponMarkers.visible = showWeapon;
+				item.mountMarkers.visible = showWeaponLayer;
+				item.weaponMarkers.visible = showWeaponLayer;
 			}
 		}
 
@@ -124,17 +122,17 @@ export function useShipRendering(
 			const isSelected = ship.$id === selectedId;
 			const cached = cache.get(ship.$id);
 			if (!cached) {
-				createShipToken(layers, cache, ship, isSelected, optionsRef, contextRef, showMount, showWeapon);
+				createShipToken(layers, cache, ship, isSelected, optionsRef, contextRef, showWeaponLayer, showWeaponLayer);
 				continue;
 			}
 
 			if (shouldUpdate(cached, ship, isSelected)) {
-				updateShipToken(cached, ship, isSelected, showMount, showWeapon);
+				updateShipToken(cached, ship, isSelected, showWeaponLayer, showWeaponLayer);
 			}
 		}
 
 		layers.tacticalTokens.visible = true;
-	}, [layers, ships, selectedShipId, visibility.showMountMarkers, visibility.showWeaponMarkers]);
+	}, [layers, ships, selectedShipId, visibility.showWeaponLayer]);
 
 	useEffect(() => {
 		return () => {
