@@ -9,7 +9,7 @@
  * 5. 武器开火、护盾维持/防御产生的辐能
  */
 
-import type { CombatToken } from "../../state/Token.js";
+import type { CombatToken } from "@vt/data";
 import { calculateModifiedValue } from "./modifier.js";
 import type { EngineContext, EngineResult } from "../context.js";
 import { createEngineEvent } from "../context.js";

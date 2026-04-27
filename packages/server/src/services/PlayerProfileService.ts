@@ -29,7 +29,6 @@ export class PlayerProfileService {
 				},
 			};
 			await this.playerInfoService.addShip(userId, ship);
-			console.log(`[PlayerProfileService] 为 ${playerName ?? userId} 导入舰船预设: ${preset.metadata?.name ?? preset.$id}`);
 		}
 
 		for (const preset of presetWeapons) {
@@ -38,10 +37,9 @@ export class PlayerProfileService {
 				$id: generateId("weapon", userId),
 			};
 			await this.playerInfoService.addWeapon(userId, weapon);
-			console.log(`[PlayerProfileService] 为 ${playerName ?? userId} 导入武器预设: ${preset.metadata?.name ?? preset.$id}`);
 		}
 
-		console.log(`[PlayerProfileService] 已为用户 ${playerName ?? userId} 导入 ${presetShips.length} 艘舰船预设、${presetWeapons.length} 个武器预设`);
+		console.log(`[PlayerProfileService] 已为用户 ${playerName ?? userId} 导入 ${presetShips.length} 艘舰船、${presetWeapons.length} 件武器`);
 	}
 
 	async getPlayerShips(userId: string): Promise<InventoryToken[]> {

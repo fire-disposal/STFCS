@@ -9,8 +9,7 @@
  * 5. 主动排散状态清除
  */
 
-import type { CombatToken } from "../../state/Token.js";
-import type { WeaponRuntime, MountSpec } from "@vt/data";
+import type { CombatToken, WeaponRuntime, MountSpec } from "@vt/data";
 import { updateWeaponStateAtTurnEnd } from "./weapon.js";
 import { getFluxDissipation } from "../modules/flux.js";
 import { calculateShieldUpkeep } from "../modules/shield.js";
@@ -86,12 +85,12 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		const capacity = token.spec.fluxCapacity ?? 100;
 		const currentTotal = currentSoft + currentHard;
 		const available = capacity - currentTotal;
-		
+
 		if (available > 0) {
 			const added = Math.min(shieldUpkeep, available);
 			currentSoft += added;
 			result.newFluxSoft = currentSoft;
-			
+
 			// 检查是否过载
 			if (currentSoft + currentHard >= capacity && !runtime.overloaded) {
 				result.overloadTriggered = true;

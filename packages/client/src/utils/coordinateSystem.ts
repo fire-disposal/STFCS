@@ -398,23 +398,3 @@ export function getCompassDirection(mathAngle: number): string {
   if (navAngle >= 281.25 && navAngle < 326.25) return 'NW';
   return 'N';
 }
-
-// ============================================================================
-// 别名（向后兼容）
-// ============================================================================
-
-/** @deprecated 使用 normalizeRotation */
-export const normalizeAngleSigned = normalizeRotation;
-
-/** @deprecated 使用 @vt/rules 的 toRadians */
-export function toRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
-/** @deprecated 使用 @vt/rules 的 toDegrees */
-export function toDegrees(radians: number): number {
-  return (radians * 180) / Math.PI;
-}
-
-export const degToRad = toRadians;
-export const radToDeg = toDegrees;

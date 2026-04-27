@@ -5,9 +5,8 @@
  * 基于 @vt/data 权威 schema 设计
  */
 
-import type { CombatToken } from "../../state/Token.js";
 import { distanceBetween, angleBetween, normalizeAngleSigned, getMountWorldPosition, mountOffsetToScreen } from "@vt/data";
-import { type MountSpec, type WeaponRuntime, type WeaponSpec } from "@vt/data";
+import { type CombatToken, type MountSpec, type WeaponRuntime, type WeaponSpec } from "@vt/data";
 
 /**
  * 武器目标信息

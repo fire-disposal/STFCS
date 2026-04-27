@@ -11,6 +11,7 @@ import { readFile } from "fs/promises";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handlers.js";
+import { validatePresets } from "@vt/data";
 import { assetService } from "./services/AssetService.js";
 
 const logger = createLogger("server");
@@ -112,15 +113,18 @@ export class STFCServer {
 		try {
 			await assetService.initialize();
 
+			// 启动时自动验证预设数据
+			this.validatePresetsOnStartup();
+
 			this.httpServer = createServer((req, res) => {
 				void handleHttpRequest(req, res);
 			});
-      this.io = new IOServer(this.httpServer, {
-        cors: { origin: this.config.corsOrigin },
-        maxHttpBufferSize: 10 * 1024 * 1024,
-        pingTimeout: 10000,
-        pingInterval: 5000,
-      });
+			this.io = new IOServer(this.httpServer, {
+				cors: { origin: this.config.corsOrigin },
+				maxHttpBufferSize: 10 * 1024 * 1024,
+				pingTimeout: 10000,
+				pingInterval: 5000,
+			});
 
 			setupSocketIO(this.io, this.roomManager);
 
@@ -135,6 +139,43 @@ export class STFCServer {
 		} catch (error) {
 			logger.error("Failed to start server", error);
 			throw error;
+		}
+	}
+
+	private validatePresetsOnStartup(): void {
+		try {
+			const result = validatePresets();
+			if (result.passed) {
+				logger.info("预设数据验证通过", {
+					ships: result.totalShips,
+					weapons: result.totalWeapons,
+				});
+			} else {
+				const failedShips = result.ships.filter(s => !s.passed).length;
+				const failedWeapons = result.weapons.filter(w => !w.passed).length;
+				logger.warn("预设数据发现验证问题", {
+					totalIssues: result.totalIssues,
+					failedShips,
+					failedWeapons,
+				});
+				// 详细输出问题列表
+				for (const ship of result.ships) {
+					if (!ship.passed) {
+						for (const issue of ship.issues) {
+							logger.warn(`  [预设] 舰船 ${ship.name}: [${issue.path}] ${issue.message}`);
+						}
+					}
+				}
+				for (const weapon of result.weapons) {
+					if (!weapon.passed) {
+						for (const issue of weapon.issues) {
+							logger.warn(`  [预设] 武器 ${weapon.name}: [${issue.path}] ${issue.message}`);
+						}
+					}
+				}
+			}
+		} catch (error) {
+			logger.error("预设数据验证失败", error);
 		}
 	}
 

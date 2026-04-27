@@ -9,7 +9,7 @@
  * 5. 护盾维持消耗
  */
 
-import type { CombatToken } from "../../state/Token.js";
+import type { CombatToken } from "@vt/data";
 import { calculateModifiedValue } from "./modifier.js";
 import { angleBetween } from "@vt/data";
 import type { EngineContext, EngineResult } from "../context.js";

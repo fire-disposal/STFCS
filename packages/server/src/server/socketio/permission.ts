@@ -8,8 +8,7 @@
 
 import type { Socket } from "socket.io";
 import type { Room } from "../rooms/Room.js";
-import type { CombatToken } from "../../core/state/Token.js";
-import type { TokenRuntime, Faction } from "@vt/data";
+import type { CombatToken, TokenRuntime, Faction } from "@vt/data";
 
 export type UserRole = "HOST" | "PLAYER";
 
