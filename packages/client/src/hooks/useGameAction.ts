@@ -83,6 +83,18 @@ export function useGameAction() {
 		return result !== null;
 	}, [send]);
 
+	const sendDeviation = useCallback(async (
+		tokenId: string,
+		allocations: Array<{ mountId: string; targets: Array<{ targetId: string; shots: number }> }>
+	): Promise<boolean> => {
+		const result = await send("game:action", {
+			action: "deviation",
+			tokenId,
+			allocations,
+		}, "偏差已执行（未命中）");
+		return result !== null;
+	}, [send]);
+
 	const sendShieldToggle = useCallback(async (
 		tokenId: string,
 		active: boolean
@@ -171,6 +183,7 @@ export function useGameAction() {
 		sendAdvancePhase,
 		sendEndTurn,
 		sendAttack,
+		sendDeviation,
 		sendShieldToggle,
 		sendShieldRotate,
 		sendVent,

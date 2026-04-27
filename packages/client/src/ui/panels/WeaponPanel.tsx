@@ -63,7 +63,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 	const [isLoading, setIsLoading] = useState(false);
 	const [allWeaponsTargeting, setAllWeaponsTargeting] = useState<Map<string, WeaponTargetingData>>(new Map());
 
-	const { isAvailable, sendAttack, sendQuery } = useGameAction();
+	const { isAvailable, sendAttack, sendDeviation, sendQuery } = useGameAction();
 
 	const ship = useSelectedShip();
 	const hasShip = ship && ship.runtime;
@@ -219,6 +219,21 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 			notify.error(error instanceof Error ? error.message : "开火失败");
 		}
 	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack]);
+
+	// 偏差（模拟未命中）
+	const handleDeviation = useCallback(async () => {
+		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0) return;
+
+		try {
+			await sendDeviation(ship!.$id, [{
+				mountId: localSelectedWeaponId,
+				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
+			}]);
+			setSelectedTargetIds([]);
+		} catch (error) {
+			notify.error(error instanceof Error ? error.message : "偏差操作失败");
+		}
+	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendDeviation]);
 
 	// 空状态
 	if (!hasShip || weapons.length === 0) {
@@ -429,7 +444,9 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 						size="2"
 						variant="soft"
 						color="gray"
-						disabled
+						onClick={handleDeviation}
+						disabled={selectedTargetIds.length === 0 || !currentWeapon?.canFire}
+						data-magnetic
 					>
 						<Text size="1">偏差</Text>
 					</Button>
