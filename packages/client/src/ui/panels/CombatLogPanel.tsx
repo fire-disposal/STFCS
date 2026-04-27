@@ -51,18 +51,33 @@ const LogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 
 	switch (log.type) {
 		case "attack":
+			const shieldLine = b("shieldHit") && n("fluxGenerated")
+				? ` | 护盾拦截 +${n("fluxGenerated")}辐能`
+				: "";
+			const armorLine = n("armorDamage") && n("armorDamage")! > 0
+				? ` | 护甲-${n("armorDamage")}(象限${n("armorQuadrant")})`
+				: "";
+			const dmgLine = n("hullDamage")
+				? ` | 结构-${n("hullDamage")}`
+				: " | 未穿透";
 			return (
 				<span>
-					<Text weight="bold" style={{ color: "#e74c3c" }}>{s("attackerName") || getTokenName(tokens, s("attackerId"))}</Text>
-					攻击 <Text weight="bold">{s("targetName") || getTokenName(tokens, s("targetId"))}</Text>
-					{n("damage") != null && <Text style={{ color: "#ff6b6b" }}> 伤害 {n("damage")}</Text>}
+					<Text weight="bold" style={{ color: "#e74c3c" }}>{s("weaponName") || s("attackerName") || getTokenName(tokens, s("attackerId"))}</Text>
+					{" → "}
+					<Text weight="bold">{s("targetName") || getTokenName(tokens, s("targetId"))}</Text>
+					<Text size="1" color="gray" style={{ fontSize: 10 }}>
+						{s("damageType")} 距离{n("distance")} 伤害{n("hitDamage")}
+						{armorLine}{dmgLine}{shieldLine}
+					</Text>
 				</span>
 			);
 		case "deviation":
 			return (
 				<span>
-					<Text weight="bold" style={{ color: "#f39c12" }}>{s("attackerName") || getTokenName(tokens, s("attackerId"))}</Text>
-					偏差射击 <Text weight="bold">{s("targetName") || getTokenName(tokens, s("targetId"))}</Text>
+					<Text weight="bold" style={{ color: "#f39c12" }}>{s("weaponName") || s("attackerName") || getTokenName(tokens, s("attackerId"))}</Text>
+					{" → "}
+					<Text weight="bold">{s("targetName") || getTokenName(tokens, s("targetId"))}</Text>
+					<Text size="1" color="gray" style={{ fontSize: 10 }}> 偏差未命中</Text>
 				</span>
 			);
 		case "destroyed":

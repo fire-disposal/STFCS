@@ -12,7 +12,7 @@ import { createEngineEvent } from "../context.js";
 import { calculateWeaponAttack } from "../rules/weapon.js";
 import { calculateDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
-import { angleBetween } from "@vt/data";
+import { angleBetween, distanceBetween } from "@vt/data";
 
 /**
  * 武器分配 - 单武器对多目标的分配
@@ -152,7 +152,20 @@ export function applyCombat(context: EngineContext): EngineResult {
           attackerId: ship.$id,
           targetId: target.targetId,
           weaponId: alloc.mountId,
-          damage: damageResult.hullDamage + damageResult.armorDamage,
+          weaponName: mount.displayName ?? alloc.mountId,
+          targetName: targetToken.metadata?.name ?? target.targetId,
+          baseDamage: weaponSpec.damage,
+          projectileCount: weaponSpec.projectilesPerShot ?? 1,
+          damageType: weaponSpec.damageType,
+          distance: Math.round(distanceBetween(attackerPos, targetPos)),
+          hitDamage: attackResult.damage,
+          finalDamage: finalDamage,
+          hullDamage: damageResult.hullDamage,
+          armorDamage: damageResult.armorDamage,
+          armorQuadrant: damageResult.armorQuadrant,
+          shieldHit: damageResult.shieldHit,
+          fluxGenerated: damageResult.fluxGenerated,
+          destroyed,
         }));
 
         if (destroyed) {
@@ -268,6 +281,8 @@ export function applyDeviation(context: EngineContext): EngineResult {
         attackerId: ship.$id,
         targetId: target.targetId,
         weaponId: alloc.mountId,
+        weaponName: mount.displayName ?? alloc.mountId,
+        targetName: targetToken.metadata?.name ?? target.targetId,
       }));
 
       totalFluxCost += weaponSpec.fluxCostPerShot ?? 0;
