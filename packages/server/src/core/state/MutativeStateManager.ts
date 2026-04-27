@@ -15,7 +15,7 @@
  */
 
 import { create, type Draft, type Patch } from "mutative"
-import { cloneDeep, merge } from "lodash"
+import { cloneDeep, merge } from "lodash-es"
 import type { Server as IOServer, Socket } from "socket.io"
 import type {
 	GameRoomState,
