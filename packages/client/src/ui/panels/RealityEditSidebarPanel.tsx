@@ -18,13 +18,14 @@ import {
 	Separator,
 } from "@radix-ui/themes";
 import { Save, Trash2, Code, Crosshair, Move, RotateCcw } from "lucide-react";
-import type { CombatToken, RoomPlayerState, TokenRuntime, TokenSpec } from "@vt/data";
+import type { CombatToken, TokenRuntime, TokenSpec } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
+import { useConnectedPlayers } from "@/state/stores/gameStore";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface RealityEditSidebarPanelProps {
-	players: Record<string, RoomPlayerState>;
 }
 
 function clone<T>(value: T): T {
@@ -69,11 +70,13 @@ function extractSpecDraft(ship: CombatToken): Partial<TokenSpec> {
 	};
 }
 
-export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = ({ players }) => {
+export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = () => {
 	const { send } = useGameAction();
 	const ship = useSelectedShip();
-	
+
 	const [editMode, setEditMode] = useState(false);
+	const playerList = useConnectedPlayers();
+
 	const [activeTab, setActiveTab] = useState("runtime");
 	const [runtimeDraft, setRuntimeDraft] = useState<TokenRuntime | null>(null);
 	const [specDraft, setSpecDraft] = useState<Partial<TokenSpec> | null>(null);
@@ -81,7 +84,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 	const [jsonError, setJsonError] = useState<string | null>(null);
 	const [selectedOwnerId, setSelectedOwnerId] = useState<string>("__none__");
 
-	const playerList = Object.values(players).filter((p) => p.connected);
 
 	useEffect(() => {
 		if (!ship) return;
@@ -254,9 +256,9 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 	}
 
 	return (
-		<Flex direction="column" gap="2" className="sidebar-panel-content">
+		<Flex direction="column" gap="2" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
 			{/* 锁定/编辑开关 */}
-			<Flex align="center" justify="between" className="sidebar-header-row">
+			<Flex align="center" justify="between" className="sidebar-header-row" style={{ flexShrink: 0 }}>
 				<Flex align="center" gap="2">
 					<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>
 						{ship.runtime.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6)}
@@ -268,7 +270,7 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				</Flex>
 			</Flex>
 
-			<Separator size="4" />
+			<Separator size="4" style={{ flexShrink: 0 }} />
 
 			{/* Tab 切换 */}
 			<Tabs.Root value={activeTab} onValueChange={setActiveTab}>
@@ -285,11 +287,11 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				</Tabs.List>
 			</Tabs.Root>
 
-			{/* Tab 内容 */}
-			<Box style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+			{/* Tab 内容 + 编辑按钮（一起在滚动区内） */}
+			<Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+				{/* Tab 内容区域 */}
 				{activeTab === "runtime" && runtimeDraft && (
-					<Flex direction="column" gap="2">
-						{/* 基础状态 */}
+					<Flex direction="column" gap="2" style={{ flexShrink: 0 }}>
 						<Box className="sidebar-edit-section">
 							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>基础</Text>
 							<Flex direction="column" gap="1">
@@ -328,7 +330,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 							</Flex>
 						</Box>
 
-						{/* 位置朝向 */}
 						<Box className="sidebar-edit-section">
 							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>位置</Text>
 							<Flex direction="column" gap="1">
@@ -367,7 +368,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 							</Flex>
 						</Box>
 
-						{/* 状态开关 */}
 						<Box className="sidebar-edit-section">
 							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>状态</Text>
 							<Flex direction="column" gap="1">
@@ -384,7 +384,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 							</Flex>
 						</Box>
 
-						{/* 所有者 */}
 						<Box className="sidebar-edit-section">
 							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>所有者</Text>
 							<Select.Root value={selectedOwnerId} onValueChange={setSelectedOwnerId} disabled={!editMode}>
@@ -403,7 +402,7 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				)}
 
 				{activeTab === "spec" && specDraft && (
-					<Flex direction="column" gap="2">
+					<Flex direction="column" gap="2" style={{ flexShrink: 0 }}>
 						<Box className="sidebar-edit-section">
 							<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 4 }}>战斗</Text>
 							<Flex direction="column" gap="1">
@@ -439,7 +438,7 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				)}
 
 				{activeTab === "json" && (
-					<Flex direction="column" gap="2">
+					<Flex direction="column" gap="2" style={{ flex: 1, minHeight: 0, display: "flex" }}>
 						<TextArea
 							size="1"
 							value={jsonText}
@@ -447,23 +446,23 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 							disabled={!editMode}
 							style={{
 								width: "100%",
-								minHeight: 120,
+								flex: 1,
+								minHeight: 0,
 								fontFamily: '"Fira Code", monospace',
 								fontSize: 11,
 							}}
 						/>
 						{jsonError && <Text size="1" color="red">{jsonError}</Text>}
-						<Button size="1" variant="solid" color="green" onClick={handleJsonSave} disabled={!editMode} style={{ width: "100%" }}>
+						<Button size="1" variant="solid" color="green" onClick={handleJsonSave} disabled={!editMode} style={{ width: "100%", flexShrink: 0 }}>
 							<Save size={12} /> 应用JSON
 						</Button>
 					</Flex>
 				)}
-			</Box>
 
-			{editMode && (
-				<>
-					<Separator size="4" />
-					<Flex direction="column" gap="1">
+				{/* 编辑模式按钮（在滚动区内） */}
+				{editMode && (
+					<Flex direction="column" gap="1" style={{ flexShrink: 0, marginTop: 4 }}>
+						<Separator size="4" />
 						<Button size="1" variant="soft" color="green" onClick={handleQuickHeal} style={{ width: "100%" }}>修复</Button>
 						<Button size="1" variant="soft" color="orange" onClick={() => handleQuickDamage(100)} style={{ width: "100%" }}>-100伤害</Button>
 						<Button size="1" variant="soft" color="red" onClick={handleDelete} style={{ width: "100%" }}>
@@ -476,8 +475,8 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 							<Save size={12} /> 保存
 						</Button>
 					</Flex>
-				</>
-			)}
+				)}
+			</Box>
 		</Flex>
 	);
 };

@@ -215,8 +215,7 @@
 }
 
 .collapsible-panel__content--vertical {
-	overflow-y: auto;
-	overflow-x: hidden;
+	overflow: hidden;
 	padding: 10px 12px;
 }
 
@@ -228,26 +227,8 @@
 	background: radial-gradient(ellipse at 50% 0%, rgba(74, 158, 255, 0.02) 0%, transparent 70%);
 }
 
-.collapsible-panel__content::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
-}
 
-.collapsible-panel__content::-webkit-scrollbar-track {
-	background: rgba(10, 30, 50, 0.3);
-	border-radius: 3px;
-}
-
-.collapsible-panel__content::-webkit-scrollbar-thumb {
-	background: rgba(74, 158, 255, 0.3);
-	border-radius: 3px;
-}
-
-.collapsible-panel__content::-webkit-scrollbar-thumb:hover {
-	background: rgba(74, 158, 255, 0.5);
-}
-
-.collapsible-panel__content > * {
+.collapsible-panel__content>* {
 	animation: panel-fade-in 200ms ease-out;
 }
 
@@ -256,6 +237,7 @@
 		opacity: 0;
 		transform: translateY(4px);
 	}
+
 	to {
 		opacity: 1;
 		transform: translateY(0);

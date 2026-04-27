@@ -30,15 +30,6 @@
 	display: flex;
 }
 
-/* 侧边栏面板内容通用样式 */
-.sidebar-panel-content {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	padding: 0;
-	min-height: 0;
-}
-
 .sidebar-panel-section {
 	padding: 8px 10px;
 	background: rgba(10, 30, 50, 0.4);

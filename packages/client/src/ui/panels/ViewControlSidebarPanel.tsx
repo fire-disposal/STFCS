@@ -2,11 +2,13 @@
  * ViewControlSidebarPanel - 视图控制面板（侧边栏优化版）
  *
  * 紧凑纵向布局：
- * - 坐标 + 缩放 + 旋转（一行）
+ * - 摄像机坐标（可复制/输入/跳转）
+ * - 缩放 + 旋转快捷控制
+ * - 游标坐标（可复制/输入/跳转）
  * - 图层开关（紧凑列表）
  */
 
-import React from "react";
+import React, { useCallback } from "react";
 import {
 	Grid3X3,
 	Image,
@@ -22,11 +24,27 @@ import {
 	RotateCw,
 	Home,
 	Square,
+	Target,
+	Camera,
 } from "lucide-react";
 import { Button, Flex, Box, Text, IconButton, Tooltip, Switch, Separator } from "@radix-ui/themes";
 import { useUIStore } from "@/state/stores/uiStore";
+import { CoordinateInput } from "@/ui/shared/CoordinateInput";
+import { CursorInput } from "@/ui/shared/CursorInput";
+import { useCameraAnimation } from "@/renderer/systems/useCameraAnimation";
 
-type LayerKey = "grid" | "bg" | "arcs" | "move" | "labels" | "armor" | "textures" | "weaponTextures" | "shieldArc" | "mountMarkers" | "weaponMarkers";
+type LayerKey =
+	| "grid"
+	| "bg"
+	| "arcs"
+	| "move"
+	| "labels"
+	| "armor"
+	| "textures"
+	| "weaponTextures"
+	| "shieldArc"
+	| "mountMarkers"
+	| "weaponMarkers";
 
 const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }> = [
 	{ key: "textures", icon: Layers, label: "舰船贴图" },
@@ -72,50 +90,113 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		toggleShieldArc,
 		toggleMountMarkers,
 		toggleWeaponMarkers,
+		// 游标
+		mapCursor,
+		setMapCursor,
 	} = useUIStore();
 
 	const layerStates: Record<LayerKey, boolean> = {
-		grid: showGrid, bg: showBackground, arcs: showWeaponArcs, move: showMovementRange,
-		labels: showLabels, armor: showHexagonArmor,
-		textures: showShipTextures, weaponTextures: showWeaponTextures, shieldArc: showShieldArc,
-		mountMarkers: showMountMarkers, weaponMarkers: showWeaponMarkers,
+		grid: showGrid,
+		bg: showBackground,
+		arcs: showWeaponArcs,
+		move: showMovementRange,
+		labels: showLabels,
+		armor: showHexagonArmor,
+		textures: showShipTextures,
+		weaponTextures: showWeaponTextures,
+		shieldArc: showShieldArc,
+		mountMarkers: showMountMarkers,
+		weaponMarkers: showWeaponMarkers,
 	};
 
 	const layerToggles: Record<LayerKey, () => void> = {
-		grid: toggleGrid, bg: toggleBackground, arcs: toggleWeaponArcs, move: toggleMovementRange,
-		labels: toggleLabels, armor: toggleHexagonArmor,
-		textures: toggleShipTextures, weaponTextures: toggleWeaponTextures, shieldArc: toggleShieldArc,
-		mountMarkers: toggleMountMarkers, weaponMarkers: toggleWeaponMarkers,
+		grid: toggleGrid,
+		bg: toggleBackground,
+		arcs: toggleWeaponArcs,
+		move: toggleMovementRange,
+		labels: toggleLabels,
+		armor: toggleHexagonArmor,
+		textures: toggleShipTextures,
+		weaponTextures: toggleWeaponTextures,
+		shieldArc: toggleShieldArc,
+		mountMarkers: toggleMountMarkers,
+		weaponMarkers: toggleWeaponMarkers,
 	};
 
-	const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 5));
-	const handleZoomOut = () => setZoom(Math.max(zoom / 1.2, 0.5));
-	const handleRotateLeft = () => setViewRotation((viewRotation - 15 + 360) % 360);
-	const handleRotateRight = () => setViewRotation((viewRotation + 15) % 360);
-	const handleResetAll = () => { setCameraPosition(0, 0); setViewRotation(0); setZoom(1); };
+	// 摄像机动画
+	const cameraAnimation = useCameraAnimation({
+		onCameraChange: setCameraPosition,
+		onViewRotationChange: setViewRotation,
+		onZoomChange: setZoom,
+		currentX: cameraPosition.x,
+		currentY: cameraPosition.y,
+		currentRotation: viewRotation,
+		currentZoom: zoom,
+	});
+
+	// 缩放 / 旋转快捷控制
+	const handleZoomIn = useCallback(
+		() => setZoom(Math.min(zoom * 1.2, 5)),
+		[zoom, setZoom]
+	);
+	const handleZoomOut = useCallback(
+		() => setZoom(Math.max(zoom / 1.2, 0.5)),
+		[zoom, setZoom]
+	);
+	const handleRotateLeft = useCallback(
+		() => setViewRotation((viewRotation - 15 + 360) % 360),
+		[viewRotation, setViewRotation]
+	);
+	const handleRotateRight = useCallback(
+		() => setViewRotation((viewRotation + 15) % 360),
+		[viewRotation, setViewRotation]
+	);
+	const handleResetAll = useCallback(() => {
+		setCameraPosition(0, 0);
+		setViewRotation(0);
+		setZoom(1);
+	}, [setCameraPosition, setViewRotation, setZoom]);
+
+	// 游标数据
+	const cursorX = mapCursor?.x ?? 0;
+	const cursorY = mapCursor?.y ?? 0;
+	const cursorR = mapCursor?.r ?? 0;
 
 	return (
-		<Flex direction="column" gap="3" className="sidebar-panel-content">
-			{/* 坐标 + 缩放 + 旋转 */}
-			<Flex gap="2" wrap="wrap">
-				<Flex align="center" gap="1" className="sidebar-info-row" style={{ padding: "3px 6px" }}>
-					<Text size="1" style={{ color: "#6b8aaa" }}>X</Text>
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-						{Math.round(cameraPosition.x)}
-					</Text>
-					<Text size="1" style={{ color: "#6b8aaa" }}>Y</Text>
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-						{Math.round(cameraPosition.y)}
+		<Flex direction="column" gap="3" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+			{/* 摄像机坐标 */}
+			<Box>
+				<Flex align="center" gap="1" style={{ marginBottom: 4 }}>
+					<Camera size={12} style={{ color: "#6b8aaa" }} />
+					<Text size="1" weight="bold" style={{ color: "#6b8aaa" }}>
+						摄像机
 					</Text>
 				</Flex>
+				<CoordinateInput
+					cameraX={cameraPosition.x}
+					cameraY={cameraPosition.y}
+					viewRotation={viewRotation}
+					zoom={zoom}
+					onCameraChange={setCameraPosition}
+					onViewRotationChange={setViewRotation}
+					onZoomChange={setZoom}
+					animateToCoords={cameraAnimation.animateToCoords}
+				/>
+			</Box>
 
+			{/* 缩放 + 旋转 快捷控制 */}
+			<Flex gap="2" wrap="wrap" align="center">
 				<Flex align="center" gap="1">
 					<Tooltip content="缩小">
 						<IconButton size="1" variant="soft" onClick={handleZoomOut}>
 							<ZoomOut size={12} />
 						</IconButton>
 					</Tooltip>
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff", minWidth: 32 }}>
+					<Text
+						size="1"
+						weight="bold"
+						style={{ color: "#cfe8ff", minWidth: 32, textAlign: "center" }}
+					>
 						{(zoom * 100).toFixed(0)}%
 					</Text>
 					<Tooltip content="放大">
@@ -131,7 +212,11 @@ export const ViewControlSidebarPanel: React.FC = () => {
 							<RotateCcw size={12} />
 						</IconButton>
 					</Tooltip>
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff", minWidth: 28 }}>
+					<Text
+						size="1"
+						weight="bold"
+						style={{ color: "#cfe8ff", minWidth: 28, textAlign: "center" }}
+					>
 						{Math.round(viewRotation)}°
 					</Text>
 					<Tooltip content="右旋">
@@ -144,9 +229,29 @@ export const ViewControlSidebarPanel: React.FC = () => {
 
 			<Separator size="4" />
 
+			{/* 游标坐标 */}
+			<Box>
+				<Flex align="center" gap="1" style={{ marginBottom: 4 }}>
+					<Target size={12} style={{ color: "#6b8aaa" }} />
+					<Text size="1" weight="bold" style={{ color: "#6b8aaa" }}>
+						游标
+					</Text>
+				</Flex>
+				<CursorInput
+					cursorX={cursorX}
+					cursorY={cursorY}
+					cursorR={cursorR}
+					onCursorChange={setMapCursor}
+				/>
+			</Box>
+
+			<Separator size="4" />
+
 			{/* 图层开关 */}
 			<Box className="sidebar-edit-section">
-				<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 6 }}>图层显示</Text>
+				<Text size="1" weight="bold" style={{ color: "#6b8aaa", marginBottom: 6 }}>
+					图层显示
+				</Text>
 				<Flex direction="column" gap="1">
 					{LAYER_CONFIG.map((layer) => {
 						const active = layerStates[layer.key];
@@ -161,7 +266,10 @@ export const ViewControlSidebarPanel: React.FC = () => {
 								style={{ padding: "2px 4px" }}
 							>
 								<Icon size={12} style={{ color: active ? "#4a9eff" : "#6b8aaa" }} />
-								<Text size="1" style={{ color: active ? "#cfe8ff" : "#6b8aaa", flex: 1 }}>
+								<Text
+									size="1"
+									style={{ color: active ? "#cfe8ff" : "#6b8aaa", flex: 1 }}
+								>
 									{layer.label}
 								</Text>
 								<Switch size="1" checked={active} />
@@ -174,7 +282,13 @@ export const ViewControlSidebarPanel: React.FC = () => {
 			<Separator size="4" />
 
 			{/* 重置 */}
-			<Button size="1" variant="soft" color="amber" onClick={handleResetAll} style={{ width: "100%" }}>
+			<Button
+				size="1"
+				variant="soft"
+				color="amber"
+				onClick={handleResetAll}
+				style={{ width: "100%" }}
+			>
 				<Home size={12} /> 重置视图
 			</Button>
 		</Flex>

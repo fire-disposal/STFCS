@@ -7,10 +7,11 @@ import React, { useMemo } from "react";
 import { CheckCircle, RotateCcw } from "lucide-react";
 import { Flex, Button, Text } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
+import type { RoomPlayerState } from "@vt/data";
 
 interface ReadyStatusFloatProps {
 	networkManager: SocketNetworkManager;
-	players: Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
+	players: Record<string, RoomPlayerState>;
 	playerId: string | null;
 	phase: string;
 }

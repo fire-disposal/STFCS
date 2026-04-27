@@ -5,11 +5,12 @@
  * 1. 使用 subscribeState 直接订阅 gameState
  * 2. React 状态变化自动触发重新渲染
  * 3. 简化逻辑，减少中间层
+ * 4. 直接使用 @vt/data 的 GameRoomState 权威类型
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
-import type { CombatToken, GameRoomState } from "@vt/data";
+import type { GameRoomState } from "@vt/data";
 import { useGameStore } from "@/state/stores/gameStore";
 
 const log = (...args: unknown[]) => console.log("[useSocketRoom]", ...args);
@@ -24,26 +25,6 @@ export interface RoomInfo {
 	phase: string;
 	turnCount: number;
 	createdAt: number;
-}
-
-export interface RoomState {
-	roomId: string;
-	playerId: string | null;
-	playerName: string | null;
-	isConnected: boolean;
-	currentPhase: string;
-	turnCount: number;
-	activeFaction: string | undefined;
-	tokens: Record<string, CombatToken>;
-	players: Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
-}
-
-export interface SocketRoom {
-	state: RoomState;
-	sessionId: string | null;
-	roomId: string;
-	send: <E extends keyof any>(event: E, payload: any) => Promise<any>;
-	leave: () => void;
 }
 
 export function useRoomList(
@@ -74,11 +55,17 @@ export function useRoomList(
 	return { rooms, isLoading, refresh: fetchRooms };
 }
 
+/**
+ * useSocketRoom - 连接到房间的 hook
+ * 
+ * 订阅 SocketNetworkManager 的状态变更，
+ * 直接将权威 GameRoomState 写入 Zustand store。
+ * 不再经过本地 RoomState/SocketRoom 中间类型转换。
+ */
 export function useSocketRoom(
 	networkManager: SocketNetworkManager | null,
 	onLeaveRoom?: () => void
-): SocketRoom | null {
-	const [roomState, setRoomState] = useState<RoomState | null>(null);
+): void {
 	const nmRef = useRef(networkManager);
 	nmRef.current = networkManager;
 	const onLeaveRef = useRef(onLeaveRoom);
@@ -89,7 +76,7 @@ export function useSocketRoom(
 		const nm = nmRef.current;
 		if (!nm?.isConnected()) {
 			log("not connected, skipping");
-			setRoomState(null);
+			useGameStore.getState().clearRoom();
 			return;
 		}
 
@@ -104,40 +91,21 @@ export function useSocketRoom(
 					hadStateRef.current = false;
 					onLeaveRef.current();
 				}
-				setRoomState(null);
+				useGameStore.getState().clearRoom();
 				return;
 			}
 
 			hadStateRef.current = true;
-			log("setting roomState", { roomId: gameState.roomId, tokenCount: Object.keys(gameState.tokens).length });
-			setRoomState({
-				roomId: gameState.roomId,
-				playerId: nm.getPlayerId(),
-				playerName: nm.getPlayerName(),
-				isConnected: true,
-				currentPhase: gameState.phase,
-				turnCount: gameState.turnCount,
-				activeFaction: gameState.activeFaction,
-				tokens: { ...gameState.tokens },
-				players: { ...gameState.players } as any,
-			});
+			log("setting GameRoomState to store", { roomId: gameState.roomId, tokenCount: Object.keys(gameState.tokens).length });
+			// 直接写入权威 GameRoomState + playerId 到 Zustand
+			useGameStore.getState().setRoom(gameState, nm.request.bind(nm), nm.getPlayerId());
 		});
 
 		const existingState = nm.getGameState();
 		if (existingState) {
 			log("found existing state", { roomId: existingState.roomId });
 			hadStateRef.current = true;
-			setRoomState({
-				roomId: existingState.roomId,
-				playerId: nm.getPlayerId(),
-				playerName: nm.getPlayerName(),
-				isConnected: true,
-				currentPhase: existingState.phase,
-				turnCount: existingState.turnCount,
-				activeFaction: existingState.activeFaction,
-				tokens: existingState.tokens,
-				players: existingState.players as any,
-			});
+			useGameStore.getState().setRoom(existingState, nm.request.bind(nm), nm.getPlayerId());
 		} else {
 			log("no existing state, waiting for sync:full");
 
@@ -158,74 +126,4 @@ export function useSocketRoom(
 			unsubscribe();
 		};
 	}, [networkManager, onLeaveRoom]);
-
-	const send = useCallback(
-		async <E extends keyof any>(event: E, payload: any): Promise<any> => {
-			const nm = nmRef.current;
-			if (!nm) throw new Error("Network unavailable");
-			return nm.request(event as any, payload);
-		},
-		[]
-	);
-
-	const leave = useCallback(() => {
-		const nm = nmRef.current;
-		if (nm) nm.leaveRoom();
-		if (onLeaveRef.current) onLeaveRef.current();
-	}, []);
-
-	const socketRoom = useMemo<SocketRoom | null>(() => {
-		if (!roomState?.roomId) return null;
-		return {
-			state: roomState,
-			sessionId: roomState.playerId,
-			roomId: roomState.roomId,
-			send,
-			leave,
-		};
-	}, [roomState, send, leave]);
-
-	useEffect(() => {
-		if (socketRoom) {
-			useGameStore.getState().setRoom({
-				roomId: socketRoom.roomId,
-				state: {
-					roomId: socketRoom.state.roomId,
-					phase: socketRoom.state.currentPhase,
-					turnCount: socketRoom.state.turnCount,
-					activeFaction: socketRoom.state.activeFaction,
-					tokens: socketRoom.state.tokens,
-					players: socketRoom.state.players,
-					ownerId: "",
-					createdAt: Date.now(),
-				} as GameRoomState,
-				send: socketRoom.send,
-			});
-		} else {
-			useGameStore.getState().clearRoom();
-		}
-	}, [socketRoom]);
-
-	return socketRoom;
 }
-
-export function useTokens(room: SocketRoom | null): CombatToken[] {
-	const [tokens, setTokens] = useState<CombatToken[]>([]);
-
-	useEffect(() => {
-		if (!room?.state?.tokens) {
-			setTokens([]);
-			return;
-		}
-
-		const arr: CombatToken[] = [];
-		for (const [, token] of Object.entries(room.state.tokens)) {
-			arr.push(token);
-		}
-		setTokens(arr);
-	}, [room, room?.state?.tokens, Object.keys(room?.state?.tokens ?? {}).join(",")]);
-
-	return tokens;
-}
-
-export { useTokens as useShips };

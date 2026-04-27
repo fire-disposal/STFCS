@@ -16,18 +16,17 @@ import type { RoomPlayerState, CombatToken } from "@vt/data";
 import { Avatar } from "@/ui/shared/Avatar";
 import { SaveMenu } from "./SaveMenu";
 import { useUIStore } from "@/state/stores/uiStore";
+import {
+	useGamePhase,
+	useGameTurnCount,
+	useGameActiveFaction,
+	useGamePlayers,
+	useAllTokens,
+	useGamePlayerId,
+} from "@/state/stores/gameStore";
 import "./top-bar.css";
 
 interface TopBarProps {
-	phase: GamePhase;
-	turnCount: number;
-	activeFaction: Faction | undefined;
-	players: Record<string, RoomPlayerState>;
-	currentPlayerId: string | null;
-	isHost: boolean;
-	isReady: boolean;
-	inRoom: boolean;
-	tokens: CombatToken[];
 	onReadyToggle: () => void;
 	onAdvancePhase: () => void;
 	onSettings: () => void;
@@ -36,24 +35,25 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-	phase,
-	turnCount,
-	activeFaction,
-	players,
-	currentPlayerId,
-	isHost,
-	isReady,
-	inRoom,
-	tokens,
 	onReadyToggle,
 	onAdvancePhase,
 	onSettings,
 	onLeave,
 	onFactionChange,
 }) => {
-	const currentPlayer = currentPlayerId ? players[currentPlayerId] : undefined;
+	// 从 Zustand 直接获取所有游戏状态
+	const phase = useGamePhase();
+	const turnCount = useGameTurnCount();
+	const activeFaction = useGameActiveFaction();
+	const players = useGamePlayers();
+	const tokens = useAllTokens();
+	const playerId = useGamePlayerId();
+	const currentPlayer = playerId ? players[playerId] : undefined;
 	const currentFaction = currentPlayer?.faction;
-	
+	const isHost = currentPlayer?.role === "HOST";
+	const isReady = currentPlayer?.isReady ?? false;
+	const inRoom = true;
+
 	// 直接从 uiStore 获取选中的舰船
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
 	const selectedShip = tokens.find((t) => t.$id === selectedShipId) ?? null;
@@ -66,7 +66,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 					turnCount={turnCount}
 					activeFaction={activeFaction}
 					players={players}
-					currentPlayerId={currentPlayerId}
+					currentPlayerId={playerId}
 					isHost={isHost}
 					isReady={isReady}
 					onReadyToggle={onReadyToggle}
@@ -89,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 				{/* 派系选择器 */}
 				<FactionSelector
 					currentFaction={currentFaction}
-					currentPlayerId={currentPlayerId}
+					currentPlayerId={playerId}
 					onFactionChange={onFactionChange}
 				/>
 				<SaveMenu isHost={isHost} inRoom={inRoom} />

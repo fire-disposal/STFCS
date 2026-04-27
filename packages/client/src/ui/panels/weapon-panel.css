@@ -9,6 +9,7 @@
 	flex-direction: row;
 	gap: var(--space-2);
 	height: 100%;
+	min-height: 180px;
 	min-width: 0;
 	padding: 4px;
 	background: rgba(13, 40, 71, 0.6);
@@ -37,6 +38,7 @@
 	align-items: center;
 	gap: 4px;
 	padding: 4px 8px;
+	min-height: 28px;
 	font-size: 11px;
 	font-weight: bold;
 	color: #cfe8ff;
@@ -54,10 +56,20 @@
 	overflow-y: auto;
 }
 
+/* 武器列表列在内容过多时可滚动 */
+.weapon-col--list {
+	overflow: hidden;
+}
+
+.weapon-col--list .weapon-col__content {
+	overflow-y: auto;
+}
+
 /* ====== 列宽度比例 ====== */
 .weapon-col--list {
 	flex: 1;
 	min-width: 70px;
+	overflow: hidden;
 }
 
 .weapon-col--info {
@@ -179,26 +191,16 @@
 	border-bottom: none;
 }
 
-/* 武器状态提示 */
-.weapon-info__status {
+/* 武器标签展示区 */
+.weapon-info__tags {
 	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding: 6px;
+	align-items: center;
+	padding: 4px 6px;
 	margin-top: 4px;
+	min-height: 24px;
 	border-radius: 3px;
-}
-
-.weapon-info__status--blocked {
-	background: rgba(231, 76, 60, 0.12);
-	border: 1px solid rgba(231, 76, 60, 0.25);
-	color: #e74c3c;
-}
-
-.weapon-info__status--ready {
-	background: rgba(46, 204, 113, 0.12);
-	border: 1px solid rgba(46, 204, 113, 0.25);
-	color: #2ecc71;
+	background: rgba(10, 25, 50, 0.3);
+	border: 1px solid rgba(74, 158, 255, 0.1);
 }
 
 /* ====== 列3：目标列表 ====== */
@@ -259,10 +261,24 @@
 }
 
 .target-item__check-placeholder {
-	width: 8px;
-	height: 8px;
+	width: 10px;
+	height: 10px;
 	border: 1px solid rgba(74, 158, 255, 0.3);
 	border-radius: 2px;
+	background: transparent;
+	transition: all 0.15s ease;
+}
+
+.target-item__check--selected {
+	border-color: #2ecc71;
+}
+
+.target-item__check-fill {
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	background: #2ecc71;
+	box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
 }
 
 .target-item__name {

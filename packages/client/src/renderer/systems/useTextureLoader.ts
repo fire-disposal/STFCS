@@ -1,5 +1,5 @@
 import { Assets, Texture } from "pixi.js";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { AssetListItem } from "@vt/data";
 
 interface AssetBatchGetResult {
@@ -27,7 +27,7 @@ export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, 
 	const { assetIds, fetchAssets } = options;
 	const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
 	const loadingRef = useRef<Set<string>>(new Set());
-	const [, forceUpdate] = useState({});
+	const [cacheVersion, setCacheVersion] = useState(0);
 
 	const shouldRetry = useCallback((entry: CacheEntry | undefined): boolean => {
 		if (!entry) return true;
@@ -112,7 +112,7 @@ export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, 
 				}
 			}
 
-			forceUpdate({});
+			setCacheVersion((v) => v + 1);
 		} catch (error) {
 			console.error("[useTextureLoader] Batch request failed:", error);
 			for (const id of toLoad) {
@@ -125,7 +125,7 @@ export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, 
 					lastAttemptAt: Date.now(),
 				});
 			}
-			forceUpdate({});
+			setCacheVersion((v) => v + 1);
 		}
 	}, [fetchAssets, shouldRetry]);
 
@@ -139,7 +139,7 @@ export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, 
 				if (entry.texture) {
 					try {
 						Assets.unload(id);
-					} catch {}
+					} catch { }
 				}
 			}
 			cacheRef.current.clear();
@@ -147,10 +147,13 @@ export function useTextureLoader(options: UseTextureLoaderOptions): Map<string, 
 		};
 	}, []);
 
-	const resultCache = new Map<string, Texture | null>();
-	for (const [id, entry] of cacheRef.current) {
-		resultCache.set(id, entry.texture);
-	}
+	const resultCache = useMemo(() => {
+		const map = new Map<string, Texture | null>();
+		for (const [id, entry] of cacheRef.current) {
+			map.set(id, entry.texture);
+		}
+		return map;
+	}, [cacheVersion]);
 	return resultCache;
 }
 

@@ -1,13 +1,15 @@
 /**
  * SocketNetworkManager - Socket.IO 连接管理
- * 
+ *
  * 设计原则：
  * 1. 状态驱动：gameState 变化自动触发 React 更新
  * 2. 房间流程：create 仅创建；join 返回状态快照并可回退 sync:request_full
  * 3. 利用 Zustand：前端 hooks 直接订阅 gameState
+ * 4. Mutative 不可变：state:patch 通过 produce() 包裹生成新引用，确保 Zustand 检测到变化
  */
 
 import { io, Socket } from "socket.io-client";
+import { create } from "mutative";
 import type {
 	WsEventName,
 	WsPayload,
@@ -360,8 +362,11 @@ export class SocketNetworkManager {
 
 		this.socket.on("state:patch", (data: StatePatchPayload) => {
 			if (!this.gameState) return;
-			this.applyPatches(data.patches);
-			this.setGameState(this.gameState);
+			// 使用 Mutative create() 生成新引用，确保 Zustand Object.is() 检测到变化
+			const nextState = create(this.gameState, (draft) => {
+				this.applyPatchesToDraft(draft, data.patches);
+			});
+			this.setGameState(nextState);
 		});
 	}
 
@@ -377,17 +382,26 @@ export class SocketNetworkManager {
 	 * - path=["phase"] op="replace" → 替换顶层标量字段
 	 * - path=["players", "id"] op="remove" → 删除字典条目
 	 */
-	private applyPatches(patches: StatePatch[]): void {
-		if (!this.gameState) return;
+	/**
+	 * 对 draft 对象应用 patches（用于 Mutative produce 回调内部）
+	 * 与旧的 applyPatches 不同：它不依赖 this.gameState，直接操作传入的 target
+	 */
+	private applyPatchesToDraft(target: any, patches: StatePatch[]): void {
 		for (const patch of patches) {
 			if (patch.path.length === 0) continue;
-			this.applyPatchAt(this.gameState, patch.path, patch);
+			this.applyPatchAt(target, patch.path, patch);
 		}
 	}
 
 	/**
 	 * 在 target 对象的 path 位置执行 patch 操作。
 	 * 递归直到 path 耗尽（叶子节点），然后执行 add/replace/remove。
+	 *
+	 * BUGFIX: remove 操作在非叶子路径上同样需要递归到叶子节点，
+	 * 而非只删除第一级子节点。
+	 * 原 Bug：path=["tokens","id","runtime","heading"], op="remove"
+	 * 错误行为：删除 target["tokens"]["id"]（整个 token）
+	 * 正确行为：递归删除 target["tokens"]["id"]["runtime"]["heading"]
 	 */
 	private applyPatchAt(target: any, path: (string | number)[], patch: StatePatch): void {
 		const [key, ...rest] = path;
@@ -406,13 +420,8 @@ export class SocketNetworkManager {
 		// 非叶子节点：确保中间对象存在后递归
 		if (!target[key]) target[key] = {};
 
-		if (patch.op === "remove") {
-			// 删除子节点（如 ["tokens", "id"] op="remove"）
-			delete target[key][String(rest[0])];
-		} else {
-			// add / replace：递归进入子路径
-			this.applyPatchAt(target[key], rest, patch);
-		}
+		// 统一递归到叶子节点（add/replace/remove 都需要递归到叶子）
+		this.applyPatchAt(target[key], rest, patch);
 	}
 
 	private async attemptRejoinRoom(): Promise<void> {

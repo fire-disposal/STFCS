@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback } from "react";
-import { Anchor, Zap, AlertTriangle, Edit2, Check, X } from "lucide-react";
+import { Anchor, Zap, AlertTriangle, Edit2, Check, X, Copy } from "lucide-react";
 import { FactionColors } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
 import { notify } from "@/ui/shared/Notification";
@@ -26,7 +26,7 @@ function getArmorColor(percent: number): string {
 export const ShipInfoPanel: React.FC = () => {
 	const ship = useSelectedShip();
 	const { send } = useGameAction();
-	
+
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editingName, setEditingName] = useState("");
 
@@ -79,6 +79,10 @@ export const ShipInfoPanel: React.FC = () => {
 	const destroyed = hasShip ? ship.runtime.destroyed : false;
 	const armor = hasShip ? (ship.runtime.armor ?? []) : [];
 	const armorMax = hasShip ? ship.spec.armorMaxPerQuadrant : 1;
+
+	const headingDeg = hasShip ? Math.round(ship.runtime.heading ?? 0) : 0;
+	const posX = hasShip ? Math.round(ship.runtime.position?.x ?? 0) : 0;
+	const posY = hasShip ? Math.round(ship.runtime.position?.y ?? 0) : 0;
 
 	return (
 		<Flex direction="column" gap="2" className="panel-content">
@@ -137,18 +141,37 @@ export const ShipInfoPanel: React.FC = () => {
 
 				<Box className="panel-divider" />
 
-				<Flex className="panel-section" align="center" gap="2">
-					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>朝向</Text>
-					<Text size="3" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-						{hasShip ? `${Math.round(ship.runtime.heading ?? 0)}°` : "NA"}
-					</Text>
-				</Flex>
-
-				<Flex className="panel-section" align="center" gap="2">
-					<Text size="2" style={{ color: "#6b8aaa", fontWeight: 600 }}>位置</Text>
-					<Text size="3" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-						{hasShip ? `(${Math.round(ship.runtime.position?.x ?? 0)}, ${Math.round(ship.runtime.position?.y ?? 0)})` : "NA"}
-					</Text>
+				<Flex className="panel-section" align="center" gap="2" style={{ minWidth: 0 }}>
+					<Text size="1" style={{ color: "#6b8aaa", fontWeight: 600, whiteSpace: "nowrap" }}>坐标</Text>
+					<div className="cursor-coordinate-input__row" style={{ height: 26, gap: 4, flex: 1, maxWidth: 260 }}>
+						<div
+							style={{
+								flex: 1,
+								display: "flex",
+								alignItems: "center",
+								padding: "2px 8px",
+								height: "100%",
+								background: "rgba(6, 16, 26, 0.8)",
+								border: "1px solid rgba(74, 158, 255, 0.2)",
+								color: "#cfe8ff",
+								fontSize: 10,
+								fontFamily: "'Consolas', 'Monaco', monospace",
+							}}
+						>
+							{hasShip ? `${headingDeg}°, ${posX}, ${posY}` : "NA"}
+						</div>
+						<button
+							className="cursor-coordinate-input__btn cursor-coordinate-input__btn--copy"
+							style={{ minWidth: 50, padding: "4px 6px", height: "100%", fontSize: 9 }}
+							onClick={() => navigator.clipboard.writeText(
+								hasShip ? `${headingDeg},${posX},${posY}` : ""
+							)}
+							data-magnetic
+						>
+							<Copy size={10} />
+							<span className="cursor-coordinate-input__btn-text">复制</span>
+						</button>
+					</div>
 				</Flex>
 			</Flex>
 

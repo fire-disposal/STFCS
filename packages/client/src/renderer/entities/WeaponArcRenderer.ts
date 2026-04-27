@@ -4,7 +4,7 @@ import { getMountWorldPosition, distanceBetween, angleBetween, normalizeAngleSig
 import { Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useCallback } from "react";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useGameRoom } from "@/state/stores/gameStore";
+import { useGameActionSender } from "@/state/stores/gameStore";
 
 interface WeaponTargetInfo {
 	targetId: string;
@@ -68,21 +68,21 @@ export function useWeaponArcRendering(
 
 	const selectedShip = ships.find((s) => s.$id === selectedShipId) ?? null;
 
-	const room = useGameRoom();
+	const sender = useGameActionSender();
 
 	const fetchTargets = useCallback(async (shipId: string) => {
-		if (!room || !room.send || pendingQueryRef.current) return;
+		if (!sender.isAvailable() || pendingQueryRef.current) return;
 
 		pendingQueryRef.current = true;
 		try {
-			const result = await room.send("game:query", { type: "targets", tokenId: shipId });
+			const result = await sender.send("game:query", { type: "targets", tokenId: shipId });
 			targetingDataRef.current = result.result as ShipTargetingResult;
 		} catch {
 			targetingDataRef.current = null;
 		} finally {
 			pendingQueryRef.current = false;
 		}
-	}, [room]);
+	}, [sender]);
 
 	useEffect(() => {
 		if (!selectedShipId || !show) {

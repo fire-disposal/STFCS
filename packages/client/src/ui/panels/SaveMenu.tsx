@@ -166,13 +166,13 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 									justify="between"
 								>
 									<Box className="save-item-info">
-										<Text size="1" weight="bold">{save.metadata.name}</Text>
+										<Text size="1" weight="bold">{save.metadata?.name ?? "未命名存档"}</Text>
 										<Flex gap="2" align="center">
 											<Text size="1" color="gray">
-												{formatDate(save.createdAt)}
+												{save.createdAt ? formatDate(save.createdAt) : "未知时间"}
 											</Text>
 											<Badge size="1" color="gray">
-												{Object.keys(save.snapshot.tokens).length} 舰船
+												{save.snapshot?.tokens ? Object.keys(save.snapshot.tokens).length : 0} 舰船
 											</Badge>
 										</Flex>
 									</Box>
@@ -192,7 +192,7 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 											size="1"
 											variant="soft"
 											color="red"
-											onClick={() => handleDelete(save.$id, save.metadata.name)}
+											onClick={() => handleDelete(save.$id, save.metadata?.name ?? "未命名")}
 											disabled={saving}
 											title="删除"
 										>

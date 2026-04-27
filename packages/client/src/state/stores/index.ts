@@ -18,7 +18,6 @@ export {
 	useAllTokens,
 	useConnectedPlayers,
 	getGameActionSender,
-	getGameRoom,
 	getGameState,
 } from "./gameStore";
 

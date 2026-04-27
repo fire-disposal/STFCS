@@ -12,7 +12,11 @@
  * - pointermove: 拖拽平移/旋转
  * - pointerup: 结束拖拽
  * - wheel: 缩放控制
- * - keydown/keyup: 空格键切换拖拽模式
+ *
+ * 拖拽模式：
+ * - 右键拖拽 = 平移（pan）
+ * - 中键拖拽 = 旋转（rotate）
+ * - 左键点击 = 选择/设置游标（click）
  *
  * 与其他模块协作：
  * - useLayerSystem: 提供层注册
@@ -42,7 +46,6 @@ export interface UsePixiAppOptions {
 	canvasSize: CanvasSize;
 	cameraRef: React.MutableRefObject<CameraState>;
 	dragStateRef: React.MutableRefObject<DragState>;
-	spacePressedRef: React.MutableRefObject<boolean>;
 	flushDragDelta: () => void;
 	zoomInteraction: UseZoomInteractionResult;
 	camera: { tickZoomAnimation: () => void };
@@ -56,7 +59,6 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 		canvasSize,
 		cameraRef,
 		dragStateRef,
-		spacePressedRef,
 		flushDragDelta,
 		zoomInteraction,
 		camera,
@@ -312,6 +314,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				event.stopPropagation();
 
 				if (button === 2) {
+					// 右键 -> 平移
 					dragState.active = true;
 					dragState.mode = "pan";
 					dragState.startX = screen.x;
@@ -324,6 +327,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				}
 
 				if (button === 1) {
+					// 中键 -> 旋转
 					dragState.active = true;
 					dragState.mode = "rotate";
 					dragState.startX = screen.x;
@@ -336,16 +340,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				}
 
 				if (button === 0) {
-					if (spacePressedRef.current) {
-						dragState.active = true;
-						dragState.mode = "pan";
-						dragState.startX = screen.x;
-						dragState.startY = screen.y;
-						dragState.lastX = dragState.startX;
-						dragState.lastY = dragState.startY;
-						dragState.moved = false;
-						stage.cursor = "grabbing";
-					} else if (!isShipObject(event.target)) {
+					// 左键 -> 点击（选择/设置游标）
+					if (!isShipObject(event.target)) {
 						dragState.active = true;
 						dragState.mode = "click";
 						dragState.startX = screen.x;
@@ -390,8 +386,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				const dragState = dragStateRef.current;
 
 				if (
-												dragState.active &&
-												(dragState.mode === "pan" || dragState.mode === "click") &&
+					dragState.active &&
+					(dragState.mode === "pan" || dragState.mode === "click") &&
 					!dragState.moved &&
 					!isShipObject(event.target)
 				) {
@@ -407,7 +403,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				dragState.pendingDx = 0;
 				dragState.pendingDy = 0;
 				dragState.pendingRotate = 0;
-				stage.cursor = spacePressedRef.current ? "grab" : "default";
+				stage.cursor = "default";
 			};
 
 			stage.on("pointerup", finishDrag);
@@ -425,44 +421,11 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			};
 			app.ticker.add(tickerCallback);
 			tickerCallbackRef.current = tickerCallback;
-
-			const handleKeyDown = (e: KeyboardEvent) => {
-				if (e.code === "Space" && !e.repeat) {
-					spacePressedRef.current = true;
-					stage.cursor = "grab";
-					e.preventDefault();
-				}
-			};
-
-			const handleKeyUp = (e: KeyboardEvent) => {
-				if (e.code === "Space") {
-					spacePressedRef.current = false;
-					stage.cursor = dragStateRef.current.active ? "grabbing" : "default";
-				}
-			};
-
-			const handleBlur = () => {
-				spacePressedRef.current = false;
-				stage.cursor = "default";
-			};
-
-			window.addEventListener("keydown", handleKeyDown);
-			window.addEventListener("keyup", handleKeyUp);
-			window.addEventListener("blur", handleBlur);
-
-			const cleanupKeyListeners = () => {
-				window.removeEventListener("keydown", handleKeyDown);
-				window.removeEventListener("keyup", handleKeyUp);
-				window.removeEventListener("blur", handleBlur);
-			};
-
-			(app as any).__cleanupKeyListeners = cleanupKeyListeners;
 		},
 		[
 			canvasSize,
 			setLayers,
 			dragStateRef,
-			spacePressedRef,
 			flushDragDelta,
 			getWorldPoint,
 			cameraRef,
@@ -490,9 +453,6 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				if (tickerCallbackRef.current) {
 					app.ticker.remove(tickerCallbackRef.current);
 					tickerCallbackRef.current = null;
-				}
-				if ((app as any).__cleanupKeyListeners) {
-					(app as any).__cleanupKeyListeners();
 				}
 			}
 		};

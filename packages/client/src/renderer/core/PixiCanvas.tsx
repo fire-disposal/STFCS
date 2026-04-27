@@ -29,9 +29,10 @@
 
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
+import { useAllTokens, useGamePlayers } from "@/state/stores/gameStore";
 import { Application } from "@pixi/react";
 
-import type { CombatToken, RoomPlayerState } from "@vt/data";
+import type { CombatToken } from "@vt/data";
 import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
@@ -61,8 +62,6 @@ interface AssetBatchGetResult {
 }
 
 interface GameCanvasProps {
-	ships: CombatToken[];
-	players?: Record<string, RoomPlayerState>;
 	onClick?: (x: number, y: number) => void;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
 }
@@ -105,11 +104,11 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
-	ships,
-	players,
 	onClick,
 	fetchAssets = noopFetchAssets,
 }) => {
+	const ships = useAllTokens();
+	const players = useGamePlayers();
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
@@ -162,7 +161,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		canvasSize,
 		cameraRef: camera.cameraRef,
 		dragStateRef: interaction.dragStateRef,
-		spacePressedRef: interaction.spacePressedRef,
 		flushDragDelta: interaction.flushDragDelta,
 		zoomInteraction,
 		camera: { tickZoomAnimation: camera.tickZoomAnimation },
@@ -241,6 +239,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useEffect(() => {
 		updateHitAreasRef.current(canvasSize);
 	}, [canvasSize]);
+
+	// 点击画布时取消输入框焦点（防止空格拖拽在输入框输入空格）
+	useEffect(() => {
+		const el = hostRef.current;
+		if (!el) return;
+		const handleMouseDown = () => {
+			if (
+				document.activeElement &&
+				(document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")
+			) {
+				(document.activeElement as HTMLElement).blur();
+			}
+		};
+		el.addEventListener("mousedown", handleMouseDown);
+		return () => el.removeEventListener("mousedown", handleMouseDown);
+	}, []);
 
 	return (
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container">

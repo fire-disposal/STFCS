@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Rocket, Target, Search, Filter } from "lucide-react";
+import { Rocket, Search, Filter } from "lucide-react";
 import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea } from "@radix-ui/themes";
 import type { InventoryToken, CombatToken } from "@vt/data";
 import { Faction as FactionEnum, HullSize } from "@vt/data";
@@ -39,10 +39,6 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 }) => {
 	const { send } = useGameAction();
 	const mapCursor = useUIStore((state) => state.mapCursor);
-	const cursorPosition = useMemo(() =>
-		mapCursor ? { x: mapCursor.x, y: mapCursor.y } : { x: 0, y: 0 },
-		[mapCursor]
-	);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterSize, setFilterSize] = useState<string>("all");
@@ -92,11 +88,15 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 			return;
 		}
 
+		const cursorPos = {
+			x: mapCursor?.x ?? 0,
+			y: mapCursor?.y ?? 0,
+		};
 		const cursorHeading = mapCursor?.r ?? 0;
 		const spec = selectedPreset.token.spec;
 
 		const runtimeBase = {
-			position: cursorPosition,
+			position: cursorPos,
 			heading: cursorHeading,
 			hull: spec.maxHitPoints,
 			armor: Array(6).fill(spec.armorMaxPerQuadrant),
@@ -109,7 +109,7 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 			venting: false,
 			weapons: (spec.mounts ?? []).map((m) => ({
 				mountId: m.id,
-				state: "READY",
+				state: "READY" as const,
 				cooldownRemaining: 0,
 			})),
 		};
@@ -132,11 +132,11 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 				action: "create",
 				token: combatToken,
 				faction: FactionEnum.PLAYER_ALLIANCE,
-				position: cursorPosition,
+				position: cursorPos,
 			});
 			const displayName = (result as { tokenId: string; displayName?: string })?.displayName ?? selectedPreset.name;
 			if (displayName) {
-				notify.success(`已部署 ${displayName} 到 (${Math.round(cursorPosition.x)}, ${Math.round(cursorPosition.y)})`);
+				notify.success(`已部署 ${displayName} 到 (${Math.round(cursorPos.x)}, ${Math.round(cursorPos.y)})`);
 			}
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "部署失败");
@@ -152,7 +152,7 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 	}
 
 	return (
-		<Flex direction="column" gap="2" className="sidebar-panel-content">
+		<Flex direction="column" gap="2" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
 			{/* 搜索和筛选 */}
 			<Flex gap="2">
 				<TextField.Root
@@ -233,15 +233,6 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 					</Flex>
 				</ScrollArea>
 			</Box>
-
-			{/* 游标位置 */}
-			<Flex align="center" gap="2" className="sidebar-info-row">
-				<Target size={12} style={{ color: "#6b8aaa" }} />
-				<Text size="1" style={{ color: "#6b8aaa" }}>游标</Text>
-				<Text size="1" weight="bold" style={{ color: "#cfe8ff", fontFamily: "'Fira Code', monospace" }}>
-					({Math.round(cursorPosition.x)}, {Math.round(cursorPosition.y)})
-				</Text>
-			</Flex>
 
 			{/* 部署按钮 */}
 			<Button

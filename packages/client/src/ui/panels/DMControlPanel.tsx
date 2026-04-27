@@ -7,28 +7,35 @@ import React, { useMemo } from "react";
 import { Settings, ChevronDown, Users, UserX } from "lucide-react";
 import { Button, Flex, Box, Text, Badge, DropdownMenu } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
+import type { RoomPlayerState } from "@vt/data";
 import { useGameAction } from "@/hooks/useGameAction";
 import { notify } from "@/ui/shared/Notification";
+import {
+	useGamePlayers,
+	useGamePhase,
+	useGameTurnCount,
+	useGameActiveFaction,
+	useGamePlayerId,
+} from "@/state/stores/gameStore";
 import "./battle-panel.css";
 
 interface DMControlPanelProps {
 	networkManager: SocketNetworkManager;
-	players: Record<string, { sessionId: string; nickname: string; role: string; isReady: boolean; connected: boolean }>;
-	isHost: boolean;
-	phase: string;
-	turnCount: number;
-	activeFaction: string | undefined;
 }
 
 export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 	networkManager,
-	players,
-	isHost,
-	phase,
-	turnCount,
-	activeFaction,
 }) => {
 	const { send } = useGameAction();
+
+	// 从 Zustand 直接获取状态
+	const players = useGamePlayers();
+	const phase = useGamePhase();
+	const turnCount = useGameTurnCount();
+	const activeFaction = useGameActiveFaction();
+	const playerId = useGamePlayerId();
+	const currentPlayer = playerId ? players[playerId] : undefined;
+	const isHost = currentPlayer?.role === "HOST";
 
 	const playerList = useMemo(() => Object.entries(players).map(([id, p]) => ({
 		id,
@@ -79,7 +86,7 @@ export const DMControlPanel: React.FC<DMControlPanelProps> = ({
 				{activeFaction && (
 					<>
 						<Text size="1" color="gray">阵营</Text>
-						<Badge size="1" color={activeFaction === "PLAYER" ? "green" : "red"}>{activeFaction}</Badge>
+						<Badge size="1" color={activeFaction === "PLAYER_ALLIANCE" ? "green" : "red"}>{activeFaction}</Badge>
 					</>
 				)}
 			</Flex>

@@ -9,7 +9,7 @@ import { Rocket, Target, Search, Filter } from "lucide-react";
 import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea } from "@radix-ui/themes";
 import type { InventoryToken, CombatToken } from "@vt/data";
 import { Faction as FactionEnum, HullSize } from "@vt/data";
-import type { SocketRoom, SocketNetworkManager } from "@/network";
+import type { SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
 import { notify } from "@/ui/shared/Notification";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -31,12 +31,10 @@ interface ShipPresetItem {
 }
 
 export interface ShipPresetPanelProps {
-	room: SocketRoom | null;
 	networkManager: SocketNetworkManager;
 }
 
 export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
-	room,
 	networkManager,
 }) => {
 	const mapCursor = useUIStore((state) => state.mapCursor);
@@ -88,7 +86,7 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 	const selectedPreset = selectedId ? shipPresets.find((p) => p.id === selectedId) : null;
 
 	const handleDeploy = async () => {
-		if (!room || !selectedPreset) {
+		if (!selectedPreset) {
 			notify.error("请先选择舰船预设");
 			return;
 		}
@@ -129,7 +127,13 @@ export const ShipPresetPanel: React.FC<ShipPresetPanelProps> = ({
 		};
 
 		try {
-			const result = await room.send("edit:token", {
+			const { getGameActionSender } = await import("@/state/stores/gameStore");
+			const sender = getGameActionSender();
+			if (!sender.isAvailable()) {
+				notify.error("网络未连接");
+				return;
+			}
+			const result = await sender.send("edit:token", {
 				action: "create",
 				token: combatToken,
 				faction: FactionEnum.PLAYER_ALLIANCE,

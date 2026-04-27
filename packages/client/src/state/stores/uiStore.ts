@@ -50,6 +50,9 @@ interface UIState {
 	isMouseDown: boolean;
 	mousePosition: { x: number; y: number };
 
+	// 通用设置
+	suppressContextMenu: boolean; // 全局拦截右键菜单
+
 	// 视图状态
 	cameraPosition: { x: number; y: number };
 	zoom: number;
@@ -66,7 +69,7 @@ interface UIState {
 	hideNativeCursor: boolean;
 	enableStarfieldParallax: boolean; // 星空视差效果
 	hpPerBar: number;                  // 血条每个|代表的HP数量
-	
+
 	// HUD 图层开关（新增）
 	showHpBars: boolean;              // 血条显示
 	showFluxBars: boolean;            // 辐能条显示
@@ -119,6 +122,9 @@ interface UIActions {
 	setMouseDown: (isDown: boolean) => void;
 	setMousePosition: (x: number, y: number) => void;
 
+	// 通用设置
+	toggleSuppressContextMenu: () => void;
+
 	// 视图相关
 	setCameraPosition: (x: number, y: number) => void;
 	setZoom: (zoom: number) => void;
@@ -134,7 +140,7 @@ interface UIActions {
 	toggleWeaponTextures: () => void;
 	setHideNativeCursor: (hide: boolean) => void;
 	toggleStarfieldParallax: () => void;
-	
+
 	// HUD 图层开关 toggle
 	toggleHpBars: () => void;
 	toggleFluxBars: () => void;
@@ -189,6 +195,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	isMouseDown: false,
 	mousePosition: { x: 0, y: 0 },
 
+	suppressContextMenu: true,
+
 	cameraPosition: { x: 0, y: 0 },
 	zoom: 1,
 	showGrid: true,
@@ -204,7 +212,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	hideNativeCursor: false,
 	enableStarfieldParallax: false, // 默认不启用星空视差
 	hpPerBar: 200,                    // 默认每个|代表20HP
-	
+
 	// HUD 图层开关（默认全部显示）
 	showHpBars: true,
 	showFluxBars: true,
@@ -266,6 +274,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	setCameraPosition: (x, y) => set({ cameraPosition: { x, y } }),
 	setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(3, zoom)) }),
+	toggleSuppressContextMenu: () => set((state) => ({ suppressContextMenu: !state.suppressContextMenu })),
+
 	toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
 	toggleRangeIndicator: () => set((state) => ({ showRangeIndicator: !state.showRangeIndicator })),
 	toggleBackground: () => set((state) => ({ showBackground: !state.showBackground })),
@@ -280,7 +290,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggleStarfieldParallax: () =>
 		set((state) => ({ enableStarfieldParallax: !state.enableStarfieldParallax })),
 	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(100, value)) }),
-	
+
 	// HUD 图层开关 toggle
 	toggleHpBars: () => set((state) => ({ showHpBars: !state.showHpBars })),
 	toggleFluxBars: () => set((state) => ({ showFluxBars: !state.showFluxBars })),

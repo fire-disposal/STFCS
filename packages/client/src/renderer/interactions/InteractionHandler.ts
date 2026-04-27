@@ -3,11 +3,10 @@
  *
  * 职责：
  * 1. 管理拖拽状态（平移/旋转/点击模式）
- * 2. 管理空格键按下状态（切换拖拽模式）
- * 3. 累积拖拽 delta，通过 flushDragDelta 批量提交
+ * 2. 累积拖拽 delta，通过 flushDragDelta 批量提交
  *
  * 拖拽模式：
- * - pan: 平移地图（默认右键拖拽，空格+左键拖拽）
+ * - pan: 平移地图（右键拖拽）
  * - rotate: 旋转地图（Ctrl+右键拖拽，Shift+拖拽）
  * - click: 单击选择舰船/设置游标
  *
@@ -33,7 +32,6 @@ export interface DragState {
 }
 
 export interface UseInteractionResult {
-	spacePressedRef: React.MutableRefObject<boolean>;
 	dragStateRef: React.MutableRefObject<DragState>;
 	flushDragDelta: () => void;
 }
@@ -42,7 +40,6 @@ export function useInteraction(
 	onPanDelta?: (deltaX: number, deltaY: number) => void,
 	onRotateDelta?: (delta: number) => void
 ): UseInteractionResult {
-	const spacePressedRef = useRef(false);
 	const onPanDeltaRef = useRef(onPanDelta);
 	const onRotateDeltaRef = useRef(onRotateDelta);
 	const dragStateRef = useRef<DragState>({
@@ -83,7 +80,6 @@ export function useInteraction(
 	};
 
 	return {
-		spacePressedRef,
 		dragStateRef,
 		flushDragDelta,
 	};

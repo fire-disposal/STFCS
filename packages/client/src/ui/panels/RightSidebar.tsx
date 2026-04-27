@@ -2,34 +2,32 @@
  * RightSidebar - 右侧栏组件
  *
  * 结构：
- * - 上折叠栏：视图控制 + 战斗Log（占位）
- * - 下折叠栏：舰船预设 + 现实修改（仅HOST可见）
- *
- * 折叠时：仅显示展开按钮条（32px）
+ * - 上侧栏：视图控制 + 战斗日志（Tab切换，横向显示）
+ * - 下侧栏：舰船预设 + 现实修改 + DM控制（Tab切换，横向显示，仅HOST可见修改和DM控制）
  */
 
 import React, { useMemo } from "react";
-import { Eye, FileText, Rocket, Edit } from "lucide-react";
+import { Eye, FileText, Rocket, Edit, Crown } from "lucide-react";
 import { CollapsiblePanel, type TabConfig } from "@/ui/shared/CollapsiblePanel";
 import { ViewControlSidebarPanel } from "./ViewControlSidebarPanel";
 import { ShipPresetSidebarPanel } from "./ShipPresetSidebarPanel";
 import { RealityEditSidebarPanel } from "./RealityEditSidebarPanel";
 import { CombatLogPlaceholder } from "./CombatLogPlaceholder";
+import { DMControlSidebarPanel } from "./DMControlSidebarPanel";
 import type { SocketNetworkManager } from "@/network";
-import type { RoomPlayerState } from "@vt/data";
+import { useGameCurrentPlayer } from "@/state/stores/gameStore";
 import "./right-sidebar.css";
 
 interface RightSidebarProps {
 	networkManager: SocketNetworkManager;
-	players: Record<string, RoomPlayerState>;
-	isHost: boolean;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
 	networkManager,
-	players,
-	isHost,
 }) => {
+	const currentPlayer = useGameCurrentPlayer();
+	const isHost = currentPlayer?.role === "HOST";
+
 	const upperTabs: TabConfig[] = useMemo(() => [
 		{
 			id: "view-control",
@@ -63,14 +61,21 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 			id: "reality-edit",
 			label: "修改",
 			icon: <Edit size={14} />,
+			component: <RealityEditSidebarPanel />,
+			enabled: Boolean(isHost),
+		},
+		{
+			id: "dm-control",
+			label: "DM控制",
+			icon: <Crown size={14} />,
 			component: (
-				<RealityEditSidebarPanel
-					players={players}
+				<DMControlSidebarPanel
+					networkManager={networkManager}
 				/>
 			),
 			enabled: Boolean(isHost),
 		},
-	], [networkManager, players, isHost]);
+	], [networkManager, isHost]);
 
 	return (
 		<div className="right-sidebar">
@@ -79,8 +84,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 					direction="vertical"
 					tabs={upperTabs}
 					defaultTab="view-control"
-					defaultCollapsed={false}
-					position="top"
+					collapsible={false}
 				/>
 			</div>
 
@@ -91,8 +95,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 					direction="vertical"
 					tabs={lowerTabs}
 					defaultTab="ship-preset"
-					defaultCollapsed={false}
-					position="bottom"
+					collapsible={false}
 				/>
 			</div>
 		</div>

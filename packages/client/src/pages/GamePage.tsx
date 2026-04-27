@@ -1,14 +1,11 @@
-import { GamePhase } from "@vt/data";
 import PixiCanvas from "@/renderer/core/PixiCanvas";
 import { useUIStore } from "@/state/stores/uiStore";
 import {
 	useGameState,
-	useGamePlayers,
-	useGamePhase,
-	useGameTurnCount,
-	useGameActiveFaction,
 	useGameRoomId,
-	useAllTokens,
+	useGamePlayers,
+	useGamePlayerId,
+	useGameStore,
 } from "@/state/stores/gameStore";
 import { useSocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
@@ -20,6 +17,8 @@ import {
 	Button,
 	Dialog,
 	TextField,
+	Switch,
+	Separator,
 } from "@radix-ui/themes";
 import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
 import React, { useState, useMemo, useCallback } from "react";
@@ -29,7 +28,6 @@ import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
 import MovementPanel from "@/ui/panels/MovementPanel";
 import WeaponPanel from "@/ui/panels/WeaponPanel";
 import ShieldPanel from "@/ui/panels/ShieldPanel";
-import DMControlPanel from "@/ui/panels/DMControlPanel";
 import TopBar from "@/ui/panels/TopBar";
 import RightSidebar from "@/ui/panels/RightSidebar";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -62,41 +60,50 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
 	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
+	const suppressContextMenu = useUIStore((state) => state.suppressContextMenu);
+	const toggleSuppressContextMenu = useUIStore((state) => state.toggleSuppressContextMenu);
 
-	// 从统一状态管理获取数据
+	// 全局拦截右键菜单（设置页开关控制）
+	React.useEffect(() => {
+		const handleContextMenu = (e: MouseEvent) => {
+			if (suppressContextMenu) {
+				e.preventDefault();
+			}
+		};
+		document.addEventListener("contextmenu", handleContextMenu);
+		return () => document.removeEventListener("contextmenu", handleContextMenu);
+	}, [suppressContextMenu]);
+
+	// 仅保留 GamePage 自身需要的数据，不再为子组件抽取 props
 	const gameState = useGameState();
 	const players = useGamePlayers();
-	const tokens = useAllTokens();
-	const phase = useGamePhase();
-	const turnCount = useGameTurnCount();
-	const activeFaction = useGameActiveFaction();
 	const roomId = useGameRoomId();
+	const playerId = useGamePlayerId();
 
 	const { send } = useGameAction();
 
-	const playerId = networkManager.getPlayerId();
 	const currentPlayer = playerId ? players[playerId] : undefined;
 	const isHost = currentPlayer?.role === "HOST";
-	const isReady = currentPlayer?.isReady ?? false;
 
 	const handleAdvancePhase = useCallback(async () => {
-		if (!phase) {
+		const currentPhase = useGameStore.getState().state?.phase;
+		if (!currentPhase) {
 			notify.error("无法获取当前阶段");
 			return;
 		}
 
 		try {
-			if (phase === "DEPLOYMENT") {
+			if (currentPhase === "DEPLOYMENT") {
 				await send("room:action", { action: "start" });
 				notify.success("游戏已开始");
-			} else if (phase === "PLAYER_ACTION") {
+			} else if (currentPhase === "PLAYER_ACTION") {
 				await send("edit:room", { action: "force_end_turn" });
 				notify.success("已推进到下一回合");
 			}
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "操作失败");
 		}
-	}, [send, phase]);
+	}, [send]);
 
 	// 底部栏仅保留核心战斗Tab
 	const tabs: TabConfig[] = useMemo(() => [
@@ -128,21 +135,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ShieldPanel canControl={true} />,
 			enabled: true,
 		},
-		{
-			id: "dm-control",
-			label: "DM控制",
-			icon: <Crown size={14} />,
-			component: <DMControlPanel
-				networkManager={networkManager}
-				players={players}
-				isHost={Boolean(isHost)}
-				phase={phase}
-				turnCount={turnCount}
-				activeFaction={activeFaction}
-			/>,
-			enabled: Boolean(isHost),
-		},
-	], [networkManager, players, isHost, phase, turnCount, activeFaction]);
+	], [networkManager, isHost]);
 
 	if (!gameState || !roomId) {
 		return (
@@ -158,15 +151,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	return (
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
 			<TopBar
-				phase={phase as GamePhase}
-				turnCount={turnCount}
-				activeFaction={activeFaction}
-				players={players}
-				currentPlayerId={playerId}
-				isHost={isHost}
-				isReady={isReady}
-				inRoom={true}
-				tokens={tokens}
 				onReadyToggle={() => networkManager.setReady()}
 				onAdvancePhase={handleAdvancePhase}
 				onSettings={() => setShowSettings(true)}
@@ -178,18 +162,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-					<PixiCanvas
-						ships={tokens}
-						players={players}
-						fetchAssets={assetSocket.batchGet}
-					/>
+					<PixiCanvas fetchAssets={assetSocket.batchGet} />
 				</Box>
 
-				<RightSidebar
-					networkManager={networkManager}
-					players={players}
-					isHost={Boolean(isHost)}
-				/>
+				<RightSidebar networkManager={networkManager} />
 			</Box>
 
 			<BattlePanel tabs={tabs} defaultActiveTab="ship-info" />
@@ -260,6 +236,17 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 							/>
 						</Flex>
 						<Text size="1" color="gray">每个 | 符号代表的HP数量</Text>
+
+						<Separator size="4" />
+
+						<Text size="1" weight="bold" color="gray">交互</Text>
+						<Flex align="center" justify="between">
+							<Text size="2">禁用右键菜单</Text>
+							<Switch size="1" checked={suppressContextMenu} onCheckedChange={toggleSuppressContextMenu} />
+						</Flex>
+						<Text size="1" color="gray">拦截浏览器右键菜单，提升右键拖拽体验</Text>
+
+						<Separator size="4" />
 
 						<Flex justify="end" gap="2">
 							<Button size="1" variant="soft" color="gray" onClick={() => {

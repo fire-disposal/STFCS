@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Crosshair, Bomb, CheckCircle, XCircle, Swords, Loader2 } from "lucide-react";
+import { Crosshair, Swords, Loader2 } from "lucide-react";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
@@ -19,6 +19,7 @@ interface WeaponStatus {
 	mountId: string;
 	name: string;
 	damageType: string;
+	damage: number;
 	state: string;
 	canFire: boolean;
 	hasFired: boolean;
@@ -28,7 +29,7 @@ interface WeaponStatus {
 	minRange: number;
 	arc: number;
 	burstCount: number;
-	ammo?: { current: number; max: number };
+	tags: string[];
 	reason?: string;
 	mountName?: string;
 	weaponDisplayName?: string;
@@ -100,16 +101,17 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 					mountId: m.id,
 					name: (weaponSpec as any).displayName ?? (weaponSpec as any).name ?? m.id,
 					damageType: weaponSpec.damageType,
+					damage: weaponSpec.damage ?? 0,
 					state,
 					canFire,
 					hasFired,
 					cooldown,
-					fluxCost: (weaponSpec as any).fluxPerShot ?? (weaponSpec as any).fluxCost ?? 0,
+					fluxCost: weaponSpec.fluxCostPerShot ?? 0,
 					range: weaponSpec.range ?? 1000,
 					minRange: weaponSpec.minRange ?? 0,
 					arc: m.arc,
 					burstCount: weaponSpec.burstCount ?? 1,
-					ammo: undefined,
+					tags: weaponSpec.tags ?? [],
 					reason,
 					mountName: m.id,
 					weaponDisplayName: (m.weapon as any)?.metadata?.name ?? (m.weapon as any)?.$id ?? m.id,
@@ -265,74 +267,82 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 				</Box>
 			</Box>
 
-			{/* 列2：武器信息（两列子布局） */}
-			{currentWeapon && (
-				<Box className="weapon-col weapon-col--info">
-					<Flex className="weapon-col__header" align="center" gap="2">
-						<Text size="1" weight="bold" className="weapon-info__name">{currentWeapon.name}</Text>
-						<Badge size="1" style={{ color: DAMAGE_TYPE_COLORS[currentWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
-							{currentWeapon.damageType}
-						</Badge>
-					</Flex>
-					<Box className="weapon-col__content">
-						<Flex className="weapon-info__cols" gap="2">
-							{/* 左列：基础参数 */}
-							<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">射程</Text>
-									<Text size="1">{currentWeapon.minRange > 0 ? `${currentWeapon.minRange}-${currentWeapon.range}` : currentWeapon.range}</Text>
-								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">射界</Text>
-									<Text size="1">{currentWeapon.arc}°</Text>
-								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">连射</Text>
-									<Text size="1">{currentWeapon.burstCount}</Text>
-								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">弹药</Text>
-									<Text size="1">{currentWeapon.ammo ? `${currentWeapon.ammo.current}/${currentWeapon.ammo.max}` : "∞"}</Text>
-								</Flex>
+			{/* 列2：武器信息（两列子布局）— 始终显示，未选中时使用第一个武器 */}
+			<Box className="weapon-col weapon-col--info">
+				{(() => {
+					const infoWeapon = currentWeapon ?? weapons[0];
+					if (!infoWeapon) return null;
+					return (
+						<>
+							<Flex className="weapon-col__header" align="center" gap="2">
+								<Text size="1" weight="bold" className="weapon-info__name">{infoWeapon.name}</Text>
+								<Badge size="1" style={{ color: DAMAGE_TYPE_COLORS[infoWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
+									{infoWeapon.damageType}
+								</Badge>
 							</Flex>
-							{/* 右列：武器参数 */}
-							<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">伤害</Text>
-									<Text size="1" style={{ color: DAMAGE_TYPE_COLORS[currentWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
-										{currentWeapon.damageType}
-									</Text>
+							<Box className="weapon-col__content">
+								<Flex className="weapon-info__cols" gap="2">
+									{/* 左列：基础参数 */}
+									<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">射程</Text>
+											<Text size="1">{infoWeapon.minRange > 0 ? `${infoWeapon.minRange}-${infoWeapon.range}` : infoWeapon.range}</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">射界</Text>
+											<Text size="1">{infoWeapon.arc}°</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">连射</Text>
+											<Text size="1">{infoWeapon.burstCount}</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">伤害</Text>
+											<Text size="1">{infoWeapon.damage}</Text>
+										</Flex>
+									</Flex>
+									{/* 右列：武器参数 */}
+									<Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">类型</Text>
+											<Text size="1" style={{ color: DAMAGE_TYPE_COLORS[infoWeapon.damageType as keyof typeof DAMAGE_TYPE_COLORS] ?? "#888" }}>
+												{infoWeapon.damageType}
+											</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">辐能</Text>
+											<Text size="1">{infoWeapon.fluxCost}</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">冷却</Text>
+											<Text size="1">{infoWeapon.cooldown > 0 ? `${infoWeapon.cooldown}s` : "就绪"}</Text>
+										</Flex>
+										<Flex className="weapon-stat-row" justify="between">
+											<Text size="1" color="gray">状态</Text>
+											<Text size="1" style={{ color: infoWeapon.canFire ? "#2ecc71" : "#e74c3c" }}>
+												{infoWeapon.canFire ? "可用" : infoWeapon.hasFired ? "已射击" : infoWeapon.state}
+											</Text>
+										</Flex>
+									</Flex>
 								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">辐能</Text>
-									<Text size="1">{currentWeapon.fluxCost}</Text>
-								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">冷却</Text>
-									<Text size="1">{currentWeapon.cooldown > 0 ? `${currentWeapon.cooldown}s` : "就绪"}</Text>
-								</Flex>
-								<Flex className="weapon-stat-row" justify="between">
-									<Text size="1" color="gray">状态</Text>
-									<Text size="1" style={{ color: currentWeapon.canFire ? "#2ecc71" : "#e74c3c" }}>
-										{currentWeapon.canFire ? "可用" : currentWeapon.hasFired ? "已射击" : currentWeapon.state}
-									</Text>
-								</Flex>
-							</Flex>
-						</Flex>
-					</Box>
-					<Box className={`weapon-info__status ${currentWeapon.canFire ? "weapon-info__status--ready" : "weapon-info__status--blocked"}`}>
-						<Flex align="center" gap="1">
-							{currentWeapon.canFire ? <CheckCircle size={12} /> : <XCircle size={12} />}
-							<Text size="1" weight="bold">
-								{currentWeapon.canFire ? "就绪" : currentWeapon.hasFired ? "已射击" : currentWeapon.state}
-							</Text>
-						</Flex>
-						{currentWeapon.reason && !currentWeapon.canFire && (
-							<Text size="1" color="gray">{currentWeapon.reason}</Text>
-						)}
-					</Box>
-				</Box>
-			)}
+							</Box>
+							<Box className="weapon-info__tags">
+								{infoWeapon.tags.length > 0 ? (
+									<Flex gap="1" wrap="wrap">
+										{infoWeapon.tags.map((tag) => (
+											<Badge key={tag} size="1" variant="soft" color="blue">
+												{tag}
+											</Badge>
+										))}
+									</Flex>
+								) : (
+									<Text size="1" color="gray">无标签</Text>
+								)}
+							</Box>
+						</>
+					);
+				})()}
+			</Box>
 
 			{/* 列3：目标列表 */}
 			<Box className="weapon-col weapon-col--targets">
@@ -363,8 +373,12 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 								onClick={() => target.canAttack && handleSelectTarget(target.id)}
 								title={target.isFriendly ? "⚠ 友军目标" : !target.canAttack ? "不在射程/射界内" : undefined}
 							>
-								<Box className="target-item__check">
-									{isSelected ? <CheckCircle size={12} /> : <Box className="target-item__check-placeholder" />}
+								<Box className={`target-item__check ${isSelected ? "target-item__check--selected" : ""}`}>
+									{isSelected ? (
+										<Box className="target-item__check-fill" />
+									) : (
+										<Box className="target-item__check-placeholder" />
+									)}
 								</Box>
 								<Text size="1" className="target-item__name">
 									{target.name}
@@ -377,27 +391,42 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 				</Box>
 			</Box>
 
-			{/* 列4：开火按钮 */}
+			{/* 列4：开火/命中/偏差 */}
 			<Box className="weapon-col weapon-col--fire">
-				<Button
-					className={`fire-btn ${!currentWeapon?.canFire ? "fire-btn--locked" : ""}`}
-					size="4"
-					variant="solid"
-					color="red"
-					onClick={handleFire}
-					disabled={selectedTargetIds.length === 0 || !currentWeapon?.canFire}
-					data-magnetic
-				>
-					<Flex direction="column" align="center" gap="2">
-						{currentWeapon?.canFire ? <Bomb size={18} /> : <Loader2 size={18} className="spin" />}
-						<Text size="1" weight="bold">
-							{currentWeapon?.canFire ? "开火" : currentWeapon?.reason ?? "锁定"}
-						</Text>
-						{selectedTargetIds.length > 0 && currentWeapon?.canFire && (
-							<Text size="1">×{selectedTargetIds.length}</Text>
-						)}
-					</Flex>
-				</Button>
+				<Flex className="weapon-col__header" align="center" gap="1">
+					<Text size="1" weight="bold">指令</Text>
+				</Flex>
+				<Flex direction="column" gap="1" className="weapon-col__content">
+					<Button
+						className="fire-col-btn"
+						size="2"
+						variant="solid"
+						color="red"
+						onClick={handleFire}
+						disabled={selectedTargetIds.length === 0 || !currentWeapon?.canFire}
+						data-magnetic
+					>
+						<Text size="1" weight="bold">开火</Text>
+					</Button>
+					<Button
+						className="fire-col-btn"
+						size="2"
+						variant="soft"
+						color="gray"
+						disabled
+					>
+						<Text size="1">命中</Text>
+					</Button>
+					<Button
+						className="fire-col-btn"
+						size="2"
+						variant="soft"
+						color="gray"
+						disabled
+					>
+						<Text size="1">偏差</Text>
+					</Button>
+				</Flex>
 			</Box>
 		</Flex>
 	);

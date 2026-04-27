@@ -30,6 +30,7 @@ export interface CollapsiblePanelProps {
 	className?: string;
 	position?: "top" | "bottom";
 	showTabWhenCollapsed?: boolean;
+	collapsible?: boolean;
 }
 
 export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
@@ -40,6 +41,7 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
 	className = "",
 	position = "bottom",
 	showTabWhenCollapsed = false,
+	collapsible = true,
 }) => {
 	const [collapsed, setCollapsed] = useState(defaultCollapsed);
 	const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || "");
@@ -70,11 +72,47 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
 	const isVertical = direction === "vertical";
 	const isTopPanel = position === "top";
 
+	// 非折叠模式：无折叠按钮，Tab 横向显示，内容始终可见
+	if (!collapsible) {
+		return (
+			<Box
+				className={`collapsible-panel collapsible-panel--${direction} ${className}`}
+			>
+				<Tabs.Root value={safeActiveTab} onValueChange={setActiveTab}>
+					<Flex
+						className={`collapsible-panel__header collapsible-panel__header--${direction}`}
+						align="center"
+						gap="2"
+					>
+						<Tabs.List className="collapsible-panel__tabs collapsible-panel__tabs--horizontal">
+							{enabledTabs.map((tab) => (
+								<Tabs.Trigger
+									key={tab.id}
+									value={tab.id}
+									className="collapsible-panel__tab"
+								>
+									<Flex align="center" gap="1">
+										{tab.icon}
+										<Text size="1">{tab.label}</Text>
+										{tab.badge}
+									</Flex>
+								</Tabs.Trigger>
+							))}
+						</Tabs.List>
+					</Flex>
+
+					<Box className={`collapsible-panel__content collapsible-panel__content--${direction}`}>
+						{enabledTabs.find((tab) => tab.id === safeActiveTab)?.component}
+					</Box>
+				</Tabs.Root>
+			</Box>
+		);
+	}
+
 	return (
 		<Box
-			className={`collapsible-panel collapsible-panel--${direction} ${
-				collapsed ? "collapsible-panel--collapsed" : ""
-			} ${isTopPanel ? "collapsible-panel--top" : ""} ${className}`}
+			className={`collapsible-panel collapsible-panel--${direction} ${collapsed ? "collapsible-panel--collapsed" : ""
+				} ${isTopPanel ? "collapsible-panel--top" : ""} ${className}`}
 		>
 			{isVertical && collapsed && !showTabWhenCollapsed ? (
 				<Flex className="collapsible-panel__strip" align="center" justify="center">
