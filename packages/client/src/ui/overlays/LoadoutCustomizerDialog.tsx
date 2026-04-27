@@ -29,6 +29,7 @@ import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
+import { getGameActionSender } from "@/state/stores/gameStore";
 import MiniShipPreview from "./MiniShipPreview";
 import MiniWeaponPreview from "./MiniWeaponPreview";
 import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
@@ -175,21 +176,18 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         };
     }, [socket, assetSocket.handleResponse]);
 
+    const send = useMemo(() => getGameActionSender().send, []);
+
     const reloadData = useCallback(async () => {
         if (!open) return;
         setLoadError(null);
 
         try {
-            const sock = networkManager.getSocket();
-            if (!sock?.connected) {
-                throw new Error("网络未连接");
-            }
-
             const responses = await Promise.all([
-                networkManager.request("customize:token", { action: "list" }) as Promise<CustomizeTokenListResponse>,
-                networkManager.request("customize:weapon", { action: "list" }) as Promise<CustomizeWeaponListResponse>,
-                networkManager.request("preset:list_tokens", {}) as Promise<PresetListTokensResponse>,
-                networkManager.request("preset:list_weapons", {}) as Promise<PresetListWeaponsResponse>,
+                send("customize:token", { action: "list" }) as Promise<CustomizeTokenListResponse>,
+                send("customize:weapon", { action: "list" }) as Promise<CustomizeWeaponListResponse>,
+                send("preset:list_tokens", {}) as Promise<PresetListTokensResponse>,
+                send("preset:list_weapons", {}) as Promise<PresetListWeaponsResponse>,
             ]);
 
             const [shipListRes, weaponListRes, shipPresetRes, weaponPresetRes] = responses;
@@ -206,7 +204,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             notify.error(error instanceof Error ? error.message : "加载失败");
             setLoadError(error instanceof Error ? error.message : "加载失败");
         }
-    }, [networkManager, open]);
+    }, [send, open]);
 
     useEffect(() => {
         void reloadData();
@@ -328,7 +326,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         token.metadata = { ...(token.metadata ?? { name: nextName }), name: nextName };
 
         try {
-            const res = await networkManager.request("customize:token", {
+            const res = await send("customize:token", {
                 action: "upsert",
                 token,
             }) as { ship?: InventoryToken };
@@ -338,7 +336,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "新增失败");
         }
-    }, [networkManager, reloadData, shipBuilds, shipPresets]);
+    }, [send, reloadData, shipBuilds, shipPresets]);
 
     const createWeaponBuild = useCallback(async () => {
         const base = weaponPresets[0] ?? weaponBuilds[0];
@@ -352,7 +350,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         weapon.metadata = { ...(weapon.metadata ?? { name: nextName }), name: nextName };
 
         try {
-            const res = await networkManager.request("customize:weapon", {
+            const res = await send("customize:weapon", {
                 action: "upsert",
                 weapon,
             }) as { weapon?: WeaponJSON };
@@ -362,7 +360,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "新增失败");
         }
-    }, [networkManager, reloadData, weaponBuilds, weaponPresets]);
+    }, [send, reloadData, weaponBuilds, weaponPresets]);
 
     const validateShipRaw = useCallback(() => {
         try {
@@ -399,7 +397,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const saveShip = useCallback(async () => {
         if (!shipDraft || !selectedShipBuildId) return;
         try {
-            await networkManager.request("customize:token", {
+            await send("customize:token", {
                 action: "upsert",
                 tokenId: selectedShipBuildId,
                 token: shipDraft,
@@ -409,12 +407,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "保存失败");
         }
-    }, [networkManager, reloadData, selectedShipBuildId, shipDraft]);
+    }, [send, reloadData, selectedShipBuildId, shipDraft]);
 
     const saveWeapon = useCallback(async () => {
         if (!weaponDraft || !selectedWeaponBuildId) return;
         try {
-            await networkManager.request("customize:weapon", {
+            await send("customize:weapon", {
                 action: "upsert",
                 weaponId: selectedWeaponBuildId,
                 weapon: weaponDraft,
@@ -424,11 +422,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "保存失败");
         }
-    }, [networkManager, reloadData, selectedWeaponBuildId, weaponDraft]);
+    }, [send, reloadData, selectedWeaponBuildId, weaponDraft]);
 
     const copyShipPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.request("customize:token", { action: "copy_preset", presetId }) as { ship?: InventoryToken };
+            const res = await send("customize:token", { action: "copy_preset", presetId }) as { ship?: InventoryToken };
             notify.success("已复制");
             await reloadData();
             if (res.ship?.$id) {
@@ -437,11 +435,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "复制失败");
         }
-    }, [networkManager, reloadData]);
+    }, [send, reloadData]);
 
     const copyWeaponPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.request("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponJSON };
+            const res = await send("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponJSON };
             notify.success("已复制");
             await reloadData();
             if (res.weapon?.$id) {
@@ -450,29 +448,29 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "复制失败");
         }
-    }, [networkManager, reloadData]);
+    }, [send, reloadData]);
 
     const deleteShip = useCallback(async (shipId: string) => {
         try {
-            await networkManager.request("customize:token", { action: "delete", tokenId: shipId });
+            await send("customize:token", { action: "delete", tokenId: shipId });
             notify.success("已删除");
             setSelectedShipBuildId(null);
             await reloadData();
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "删除失败");
         }
-    }, [networkManager, reloadData]);
+    }, [send, reloadData]);
 
     const deleteWeapon = useCallback(async (weaponId: string) => {
         try {
-            await networkManager.request("customize:weapon", { action: "delete", weaponId });
+            await send("customize:weapon", { action: "delete", weaponId });
             notify.success("已删除");
             setSelectedWeaponBuildId(null);
             await reloadData();
         } catch (error) {
             notify.error(error instanceof Error ? error.message : "删除失败");
         }
-    }, [networkManager, reloadData]);
+    }, [send, reloadData]);
 
     const uploadShipTextureFromPreview = useCallback(async () => {
         if (!shipColorKeyPreviewUrl) return;
