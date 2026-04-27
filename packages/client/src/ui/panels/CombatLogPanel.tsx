@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { FileText, Swords, Crosshair, Shield, Zap, Move, RotateCw, Skull, AlertTriangle, Eye, Edit3, Send } from "lucide-react";
+import { FileText, Swords, Crosshair, Shield, Zap, Move, RotateCw, Skull, AlertTriangle, Eye, Edit3, Send, Play, Flag } from "lucide-react";
 import { Flex, Text, Box } from "@radix-ui/themes";
 import { useGameLogs, useGameTokens } from "@/state/stores/gameStore";
 import type { BattleLogEvent } from "@vt/data";
@@ -41,6 +41,8 @@ const LogIcon: Record<string, React.ReactNode> = {
 	advance_phase: <Send size={12} />,
 	edit: <Edit3 size={12} />,
 	system: <Eye size={12} />,
+	game_started: <Play size={12} />,
+	faction_change: <Flag size={12} />,
 };
 
 const LogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
@@ -149,6 +151,25 @@ const LogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					<Text style={{ color: "#6b8aaa" }}>{s("playerName")}</Text>
 					{" "}编辑 {s("tokenName") || getTokenName(tokens, s("tokenId"))}
 					{s("reason") ? <Text color="gray"> ({s("reason")})</Text> : null}
+				</span>
+			);
+		case "game_started":
+			return (
+				<span>
+					<Text style={{ color: "#4fc3ff" }}>游戏开始</Text>
+					<Text size="1" color="gray" style={{ fontSize: 10 }}>
+						{" "}首轮 {s("firstFaction")}
+					</Text>
+				</span>
+			);
+		case "faction_change":
+			const turnInfo = n("turn") ? ` 第${n("turn")}回合` : "";
+			return (
+				<span>
+					<Text style={{ color: "#9b59b6" }}>{s("fromFaction")}</Text>
+					{" → "}
+					<Text style={{ color: "#4fc3ff" }}>{s("toFaction")}</Text>
+					<Text size="1" color="gray" style={{ fontSize: 10 }}>{turnInfo}</Text>
 				</span>
 			);
 		case "system":

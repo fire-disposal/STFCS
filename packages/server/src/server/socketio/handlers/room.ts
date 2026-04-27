@@ -2,12 +2,11 @@
  * room namespace handlers — 房间创建/列表/加入/离开/操作/删除
  */
 import { err } from "./err.js";
-import { ErrorCodes, PlayerRole } from "@vt/data";
+import { ErrorCodes, PlayerRole, GamePhase, TURN_ORDER, createBattleLogEvent } from "@vt/data";
 import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
 import { assetService } from "./services.js";
-import { GamePhase } from "@vt/data";
 
 export const roomHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
@@ -188,9 +187,11 @@ export const roomHandlers = {
             case "start":
                 ctx.requireHost();
                 ctx.state.changeTurn(1);
-                // 游戏开始时执行一次回合结束逻辑，赋予所有单位初始资源（辐能消散、武器状态初始化等）
                 room.processTurnEndLogic();
                 ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+                ctx.state.appendLog(createBattleLogEvent("game_started", {
+                    firstFaction: TURN_ORDER[0],
+                }));
                 return;
             case "kick":
                 ctx.requireHost();

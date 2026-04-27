@@ -94,7 +94,6 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                 <Flex gap="1" wrap="wrap">
                     <Button size="1" variant="soft" onClick={() => handleSetPhase("DEPLOYMENT")}>部署</Button>
                     <Button size="1" variant="soft" onClick={() => handleSetPhase("PLAYER_ACTION")}>行动</Button>
-                    <Button size="1" variant="soft" onClick={() => handleSetPhase("DM_ACTION")}>DM</Button>
                 </Flex>
             </Card>
 

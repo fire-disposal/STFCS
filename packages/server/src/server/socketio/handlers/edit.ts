@@ -2,7 +2,7 @@
  * edit namespace handlers — 编辑态下的舰船/房间操作
  */
 import { err } from "./err.js";
-import { Faction, TURN_ORDER, GamePhase, MovementPhase, ErrorCodes, findCollidingShips } from "@vt/data";
+import { Faction, TURN_ORDER, GamePhase, MovementPhase, ErrorCodes, findCollidingShips, createBattleLogEvent } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { generateShortId } from "../../utils/shortId.js";
@@ -176,28 +176,38 @@ export const editHandlers = {
             }
             case "force_end_turn": {
                 const room = ctx.room!;
-                const currentPhase = room.getStateManager().getState().phase;
+                const state = room.getStateManager().getState();
+                const currentPhase = state.phase;
 
                 if (currentPhase !== GamePhase.PLAYER_ACTION) {
                     throw err("当前阶段不允许强制结束回合", ErrorCodes.INVALID_PHASE);
                 }
 
-                const currentFaction = room.getStateManager().getState().activeFaction;
+                const currentFaction = state.activeFaction;
                 const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
                 const nextIndex = currentIndex + 1;
                 const incrementTurn = nextIndex >= TURN_ORDER.length;
 
                 if (incrementTurn) {
-                    // 回合末：先结算，再 turn++
                     room.processTurnEndLogic();
-                    const newTurn = room.getStateManager().getState().turnCount + 1;
+                    const newTurn = state.turnCount + 1;
                     ctx.state.changeTurn(newTurn);
-                    // changePhase 会用新 turnCount 计算第一个派系
                     ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+
+                    const nextFaction = TURN_ORDER[0] as Faction;
+                    ctx.state.appendLog(createBattleLogEvent("faction_change", {
+                        fromFaction: currentFaction,
+                        toFaction: nextFaction,
+                        turn: newTurn,
+                    }));
                 } else {
-                    // 派系切换：直接设置下一个派系
                     const nextFaction = TURN_ORDER[nextIndex] as Faction;
                     ctx.state.changeFaction(nextFaction);
+                    ctx.state.appendLog(createBattleLogEvent("faction_change", {
+                        fromFaction: currentFaction,
+                        toFaction: nextFaction,
+                        turn: state.turnCount,
+                    }));
                 }
 
                 ctx.state.resetAllPlayersReady();

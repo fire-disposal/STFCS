@@ -39,8 +39,7 @@
 **phase 和 activeFaction 固定对应关系：**
 修改 phase 时必须同步更新 activeFaction：
 - phase="DEPLOYMENT" → activeFaction=undefined
-- phase="PLAYER_ACTION" → activeFaction="PLAYER"
-- phase="DM_ACTION" → activeFaction="ENEMY"
+- phase="PLAYER_ACTION" → activeFaction 由 TURN_ORDER 决定（派系轮流行动）
 
 ### 其他约定
 

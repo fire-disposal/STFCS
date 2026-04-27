@@ -473,7 +473,6 @@ export class MutativeStateManager {
 	 * phase ↔ activeFaction 对应关系：
 	 *   DEPLOYMENT   → undefined
 	 *   PLAYER_ACTION → TURN_ORDER 循环决定
-	 *   DM_ACTION     → "ENEMY"
 	 */
 	changePhase(phase: GamePhase): void {
 		this.mutateAndBroadcast((draft) => {
