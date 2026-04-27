@@ -66,7 +66,8 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 
 	const ship = useSelectedShip();
 	const hasShip = ship && ship.runtime;
-	const canAct = canControl && hasShip && isAvailable();
+	const destroyed = hasShip ? ship.runtime.destroyed : false;
+	const canAct = canControl && hasShip && !destroyed && isAvailable();
 
 	// 计算武器列表和状态
 	const weapons = useMemo<WeaponStatus[]>(() => {

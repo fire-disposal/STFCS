@@ -12,7 +12,7 @@
 
 import type { CombatToken, RoomPlayerState } from "@vt/data";
 import { FactionColors } from "@vt/data";
-import { Text, TextStyle, Container } from "pixi.js";
+import { Text, TextStyle, Container, Graphics } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 import { useUIStore } from "@/state/stores/uiStore";
 
@@ -202,12 +202,22 @@ export class ShipHUDManager {
 		const fluxBarContainer = this.createFluxBarContainer(ship, isSelected);
 		fluxBarContainer.position.set(screenX, screenY + FLUX_BAR_OFFSET_Y);
 
+		const destroyed = !!ship.runtime.destroyed;
 		const label = new Text({
 			text: this.formatLabel(ship),
-			style: labelStyle,
+			style: destroyed ? { ...labelStyle, fill: 0x666666 } : labelStyle,
 		});
 		label.anchor.set(0.5, 0);
 		label.position.set(screenX, screenY + LABEL_OFFSET_Y);
+
+		if (destroyed) {
+			const strike = new Graphics()
+				.moveTo(-label.width / 2, 0)
+				.lineTo(label.width / 2, 0)
+				.stroke({ color: 0x888888, width: 1.5, alpha: 0.7 });
+			strike.position.set(screenX, screenY + LABEL_OFFSET_Y + label.height / 2);
+			this.labelLayer.addChild(strike);
+		}
 
 		this.hpBarLayer.addChild(hpBarContainer);
 		this.fluxBarLayer.addChild(fluxBarContainer);

@@ -204,6 +204,11 @@ export function validateMovement(
   const maxMove = calculateModifiedValue(baseMaxSpeed, ship.runtime, "speed");
   const movement = getMovementState(ship);
 
+  // 检查是否击毁
+  if (ship.runtime.destroyed) {
+    return { valid: false, error: "Ship is destroyed" };
+  }
+
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {
     return { valid: false, error: "Ship has already completed movement this turn" };
@@ -294,6 +299,11 @@ export function validateRotation(
   const baseMaxTurn = ship.spec.maxTurnRate || 0;
   const maxTurn = calculateModifiedValue(baseMaxTurn, ship.runtime, "turnRate");
   const movement = getMovementState(ship);
+
+  // 检查是否击毁
+  if (ship.runtime.destroyed) {
+    return { valid: false, error: "Ship is destroyed" };
+  }
 
   // 检查是否已完成移动
   if (movement.hasMoved || movement.currentPhase === "DONE") {

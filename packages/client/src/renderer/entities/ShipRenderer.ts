@@ -60,6 +60,7 @@ export interface ShipCacheItem {
 		flux: number;
 		weaponCount: number;
 		mountsHash: string;
+		destroyed: boolean;
 	};
 }
 
@@ -199,9 +200,10 @@ function updateShipToken(
 	cached.root.position.set(ship.runtime.position.x, ship.runtime.position.y);
 	cached.root.rotation = toPixiRotation(ship.runtime.heading);
 
-	if (cached.isSelected !== isSelected) {
+	const destroyed = !!ship.runtime.destroyed;
+	if (cached.isSelected !== isSelected || cached.lastState?.destroyed !== destroyed) {
 		cached.isSelected = isSelected;
-		drawTacticalToken(cached.tacticalToken, color, halfWidth, halfLength, isSelected);
+		drawTacticalToken(cached.tacticalToken, color, halfWidth, halfLength, isSelected, destroyed);
 		drawHitbox(cached.hitbox, halfWidth, halfLength, isSelected);
 	}
 
@@ -219,6 +221,7 @@ function updateShipToken(
 		flux: fluxTotal,
 		weaponCount: ship.runtime.weapons?.length ?? 0,
 		mountsHash: computeMountsHash(ship.spec.mounts),
+		destroyed: !!ship.runtime.destroyed,
 	};
 }
 
@@ -244,6 +247,8 @@ function createShipToken(
 	root.rotation = toPixiRotation(ship.runtime.heading);
 	root.eventMode = "static";
 	root.cursor = "pointer";
+	const destroyed = !!ship.runtime.destroyed;
+
 	root.hitArea = new Circle(0, 0, hitRadius);
 
 	const hitbox = new Graphics();
@@ -251,18 +256,22 @@ function createShipToken(
 	root.addChild(hitbox);
 
 	const tacticalToken = new Graphics();
-	drawTacticalToken(tacticalToken, color, halfWidth, halfLength, isSelected);
+	drawTacticalToken(tacticalToken, color, halfWidth, halfLength, isSelected, destroyed);
 	root.addChild(tacticalToken);
 
 	const mountMarkers = new Graphics();
 	drawMountMarkers(mountMarkers, ship.spec.mounts, isSelected);
-	mountMarkers.visible = showMount;
+	mountMarkers.visible = showMount && !destroyed;
 	root.addChild(mountMarkers);
 
 	const weaponMarkers = new Graphics();
 	drawWeaponMarkers(weaponMarkers, ship, isSelected);
-	weaponMarkers.visible = showWeapon;
+	weaponMarkers.visible = showWeapon && !destroyed;
 	root.addChild(weaponMarkers);
+
+	if (destroyed) {
+		root.alpha = 0.45;
+	}
 
 	root.on("pointertap", () => {
 		optionsRef.current.storeSelectShip?.(ship.$id);
@@ -310,6 +319,7 @@ function createShipToken(
 			flux: fluxTotal,
 			weaponCount: ship.runtime.weapons?.length ?? 0,
 			mountsHash: computeMountsHash(ship.spec.mounts),
+			destroyed: !!ship.runtime.destroyed,
 		},
 	});
 }
@@ -344,9 +354,21 @@ function drawTacticalToken(
 	color: number,
 	halfWidth: number,
 	halfLength: number,
-	isSelected: boolean
+	isSelected: boolean,
+	destroyed: boolean = false
 ): void {
 	target.clear();
+
+	if (destroyed) {
+		const size = Math.max(halfWidth, halfLength) * 0.5;
+		const dimColor = 0x555555;
+		const a = isSelected ? 0.6 : 0.4;
+		target
+			.moveTo(-size, -size).lineTo(size, size)
+			.moveTo(size, -size).lineTo(-size, size)
+			.stroke({ color: dimColor, width: 2.5, alpha: a });
+		return;
+	}
 
 	const arrowLength = Math.max(halfLength * 0.6, 15);
 	const arrowWidth = Math.max(halfWidth * 0.4, 8);
