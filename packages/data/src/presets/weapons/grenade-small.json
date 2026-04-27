@@ -13,7 +13,7 @@
 		"range": 800,
 		"minRange": 0,
 		"cooldown": 0,
-		"fluxCostPerShot": 5,
+		"fluxCostPerShot": 25,
 		"tags": ["BALLISTIC"]
 	}
 }

@@ -13,7 +13,7 @@
 		"range": 3500,
 		"minRange": 500,
 		"cooldown": 3,
-		"fluxCostPerShot": 100,
+		"fluxCostPerShot": 250,
 		"tags": ["GUIDED", "HE", "ANTI_SHIP"]
 	}
 }

@@ -13,7 +13,7 @@
 		"range": 2000,
 		"minRange": 0,
 		"cooldown": 1,
-		"fluxCostPerShot": 25,
+		"fluxCostPerShot": 90,
 		"tags": ["ENERGY", "ANTI_SHIP"]
 	}
 }

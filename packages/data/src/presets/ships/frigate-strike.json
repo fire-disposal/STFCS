@@ -14,8 +14,8 @@
 		"armorMaxPerQuadrant": 80,
 		"armorMinReduction": 0.1,
 		"armorMaxReduction": 0.8,
-		"fluxCapacity": 150,
-		"fluxDissipation": 15,
+		"fluxCapacity": 250,
+		"fluxDissipation": 20,
 		"maxSpeed": 200,
 		"maxTurnRate": 120,
 		"shield": {
