@@ -31,7 +31,9 @@ rpc.namespace("auth", {
       playerId = result.file.info.playerId;
       await playerInfoService.updateInfo(playerId, { lastLogin: Date.now() });
     } else {
-      playerId = generateShortId();
+      // 读取所有已存在的 ID，确保新生成的短数字 ID 不重复
+      const existingIds = await playerInfoService.getAllPlayerIds();
+      playerId = generateShortId(existingIds);
       await playerInfoService.create(p.playerName, playerId);
     }
 

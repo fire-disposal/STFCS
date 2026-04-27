@@ -29,6 +29,25 @@ function findFilePathByUsername(files: string[], username: string): string | nul
 }
 
 export class PlayerInfoService {
+	/**
+	 * 获取所有已存在的 playerId 集合
+	 * 用于新用户注册时避免短数字 ID 冲突
+	 */
+	async getAllPlayerIds(): Promise<Set<string>> {
+		await ensureDir();
+		const files = await fs.readdir(PLAYERS_DIR);
+		const ids = new Set<string>();
+		for (const file of files) {
+			if (!file.endsWith(".json")) continue;
+			// 文件名格式: {username}#{xxx}.json → 提取 #xxx
+			const match = file.match(/#\d{3}\.json$/);
+			if (match) {
+				ids.add(match[0].replace(".json", ""));
+			}
+		}
+		return ids;
+	}
+
 	async loadPlayerFile(filePath: string): Promise<PlayerFile | null> {
 		try {
 			const content = await fs.readFile(filePath, "utf-8");
