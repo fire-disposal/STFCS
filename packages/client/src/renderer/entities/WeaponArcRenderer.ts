@@ -64,7 +64,7 @@ export function useWeaponArcRendering(
 	const targetingDataRef = useRef<ShipTargetingResult | null>(null);
 	const pendingQueryRef = useRef(false);
 
-	const showWeaponArcs = useUIStore((state) => state.showWeaponArcs);
+	const showWeaponArcs = useUIStore((state) => state.toggles.weaponArcs);
 	const show = options.show ?? showWeaponArcs;
 	const activeBottomTab = useUIStore((state) => state.activeBottomTab);
 	const selectedWeaponMountId = useUIStore((state) => state.selectedWeaponMountId);

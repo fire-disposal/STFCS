@@ -69,7 +69,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 
 	const fluxDissipation = hasShip ? (ship.spec.fluxDissipation ?? 0) : 0;
 
-	const canAct = canControl && hasShip && isAvailable && !destroyed;
+	const canAct = canControl && hasShip && isAvailable() && !destroyed;
 	const canToggleShield = canAct && hasShieldSpec && !overloaded && !venting;
 	const canRotateShield = canAct && hasShieldSpec && shieldActive && !overloaded && !shieldFixed && !isOmniShield;
 	const canVent = canAct && fluxTotal > 0 && !venting && !overloaded;

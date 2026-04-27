@@ -51,6 +51,19 @@ const LAYER_CONFIG: Array<{ key: LayerKey; icon: typeof Grid3X3; label: string }
 	{ key: "bg", icon: Image, label: "星空" },
 ];
 
+const LAYER_TOGGLE_MAP: Record<LayerKey, string> = {
+	grid: "grid",
+	bg: "background",
+	arcs: "weaponArcs",
+	move: "movementRange",
+	labels: "labels",
+	armor: "hexagonArmor",
+	textures: "shipTextures",
+	weaponTextures: "weaponTextures",
+	shieldArc: "shieldArc",
+	weaponLayer: "weaponLayer",
+};
+
 const LAYER_ITEM_STYLE: React.CSSProperties = {
 	padding: "4px 6px",
 	borderRadius: 4,
@@ -63,57 +76,26 @@ export const ViewControlSidebarPanel: React.FC = () => {
 		zoom,
 		cameraPosition,
 		viewRotation,
-		showGrid,
-		showBackground,
-		showWeaponArcs,
-		showMovementRange,
-		showLabels,
-		showHexagonArmor,
-		showShipTextures,
-		showWeaponTextures,
-		showShieldArc,
-		showWeaponLayer,
+		toggles,
 		setZoom,
 		setCameraPosition,
 		setViewRotation,
-		toggleGrid,
-		toggleBackground,
-		toggleWeaponArcs,
-		toggleMovementRange,
-		toggleLabels,
-		toggleHexagonArmor,
-		toggleShipTextures,
-		toggleWeaponTextures,
-		toggleShieldArc,
-		toggleWeaponLayer,
+		toggle,
 		mapCursor,
 		setMapCursor,
 	} = useUIStore();
 
 	const layerStates: Record<LayerKey, boolean> = {
-		grid: showGrid,
-		bg: showBackground,
-		arcs: showWeaponArcs,
-		move: showMovementRange,
-		labels: showLabels,
-		armor: showHexagonArmor,
-		textures: showShipTextures,
-		weaponTextures: showWeaponTextures,
-		shieldArc: showShieldArc,
-		weaponLayer: showWeaponLayer,
-	};
-
-	const layerToggles: Record<LayerKey, () => void> = {
-		grid: toggleGrid,
-		bg: toggleBackground,
-		arcs: toggleWeaponArcs,
-		move: toggleMovementRange,
-		labels: toggleLabels,
-		armor: toggleHexagonArmor,
-		textures: toggleShipTextures,
-		weaponTextures: toggleWeaponTextures,
-		shieldArc: toggleShieldArc,
-		weaponLayer: toggleWeaponLayer,
+		grid: toggles.grid,
+		bg: toggles.background,
+		arcs: toggles.weaponArcs,
+		move: toggles.movementRange,
+		labels: toggles.labels,
+		armor: toggles.hexagonArmor,
+		textures: toggles.shipTextures,
+		weaponTextures: toggles.weaponTextures,
+		shieldArc: toggles.shieldArc,
+		weaponLayer: toggles.weaponLayer,
 	};
 
 	const cameraAnimation = useCameraAnimation({
@@ -229,7 +211,7 @@ export const ViewControlSidebarPanel: React.FC = () => {
 										key={layer.key}
 										align="center"
 										gap="2"
-										onClick={layerToggles[layer.key]}
+										onClick={() => toggle(LAYER_TOGGLE_MAP[layer.key])}
 										style={LAYER_ITEM_STYLE}
 									>
 										<Icon size={12} style={{ color: active ? "#4a9eff" : "#6b8aaa" }} />

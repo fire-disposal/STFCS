@@ -10,8 +10,8 @@
 		"size": "LARGE",
 		"damage": 400,
 		"projectilesPerShot": 1,
-		"range": 1000,
-		"minRange": 200,
+		"range": 3500,
+		"minRange": 500,
 		"cooldown": 3,
 		"fluxCostPerShot": 100,
 		"tags": ["GUIDED", "HE", "ANTI_SHIP"]

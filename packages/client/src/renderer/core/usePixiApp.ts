@@ -29,11 +29,25 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import { Container, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";
-import type { CameraState } from "@/state/stores/gameStore";
 import type { CanvasSize } from "./useCanvasResize";
 import type { DragState } from "../interactions/InteractionHandler";
 import type { LayerRegistry } from "./useLayerSystem";
 import type { UseZoomInteractionResult } from "../interactions/ZoomHandler";
+
+export interface CameraState {
+	x: number;
+	y: number;
+	zoom: number;
+	viewRotation?: number;
+	followingShipId?: string | null;
+}
+
+export const DEFAULT_CAMERA: CameraState = {
+	x: 0,
+	y: 0,
+	zoom: 1,
+	viewRotation: 0,
+};
 
 export interface UsePixiAppResult {
 	handleInit: (app: any) => void;

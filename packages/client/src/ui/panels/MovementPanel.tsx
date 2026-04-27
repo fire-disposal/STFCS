@@ -61,7 +61,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 	const currentPhaseLock = currentPhase === "A" ? phaseALock : currentPhase === "C" ? phaseCLock : null;
 	const phaseRemaining = currentPhase === "A" ? phaseARemaining : currentPhase === "C" ? phaseCRemaining : 0;
 
-	const canAct = canControl && hasShip && isAvailable && currentPhase !== "DONE";
+	const canAct = canControl && hasShip && isAvailable() && currentPhase !== "DONE";
 
 	const [selectedDirection, setSelectedDirection] = useState<"forward" | "backward" | "left" | "right" | null>(null);
 	const [translateValue, setTranslateValue] = useState(0);

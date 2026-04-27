@@ -1,14 +1,14 @@
-/**
- * useGameAction - 统一的游戏操作发送 hook
- *
- * 所有 Panel 组件使用此 hook 发送 game:action/edit:token 等请求
- * 无需 props drilling，直接从 gameStateRef 获取 actionSender
- */
-
 import { useCallback } from "react";
 import { useGameActionSender } from "@/state/stores/gameStore";
 import type { WsEventName, WsPayload, WsResponseData } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
+
+type GameActionName = "move" | "rotate" | "attack" | "deviation" | "shield_toggle" | "shield_rotate" | "vent" | "advance_phase" | "end_turn";
+
+interface Allocation {
+	mountId: string;
+	targets: Array<{ targetId: string; shots: number }>;
+}
 
 export function useGameAction() {
 	const sender = useGameActionSender();
@@ -16,149 +16,60 @@ export function useGameAction() {
 	const send = useCallback(async <E extends WsEventName>(
 		event: E,
 		payload: WsPayload<E>,
-		successMsg?: string,
-		errorMsg?: string
 	): Promise<WsResponseData<E> | null> => {
 		if (!sender.isAvailable()) {
-			notify.error("网络未连接");
 			return null;
 		}
-
 		try {
-			const result = await sender.send(event, payload);
-			if (successMsg) notify.success(successMsg);
-			return result;
+			return await sender.send(event, payload);
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : (errorMsg || "操作失败");
-			notify.error(msg);
+			notify.error(error instanceof Error ? error.message : "操作失败");
 			return null;
 		}
 	}, [sender]);
 
-	const sendMove = useCallback(async (
+	const sendGameAction = useCallback(async (
+		action: GameActionName,
 		tokenId: string,
-		forward: number,
-		strafe: number
+		extra: Record<string, unknown> = {},
 	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "move",
-			tokenId,
-			forward,
-			strafe,
-		}, `移动 ${forward > 0 ? "前进" : forward < 0 ? "后退" : ""} ${Math.abs(forward)}`);
+		const result = await send("game:action", { action, tokenId, ...extra } as any);
 		return result !== null;
 	}, [send]);
 
-	const sendRotate = useCallback(async (
-		tokenId: string,
-		angle: number
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "rotate",
-			tokenId,
-			angle,
-		}, `旋转 ${angle}°`);
-		return result !== null;
-	}, [send]);
+	const sendMove = useCallback((tokenId: string, forward: number, strafe: number) =>
+		sendGameAction("move", tokenId, { forward, strafe }), [sendGameAction]);
 
-	const sendAdvancePhase = useCallback(async (
-		tokenId: string
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "advance_phase",
-			tokenId,
-		}, "阶段推进");
-		return result !== null;
-	}, [send]);
+	const sendRotate = useCallback((tokenId: string, angle: number) =>
+		sendGameAction("rotate", tokenId, { angle }), [sendGameAction]);
 
-	const sendAttack = useCallback(async (
-		tokenId: string,
-		allocations: Array<{ mountId: string; targets: Array<{ targetId: string; shots: number }> }>
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "attack",
-			tokenId,
-			allocations,
-		}, "攻击已执行");
-		return result !== null;
-	}, [send]);
+	const sendAdvancePhase = useCallback((tokenId: string) =>
+		sendGameAction("advance_phase", tokenId), [sendGameAction]);
 
-	const sendDeviation = useCallback(async (
-		tokenId: string,
-		allocations: Array<{ mountId: string; targets: Array<{ targetId: string; shots: number }> }>
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "deviation",
-			tokenId,
-			allocations,
-		}, "偏差已执行（未命中）");
-		return result !== null;
-	}, [send]);
+	const sendEndTurn = useCallback((tokenId: string) =>
+		sendGameAction("end_turn", tokenId), [sendGameAction]);
 
-	const sendShieldToggle = useCallback(async (
-		tokenId: string,
-		active: boolean
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "shield_toggle",
-			tokenId,
-			active,
-		}, active ? "护盾开启" : "护盾关闭");
-		return result !== null;
-	}, [send]);
+	const sendAttack = useCallback((tokenId: string, allocations: Allocation[]) =>
+		sendGameAction("attack", tokenId, { allocations }), [sendGameAction]);
 
-	const sendShieldRotate = useCallback(async (
-		tokenId: string,
-		direction: number
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "shield_rotate",
-			tokenId,
-			direction,
-		}, `护盾朝向 ${direction}°`);
-		return result !== null;
-	}, [send]);
+	const sendDeviation = useCallback((tokenId: string, allocations: Allocation[]) =>
+		sendGameAction("deviation", tokenId, { allocations }), [sendGameAction]);
 
-	const sendVent = useCallback(async (
-		tokenId: string
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "vent",
-			tokenId,
-		}, "开始散辐");
-		return result !== null;
-	}, [send]);
+	const sendShieldToggle = useCallback((tokenId: string, active: boolean) =>
+		sendGameAction("shield_toggle", tokenId, { active }), [sendGameAction]);
 
-	const sendEndTurn = useCallback(async (
-		tokenId: string
-	): Promise<boolean> => {
-		const result = await send("game:action", {
-			action: "end_turn",
-			tokenId,
-		}, "结束回合");
-		return result !== null;
-	}, [send]);
+	const sendShieldRotate = useCallback((tokenId: string, direction: number) =>
+		sendGameAction("shield_rotate", tokenId, { direction }), [sendGameAction]);
+
+	const sendVent = useCallback((tokenId: string) =>
+		sendGameAction("vent", tokenId), [sendGameAction]);
 
 	const sendEditToken = useCallback(async (
-		action: "create" | "modify" | "remove" | "heal" | "damage" | "restore" | "reset",
+		action: "create" | "modify" | "remove" | "heal" | "damage" | "restore" | "reset" | "rename",
 		tokenId?: string,
-		token?: any,
-		position?: { x: number; y: number },
-		faction?: string,
-		amount?: number,
-		path?: string,
-		value?: any
+		extra: Record<string, unknown> = {},
 	): Promise<boolean> => {
-		const result = await send("edit:token", {
-			action,
-			tokenId,
-			token,
-			position,
-			faction,
-			amount,
-			path,
-			value,
-		} as any, action === "create" ? "舰船已部署" : action === "heal" ? "已修复" : action === "damage" ? "已损伤" : "操作完成");
+		const result = await send("edit:token", { action, tokenId, ...extra } as any);
 		return result !== null;
 	}, [send]);
 
@@ -167,16 +78,12 @@ export function useGameAction() {
 		tokenId: string,
 		mountId?: string
 	): Promise<any | null> => {
-		const result = await send("game:query", {
-			type,
-			tokenId,
-			mountId,
-		});
+		const result = await send("game:query", { type, tokenId, mountId });
 		return result?.result ?? null;
 	}, [send]);
 
 	return {
-		isAvailable: sender.isAvailable(),
+		isAvailable: sender.isAvailable,
 		send,
 		sendMove,
 		sendRotate,

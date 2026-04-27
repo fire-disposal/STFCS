@@ -87,21 +87,16 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const handleAdvancePhase = useCallback(async () => {
 		const currentPhase = useGameStore.getState().state?.phase;
-		if (!currentPhase) {
-			notify.error("无法获取当前阶段");
-			return;
-		}
+		if (!currentPhase) return;
 
 		try {
 			if (currentPhase === "DEPLOYMENT") {
 				await send("room:action", { action: "start" });
-				notify.success("游戏已开始");
 			} else if (currentPhase === "PLAYER_ACTION") {
 				await send("edit:room", { action: "force_end_turn" });
-				notify.success("已推进到下一回合");
 			}
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "操作失败");
+		} catch {
+			// 错误已由 useGameAction 中的 notify.error 处理
 		}
 	}, [send]);
 

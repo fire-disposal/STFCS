@@ -1,0 +1,29 @@
+.combat-log-panel {
+	background: rgba(10, 30, 50, 0.3);
+}
+
+.combat-log-header {
+	border-bottom: 1px solid rgba(43, 66, 97, 0.4);
+	flex-shrink: 0;
+}
+
+.combat-log-list {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(43, 66, 97, 0.4) transparent;
+}
+
+.combat-log-entry {
+	border-bottom: 1px solid rgba(43, 66, 97, 0.15);
+	transition: background 0.1s;
+	min-height: 24px;
+	align-items: center;
+}
+
+.combat-log-entry:hover {
+	background: rgba(74, 158, 255, 0.05);
+}
+
+.combat-log-icon {
+	color: #6b8aaa;
+	flex-shrink: 0;
+}

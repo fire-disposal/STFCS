@@ -10,7 +10,6 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { SocketNetworkManager } from "./SocketNetworkManager";
-import type { GameRoomState } from "@vt/data";
 import { useGameStore } from "@/state/stores/gameStore";
 
 const log = (...args: unknown[]) => console.log("[useSocketRoom]", ...args);

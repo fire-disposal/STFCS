@@ -56,6 +56,7 @@ export {
   WsEventDefinitions,
   createPatch,
   createPatchPayload,
+  createBattleLogEvent,
   createBattleLogEdit,
 } from "./core/index.js"
 
@@ -86,7 +87,6 @@ export type {
   PatchOp,
   StatePatch,
   StatePatchPayload,
-  BattleLogEdit,
   BattleLogEvent,
   BattleLogPayload,
   EditLogContext,

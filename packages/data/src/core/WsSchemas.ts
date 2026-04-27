@@ -17,7 +17,9 @@ import {
   GameRoomStateSchema,
   PointSchema,
   AssetListItemSchema,
+  BattleLogEventSchema,
 } from "./GameSchemas.js"
+import type { BattleLogEvent } from "./GameSchemas.js"
 
 export const WsRequestSchema = z.object({
   requestId: z.string(),
@@ -418,48 +420,8 @@ export const SyncRequestFullDef = {
 } as const satisfies WsEventDef<any, any>
 
 // ============================================================
-// BattleLog（编辑操作日志）
+// BattleLog（战斗日志）
 // ============================================================
-
-export const BattleLogEditSchema = z.object({
-  type: z.literal("edit"),
-  playerId: z.string(),
-  playerName: z.string(),
-  tokenId: z.string(),
-  tokenName: z.string(),
-  path: z.string(),
-  oldValue: z.any(),
-  newValue: z.any(),
-  reason: z.string().optional(),
-  timestamp: z.number(),
-})
-export type BattleLogEdit = z.infer<typeof BattleLogEditSchema>
-
-export const BattleLogEventSchema = z.discriminatedUnion("type", [
-  BattleLogEditSchema,
-  z.object({
-    type: z.literal("attack"),
-    attackerId: z.string(),
-    targetId: z.string(),
-    weaponId: z.string().optional(),
-    damage: z.number(),
-    timestamp: z.number(),
-  }),
-  z.object({
-    type: z.literal("deviation"),
-    attackerId: z.string(),
-    targetId: z.string(),
-    weaponId: z.string().optional(),
-    timestamp: z.number(),
-  }),
-  z.object({
-    type: z.literal("destroyed"),
-    tokenId: z.string(),
-    tokenName: z.string(),
-    timestamp: z.number(),
-  }),
-])
-export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>
 
 export const BattleLogPayloadSchema = z.object({
   log: BattleLogEventSchema,
@@ -552,6 +514,15 @@ export function createPatchPayload(patches: StatePatch[]): StatePatchPayload {
 }
 
 // BattleLog 工具函数
+export function createBattleLogEvent(
+  type: string,
+  data: Record<string, unknown> = {},
+  timestamp?: number
+): BattleLogEvent {
+  return { type, data, timestamp: timestamp ?? Date.now() }
+}
+
+/** @deprecated 使用 createBattleLogEvent */
 export function createBattleLogEdit(
   playerId: string,
   playerName: string,
@@ -561,17 +532,8 @@ export function createBattleLogEdit(
   oldValue: unknown,
   newValue: unknown,
   reason?: string
-): BattleLogEdit {
-  return {
-    type: "edit",
-    playerId,
-    playerName,
-    tokenId,
-    tokenName,
-    path,
-    oldValue,
-    newValue,
-    reason,
-    timestamp: Date.now(),
-  }
+): BattleLogEvent {
+  return createBattleLogEvent("edit", {
+    playerId, playerName, tokenId, tokenName, path, oldValue, newValue, reason,
+  })
 }

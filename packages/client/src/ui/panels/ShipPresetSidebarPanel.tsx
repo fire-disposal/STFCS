@@ -133,18 +133,14 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 		};
 
 		try {
-			const result = await send("edit:token", {
+			await send("edit:token", {
 				action: "create",
 				token: combatToken,
 				faction: FactionEnum.PLAYER_ALLIANCE,
 				position: cursorPos,
 			});
-			const displayName = (result as { tokenId: string; displayName?: string })?.displayName ?? selectedPreset.name;
-			if (displayName) {
-				notify.success(`已部署 ${displayName} 到 (${Math.round(cursorPos.x)}, ${Math.round(cursorPos.y)})`);
-			}
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "部署失败");
+		} catch {
+			// 错误已由 useGameAction 中的 notify.error 处理
 		}
 	};
 

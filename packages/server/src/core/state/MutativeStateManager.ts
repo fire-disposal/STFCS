@@ -20,8 +20,7 @@ import type {
 	GameRoomState,
 	StatePatch,
 	StatePatchPayload,
-	BattleLogEdit,
-	BattleLogPayload,
+	BattleLogEvent,
 	CombatToken,
 	TokenRuntime,
 	TokenSpec,
@@ -59,6 +58,7 @@ export class MutativeStateManager {
 			players: {},
 			tokens: {},
 			globalModifiers: {},
+			logs: [],
 			createdAt: Date.now(),
 		}
 	}
@@ -180,6 +180,16 @@ export class MutativeStateManager {
 	}
 
 	/**
+	 * 追加战斗日志条目到 room state（持久化 + 广播）。
+	 */
+	appendLog(entry: BattleLogEvent): void {
+		this.mutateAndBroadcast((draft) => {
+			if (!draft.logs) draft.logs = []
+			draft.logs.push(entry)
+		})
+	}
+
+	/**
 	 * 广播编辑日志变更。
 	 * 只记录 tokens/** 下的变更，生成 BattleLogEdit 事件。
 	 */
@@ -197,20 +207,22 @@ export class MutativeStateManager {
 				const token = this.state.tokens[tokenId]
 				const pathStr = invPath.slice(2).map(String).join("/")
 
-				const log: BattleLogEdit = {
+				const log: BattleLogEvent = {
 					type: "edit",
-					playerId: logContext.playerId,
-					playerName: logContext.playerName,
-					tokenId,
-					tokenName: token?.metadata?.name ?? tokenId,
-					path: pathStr,
-					oldValue: invPatch.value,
-					newValue: correspondingPatch?.value,
-					reason: logContext.reason,
 					timestamp: Date.now(),
+					data: {
+						playerId: logContext.playerId,
+						playerName: logContext.playerName,
+						tokenId,
+						tokenName: token?.metadata?.name ?? tokenId,
+						path: pathStr,
+						oldValue: invPatch.value,
+						newValue: correspondingPatch?.value,
+						reason: logContext.reason,
+					},
 				}
 
-				this.io.to(this.roomId).emit("battle:log", { log } as BattleLogPayload)
+				this.appendLog(log)
 			}
 		}
 	}

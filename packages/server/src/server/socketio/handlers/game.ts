@@ -2,8 +2,8 @@
  * game namespace handlers — 玩家行动执行 + 游戏状态查询
  */
 import { err } from "./err.js";
-import { GamePhase, ErrorCodes } from "@vt/data";
-import type { WsPayload } from "@vt/data";
+import { GamePhase, ErrorCodes, createBattleLogEvent } from "@vt/data";
+import type { WsPayload, BattleLogEvent } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { calculateShipWeaponTargets } from "../../../core/engine/rules/targeting.js";
 import { applyAction, CLIENT_ACTION_MAP } from "../../../core/engine/applyAction.js";
@@ -43,15 +43,20 @@ export const gameHandlers = {
             ctx.state.updateTokenRuntime(update.tokenId, update.updates as Record<string, unknown>);
         }
 
-        // 广播 Engine 事件
+        // 广播 + 写入 战斗日志
+        const token = room.getCombatToken(p.tokenId);
+        const tokenName = token?.runtime?.displayName ?? token?.metadata?.name ?? p.tokenId;
+
         for (const event of result.events) {
-            ctx.broadcast("battle:log", {
-                log: {
-                    type: event.type,
-                    ...event.data,
-                    timestamp: Date.now(),
-                }
+            const logEntry: BattleLogEvent = createBattleLogEvent(event.type, {
+                ...event.data,
+                tokenId: p.tokenId,
+                tokenName,
+                action: p.action,
             });
+
+            // 写入 room state（持久化）
+            ctx.state.appendLog(logEntry);
         }
     },
 

@@ -186,10 +186,10 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             }
 
             const responses = await Promise.all([
-                networkManager.send("customize:token", { action: "list" }) as Promise<CustomizeTokenListResponse>,
-                networkManager.send("customize:weapon", { action: "list" }) as Promise<CustomizeWeaponListResponse>,
-                networkManager.send("preset:list_tokens", {}) as Promise<PresetListTokensResponse>,
-                networkManager.send("preset:list_weapons", {}) as Promise<PresetListWeaponsResponse>,
+                networkManager.request("customize:token", { action: "list" }) as Promise<CustomizeTokenListResponse>,
+                networkManager.request("customize:weapon", { action: "list" }) as Promise<CustomizeWeaponListResponse>,
+                networkManager.request("preset:list_tokens", {}) as Promise<PresetListTokensResponse>,
+                networkManager.request("preset:list_weapons", {}) as Promise<PresetListWeaponsResponse>,
             ]);
 
             const [shipListRes, weaponListRes, shipPresetRes, weaponPresetRes] = responses;
@@ -328,7 +328,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         token.metadata = { ...(token.metadata ?? { name: nextName }), name: nextName };
 
         try {
-            const res = await networkManager.send("customize:token", {
+            const res = await networkManager.request("customize:token", {
                 action: "upsert",
                 token,
             }) as { ship?: InventoryToken };
@@ -352,7 +352,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         weapon.metadata = { ...(weapon.metadata ?? { name: nextName }), name: nextName };
 
         try {
-            const res = await networkManager.send("customize:weapon", {
+            const res = await networkManager.request("customize:weapon", {
                 action: "upsert",
                 weapon,
             }) as { weapon?: WeaponJSON };
@@ -399,7 +399,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const saveShip = useCallback(async () => {
         if (!shipDraft || !selectedShipBuildId) return;
         try {
-            await networkManager.send("customize:token", {
+            await networkManager.request("customize:token", {
                 action: "upsert",
                 tokenId: selectedShipBuildId,
                 token: shipDraft,
@@ -414,7 +414,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const saveWeapon = useCallback(async () => {
         if (!weaponDraft || !selectedWeaponBuildId) return;
         try {
-            await networkManager.send("customize:weapon", {
+            await networkManager.request("customize:weapon", {
                 action: "upsert",
                 weaponId: selectedWeaponBuildId,
                 weapon: weaponDraft,
@@ -428,7 +428,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyShipPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("customize:token", { action: "copy_preset", presetId }) as { ship?: InventoryToken };
+            const res = await networkManager.request("customize:token", { action: "copy_preset", presetId }) as { ship?: InventoryToken };
             notify.success("已复制");
             await reloadData();
             if (res.ship?.$id) {
@@ -441,7 +441,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const copyWeaponPreset = useCallback(async (presetId: string) => {
         try {
-            const res = await networkManager.send("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponJSON };
+            const res = await networkManager.request("customize:weapon", { action: "copy_preset", presetId }) as { weapon?: WeaponJSON };
             notify.success("已复制");
             await reloadData();
             if (res.weapon?.$id) {
@@ -454,7 +454,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const deleteShip = useCallback(async (shipId: string) => {
         try {
-            await networkManager.send("customize:token", { action: "delete", tokenId: shipId });
+            await networkManager.request("customize:token", { action: "delete", tokenId: shipId });
             notify.success("已删除");
             setSelectedShipBuildId(null);
             await reloadData();
@@ -465,7 +465,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
 
     const deleteWeapon = useCallback(async (weaponId: string) => {
         try {
-            await networkManager.send("customize:weapon", { action: "delete", weaponId });
+            await networkManager.request("customize:weapon", { action: "delete", weaponId });
             notify.success("已删除");
             setSelectedWeaponBuildId(null);
             await reloadData();

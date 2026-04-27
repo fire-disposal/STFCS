@@ -99,7 +99,7 @@ export function useMovementVisualRendering(
 	options: MovementVisualOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, MovementGraphicsCache>>(new Map());
-	const showMovementRange = useUIStore((state) => state.showMovementRange);
+	const showMovementRange = useUIStore((state) => state.toggles.movementRange);
 	const show = options.show ?? showMovementRange;
 	const defaultMaxSpeed = options.maxSpeed ?? DEFAULT_MAX_SPEED;
 	const defaultMaxTurnRate = options.maxTurnRate ?? DEFAULT_MAX_TURN_RATE;

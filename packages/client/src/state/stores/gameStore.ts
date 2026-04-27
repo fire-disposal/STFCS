@@ -1,30 +1,8 @@
 import { create } from "zustand";
-import { useMemo } from "react";
-import type { GameRoomState, CombatToken, RoomPlayerState, WsEventName, WsPayload, WsResponseData, MovementPhase } from "@vt/data";
-
-export type MovementPhaseValue = MovementPhase | undefined;
-
-export interface CameraState {
-	x: number;
-	y: number;
-	zoom: number;
-	viewRotation?: number;
-	followingShipId?: string | null;
-}
-
-export interface PlayerCamera extends CameraState {
-	playerId: string;
-}
-
-export const DEFAULT_CAMERA: CameraState = {
-	x: 0,
-	y: 0,
-	zoom: 1,
-	viewRotation: 0,
-};
+import type { GameRoomState, CombatToken, RoomPlayerState } from "@vt/data";
 
 interface GameActionSender {
-	send: <E extends WsEventName>(event: E, payload: WsPayload<E>) => Promise<WsResponseData<E>>;
+	send: <E extends import("@vt/data").WsEventName>(event: E, payload: import("@vt/data").WsPayload<E>) => Promise<import("@vt/data").WsResponseData<E>>;
 	isAvailable: () => boolean;
 }
 
@@ -86,6 +64,8 @@ export const useGamePlayers = () => useGameStore((s) => s.state?.players ?? EMPT
 export const useGamePhase = () => useGameStore((s) => s.state?.phase ?? "DEPLOYMENT");
 export const useGameTurnCount = () => useGameStore((s) => s.state?.turnCount ?? 0);
 export const useGameActiveFaction = () => useGameStore((s) => s.state?.activeFaction);
+export const useGameLogs = () => useGameStore((s) => s.state?.logs ?? EMPTY_ARRAY);
+const EMPTY_ARRAY: readonly any[] = [];
 
 // 便捷 hooks
 export function useGameToken(tokenId: string | null): CombatToken | null {
@@ -121,21 +101,3 @@ export function useConnectedPlayers(): RoomPlayerState[] {
 export const getGameActionSender = () => useGameStore.getState().actionSender;
 export const getGameState = () => useGameStore.getState().state;
 export const getGamePlayerId = () => useGameStore.getState().playerId;
-
-/**
- * 兼容层：为仍使用 room.send 的旧代码提供过渡接口
- * 新代码应直接使用 useGameActionSender
- */
-export const useGameRoom = () => {
-	const state = useGameStore((s) => s.state);
-	const sender = useGameStore((s) => s.actionSender);
-	const value = useMemo(() => {
-		if (!state) return null;
-		return {
-			roomId: state.roomId,
-			state,
-			send: sender.send,
-		};
-	}, [state, sender]);
-	return value;
-};

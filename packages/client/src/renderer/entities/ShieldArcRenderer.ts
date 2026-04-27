@@ -100,7 +100,7 @@ export function useShieldArcRendering(
 	options: ShieldArcOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ShieldArcCacheItem>>(new Map());
-	const showShieldArc = useUIStore((state) => state.showShieldArc);
+	const showShieldArc = useUIStore((state) => state.toggles.shieldArc);
 	const shieldDirectionPreview = useUIStore((state) => state.shieldDirectionPreview);
 	const show = options.show ?? showShieldArc;
 	const defaultRadius = options.shieldRadius ?? DEFAULT_SHIELD_RADIUS;

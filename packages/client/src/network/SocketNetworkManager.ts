@@ -230,29 +230,37 @@ export class SocketNetworkManager {
 		this.setGameState(null);
 	}
 
-	leaveRoom(): void {
-		if (this.currentRoomId) {
-			logger.info("leaveRoom", { roomId: this.currentRoomId });
-			this.socket?.emit("request", { event: "room:leave", requestId: crypto.randomUUID(), payload: {} });
-			this.currentRoomId = null;
-			this.setGameState(null);
-		}
+	async leaveRoom(): Promise<void> {
+		if (!this.currentRoomId) return;
+		try {
+			await this.request("room:leave", {});
+		} catch { /* ignore */ }
+		this.currentRoomId = null;
+		this.setGameState(null);
 	}
 
-	setReady(): void {
-		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "ready" } });
+	async setReady(): Promise<void> {
+		try {
+			await this.request("room:action", { action: "ready" });
+		} catch { /* ignore */ }
 	}
 
-	startGame(): void {
-		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "start" } });
+	async startGame(): Promise<void> {
+		try {
+			await this.request("room:action", { action: "start" });
+		} catch { /* ignore */ }
 	}
 
-	kickPlayer(targetId: string): void {
-		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "kick", targetId } });
+	async kickPlayer(targetId: string): Promise<void> {
+		try {
+			await this.request("room:action", { action: "kick", targetId });
+		} catch { /* ignore */ }
 	}
 
-	transferHost(targetId: string): void {
-		this.socket?.emit("request", { event: "room:action", requestId: crypto.randomUUID(), payload: { action: "transfer_host", targetId } });
+	async transferHost(targetId: string): Promise<void> {
+		try {
+			await this.request("room:action", { action: "transfer_host", targetId });
+		} catch { /* ignore */ }
 	}
 
 	async deleteRoom(roomId: string): Promise<{ success: boolean; error?: string }> {
@@ -264,10 +272,6 @@ export class SocketNetworkManager {
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : "Failed" };
 		}
-	}
-
-	send<E extends WsEventName>(event: E, payload: WsPayload<E>): Promise<WsResponseData<E>> {
-		return this.request(event, payload);
 	}
 
 	buildInviteLink(roomId: string): string {

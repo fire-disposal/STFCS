@@ -119,23 +119,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		setCameraPosition,
 		viewRotation,
 		setViewRotation,
-		showGrid,
-		showBackground,
-		showMovementRange,
-		showShipTextures,
-		showWeaponTextures,
+		toggles,
 		selectedShipId,
 		setZoom,
 		setMapCursor,
 		mapCursor,
 		selectShip,
 		movementPreview,
-		showHpBars,
-		showFluxBars,
-		showShipNames,
-		showOwnerLabels,
-		showWeaponLayer,
 	} = useUIStore();
+
+	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, shipTextures: showShipTextures, weaponTextures: showWeaponTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
 
 	const cameraPositionRef = useRef(cameraPosition);
 	cameraPositionRef.current = cameraPosition;

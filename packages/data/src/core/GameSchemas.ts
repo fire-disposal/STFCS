@@ -556,6 +556,17 @@ export const RoomPlayerStateSchema = z.object({
 });
 export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 
+// ============================================================
+// 战斗日志
+// ============================================================
+
+export const BattleLogEventSchema = z.object({
+  type: z.string(),
+  timestamp: z.number(),
+  data: z.record(z.string(), z.unknown()).default({}),
+})
+export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>
+
 /**
  * 游戏房间状态
  *
@@ -575,6 +586,7 @@ export const GameRoomStateSchema = z.object({
 	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
+	logs: z.array(BattleLogEventSchema).default([]).optional(),
 	createdAt: z.number(),
 });
 export type GameRoomState = z.infer<typeof GameRoomStateSchema>;

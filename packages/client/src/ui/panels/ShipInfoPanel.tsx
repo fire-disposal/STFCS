@@ -10,7 +10,6 @@ import React, { useState, useCallback } from "react";
 import { Anchor, Zap, AlertTriangle, Edit2, Check, X, Copy } from "lucide-react";
 import { FactionColors } from "@vt/data";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
-import { notify } from "@/ui/shared/Notification";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useGameAction } from "@/hooks/useGameAction";
 import "./battle-panel-row.css";
@@ -62,11 +61,10 @@ export const ShipInfoPanel: React.FC = () => {
 		if (!hasShip || !editingName.trim()) return;
 		try {
 			await send("edit:token", { action: "rename", tokenId: ship.$id, displayName: editingName.trim() });
-			notify.success(`已更名为 ${editingName.trim()}`);
 			setIsEditingName(false);
 			setEditingName("");
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "更名失败");
+		} catch {
+			// 错误已由 useGameAction 中的 notify.error 处理
 		}
 	}, [hasShip, ship?.$id, editingName, send]);
 

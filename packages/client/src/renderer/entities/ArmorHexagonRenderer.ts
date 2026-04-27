@@ -65,7 +65,7 @@ export function useArmorHexagonRendering(
 	options: ArmorHexagonOptions = {}
 ) {
 	const cacheRef = useRef<Map<string, ArmorHexagonCacheItem>>(new Map());
-	const showHexagonArmor = useUIStore((state) => state.showHexagonArmor);
+	const showHexagonArmor = useUIStore((state) => state.toggles.hexagonArmor);
 	const show = options.show ?? showHexagonArmor;
 	const armorMax = options.armorMaxPerQuadrant ?? DEFAULT_ARMOR_MAX;
 

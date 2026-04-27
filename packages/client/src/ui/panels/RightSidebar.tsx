@@ -12,7 +12,7 @@ import { CollapsiblePanel, type TabConfig } from "@/ui/shared/CollapsiblePanel";
 import { ViewControlSidebarPanel } from "./ViewControlSidebarPanel";
 import { ShipPresetSidebarPanel } from "./ShipPresetSidebarPanel";
 import { RealityEditSidebarPanel } from "./RealityEditSidebarPanel";
-import { CombatLogPlaceholder } from "./CombatLogPlaceholder";
+import { CombatLogPanel } from "./CombatLogPanel";
 import { DMControlSidebarPanel } from "./DMControlSidebarPanel";
 import type { SocketNetworkManager } from "@/network";
 import { useGameCurrentPlayer } from "@/state/stores/gameStore";
@@ -40,7 +40,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 			id: "combat-log",
 			label: "日志",
 			icon: <FileText size={14} />,
-			component: <CombatLogPlaceholder />,
+			component: <CombatLogPanel />,
 			enabled: true,
 		},
 	], []);

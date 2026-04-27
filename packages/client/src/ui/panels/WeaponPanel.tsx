@@ -10,7 +10,6 @@ import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useUIStore } from "@/state/stores/uiStore";
-import { notify } from "@/ui/shared/Notification";
 import { UI_CONFIG } from "@/config/constants";
 import "./weapon-panel.css";
 
@@ -67,7 +66,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 
 	const ship = useSelectedShip();
 	const hasShip = ship && ship.runtime;
-	const canAct = canControl && hasShip && isAvailable;
+	const canAct = canControl && hasShip && isAvailable();
 
 	// 计算武器列表和状态
 	const weapons = useMemo<WeaponStatus[]>(() => {
@@ -209,30 +208,22 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 	const handleFire = useCallback(async () => {
 		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0) return;
 
-		try {
-			await sendAttack(ship!.$id, [{
-				mountId: localSelectedWeaponId,
-				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
-			}]);
-			setSelectedTargetIds([]);
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "开火失败");
-		}
+		await sendAttack(ship!.$id, [{
+			mountId: localSelectedWeaponId,
+			targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
+		}]);
+		setSelectedTargetIds([]);
 	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack]);
 
 	// 偏差（模拟未命中）
 	const handleDeviation = useCallback(async () => {
 		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0) return;
 
-		try {
-			await sendDeviation(ship!.$id, [{
-				mountId: localSelectedWeaponId,
-				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
-			}]);
-			setSelectedTargetIds([]);
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "偏差操作失败");
-		}
+		await sendDeviation(ship!.$id, [{
+			mountId: localSelectedWeaponId,
+			targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
+		}]);
+		setSelectedTargetIds([]);
 	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendDeviation]);
 
 	// 空状态

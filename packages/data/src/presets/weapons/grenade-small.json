@@ -10,7 +10,7 @@
 		"size": "SMALL",
 		"damage": 40,
 		"projectilesPerShot": 3,
-		"range": 350,
+		"range": 800,
 		"minRange": 0,
 		"cooldown": 0,
 		"fluxCostPerShot": 5,
