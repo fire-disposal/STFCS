@@ -43,12 +43,9 @@ export const WeaponSlotSizeSchema = z.enum(["SMALL", "MEDIUM", "LARGE"]);
 export const WeaponSlotSize = WeaponSlotSizeSchema.enum;
 export type WeaponSlotSize = z.infer<typeof WeaponSlotSizeSchema>;
 
-export const WeaponTagSchema = z.enum([
-	"EMP",
-	"PD",
-]);
-export const WeaponTag = WeaponTagSchema.enum;
-export type WeaponTag = z.infer<typeof WeaponTagSchema>;
+export const WeaponTagSchema = z.string();
+export const WeaponTagValues = ["EMP", "PD"] as const;
+export type WeaponTag = typeof WeaponTagValues[number];
 
 export const HullSizeSchema = z.enum(["FRIGATE", "DESTROYER", "CRUISER", "CAPITAL"]);
 export const HullSize = HullSizeSchema.enum;

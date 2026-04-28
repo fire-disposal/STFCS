@@ -32,7 +32,6 @@ import {
   PlayerRole,
   DamageType,
   WeaponState,
-  WeaponTag,
   HullSize,
   ShipClass,
 } from "./core/GameSchemas.js"
@@ -42,7 +41,6 @@ export type FactionValue = (typeof Faction)[keyof typeof Faction]
 export type PlayerRoleValue = (typeof PlayerRole)[keyof typeof PlayerRole]
 export type DamageTypeValue = (typeof DamageType)[keyof typeof DamageType]
 export type WeaponStateValue = (typeof WeaponState)[keyof typeof WeaponState]
-export type WeaponTagValue = (typeof WeaponTag)[keyof typeof WeaponTag]
 export type HullSizeValue = (typeof HullSize)[keyof typeof HullSize]
 export type ShipClassValue = (typeof ShipClass)[keyof typeof ShipClass]
 

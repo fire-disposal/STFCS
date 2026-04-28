@@ -19,7 +19,7 @@ import {
     HullSize,
     ShipClass,
     WeaponSlotSize,
-    WeaponTag,
+    WeaponTagValues,
     isWeaponSizeCompatible,
     type InventoryToken,
     type WeaponJSON,
@@ -1454,12 +1454,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             <Badge key={tag} size="1">{tag}</Badge>
                                                         ))}
                                                         <Select.Root onValueChange={(v) => {
-                                                            if (v && !weaponDraft.spec.tags?.includes(v as WeaponTag)) {
-                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v as WeaponTag]; });
+                                                            if (v && !weaponDraft.spec.tags?.includes(v)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v]; });
                                                             }
                                                         }}>
                                                             <Select.Trigger placeholder="添加标签" />
-                                                            <Select.Content>{Object.values(WeaponTag).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            <Select.Content>{WeaponTagValues.map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
                                                     </Flex>
                                                 </Box>
@@ -1703,12 +1703,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             <Badge key={tag} size="1">{tag}</Badge>
                                                         ))}
                                                         <Select.Root onValueChange={(v) => {
-                                                            if (v && !weaponDraft.spec.tags?.includes(v as WeaponTag)) {
-                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v as WeaponTag]; });
+                                                            if (v && !weaponDraft.spec.tags?.includes(v)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v]; });
                                                             }
                                                         }}>
                                                             <Select.Trigger placeholder="添加标签" />
-                                                            <Select.Content>{Object.values(WeaponTag).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            <Select.Content>{WeaponTagValues.map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
                                                     </Flex>
                                                 </Box>

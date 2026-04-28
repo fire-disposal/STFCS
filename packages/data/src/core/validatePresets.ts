@@ -8,7 +8,6 @@
 import {
     InventoryTokenSchema,
     WeaponJSONSchema,
-    WeaponTagSchema,
     HullSizeSchema,
     HullSize,
 } from "./GameSchemas.js";
@@ -44,27 +43,7 @@ export interface PresetValidationResult {
 // 辅助函数
 // ============================================================
 
-const VALID_WEAPON_TAGS: readonly string[] = WeaponTagSchema.options;
 
-function findInvalidTags(tags: string[] | undefined): string[] {
-    if (!tags) return [];
-    return tags.filter((t) => !VALID_WEAPON_TAGS.includes(t));
-}
-
-function checkWeaponSpec(spec: Record<string, unknown>, prefix: string): PresetValidationIssue[] {
-    const issues: PresetValidationIssue[] = [];
-
-    const tags = spec["tags"] as string[] | undefined;
-    const invalidTags = findInvalidTags(tags);
-    for (const tag of invalidTags) {
-        issues.push({
-            path: `${prefix}.tags`,
-            message: `非法标签 "${tag}"，合法值: ${VALID_WEAPON_TAGS.join(", ")}`,
-        });
-    }
-
-    return issues;
-}
 
 function checkMounts(mounts: Record<string, unknown>[] | undefined): PresetValidationIssue[] {
     const issues: PresetValidationIssue[] = [];
@@ -96,13 +75,7 @@ function checkMounts(mounts: Record<string, unknown>[] | undefined): PresetValid
             }
         }
 
-        const weapon = mount["weapon"] as Record<string, unknown> | undefined;
-        if (weapon) {
-            const weaponSpec = weapon["spec"] as Record<string, unknown> | undefined;
-            if (weaponSpec) {
-                issues.push(...checkWeaponSpec(weaponSpec, `${mountPath}.weapon.spec`));
-            }
-        }
+        
     }
 
     return issues;
@@ -190,18 +163,6 @@ export function validatePresets(): PresetValidationResult {
                 });
                 totalIssues++;
             }
-        }
-
-        // 2. tags 合法性
-        const spec = weapon.spec as Record<string, unknown>;
-        const tags = spec["tags"] as string[] | undefined;
-        const invalidTags = findInvalidTags(tags);
-        for (const tag of invalidTags) {
-            issues.push({
-                path: "spec.tags",
-                message: `非法标签 "${tag}"，合法值: ${VALID_WEAPON_TAGS.join(", ")}`,
-            });
-            totalIssues++;
         }
 
         weapons.push({ id, name, issues, passed: issues.length === 0 });
