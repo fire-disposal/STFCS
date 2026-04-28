@@ -14,15 +14,13 @@
 		"armorMaxPerQuadrant": 200,
 		"armorMinReduction": 0.1,
 		"armorMaxReduction": 0.9,
-		"fluxCapacity": 700,
-		"fluxDissipation": 35,
-		"maxSpeed": 260,
-		"maxTurnRate": 60,
+"fluxCapacity": 800,
+		"fluxDissipation": 50,
 		"shield": {
 			"arc": 180,
 			"radius": 95,
 			"efficiency": 0.85,
-			"upkeep": 8
+			"upkeep": 25
 		},
 		"mounts": [
 			{
@@ -64,7 +62,7 @@
 						"range": 600,
 						"minRange": 0,
 						"cooldown": 1,
-						"fluxCostPerShot": 30,
+						"fluxCostPerShot": 50,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}
 				}
@@ -86,7 +84,7 @@
 						"range": 600,
 						"minRange": 0,
 						"cooldown": 1,
-						"fluxCostPerShot": 30,
+						"fluxCostPerShot": 50,
 						"tags": ["BALLISTIC", "ANTI_SHIP"]
 					}
 				}
@@ -108,7 +106,7 @@
 						"range": 350,
 						"minRange": 0,
 						"cooldown": 0,
-						"fluxCostPerShot": 5,
+						"fluxCostPerShot": 15,
 						"tags": ["BALLISTIC"]
 					}
 				}
@@ -130,7 +128,7 @@
 						"range": 350,
 						"minRange": 0,
 						"cooldown": 0,
-						"fluxCostPerShot": 5,
+						"fluxCostPerShot": 15,
 						"tags": ["BALLISTIC"]
 					}
 				}

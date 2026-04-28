@@ -10,10 +10,10 @@
 		"size": "MEDIUM",
 		"damage": 120,
 		"projectilesPerShot": 1,
-		"range": 2000,
+		"range": 700,
 		"minRange": 0,
 		"cooldown": 1,
-		"fluxCostPerShot": 90,
+		"fluxCostPerShot": 70,
 		"tags": ["ENERGY", "ANTI_SHIP"]
 	}
 }

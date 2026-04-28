@@ -10,10 +10,10 @@
 		"size": "SMALL",
 		"damage": 60,
 		"projectilesPerShot": 1,
-		"range": 1200,
+		"range": 800,
 		"minRange": 0,
 		"cooldown": 0,
-		"fluxCostPerShot": 35,
+		"fluxCostPerShot": 40,
 		"tags": ["ENERGY", "BEAM"]
 	}
 }

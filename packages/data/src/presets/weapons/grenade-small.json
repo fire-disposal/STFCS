@@ -10,10 +10,10 @@
 		"size": "SMALL",
 		"damage": 40,
 		"projectilesPerShot": 3,
-		"range": 800,
+		"range": 400,
 		"minRange": 0,
 		"cooldown": 0,
-		"fluxCostPerShot": 25,
+		"fluxCostPerShot": 15,
 		"tags": ["BALLISTIC"]
 	}
 }
