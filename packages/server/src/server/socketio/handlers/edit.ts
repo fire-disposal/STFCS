@@ -2,10 +2,9 @@
  * edit namespace handlers — 编辑态下的舰船/房间操作
  */
 import { err } from "./err.js";
-import { Faction, MovementPhase, ErrorCodes, findCollidingShips } from "@vt/data";
-import type { WsPayload, WsResponseData, CombatToken } from "@vt/data";
+import { MovementPhase, ErrorCodes } from "@vt/data";
+import type { WsPayload, WsResponseData } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
-import { generateShortId } from "../../utils/shortId.js";
 import { executeTurnAdvance, validateTurnAdvance } from "../../../core/engine/flow/TurnFlowController.js";
 
 export const editHandlers = {
@@ -15,50 +14,6 @@ export const editHandlers = {
         const room = ctx.room!;
 
         switch (p.action) {
-            case "create": {
-                if (!p.token) throw err("需要 token 数据", ErrorCodes.TOKEN_DATA_REQUIRED);
-                const tokenId = `token_${generateShortId()}_${Date.now()}`;
-
-                const baseName = p.token.metadata?.name ?? p.token.$presetRef?.split(":").pop() ?? "舰船";
-                const existingTokens = room.getCombatTokens();
-                const sameTypeCount = existingTokens.filter(t => {
-                    const existingBaseName = t.metadata?.name ?? t.$presetRef?.split(":").pop() ?? "舰船";
-                    return existingBaseName === baseName;
-                }).length;
-                const displayName = `${baseName} ${sameTypeCount + 1}`;
-
-                const spec = p.token.spec;
-                const deployPos = p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 };
-                const deployHeading = p.token.runtime?.heading ?? 0;
-                const deployHalfW = (spec?.width ?? 30) / 2;
-                const deployHalfL = (spec?.length ?? 50) / 2;
-
-                const collidingIds = findCollidingShips(
-                    deployPos, deployHeading, deployHalfW, deployHalfL,
-                    "__deploying__", existingTokens
-                );
-                if (collidingIds.length > 0) {
-                    throw err("部署位置与现有舰船碰撞", ErrorCodes.DEPLOY_COLLISION);
-                }
-
-                const createToken: CombatToken = {
-                    ...p.token,
-                    $id: tokenId,
-                    runtime: {
-                        position: deployPos,
-                        heading: deployHeading,
-                        faction: p.faction ?? p.token.runtime?.faction ?? Faction.PLAYER_ALLIANCE,
-                        ownerId: ctx.playerId,
-                        displayName,
-                    } as any,
-                    metadata: {
-                        ...p.token.metadata,
-                        owner: p.token.metadata?.owner ?? ctx.playerId,
-                    },
-                };
-                ctx.state.setToken(tokenId, createToken, ctx.editLogContext(p.reason ?? "创建舰船"));
-                return { tokenId, displayName };
-            }
             case "modify": {
                 if (!p.tokenId) throw err("需要 tokenId", ErrorCodes.TOKEN_ID_REQUIRED);
                 if (!p.path) throw err("需要 path", ErrorCodes.PATH_REQUIRED);

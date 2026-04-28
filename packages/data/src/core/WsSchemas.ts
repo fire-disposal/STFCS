@@ -360,7 +360,7 @@ export type GameQueryPayload = z.infer<typeof GameQueryDef.payload>
 
 export const EditTokenDef = {
   payload: z.object({
-    action: z.enum(["create", "modify", "remove", "heal", "damage", "restore", "reset", "rename"]),
+    action: z.enum(["modify", "remove", "heal", "damage", "restore", "reset", "rename"]),
     tokenId: z.string().optional(),
     token: CombatTokenSchema.optional(),
     path: z.string().optional(),
@@ -368,6 +368,7 @@ export const EditTokenDef = {
     amount: z.number().optional(),
     faction: FactionSchema.optional(),
     position: PointSchema.optional(),
+    heading: z.number().optional(),
     reason: z.string().optional(),
     displayName: z.string().optional(),
   }),
@@ -392,6 +393,21 @@ export const EditRoomDef = {
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
 export type EditRoomPayload = z.infer<typeof EditRoomDef.payload>
+
+// ============================================================
+// deploy 命名空间（舰船部署，从预设创建实例）
+// ============================================================
+
+export const DeployTokenDef = {
+  payload: z.object({
+    preset: InventoryTokenSchema,
+    position: PointSchema,
+    heading: z.number().optional(),
+    faction: FactionSchema.optional(),
+  }),
+  response: z.object({ tokenId: z.string(), displayName: z.string() }),
+} as const satisfies WsEventDef<any, any>
+export type DeployTokenPayload = z.infer<typeof DeployTokenDef.payload>
 
 // ============================================================
 // sync 命名空间（Patch 格式）
@@ -458,6 +474,7 @@ export const WsEventDefinitions = {
   "game:query": GameQueryDef,
   "edit:token": EditTokenDef,
   "edit:room": EditRoomDef,
+  "deploy:token": DeployTokenDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 

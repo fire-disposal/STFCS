@@ -4,6 +4,7 @@
 import { createRpcRegistry } from "./RpcServer.js";
 import { err } from "./handlers/err.js";
 import { editHandlers } from "./handlers/edit.js";
+import { deployHandlers } from "./handlers/deploy.js";
 import { roomHandlers } from "./handlers/room.js";
 import { customizeHandlers } from "./handlers/customize.js";
 import { gameHandlers } from "./handlers/game.js";
@@ -16,6 +17,7 @@ export const rpc = createRpcRegistry();
 
 // ===== 导入的大 namespace =====
 rpc.namespace("edit", editHandlers);
+rpc.namespace("deploy", deployHandlers);
 rpc.namespace("room", roomHandlers);
 rpc.namespace("customize", customizeHandlers);
 rpc.namespace("game", gameHandlers);

@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Rocket, Search, Filter } from "lucide-react";
 import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea, Card } from "@radix-ui/themes";
-import type { InventoryToken, CombatToken } from "@vt/data";
+import type { InventoryToken } from "@vt/data";
 import { Faction as FactionEnum, HullSize } from "@vt/data";
 import type { SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
@@ -60,12 +60,12 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 				notify.error(result.error || "预设加载失败");
 				setShipPresets([]);
 			} else {
-				const presets: ShipPresetItem[] = result.loadout.ships.map((t: CombatToken) => ({
+				const presets: ShipPresetItem[] = result.loadout.ships.map((t: InventoryToken) => ({
 					id: t.$id,
-					token: t as InventoryToken,
+					token: t,
 					name: t.metadata?.name ?? t.$id.slice(-6),
 					hullSize: t.spec.size,
-					weaponCount: (t.spec.mounts ?? []).filter((m) => m.weapon).length,
+					weaponCount: (t.spec.mounts ?? []).filter((m: { weapon?: unknown }) => m.weapon).length,
 				}));
 				setShipPresets(presets);
 			}
@@ -99,22 +99,14 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 		};
 		const cursorHeading = mapCursor?.r ?? 0;
 
-		const combatToken: CombatToken = {
-			...selectedPreset.token,
-			runtime: {
+		try {
+			await send("deploy:token", {
+				preset: selectedPreset.token,
 				position: cursorPos,
 				heading: cursorHeading,
 				faction: FactionEnum.PLAYER_ALLIANCE,
-			} as any,
-		};
-
-		try {
-			await send("edit:token", {
-				action: "create",
-				token: combatToken,
-				faction: FactionEnum.PLAYER_ALLIANCE,
-				position: cursorPos,
 			});
+			notify.success("舰船部署成功");
 		} catch {
 			// 错误已由 useGameAction 中的 notify.error 处理
 		}
