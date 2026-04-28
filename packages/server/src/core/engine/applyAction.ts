@@ -13,8 +13,7 @@ import { createEngineContext } from "./context.js";
 import { applyCombat, applyDeviation } from "./modules/combat.js";
 import { applyMove, applyRotate, applyAdvancePhase } from "./modules/movement.js";
 import { applyShieldToggle, applyShieldRotate } from "./modules/shield.js";
-import { applyVent } from "./modules/flux.js";
-import { applyEndTurn } from "./rules/turnEnd.js";
+import { applyVent, applyEndTurn } from "./rules/turnEnd.js";
 
 /** Action 处理函数签名 */
 type ActionHandler = (context: EngineContext) => EngineResult;

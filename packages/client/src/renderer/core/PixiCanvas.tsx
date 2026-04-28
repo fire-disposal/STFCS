@@ -128,7 +128,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		movementPreview,
 	} = useUIStore();
 
-	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, shipTextures: showShipTextures, weaponTextures: showWeaponTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
+	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, textures: showTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
 
 	const cameraPositionRef = useRef(cameraPosition);
 	cameraPositionRef.current = cameraPosition;
@@ -207,9 +207,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useEffect(() => {
 		if (!layerSystem.layers) return;
 		layerSystem.layers.tacticalTokens.visible = true;
-		layerSystem.layers.shipSprites.visible = showShipTextures;
-		layerSystem.layers.weaponSprites.visible = showWeaponTextures;
-	}, [layerSystem.layers, showShipTextures, showWeaponTextures]);
+		layerSystem.layers.shipSprites.visible = showTextures;
+		layerSystem.layers.weaponSprites.visible = showTextures;
+	}, [layerSystem.layers, showTextures]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;

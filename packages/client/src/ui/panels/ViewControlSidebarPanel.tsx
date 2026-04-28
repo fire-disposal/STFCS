@@ -24,9 +24,8 @@ interface LayerItem {
 }
 
 const ALL_LAYER_ITEMS: LayerItem[] = [
-	{ key: "shipTextures", label: "舰船贴图" },
-	{ key: "weaponTextures", label: "武器贴图" },
-	{ key: "weaponLayer", label: "武器图层" },
+	{ key: "textures", label: "贴图图层" },
+	{ key: "weaponLayer", label: "战术视图" },
 	{ key: "weaponArcs", label: "攻击范围" },
 	{ key: "shieldArc", label: "护盾弧" },
 	{ key: "movementRange", label: "移动范围" },

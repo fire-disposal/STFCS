@@ -1,188 +1,163 @@
 /**
- * TurnBar - 回合条样式
- * 参考现代回合制策略游戏设计：
- * - 派系进度条：显示所有派系的行动顺序
- * - 当前派系高亮脉冲
- * - 轮次分隔清晰
+ * TurnBar - 回合指示条样式（简洁版）
  */
 
-.turn-bar-compact {
+.turn-bar {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	padding: 4px 8px;
-	background: rgba(10, 14, 20, 0.6);
-	border: 1px solid rgba(74, 158, 255, 0.15);
+	background: rgba(10, 14, 20, 0.7);
+	border: 1px solid rgba(74, 158, 255, 0.2);
 	border-radius: 6px;
+	font-size: 12px;
 }
 
-/* ===== 阶段徽章 ===== */
-.turn-bar-compact__phase {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px 8px;
-	font-size: 12px;
+.turn-bar__phase {
+	padding: 3px 8px;
 	font-weight: 600;
 	border-radius: 4px;
-	letter-spacing: 0.5px;
-	text-transform: uppercase;
+	letter-spacing: 0.3px;
 }
 
-.turn-bar-compact__phase--deployment {
+.turn-bar__phase--deployment {
 	color: #9b59b6;
 	background: rgba(155, 89, 182, 0.15);
-	border: 1px solid rgba(155, 89, 182, 0.3);
 }
 
-.turn-bar-compact__phase--player {
+.turn-bar__phase--player_action {
 	color: #4a9eff;
 	background: rgba(74, 158, 255, 0.15);
-	border: 1px solid rgba(74, 158, 255, 0.3);
 }
 
-/* ===== 轮次显示 ===== */
-.turn-bar-compact__turn {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px 8px;
-	background: rgba(20, 30, 45, 0.6);
-	border: 1px solid rgba(74, 158, 255, 0.2);
+.turn-bar__turn {
+	padding: 3px 6px;
+	background: rgba(20, 30, 45, 0.5);
 	border-radius: 4px;
-}
-
-.turn-bar-compact__turn-label {
-	font-size: 11px;
-	font-weight: 500;
-	color: #6b8ca8;
-	letter-spacing: 0.5px;
-}
-
-.turn-bar-compact__turn-number {
-	font-size: 15px;
 	font-weight: 700;
 	color: #4a9eff;
-	font-variant-numeric: tabular-nums;
 }
 
-/* ===== 派系进度条 ===== */
-.turn-bar-compact__faction-track {
+.turn-bar__info {
 	display: flex;
 	align-items: center;
-	gap: 2px;
-	padding: 2px 6px;
+	gap: 1px;
+	padding: 3px 8px;
 	background: rgba(20, 30, 45, 0.4);
 	border-radius: 4px;
 }
 
-.turn-bar-compact__faction-dot {
-	width: 20px;
-	height: 20px;
+.turn-bar__ready {
+	font-weight: 700;
+	color: #2ecc71;
+}
+
+.turn-bar__slash {
+	color: #6b8ca8;
+}
+
+.turn-bar__total {
+	font-weight: 600;
+	color: #9aa8b8;
+}
+
+.turn-bar__faction {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	background: rgba(20, 30, 45, 0.4);
+	border-radius: 4px;
+	font-weight: 600;
+}
+
+.turn-bar__faction--player_alliance { color: #4a9eff; }
+.turn-bar__faction--fate_grip { color: #ef4444; }
+
+.turn-bar__ships {
+	font-size: 10px;
+	color: #6b8ca8;
+	padding: 1px 4px;
+	background: rgba(100, 120, 140, 0.15);
+	border-radius: 3px;
+}
+
+.turn-bar__track {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	padding: 2px 4px;
+}
+
+.turn-bar__arrow {
+	font-size: 9px;
+	color: rgba(74, 158, 255, 0.35);
+}
+
+.turn-bar__dot {
+	width: 18px;
+	height: 18px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: 4px;
 	font-size: 10px;
 	font-weight: 700;
-	transition: all 0.3s ease;
-	position: relative;
+	transition: all 0.2s;
 }
 
-/* 已完成 - 半透明 */
-.turn-bar-compact__faction-dot--done {
-	opacity: 0.4;
+.turn-bar__dot--done { opacity: 0.35; }
+.turn-bar__dot--done svg { color: #2ecc71; }
+
+.turn-bar__dot--active {
+	animation: dot-pulse 1.5s ease-in-out infinite;
+	transform: scale(1.05);
 }
 
-/* 当前行动 - 高亮脉冲 */
-.turn-bar-compact__faction-dot--active {
-	animation: faction-pulse 2s ease-in-out infinite;
-	box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+@keyframes dot-pulse {
+	0%, 100% { box-shadow: 0 0 4px rgba(74, 158, 255, 0.3); }
+	50% { box-shadow: 0 0 8px rgba(74, 158, 255, 0.5); }
 }
 
-@keyframes faction-pulse {
+.turn-bar__dot--pending { opacity: 0.55; }
 
-	0%,
-	100% {
-		box-shadow: 0 0 4px rgba(74, 158, 255, 0.3);
-	}
-
-	50% {
-		box-shadow: 0 0 12px rgba(74, 158, 255, 0.6);
-	}
-}
-
-/* 待行动 - 正常 */
-.turn-bar-compact__faction-dot--pending {
-	opacity: 0.7;
-}
-
-/* 派系颜色变体 */
-.turn-bar-compact__faction-dot--player_alliance {
-	background: rgba(74, 158, 255, 0.25);
+.turn-bar__dot--player_alliance {
+	background: rgba(74, 158, 255, 0.2);
 	color: #4a9eff;
-	border: 1px solid rgba(74, 158, 255, 0.4);
 }
 
-.turn-bar-compact__faction-dot--fate_grip {
-	background: rgba(239, 68, 68, 0.25);
+.turn-bar__dot--fate_grip {
+	background: rgba(239, 68, 68, 0.2);
 	color: #ef4444;
-	border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
-/* 派系之间的分隔线 */
-.turn-bar-compact__faction-divider {
-	width: 1px;
-	height: 14px;
-	background: rgba(74, 158, 255, 0.15);
-}
-
-/* ===== 按钮 ===== */
-.turn-bar-compact__btn {
+.turn-bar__btn {
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	padding: 5px 10px;
+	padding: 4px 10px;
 	font-size: 12px;
 	font-weight: 500;
 	border-radius: 4px;
 	cursor: pointer;
-	transition: all 0.15s ease;
-	border: 1px solid rgba(74, 158, 255, 0.35);
-	background: rgba(74, 158, 255, 0.12);
-	color: #4a9eff;
-	white-space: nowrap;
+	transition: all 0.15s;
+	border: 1px solid rgba(245, 158, 11, 0.35);
+	background: rgba(245, 158, 11, 0.12);
+	color: #f59e0b;
 }
 
-.turn-bar-compact__btn:hover {
-	background: rgba(74, 158, 255, 0.22);
+.turn-bar__btn:hover {
+	background: rgba(245, 158, 11, 0.22);
+}
+
+.turn-bar__btn--active {
 	border-color: rgba(74, 158, 255, 0.5);
+	background: rgba(74, 158, 255, 0.2);
+	color: #4a9eff;
+	animation: btn-active 2s ease-in-out infinite;
 }
 
-.turn-bar-compact__btn:active {
-	transform: scale(0.97);
-}
-
-.turn-bar-compact__btn--disabled {
-	background: rgba(60, 70, 80, 0.15);
-	color: #6b7280;
-	border-color: rgba(100, 100, 100, 0.2);
-	cursor: not-allowed;
-	pointer-events: none;
-}
-
-.turn-bar-compact__btn--turn-end {
-	animation: turn-end-glow 1.5s ease-in-out infinite;
-}
-
-@keyframes turn-end-glow {
-
-	0%,
-	100% {
-		box-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
-	}
-
-	50% {
-		box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
-	}
+@keyframes btn-active {
+	0%, 100% { box-shadow: 0 0 3px rgba(74, 158, 255, 0.3); }
+	50% { box-shadow: 0 0 6px rgba(74, 158, 255, 0.5); }
 }

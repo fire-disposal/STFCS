@@ -2,10 +2,11 @@
  * edit namespace handlers — 编辑态下的舰船/房间操作
  */
 import { err } from "./err.js";
-import { Faction, TURN_ORDER, GamePhase, MovementPhase, ErrorCodes, findCollidingShips, createBattleLogEvent } from "@vt/data";
+import { Faction, MovementPhase, ErrorCodes, findCollidingShips } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { generateShortId } from "../../utils/shortId.js";
+import { executeTurnAdvance, validateTurnAdvance } from "../../../core/engine/flow/TurnFlowController.js";
 
 export const editHandlers = {
     token: async (payload: unknown, ctx: RpcContext): Promise<WsResponseData<"edit:token">> => {
@@ -27,10 +28,6 @@ export const editHandlers = {
                 const displayName = `${baseName} ${sameTypeCount + 1}`;
 
                 const spec = p.token.spec;
-                const shieldSpec = spec?.shield;
-                const hasShield = Boolean(shieldSpec);
-
-                // 碰撞检测：部署位置不能与现有舰船重叠
                 const deployPos = p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 };
                 const deployHeading = p.token.runtime?.heading ?? 0;
                 const deployHalfW = (spec?.width ?? 30) / 2;
@@ -48,19 +45,11 @@ export const editHandlers = {
                     ...p.token,
                     $id: tokenId,
                     runtime: {
-                        ...p.token.runtime,
-                        position: p.position ?? p.token.runtime?.position ?? { x: 0, y: 0 },
-                        heading: p.token.runtime?.heading ?? 0,
+                        position: deployPos,
+                        heading: deployHeading,
                         faction: p.faction ?? p.token.runtime?.faction ?? Faction.PLAYER_ALLIANCE,
                         ownerId: ctx.playerId,
                         displayName,
-                        ...(hasShield && !p.token.runtime?.shield ? {
-                            shield: {
-                                active: false,
-                                value: shieldSpec!.radius,
-                                direction: 0,
-                            }
-                        } : {}),
                     } as any,
                     metadata: {
                         ...p.token.metadata,
@@ -177,41 +166,39 @@ export const editHandlers = {
             case "force_end_turn": {
                 const room = ctx.room!;
                 const state = room.getStateManager().getState();
-                const currentPhase = state.phase;
+                const isHost = ctx.playerId === state.ownerId;
 
-                if (currentPhase !== GamePhase.PLAYER_ACTION) {
-                    throw err("当前阶段不允许强制结束回合", ErrorCodes.INVALID_PHASE);
+                const validation = validateTurnAdvance(state, isHost);
+                if (!validation.valid) {
+                    throw err(validation.error ?? "无法推进回合", ErrorCodes.INVALID_PHASE);
                 }
 
-                const currentFaction = state.activeFaction;
-                const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
-                const nextIndex = currentIndex + 1;
-                const incrementTurn = nextIndex >= TURN_ORDER.length;
+                const result = executeTurnAdvance(state);
 
-                if (incrementTurn) {
-                    room.processTurnEndLogic();
-                    const newTurn = state.turnCount + 1;
-                    ctx.state.changeTurn(newTurn);
-                    ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+                // 应用状态更新
+                if (result.phaseChanged) {
+                    ctx.state.changePhase(result.newPhase);
+                }
 
-                    const nextFaction = TURN_ORDER[0] as Faction;
-                    ctx.state.appendLog(createBattleLogEvent("faction_change", {
-                        fromFaction: currentFaction,
-                        toFaction: nextFaction,
-                        turn: newTurn,
-                    }));
-                } else {
-                    const nextFaction = TURN_ORDER[nextIndex] as Faction;
-                    ctx.state.changeFaction(nextFaction);
-                    ctx.state.appendLog(createBattleLogEvent("faction_change", {
-                        fromFaction: currentFaction,
-                        toFaction: nextFaction,
-                        turn: state.turnCount,
-                    }));
+                if (result.turnIncremented) {
+                    ctx.state.changeTurn(result.newTurnCount);
+                }
+
+                if (result.factionChanged && result.newFaction) {
+                    ctx.state.changeFaction(result.newFaction);
+                }
+
+                // 应用舰船状态更新
+                for (const [tokenId, updates] of result.stateUpdates) {
+                    ctx.state.updateTokenRuntime(tokenId, updates);
+                }
+
+                // 写入日志
+                for (const logEvent of result.logEvents) {
+                    ctx.state.appendLog(logEvent);
                 }
 
                 ctx.state.resetAllPlayersReady();
-
                 return;
             }
             case "set_phase": {

@@ -5,6 +5,8 @@
  * 支持多武器多目标分配（allocations），与 handlers.ts 的 attack handler 对齐。
  *
  * 基于 @vt/data GameRoomState（Record-based）
+ * 
+ * 数值约定：所有终端数值四舍五入为整数
  */
 
 import type { EngineContext, EngineResult, TokenRuntimeUpdate } from "../context.js";
@@ -14,33 +16,22 @@ import { calculateDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
 import { angleBetween, distanceBetween } from "@vt/data";
 
-/**
- * 武器分配 - 单武器对多目标的分配
- */
 export interface WeaponAllocation {
   mountId: string;
   targets: { targetId: string; shotCount: number; quadrant?: number }[];
 }
 
-/**
- * 应用战斗 Action（ATTACK）
- * 支持多武器多目标分配
- */
 export function applyCombat(context: EngineContext): EngineResult {
   const { state, ship } = context;
   const payload = context.payload as Record<string, unknown>;
 
-  if (!ship) {
-    return { runtimeUpdates: [], events: [] };
-  }
+  if (!ship) return { runtimeUpdates: [], events: [] };
 
   const runtimeUpdates: TokenRuntimeUpdate[] = [];
   const events: ReturnType<typeof createEngineEvent>[] = [];
 
   const rawAllocations = payload["allocations"] as Array<Record<string, unknown>> | undefined;
-  if (!rawAllocations || rawAllocations.length === 0) {
-    return { runtimeUpdates, events };
-  }
+  if (!rawAllocations || rawAllocations.length === 0) return { runtimeUpdates, events };
 
   const allocations: WeaponAllocation[] = rawAllocations.map((alloc) => {
     const rawTargets = alloc["targets"] as Array<Record<string, unknown>> | undefined;
@@ -110,17 +101,16 @@ export function applyCombat(context: EngineContext): EngineResult {
           targetPos
         );
 
-        const newHull = Math.max(0, (targetRuntime.hull ?? 0) - damageResult.hullDamage);
+        const newHull = Math.round(Math.max(0, (targetRuntime.hull ?? 0) - damageResult.hullDamage));
         const newArmor = [...(targetRuntime.armor ?? [0, 0, 0, 0, 0, 0])];
         if (damageResult.armorQuadrant >= 0 && damageResult.armorQuadrant < 6) {
-          const quadrant = damageResult.armorQuadrant;
-          newArmor[quadrant] = Math.max(0, newArmor[quadrant]! - damageResult.armorDamage);
+          newArmor[damageResult.armorQuadrant] = Math.round(Math.max(0, newArmor[damageResult.armorQuadrant]! - damageResult.armorDamage));
         }
-        const newFluxHard = (targetRuntime.fluxHard ?? 0) + damageResult.fluxGenerated;
-        const newFluxSoft = targetRuntime.fluxSoft ?? 0;
+        const newFluxHard = Math.round((targetRuntime.fluxHard ?? 0) + damageResult.fluxGenerated);
+        const newFluxSoft = Math.round(targetRuntime.fluxSoft ?? 0);
         const newTotalFlux = newFluxHard + newFluxSoft;
         const destroyed = newHull <= 0;
-        const overloaded = newTotalFlux >= (targetToken.spec.fluxCapacity ?? 0) && !targetRuntime.overloaded;
+        const overloaded = newTotalFlux >= Math.round(targetToken.spec.fluxCapacity ?? 0) && !targetRuntime.overloaded;
 
         const targetUpdates: Record<string, unknown> = {
           hull: newHull,
@@ -143,10 +133,7 @@ export function applyCombat(context: EngineContext): EngineResult {
           }
         }
 
-        runtimeUpdates.push({
-          tokenId: target.targetId,
-          updates: targetUpdates,
-        });
+        runtimeUpdates.push({ tokenId: target.targetId, updates: targetUpdates });
 
         events.push(createEngineEvent("attack", ship.$id, {
           attackerId: ship.$id,
@@ -154,19 +141,29 @@ export function applyCombat(context: EngineContext): EngineResult {
           weaponId: alloc.mountId,
           weaponName: mount.displayName ?? alloc.mountId,
           targetName: targetToken.metadata?.name ?? target.targetId,
-          baseDamage: weaponSpec.damage,
+          baseDamage: Math.round(weaponSpec.damage),
           projectileCount: weaponSpec.projectilesPerShot ?? 1,
           damageType: weaponSpec.damageType,
           distance: Math.round(distanceBetween(attackerPos, targetPos)),
-          hitDamage: attackResult.damage,
-          finalDamage: finalDamage,
-          hullDamage: damageResult.hullDamage,
-          armorDamage: damageResult.armorDamage,
+          hitDamage: Math.round(attackResult.damage),
+          finalDamage,
+          hullDamage: Math.round(damageResult.hullDamage),
+          armorDamage: Math.round(damageResult.armorDamage),
           armorQuadrant: damageResult.armorQuadrant,
           shieldHit: damageResult.shieldHit,
-          fluxGenerated: damageResult.fluxGenerated,
+          fluxGenerated: Math.round(damageResult.fluxGenerated),
           destroyed,
+          overloaded,
         }));
+
+        if (overloaded) {
+          events.push(createEngineEvent("overload", target.targetId, {
+            tokenId: target.targetId,
+            tokenName: targetToken.metadata?.name ?? target.targetId,
+            totalFlux: newTotalFlux,
+            fluxCapacity: Math.round(targetToken.spec.fluxCapacity ?? 0),
+          }));
+        }
 
         if (destroyed) {
           events.push(createEngineEvent("destroyed", target.targetId, {
@@ -187,9 +184,9 @@ export function applyCombat(context: EngineContext): EngineResult {
     };
   }
 
-  const newAttackerFluxSoft = (attackerRuntime.fluxSoft ?? 0) + totalFluxCost;
-  const newAttackerTotalFlux = newAttackerFluxSoft + (attackerRuntime.fluxHard ?? 0);
-  const attackerCapacity = attackerSpec.fluxCapacity ?? 0;
+  const newAttackerFluxSoft = Math.round((attackerRuntime.fluxSoft ?? 0) + totalFluxCost);
+  const newAttackerTotalFlux = newAttackerFluxSoft + Math.round(attackerRuntime.fluxHard ?? 0);
+  const attackerCapacity = Math.round(attackerSpec.fluxCapacity ?? 0);
   const attackerOverloaded = newAttackerTotalFlux >= attackerCapacity && !attackerRuntime.overloaded;
 
   const attackerUpdates: Record<string, unknown> = {
@@ -207,35 +204,32 @@ export function applyCombat(context: EngineContext): EngineResult {
       ...w,
       state: w.state === "READY" || w.state === "COOLDOWN" ? "DISABLED" : w.state,
     }));
+
+    events.push(createEngineEvent("overload", ship.$id, {
+      tokenId: ship.$id,
+      tokenName: ship.metadata?.name ?? ship.$id,
+      totalFlux: newAttackerTotalFlux,
+      fluxCapacity: attackerCapacity,
+      reason: "weapon_fire",
+    }));
   }
 
-  runtimeUpdates.push({
-    tokenId: ship.$id,
-    updates: attackerUpdates,
-  });
+  runtimeUpdates.push({ tokenId: ship.$id, updates: attackerUpdates });
 
   return { runtimeUpdates, events };
 }
 
-/**
- * 应用偏差 Action（DEVIATION）
- * 特殊开火：正常消耗资源和更新武器状态，但不造成伤害
- */
 export function applyDeviation(context: EngineContext): EngineResult {
   const { state, ship } = context;
   const payload = context.payload as Record<string, unknown>;
 
-  if (!ship) {
-    return { runtimeUpdates: [], events: [] };
-  }
+  if (!ship) return { runtimeUpdates: [], events: [] };
 
   const runtimeUpdates: TokenRuntimeUpdate[] = [];
   const events: ReturnType<typeof createEngineEvent>[] = [];
 
   const rawAllocations = payload["allocations"] as Array<Record<string, unknown>> | undefined;
-  if (!rawAllocations || rawAllocations.length === 0) {
-    return { runtimeUpdates, events };
-  }
+  if (!rawAllocations || rawAllocations.length === 0) return { runtimeUpdates, events };
 
   const allocations: WeaponAllocation[] = rawAllocations.map((alloc) => {
     const rawTargets = alloc["targets"] as Array<Record<string, unknown>> | undefined;
@@ -296,9 +290,9 @@ export function applyDeviation(context: EngineContext): EngineResult {
     };
   }
 
-  const newAttackerFluxSoft = (attackerRuntime.fluxSoft ?? 0) + totalFluxCost;
-  const newAttackerTotalFlux = newAttackerFluxSoft + (attackerRuntime.fluxHard ?? 0);
-  const attackerCapacity = attackerSpec.fluxCapacity ?? 0;
+  const newAttackerFluxSoft = Math.round((attackerRuntime.fluxSoft ?? 0) + totalFluxCost);
+  const newAttackerTotalFlux = newAttackerFluxSoft + Math.round(attackerRuntime.fluxHard ?? 0);
+  const attackerCapacity = Math.round(attackerSpec.fluxCapacity ?? 0);
   const attackerOverloaded = newAttackerTotalFlux >= attackerCapacity && !attackerRuntime.overloaded;
 
   const attackerUpdates: Record<string, unknown> = {
@@ -316,12 +310,17 @@ export function applyDeviation(context: EngineContext): EngineResult {
       ...w,
       state: w.state === "READY" || w.state === "COOLDOWN" ? "DISABLED" : w.state,
     }));
+
+    events.push(createEngineEvent("overload", ship.$id, {
+      tokenId: ship.$id,
+      tokenName: ship.metadata?.name ?? ship.$id,
+      totalFlux: newAttackerTotalFlux,
+      fluxCapacity: attackerCapacity,
+      reason: "weapon_fire",
+    }));
   }
 
-  runtimeUpdates.push({
-    tokenId: ship.$id,
-    updates: attackerUpdates,
-  });
+  runtimeUpdates.push({ tokenId: ship.$id, updates: attackerUpdates });
 
   return { runtimeUpdates, events };
 }

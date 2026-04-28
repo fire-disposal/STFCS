@@ -53,10 +53,6 @@ export class RoomManager {
 		const callbacks: RoomTransportCallbacks = {
 			sendToPlayer: (_playerId, _message) => {},
 			broadcast: (_message) => {},
-			broadcastToFaction: (_faction, _message) => {},
-			broadcastExcept: (_excludePlayerId, _message) => {},
-			broadcastToSpectators: (_message) => {},
-			broadcastToPlayers: (_message) => {},
 		};
 
 		const room = new Room(callbacks, options);

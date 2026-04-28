@@ -296,43 +296,83 @@ export class MutativeStateManager {
 
 	/**
 	 * 设置/创建舰船。
-	 * 自动初始化护盾和武器运行时状态（如有规格但缺少运行时数据）。
+	 * 自动初始化所有运行时状态：
+	 * - hull → maxHitPoints（满血）
+	 * - armor → armorMaxPerQuadrant × 6（满护甲）
+	 * - fluxSoft/fluxHard → 0（清空辐能）
+	 * - shield → 如有 shield spec 则初始化
+	 * - weapons → 如有 mounts 则初始化为 READY
+	 * - movement → 默认移动状态
+	 * - 其他状态字段 → 默认值
 	 * 不污染输入 token 对象。
 	 */
 	setToken(tokenId: string, token: CombatToken, logContext?: EditLogContext): void {
 		const mutator = (draft: Draft<GameRoomState>) => {
-			// 创建新的 runtime 对象，不修改外部传入的 token
-			const existingRuntime = token.runtime ?? {} as TokenRuntime
-			const runtime: TokenRuntime = { ...existingRuntime }
+			const spec = token.spec;
+			const existingRuntime = token.runtime ?? {} as TokenRuntime;
+			const runtime: TokenRuntime = { ...existingRuntime };
+
+			// 资源初始化：满血、满护甲、清空辐能
+			if (runtime.hull === undefined || runtime.hull === null) {
+				runtime.hull = Math.round(spec?.maxHitPoints ?? 100);
+			}
+			if (!runtime.armor || runtime.armor.length !== 6) {
+				const armorMax = Math.round(spec?.armorMaxPerQuadrant ?? 0);
+				runtime.armor = [armorMax, armorMax, armorMax, armorMax, armorMax, armorMax] as [number, number, number, number, number, number];
+			}
+			if (runtime.fluxSoft === undefined) runtime.fluxSoft = 0;
+			if (runtime.fluxHard === undefined) runtime.fluxHard = 0;
+
+			// 状态初始化
+			if (runtime.overloaded === undefined) runtime.overloaded = false;
+			if (runtime.destroyed === undefined) runtime.destroyed = false;
+			if (runtime.hasFired === undefined) runtime.hasFired = false;
+			if (runtime.venting === undefined) runtime.venting = false;
+
+			// 移动状态初始化
+			if (!runtime.movement) {
+				runtime.movement = {
+					currentPhase: "A",
+					hasMoved: false,
+					phaseAUsed: 0,
+					turnAngleUsed: 0,
+					phaseCUsed: 0,
+					phaseALock: null,
+					phaseCLock: null,
+				};
+			}
 
 			// 护盾初始化：有 shield spec 但无 runtime.shield 时自动创建
-			if (token.spec?.shield && !runtime.shield) {
+			if (spec?.shield && !runtime.shield) {
 				runtime.shield = {
 					active: false,
 					direction: 0,
-				}
+				};
 			}
 
 			// 武器初始化：有 mounts 但无 runtime.weapons 时自动创建
-			if (!runtime.weapons && token.spec?.mounts) {
-				runtime.weapons = token.spec.mounts
+			if (!runtime.weapons && spec?.mounts) {
+				runtime.weapons = spec.mounts
 					.filter((m: { weapon?: unknown }) => m.weapon)
 					.map((m: { id: string }) => ({
 						mountId: m.id,
 						state: "READY" as const,
-					}))
+					}));
 			}
+
+			// 动作序列初始化
+			if (runtime.actionSequence === undefined) runtime.actionSequence = 0;
 
 			draft.tokens[tokenId] = {
 				...token,
 				runtime,
-			}
-		}
+			};
+		};
 
 		if (logContext) {
-			this.mutateWithLog(mutator, logContext)
+			this.mutateWithLog(mutator, logContext);
 		} else {
-			this.mutateAndBroadcast(mutator)
+			this.mutateAndBroadcast(mutator);
 		}
 	}
 

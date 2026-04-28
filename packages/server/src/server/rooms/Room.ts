@@ -7,8 +7,8 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
-import { TURN_ORDER, GamePhase, Faction } from "@vt/data";
-import { processTokenTurnEnd } from "../../core/engine/rules/turnEnd.js";
+import { GamePhase, Faction } from "@vt/data";
+import { executeTurnAdvance } from "../../core/engine/flow/TurnFlowController.js";
 
 export interface RoomOptions {
 	roomName: string;
@@ -22,10 +22,6 @@ export interface RoomOptions {
 export interface RoomTransportCallbacks {
 	sendToPlayer: (playerId: string, message: any) => void;
 	broadcast: (message: any) => void;
-	broadcastToFaction: (faction: string, message: any) => void;
-	broadcastExcept: (excludePlayerId: string, message: any) => void;
-	broadcastToSpectators: (message: any) => void;
-	broadcastToPlayers: (message: any) => void;
 }
 
 export class Room {
@@ -250,6 +246,7 @@ export class Room {
 	startGame(): void {
 		this.stateManager.changeTurn(1);
 		this.stateManager.changePhase(GamePhase.PLAYER_ACTION);
+		this.stateManager.resetAllPlayersReady();
 		this.logger.info("Game started");
 
 		this.callbacks.broadcast({
@@ -258,109 +255,39 @@ export class Room {
 		});
 	}
 
-	advancePhase(): void {
-		const currentPhase = this.stateManager.getState().phase;
+advancePhase(): void {
+		const state = this.stateManager.getState();
+		const result = executeTurnAdvance(state);
 
-		let nextPhase: typeof currentPhase;
-		let incrementTurn = false;
-
-		switch (currentPhase) {
-			case GamePhase.DEPLOYMENT:
-				nextPhase = GamePhase.PLAYER_ACTION;
-				break;
-			case GamePhase.PLAYER_ACTION: {
-				// PLAYER_ACTION 内：推进到 TURN_ORDER 中的下一个派系
-				const currentFaction = this.stateManager.getState().activeFaction;
-				const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
-				const nextIndex = currentIndex + 1;
-				if (nextIndex >= TURN_ORDER.length) {
-					// 最后一个派系，回到第一个并递增回合
-					incrementTurn = true;
-				}
-				nextPhase = GamePhase.PLAYER_ACTION;
-				break;
-			}
-			default:
-				nextPhase = GamePhase.PLAYER_ACTION;
+		// 应用状态更新
+		if (result.phaseChanged) {
+			this.stateManager.changePhase(result.newPhase);
 		}
 
-		this.stateManager.changePhase(nextPhase);
-
-		if (incrementTurn) {
-			this.processTurnEndLogic();
-			const newTurn = this.stateManager.getState().turnCount + 1;
-			this.stateManager.changeTurn(newTurn);
+		if (result.turnIncremented) {
+			this.stateManager.changeTurn(result.newTurnCount);
 		}
 
+		if (result.factionChanged && result.newFaction) {
+			this.stateManager.changeFaction(result.newFaction);
+		}
+
+		// 应用舰船状态更新
+		for (const [tokenId, updates] of result.stateUpdates) {
+			this.stateManager.updateTokenRuntime(tokenId, updates);
+		}
+
+		// 写入日志
+		for (const logEvent of result.logEvents) {
+			this.stateManager.appendLog(logEvent);
+		}
+
+		// 广播回合变更
 		const newState = this.stateManager.getState();
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
 			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
 		});
-	}
-
-	processTurnEndLogic(): void {
-		const state = this.stateManager.getState();
-
-		for (const tokenId of Object.keys(state.tokens)) {
-			const token = state.tokens[tokenId];
-			if (!token) continue;
-			if (token.runtime && !token.runtime.destroyed) {
-				const result = processTokenTurnEnd(token);
-
-				const updates: Partial<TokenRuntime> = {
-					fluxSoft: result.newFluxSoft,
-					fluxHard: result.newFluxHard,
-					venting: result.ventingCleared ? false : token.runtime.venting,
-					movement: {
-						currentPhase: "A",
-						hasMoved: false,
-						phaseAUsed: 0,
-						turnAngleUsed: 0,
-						phaseCUsed: 0,
-						phaseALock: null,
-						phaseCLock: null,
-					},
-					hasFired: false,
-				};
-
-				if (result.overloadEnded) {
-					updates.overloaded = false;
-					updates.overloadTime = 0;
-				}
-
-				if (result.overloadTriggered) {
-					updates.overloaded = true;
-					updates.overloadTime = 1;
-					if (token.runtime.shield) {
-						updates.shield = { ...token.runtime.shield, active: false };
-					}
-				}
-
-				if (result.weaponsUpdated && result.updatedWeapons) {
-					updates.weapons = result.updatedWeapons;
-				}
-
-				this.stateManager.updateTokenRuntime(token.$id, updates);
-
-				// 发送回合结算通知
-				if (result.fluxDissipated || result.overloadEnded || result.overloadTriggered) {
-					this.callbacks.broadcast({
-						type: "TURN_END_UPDATE",
-						payload: {
-							tokenId: token.$id,
-							tokenName: token.metadata?.name ?? tokenId,
-							fluxChange: {
-								soft: result.newFluxSoft,
-								hard: result.newFluxHard,
-							},
-							overloadEnded: result.overloadEnded,
-							overloadTriggered: result.overloadTriggered,
-						},
-					});
-				}
-			}
-		}
 	}
 
 	switchActiveFaction(faction: Faction): void {

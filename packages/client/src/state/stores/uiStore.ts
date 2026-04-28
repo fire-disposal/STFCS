@@ -50,8 +50,7 @@ interface UIState {
 		labels: boolean;
 		hexagonArmor: boolean;
 		shieldArc: boolean;
-		shipTextures: boolean;
-		weaponTextures: boolean;
+		textures: boolean;
 		starfieldParallax: boolean;
 		hpBars: boolean;
 		fluxBars: boolean;
@@ -135,8 +134,7 @@ const DEFAULT_TOGGLES = {
 	labels: true,
 	hexagonArmor: false,
 	shieldArc: true,
-	shipTextures: true,
-	weaponTextures: true,
+	textures: true,
 	starfieldParallax: false,
 	hpBars: true,
 	fluxBars: true,

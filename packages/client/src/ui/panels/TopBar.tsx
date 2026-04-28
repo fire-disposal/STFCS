@@ -28,7 +28,6 @@ import "./top-bar.css";
 
 interface TopBarProps {
 	onReadyToggle: () => void;
-	onAdvancePhase: () => void;
 	onSettings: () => void;
 	onLeave: () => void;
 	onFactionChange?: (playerId: string, faction: Faction) => void;
@@ -36,7 +35,6 @@ interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({
 	onReadyToggle,
-	onAdvancePhase,
 	onSettings,
 	onLeave,
 	onFactionChange,
@@ -66,11 +64,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 					turnCount={turnCount}
 					activeFaction={activeFaction}
 					players={players}
-					currentPlayerId={playerId}
-					isHost={isHost}
+					tokens={tokens}
+					currentFaction={currentFaction}
 					isReady={isReady}
 					onReadyToggle={onReadyToggle}
-					onAdvancePhase={onAdvancePhase}
 				/>
 			</div>
 

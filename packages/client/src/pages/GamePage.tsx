@@ -5,7 +5,6 @@ import {
 	useGameRoomId,
 	useGamePlayers,
 	useGamePlayerId,
-	useGameStore,
 } from "@/state/stores/gameStore";
 import { useSocketRoom } from "@/network";
 import { notify } from "@/ui/shared/Notification";
@@ -21,7 +20,7 @@ import {
 	Separator,
 } from "@radix-ui/themes";
 import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import type { SocketNetworkManager } from "@/network";
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
@@ -85,21 +84,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const currentPlayer = playerId ? players[playerId] : undefined;
 	const isHost = currentPlayer?.role === "HOST";
 
-	const handleAdvancePhase = useCallback(async () => {
-		const currentPhase = useGameStore.getState().state?.phase;
-		if (!currentPhase) return;
-
-		try {
-			if (currentPhase === "DEPLOYMENT") {
-				await send("room:action", { action: "start" });
-			} else if (currentPhase === "PLAYER_ACTION") {
-				await send("edit:room", { action: "force_end_turn" });
-			}
-		} catch {
-			// 错误已由 useGameAction 中的 notify.error 处理
-		}
-	}, [send]);
-
 	// 底部栏仅保留核心战斗Tab
 	const tabs: TabConfig[] = useMemo(() => [
 		{
@@ -147,7 +131,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
 			<TopBar
 				onReadyToggle={() => networkManager.setReady()}
-				onAdvancePhase={handleAdvancePhase}
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
 				onFactionChange={(playerId, faction) => {

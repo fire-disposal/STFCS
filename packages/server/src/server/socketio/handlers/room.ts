@@ -187,8 +187,8 @@ export const roomHandlers = {
             case "start":
                 ctx.requireHost();
                 ctx.state.changeTurn(1);
-                room.processTurnEndLogic();
                 ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+                ctx.state.resetAllPlayersReady();
                 ctx.state.appendLog(createBattleLogEvent("game_started", {
                     firstFaction: TURN_ORDER[0],
                 }));

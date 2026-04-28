@@ -7,6 +7,8 @@
  * 3. 武器状态转换（FIRED → COOLDOWN/READY）
  * 4. 移动状态重置（phase A/B/C → A）
  * 5. 主动排散状态清除
+ *
+ * 数值约定：所有终端数值四舍五入为整数
  */
 
 import type { CombatToken, WeaponRuntime, MountSpec } from "@vt/data";
@@ -26,6 +28,10 @@ export interface TurnEndResult {
 	ventingCleared: boolean;
 	newFluxSoft: number;
 	newFluxHard: number;
+	shieldUpkeepAdded: number;
+	dissipationReduced: number;
+	ventingClearedAmount: number;
+	fluxChange: number;
 }
 
 export interface ProcessAllTokensResult {
@@ -35,12 +41,12 @@ export interface ProcessAllTokensResult {
 	weaponStateChanges: string[];
 }
 
-/**
- * 处理单个舰船的回合结束逻辑
- * 纯计算：不直接修改 token，返回新值
- */
 export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	const runtime = token.runtime;
+	const initialSoft = Math.round(runtime?.fluxSoft ?? 0);
+	const initialHard = Math.round(runtime?.fluxHard ?? 0);
+	const initialTotal = initialSoft + initialHard;
+
 	if (!runtime || runtime.destroyed) {
 		return {
 			fluxDissipated: false,
@@ -48,8 +54,12 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 			weaponsUpdated: false,
 			movementReset: false,
 			ventingCleared: false,
-			newFluxSoft: runtime?.fluxSoft ?? 0,
-			newFluxHard: runtime?.fluxHard ?? 0,
+			newFluxSoft: 0,
+			newFluxHard: 0,
+			shieldUpkeepAdded: 0,
+			dissipationReduced: 0,
+			ventingClearedAmount: 0,
+			fluxChange: 0,
 		};
 	}
 
@@ -59,16 +69,23 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		weaponsUpdated: false,
 		movementReset: false,
 		ventingCleared: false,
-		newFluxSoft: runtime.fluxSoft ?? 0,
-		newFluxHard: runtime.fluxHard ?? 0,
+		newFluxSoft: initialSoft,
+		newFluxHard: initialHard,
+		shieldUpkeepAdded: 0,
+		dissipationReduced: 0,
+		ventingClearedAmount: 0,
+		fluxChange: 0,
 	};
 
-	let currentSoft = runtime.fluxSoft ?? 0;
-	let currentHard = runtime.fluxHard ?? 0;
+	let currentSoft = initialSoft;
+	let currentHard = initialHard;
 
-	// 1. 处理排散状态清除
+	// 1. 处理主动排散
 	if (runtime.venting) {
 		result.ventingCleared = true;
+		result.ventingClearedAmount = initialTotal;
+		currentSoft = 0;
+		currentHard = 0;
 	}
 
 	// 2. 处理过载恢复时间
@@ -80,15 +97,16 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	}
 
 	// 3. 护盾维持消耗：护盾开启时每回合结束产生 soft flux
-	const shieldUpkeep = calculateShieldUpkeep(token);
-	if (shieldUpkeep > 0) {
-		const capacity = token.spec.fluxCapacity ?? 100;
+	const shieldUpkeep = Math.round(calculateShieldUpkeep(token));
+	if (shieldUpkeep > 0 && !result.ventingCleared) {
+		const capacity = Math.round(token.spec.fluxCapacity ?? 100);
 		const currentTotal = currentSoft + currentHard;
 		const available = capacity - currentTotal;
 
 		if (available > 0) {
 			const added = Math.min(shieldUpkeep, available);
-			currentSoft += added;
+			currentSoft = Math.round(currentSoft + added);
+			result.shieldUpkeepAdded = added;
 			result.newFluxSoft = currentSoft;
 
 			// 检查是否过载
@@ -99,31 +117,37 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	}
 
 	// 4. 处理辐能消散
-	const dissipation = getFluxDissipation(token);
+	const dissipation = Math.round(getFluxDissipation(token));
 	const shieldActive = runtime.shield?.active ?? false;
 
-	if (dissipation > 0) {
+	if (dissipation > 0 && !result.ventingCleared) {
+		let reduced = 0;
 		// 软辐能优先消散
 		if (currentSoft > 0) {
-			const newSoft = Math.max(0, currentSoft - dissipation);
-			if (newSoft !== currentSoft) {
-				result.fluxDissipated = true;
-			}
+			const newSoft = Math.round(Math.max(0, currentSoft - dissipation));
+			reduced += currentSoft - newSoft;
 			currentSoft = newSoft;
 		}
 
 		// 护盾关闭时硬辐能也会消散
 		if (!shieldActive && currentHard > 0) {
-			const newHard = Math.max(0, currentHard - dissipation);
-			if (newHard !== currentHard) {
-				result.fluxDissipated = true;
-			}
+			const newHard = Math.round(Math.max(0, currentHard - dissipation));
+			reduced += currentHard - newHard;
 			currentHard = newHard;
+		}
+
+		if (reduced > 0) {
+			result.fluxDissipated = true;
+			result.dissipationReduced = Math.round(reduced);
 		}
 
 		result.newFluxSoft = currentSoft;
 		result.newFluxHard = currentHard;
 	}
+
+	// 计算最终变化
+	const finalTotal = currentSoft + currentHard;
+	result.fluxChange = Math.round(finalTotal - initialTotal);
 
 	// 5. 处理武器状态转换
 	if (runtime.weapons && runtime.weapons.length > 0) {
@@ -157,9 +181,6 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	return result;
 }
 
-/**
- * 处理所有舰船的回合结束逻辑
- */
 export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokensResult {
 	const result: ProcessAllTokensResult = {
 		tokensUpdated: [],
@@ -179,7 +200,7 @@ export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokens
 			result.tokensUpdated.push(token.$id);
 		}
 
-		if (tokenResult.fluxDissipated) {
+		if (tokenResult.fluxDissipated || tokenResult.ventingCleared) {
 			result.fluxChanges.set(token.$id, {
 				soft: tokenResult.newFluxSoft,
 				hard: tokenResult.newFluxHard,
@@ -199,9 +220,6 @@ export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokens
 	return result;
 }
 
-/**
- * 检查回合结束合法性（用于验证）
- */
 export function validateEndTurn(
 	token: CombatToken,
 	_playerId: string
@@ -219,12 +237,6 @@ export function validateEndTurn(
 	return { valid: true };
 }
 
-// ==================== Engine Action Handlers ====================
-
-/**
-* 应用结束回合（标记 hasFired）
-* 纯计算：读取 state，返回更新指令
-*/
 export function applyEndTurn(context: EngineContext): EngineResult {
 	const payload = context.payload as Record<string, unknown>;
 	const tokenId = payload["tokenId"] as string;
@@ -236,5 +248,37 @@ export function applyEndTurn(context: EngineContext): EngineResult {
 			updates: { hasFired: true } as Record<string, unknown>,
 		}],
 		events: [createEngineEvent("end_turn", tokenId)],
+	};
+}
+
+export function applyVent(context: EngineContext): EngineResult {
+	const payload = context.payload as Record<string, unknown>;
+	const tokenId = payload["tokenId"] as string;
+	const ship = context.state.tokens[tokenId];
+	if (!ship) return { runtimeUpdates: [], events: [] };
+
+	const runtime = ship.runtime;
+	if (!runtime || runtime.destroyed || runtime.venting || runtime.hasFired) {
+		return { runtimeUpdates: [], events: [] };
+	}
+
+	const fluxCleared = Math.round((runtime.fluxSoft ?? 0) + (runtime.fluxHard ?? 0));
+
+	return {
+		runtimeUpdates: [{
+			tokenId,
+			updates: {
+				fluxSoft: 0,
+				fluxHard: 0,
+				venting: true,
+			} as Record<string, unknown>,
+		}],
+		events: [createEngineEvent("vent", tokenId, {
+			tokenId,
+			tokenName: ship.metadata?.name ?? tokenId,
+			fluxCleared,
+			fluxSoftBefore: Math.round(runtime.fluxSoft ?? 0),
+			fluxHardBefore: Math.round(runtime.fluxHard ?? 0),
+		})],
 	};
 }
