@@ -1,0 +1,19 @@
+{
+	"$id": "preset:heavy-torpedo-large",
+	"metadata": {
+		"name": "重型反舰鱼雷",
+		"description": "超重型制导鱼雷，单发伤害极高。严格限制：最小射程400、冷却5回合、flux消耗300（主力舰flux容量的25%）",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "HIGH_EXPLOSIVE",
+		"size": "LARGE",
+		"damage": 800,
+		"projectilesPerShot": 1,
+		"range": 1500,
+		"minRange": 400,
+		"cooldown": 5,
+		"fluxCostPerShot": 300,
+		"tags": []
+	}
+}

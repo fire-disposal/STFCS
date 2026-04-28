@@ -1,0 +1,21 @@
+{
+	"$id": "preset:emp-disruptor-medium",
+	"metadata": {
+		"name": "EMP干扰器",
+		"description": "电磁脉冲武器，不造成物理伤害但产生大量硬辐能。严格限制：冷却4回合、flux消耗200、仅对护盾活跃目标有效",
+		"author": "STFCS"
+	},
+	"spec": {
+		"damageType": "ENERGY",
+		"size": "MEDIUM",
+		"damage": 0,
+		"emp": 400,
+		"projectilesPerShot": 1,
+		"range": 600,
+		"minRange": 0,
+		"cooldown": 4,
+		"fluxCostPerShot": 200,
+		"requiresShieldActive": true,
+		"tags": ["EMP"]
+	}
+}

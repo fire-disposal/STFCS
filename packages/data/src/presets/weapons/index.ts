@@ -7,7 +7,9 @@ import pulseLaserSmall from "./pulse-laser-small.json";
 import grenadeSmall from "./grenade-small.json";
 import cannonMedium from "./cannon-medium.json";
 import plasmaMedium from "./plasma-medium.json";
+import empDisruptorMedium from "./emp-disruptor-medium.json";
 import missileLarge from "./missile-large.json";
+import heavyTorpedoLarge from "./heavy-torpedo-large.json";
 
 export const presetWeapons = [
 	railgunSmall,
@@ -15,7 +17,9 @@ export const presetWeapons = [
 	grenadeSmall,
 	cannonMedium,
 	plasmaMedium,
+	empDisruptorMedium,
 	missileLarge,
+	heavyTorpedoLarge,
 ] as const;
 
 export type PresetWeapon = typeof presetWeapons[number];

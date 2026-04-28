@@ -44,14 +44,8 @@ export const WeaponSlotSize = WeaponSlotSizeSchema.enum;
 export type WeaponSlotSize = z.infer<typeof WeaponSlotSizeSchema>;
 
 export const WeaponTagSchema = z.enum([
-	"ANTI_SHIP",
+	"EMP",
 	"PD",
-	"GUIDED",
-	"BALLISTIC",
-	"ENERGY",
-	"HE",
-	"BEAM",
-	"SUPPRESSION",
 ]);
 export const WeaponTag = WeaponTagSchema.enum;
 export type WeaponTag = z.infer<typeof WeaponTagSchema>;
@@ -185,7 +179,8 @@ export type StatusEffect = z.infer<typeof StatusEffectSchema>;
 export const WeaponSpecSchema = z.object({
 	damageType: DamageTypeSchema,
 	size: WeaponSlotSizeSchema,
-	damage: z.number(),
+	damage: z.number().default(0),
+	emp: z.number().optional(),
 	projectilesPerShot: z.number().optional(),
 	range: z.number(),
 	minRange: z.number().optional(),

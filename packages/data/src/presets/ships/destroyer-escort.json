@@ -16,6 +16,8 @@
 		"armorMaxReduction": 0.85,
 "fluxCapacity": 450,
 		"fluxDissipation": 30,
+		"maxSpeed": 240,
+		"maxTurnRate": 90,
 		"shield": {
 			"arc": 240,
 			"radius": 70,
@@ -41,7 +43,7 @@
 						"minRange": 0,
 						"cooldown": 1,
 						"fluxCostPerShot": 70,
-						"tags": ["ENERGY", "ANTI_SHIP"]
+						"tags": []
 					}
 				}
 			},
@@ -63,7 +65,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 25,
-						"tags": ["BALLISTIC", "ANTI_SHIP"]
+						"tags": []
 					}
 				}
 			},
@@ -85,7 +87,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 25,
-						"tags": ["BALLISTIC", "ANTI_SHIP"]
+						"tags": []
 					}
 				}
 			},
@@ -107,7 +109,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 40,
-						"tags": ["ENERGY", "BEAM"]
+						"tags": []
 					}
 				}
 			},
@@ -129,7 +131,7 @@
 						"minRange": 0,
 						"cooldown": 0,
 						"fluxCostPerShot": 40,
-						"tags": ["ENERGY", "BEAM"]
+						"tags": []
 					}
 				}
 			}
