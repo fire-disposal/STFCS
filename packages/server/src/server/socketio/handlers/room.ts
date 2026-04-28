@@ -2,7 +2,7 @@
  * room namespace handlers — 房间创建/列表/加入/离开/操作/删除
  */
 import { err } from "./err.js";
-import { ErrorCodes, PlayerRole, GamePhase, TURN_ORDER, createBattleLogEvent } from "@vt/data";
+import { ErrorCodes, PlayerRole, TURN_ORDER, createBattleLogEvent } from "@vt/data";
 import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
@@ -186,8 +186,7 @@ export const roomHandlers = {
                 return;
             case "start":
                 ctx.requireHost();
-                ctx.state.changeTurn(1);
-                ctx.state.changePhase(GamePhase.PLAYER_ACTION);
+                ctx.state.startGame();
                 ctx.state.resetAllPlayersReady();
                 ctx.state.appendLog(createBattleLogEvent("game_started", {
                     firstFaction: TURN_ORDER[0],

@@ -408,13 +408,28 @@ export class MutativeStateManager {
 	}
 
 	/**
+	 * 批量更新 token 运行时字段（带版本保护）。
+	 * 如果 token 的 actionSequence 与 expectedSequence 不匹配，拒绝更新。
+	 * 
+	 * @returns true 更新成功, false 版本不匹配（并发冲突）
+	 */
+	updateTokenRuntimeAtomic(tokenId: string, runtimeUpdates: Partial<TokenRuntime>, expectedSequence: number): boolean {
+		let success = false
+		this.mutateAndBroadcast((draft) => {
+			const token = draft.tokens[tokenId]
+			if (token?.runtime) {
+				if (token.runtime.actionSequence !== expectedSequence) return
+				token.runtime.actionSequence = expectedSequence + 1
+				Object.assign(token.runtime, runtimeUpdates)
+				success = true
+			}
+		})
+		return success
+	}
+
+	/**
 	 * 批量更新 token 运行时字段。
-	 * ⚠️ 注意：使用浅合并（Object.assign 语义）。
-	 * 对于嵌套对象（shield, movement, weapons），调用方必须提供完整结构，
-	 * 否则会丢失未提供的字段。
-	 * 推荐使用方式：
-	 *   updateTokenRuntime(id, { shield: { ...current, active: true } })
-	 *   updateTokenRuntime(id, { hull: 50, fluxSoft: 100 })
+	 * 不检查版本号，直接递增。
 	 */
 	updateTokenRuntime(tokenId: string, runtimeUpdates: Partial<TokenRuntime>): void {
 		this.mutateAndBroadcast((draft) => {
@@ -577,6 +592,14 @@ export class MutativeStateManager {
 			if (draft.globalModifiers) {
 				delete draft.globalModifiers[key]
 			}
+		})
+	}
+
+	startGame(): void {
+		this.mutateAndBroadcast((draft) => {
+			draft.turnCount = 1
+			draft.phase = GamePhase.PLAYER_ACTION
+			draft.activeFaction = TURN_ORDER[0] as Faction
 		})
 	}
 

@@ -125,9 +125,14 @@ export class Room {
 
 		this.emptiedAt = null;
 
-		this.stateManager.updatePlayerConnection(playerId, true);
-		this.stateManager.updatePlayer(playerId, { sessionId: connectionId, nickname: playerName });
-		if (avatar) this.stateManager.updatePlayer(playerId, { avatar });
+		const updates: Partial<{ sessionId: string; nickname: string; connected: boolean; avatar: string }> = {
+			sessionId: connectionId,
+			nickname: playerName,
+			connected: true,
+		};
+		if (avatar) updates.avatar = avatar;
+
+		this.stateManager.updatePlayer(playerId, updates);
 
 		this.playerConnections.set(playerId, connectionId);
 
