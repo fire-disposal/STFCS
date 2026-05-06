@@ -7,7 +7,7 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
-import { GamePhase, Faction } from "@vt/data";
+import { GamePhase, Faction, createBattleLogEvent } from "@vt/data";
 import { executeTurnAdvance } from "../../core/engine/flow/TurnFlowController.js";
 
 export interface RoomOptions {
@@ -38,10 +38,7 @@ export class Room {
 	private playerHistory = new Set<string>();
 	private isActive = true;
 
-	constructor(
-		callbacks: RoomTransportCallbacks,
-		options: RoomOptions
-	) {
+	constructor(callbacks: RoomTransportCallbacks, options: RoomOptions) {
 		this.id = `room_${uuidv4().substring(0, 8)}`;
 		this.createdAt = Date.now();
 		this.callbacks = callbacks;
@@ -95,7 +92,14 @@ export class Room {
 
 		this.emptiedAt = null;
 
-		const playerData: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string } = {
+		const playerData: {
+			sessionId: string;
+			nickname: string;
+			role: "HOST" | "PLAYER";
+			isReady: boolean;
+			connected: boolean;
+			avatar?: string;
+		} = {
 			sessionId: connectionId,
 			nickname: playerName,
 			role: this.options.creatorSessionId === playerId ? "HOST" : "PLAYER",
@@ -109,23 +113,50 @@ export class Room {
 		this.playerConnections.set(playerId, connectionId);
 		this.playerHistory.add(playerId);
 
-		this.logger.info("Player joined", { playerId, playerName, totalPlayers: this.playerConnections.size });
+		this.logger.info("Player joined", {
+			playerId,
+			playerName,
+			totalPlayers: this.playerConnections.size,
+		});
 
 		this.callbacks.broadcast({
 			type: "PLAYER_JOINED",
-			payload: { playerId, playerName, joinedAt: Date.now(), totalPlayers: this.playerConnections.size },
+			payload: {
+				playerId,
+				playerName,
+				joinedAt: Date.now(),
+				totalPlayers: this.playerConnections.size,
+			},
 		});
+
+		this.stateManager.appendLog(
+			createBattleLogEvent("player_joined", {
+				playerId,
+				playerName,
+				totalPlayers: this.playerConnections.size,
+			})
+		);
 
 		return true;
 	}
 
-	reconnectPlayer(connectionId: string, playerId: string, playerName: string, avatar?: string): boolean {
+	reconnectPlayer(
+		connectionId: string,
+		playerId: string,
+		playerName: string,
+		avatar?: string
+	): boolean {
 		const existingPlayer = this.stateManager.getPlayer(playerId);
 		if (!existingPlayer) return false;
 
 		this.emptiedAt = null;
 
-		const updates: Partial<{ sessionId: string; nickname: string; connected: boolean; avatar: string }> = {
+		const updates: Partial<{
+			sessionId: string;
+			nickname: string;
+			connected: boolean;
+			avatar: string;
+		}> = {
 			sessionId: connectionId,
 			nickname: playerName,
 			connected: true,
@@ -143,22 +174,49 @@ export class Room {
 			payload: { playerId, playerName, reconnectedAt: Date.now() },
 		});
 
+		this.stateManager.appendLog(
+			createBattleLogEvent("player_reconnected", {
+				playerId,
+				playerName,
+			})
+		);
+
 		return true;
 	}
 
 	leavePlayer(playerId: string): boolean {
 		if (!this.playerConnections.has(playerId)) return false;
 
+		const playerState = this.stateManager.getPlayer(playerId);
+		const playerName = playerState?.nickname ?? playerId;
+
 		this.stateManager.removePlayer(playerId);
 		this.playerConnections.delete(playerId);
 		this.playerHistory.delete(playerId);
 
-		this.logger.info("Player left", { playerId, totalPlayers: this.playerConnections.size });
+		this.logger.info("Player left", {
+			playerId,
+			playerName,
+			totalPlayers: this.playerConnections.size,
+		});
 
 		this.callbacks.broadcast({
 			type: "PLAYER_LEFT",
-			payload: { playerId, leftAt: Date.now(), totalPlayers: this.playerConnections.size },
+			payload: {
+				playerId,
+				playerName,
+				leftAt: Date.now(),
+				totalPlayers: this.playerConnections.size,
+			},
 		});
+
+		this.stateManager.appendLog(
+			createBattleLogEvent("player_left", {
+				playerId,
+				playerName,
+				totalPlayers: this.playerConnections.size,
+			})
+		);
 
 		if (this.playerConnections.size === 0) {
 			this.emptiedAt = Date.now();
@@ -170,15 +228,25 @@ export class Room {
 	disconnectPlayer(playerId: string): boolean {
 		if (!this.playerConnections.has(playerId)) return false;
 
+		const playerState = this.stateManager.getPlayer(playerId);
+		const playerName = playerState?.nickname ?? playerId;
+
 		this.stateManager.updatePlayerConnection(playerId, false);
 		this.playerConnections.delete(playerId);
 
-		this.logger.info("Player disconnected (kept in state)", { playerId });
+		this.logger.info("Player disconnected (kept in state)", { playerId, playerName });
 
 		this.callbacks.broadcast({
 			type: "PLAYER_DISCONNECTED",
-			payload: { playerId, disconnectedAt: Date.now() },
+			payload: { playerId, playerName, disconnectedAt: Date.now() },
 		});
+
+		this.stateManager.appendLog(
+			createBattleLogEvent("player_disconnected", {
+				playerId,
+				playerName,
+			})
+		);
 
 		if (this.options.creatorSessionId === playerId && this.playerConnections.size > 0) {
 			this.transferHostOnDisconnect();
@@ -204,12 +272,21 @@ export class Room {
 			this.stateManager.updatePlayer(newHostId, { role: "HOST" });
 		}
 
-		this.logger.info("Host transferred due to disconnect", { newHostId });
+		const newHostName = newHostState?.nickname ?? newHostId;
+		this.logger.info("Host transferred due to disconnect", { newHostId, newHostName });
 
 		this.callbacks.broadcast({
 			type: "HOST_CHANGED",
-			payload: { newHostId, previousHostDisconnected: true },
+			payload: { newHostId, newHostName, previousHostDisconnected: true },
 		});
+
+		this.stateManager.appendLog(
+			createBattleLogEvent("host_changed", {
+				newHostId,
+				newHostName,
+				previousHostDisconnected: true,
+			})
+		);
 	}
 
 	wasPlayerInRoom(playerId: string): boolean {
@@ -239,12 +316,16 @@ export class Room {
 
 	private checkAllPlayersReady(): void {
 		const state = this.stateManager.getState();
-		const playerList = Object.keys(state.players).map(k => state.players[k]);
-		const allReady = playerList.length > 0 && playerList.every(p => p?.isReady);
+		const playerList = Object.keys(state.players).map((k) => state.players[k]);
+		const allReady = playerList.length > 0 && playerList.every((p) => p?.isReady);
 
 		this.callbacks.broadcast({
 			type: "ALL_READY_STATUS",
-			payload: { allReady, playerCount: playerList.length, readyCount: playerList.filter(p => p?.isReady).length },
+			payload: {
+				allReady,
+				playerCount: playerList.length,
+				readyCount: playerList.filter((p) => p?.isReady).length,
+			},
 		});
 	}
 
@@ -260,7 +341,7 @@ export class Room {
 		});
 	}
 
-advancePhase(): void {
+	advancePhase(): void {
 		const state = this.stateManager.getState();
 		const result = executeTurnAdvance(state);
 
@@ -291,7 +372,12 @@ advancePhase(): void {
 		const newState = this.stateManager.getState();
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
-			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
+			payload: {
+				turn: newState.turnCount,
+				activeFaction: newState.activeFaction,
+				phase: newState.phase,
+				changedAt: Date.now(),
+			},
 		});
 	}
 
@@ -321,7 +407,7 @@ advancePhase(): void {
 
 	getPlayers(): any[] {
 		const state = this.stateManager.getState();
-		return Object.keys(state.players).map(k => {
+		return Object.keys(state.players).map((k) => {
 			const player = state.players[k];
 			return {
 				id: player?.sessionId,
@@ -338,7 +424,9 @@ advancePhase(): void {
 		return this.stateManager.getState();
 	}
 
-	get gameState(): GameRoomState { return this.getGameState(); }
+	get gameState(): GameRoomState {
+		return this.getGameState();
+	}
 
 	getPlayerCount(): number {
 		return this.playerConnections.size;
@@ -348,15 +436,25 @@ advancePhase(): void {
 		return this.isActive;
 	}
 
-	get name(): string { return this.options.roomName; }
-	get creatorId(): string { return this.options.creatorSessionId; }
+	get name(): string {
+		return this.options.roomName;
+	}
+	get creatorId(): string {
+		return this.options.creatorSessionId;
+	}
 	set creatorId(value: string) {
 		this.options.creatorSessionId = value;
 		this.stateManager.changeHost(value);
 	}
-	get creatorName(): string { return this.options.creatorName; }
-	get maxPlayers(): number { return this.options.maxPlayers; }
-	get phase(): GamePhase { return this.stateManager.getState().phase; }
+	get creatorName(): string {
+		return this.options.creatorName;
+	}
+	get maxPlayers(): number {
+		return this.options.maxPlayers;
+	}
+	get phase(): GamePhase {
+		return this.stateManager.getState().phase;
+	}
 
 	getCombatTokens(): CombatToken[] {
 		return Object.values(this.stateManager.getState().tokens);
@@ -370,7 +468,15 @@ advancePhase(): void {
 		this.stateManager.updateTokenRuntime(tokenId, updates);
 	}
 
-	addPlayer(playerState: { id: string; sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string }): boolean {
+	addPlayer(playerState: {
+		id: string;
+		sessionId: string;
+		nickname: string;
+		role: "HOST" | "PLAYER";
+		isReady: boolean;
+		connected: boolean;
+		avatar?: string;
+	}): boolean {
 		this.stateManager.addPlayer(playerState.id, playerState);
 		this.playerConnections.set(playerState.id, playerState.sessionId);
 		return true;
@@ -409,22 +515,42 @@ advancePhase(): void {
 					break;
 				case "START_GAME":
 					if (this.stateManager.getState().phase !== GamePhase.DEPLOYMENT) {
-						this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" }, requestId });
+						this.callbacks.sendToPlayer(playerId, {
+							type: "ERROR",
+							payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" },
+							requestId,
+						});
 						return;
 					}
 					this.startGame();
-					this.callbacks.sendToPlayer(playerId, { type: "START_GAME_SUCCESS", payload: { startedAt: Date.now() }, requestId });
+					this.callbacks.sendToPlayer(playerId, {
+						type: "START_GAME_SUCCESS",
+						payload: { startedAt: Date.now() },
+						requestId,
+					});
 					break;
 				case "NEXT_TURN":
 					this.advancePhase();
-					this.callbacks.sendToPlayer(playerId, { type: "NEXT_TURN_SUCCESS", payload: { turn: this.stateManager.getState().turnCount }, requestId });
+					this.callbacks.sendToPlayer(playerId, {
+						type: "NEXT_TURN_SUCCESS",
+						payload: { turn: this.stateManager.getState().turnCount },
+						requestId,
+					});
 					break;
 				default:
-					this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "UNKNOWN_COMMAND", message: "未知命令" }, requestId });
+					this.callbacks.sendToPlayer(playerId, {
+						type: "ERROR",
+						payload: { code: "UNKNOWN_COMMAND", message: "未知命令" },
+						requestId,
+					});
 			}
 		} catch (error) {
 			this.logger.error("Error handling player message", error, { playerId, messageType: type });
-			this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "COMMAND_ERROR", message: "命令处理失败" }, requestId });
+			this.callbacks.sendToPlayer(playerId, {
+				type: "ERROR",
+				payload: { code: "COMMAND_ERROR", message: "命令处理失败" },
+				requestId,
+			});
 		}
 	}
 
@@ -432,7 +558,10 @@ advancePhase(): void {
 		if (!this.isActive) return;
 		this.isActive = false;
 		this.logger.info("Room cleaning up");
-		this.callbacks.broadcast({ type: "ROOM_CLOSED", payload: { reason: "empty", closedAt: Date.now() } });
+		this.callbacks.broadcast({
+			type: "ROOM_CLOSED",
+			payload: { reason: "empty", closedAt: Date.now() },
+		});
 		this.playerConnections.clear();
 	}
 }

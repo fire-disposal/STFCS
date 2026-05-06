@@ -14,8 +14,8 @@
  * - 路径操作（updateToken）不做类型校验，路径错误静默失败
  */
 
-import { create, type Draft, type Patch } from "mutative"
-import type { Server as IOServer, Socket } from "socket.io"
+import { create, type Draft, type Patch } from "mutative";
+import type { Server as IOServer, Socket } from "socket.io";
 import type {
 	GameRoomState,
 	StatePatch,
@@ -26,30 +26,30 @@ import type {
 	TokenSpec,
 	Faction,
 	EditLogContext,
-} from "@vt/data"
-import { TURN_ORDER, GamePhase } from "@vt/data"
+} from "@vt/data";
+import { TURN_ORDER, GamePhase } from "@vt/data";
 
 export interface MutateResult {
-	patches: Patch[]
-	inversePatches: Patch[]
+	patches: Patch[];
+	inversePatches: Patch[];
 }
 
 interface HistoryEntry {
-	patches: Patch[]
-	inversePatches: Patch[]
-	timestamp: number
-	description: string | undefined
+	patches: Patch[];
+	inversePatches: Patch[];
+	timestamp: number;
+	description: string | undefined;
 }
 
 export class MutativeStateManager {
-	private state: GameRoomState
-	private io: IOServer | null = null
-	private roomId: string
-	private history: HistoryEntry[] = []
-	private maxHistoryLength = 50
+	private state: GameRoomState;
+	private io: IOServer | null = null;
+	private roomId: string;
+	private history: HistoryEntry[] = [];
+	private maxHistoryLength = 50;
 
 	constructor(roomId: string, initialState?: GameRoomState) {
-		this.roomId = roomId
+		this.roomId = roomId;
 		this.state = initialState ?? {
 			roomId,
 			ownerId: "",
@@ -60,15 +60,15 @@ export class MutativeStateManager {
 			globalModifiers: {},
 			logs: [],
 			createdAt: Date.now(),
-		}
+		};
 	}
 
 	setIo(io: IOServer): void {
-		this.io = io
+		this.io = io;
 	}
 
 	getState(): GameRoomState {
-		return this.state
+		return this.state;
 	}
 
 	/**
@@ -77,9 +77,9 @@ export class MutativeStateManager {
 	 * 注意：不会生成增量 patches。
 	 */
 	loadSnapshot(snapshot: GameRoomState): void {
-		this.state = structuredClone(snapshot)
-		this.history = []
-		this.broadcastFull()
+		this.state = structuredClone(snapshot);
+		this.history = [];
+		this.broadcastFull();
 	}
 
 	/**
@@ -88,13 +88,15 @@ export class MutativeStateManager {
 	 * @param saveHistory - 是否将操作存入 undo 历史
 	 * @param description - 操作描述（用于 undo 列表显示）
 	 */
-	mutate(mutator: (draft: Draft<GameRoomState>) => void, saveHistory = false, description?: string): MutateResult {
-		const [newState, patches, inversePatches] = create(
-			this.state,
-			mutator,
-			{ enablePatches: true }
-		)
-		this.state = newState
+	mutate(
+		mutator: (draft: Draft<GameRoomState>) => void,
+		saveHistory = false,
+		description?: string
+	): MutateResult {
+		const [newState, patches, inversePatches] = create(this.state, mutator, {
+			enablePatches: true,
+		});
+		this.state = newState;
 
 		if (saveHistory && patches.length > 0) {
 			this.history.push({
@@ -102,20 +104,23 @@ export class MutativeStateManager {
 				inversePatches,
 				timestamp: Date.now(),
 				description,
-			})
+			});
 			if (this.history.length > this.maxHistoryLength) {
-				this.history.shift()
+				this.history.shift();
 			}
 		}
 
-		return { patches, inversePatches }
+		return { patches, inversePatches };
 	}
 
 	/** mutate + 广播 patches */
-	mutateAndBroadcast(mutator: (draft: Draft<GameRoomState>) => void, saveHistory = false): MutateResult {
-		const result = this.mutate(mutator, saveHistory)
-		this.broadcastPatches(result.patches)
-		return result
+	mutateAndBroadcast(
+		mutator: (draft: Draft<GameRoomState>) => void,
+		saveHistory = false
+	): MutateResult {
+		const result = this.mutate(mutator, saveHistory);
+		this.broadcastPatches(result.patches);
+		return result;
 	}
 
 	/** mutate + 广播 patches + 广播编辑日志（用于 DM/编辑操作） */
@@ -124,59 +129,59 @@ export class MutativeStateManager {
 		logContext: EditLogContext,
 		saveHistory = true
 	): MutateResult {
-		const result = this.mutate(mutator, saveHistory, logContext.reason)
+		const result = this.mutate(mutator, saveHistory, logContext.reason);
 
-		this.broadcastPatches(result.patches)
-		this.broadcastEditLogs(result, logContext)
+		this.broadcastPatches(result.patches);
+		this.broadcastEditLogs(result, logContext);
 
-		return result
+		return result;
 	}
 
 	/** 撤销上一次保存了历史的操作 */
 	undo(): boolean {
-		const lastEntry = this.history.pop()
-		if (!lastEntry) return false
+		const lastEntry = this.history.pop();
+		if (!lastEntry) return false;
 
 		const [newState] = create(
 			this.state,
 			(draft) => {
-				this.applyInversePatches(draft, lastEntry.inversePatches)
+				this.applyInversePatches(draft, lastEntry.inversePatches);
 			},
 			{ enablePatches: true }
-		)
-		this.state = newState
-		this.broadcastFull()
-		return true
+		);
+		this.state = newState;
+		this.broadcastFull();
+		return true;
 	}
 
 	/** 广播全量状态 */
 	broadcastFull(): void {
 		if (this.io) {
-			this.io.to(this.roomId).emit("sync:full", this.state)
+			this.io.to(this.roomId).emit("sync:full", this.state);
 		}
 	}
 
 	/** 向特定 socket 发送全量状态（用于新玩家加入） */
 	broadcastToSocket(socket: Socket): void {
-		socket.emit("sync:full", this.state)
+		socket.emit("sync:full", this.state);
 	}
 
 	/** 广播增量 patches */
 	broadcastPatches(patches: Patch[]): void {
-		if (patches.length === 0 || !this.io) return
+		if (patches.length === 0 || !this.io) return;
 
-		const statePatches: StatePatch[] = patches.map(p => ({
-			op: this.patchOpToStateOp(p.op),
+		const statePatches: StatePatch[] = patches.map((p) => ({
+			op: p.op as StatePatch["op"],
 			path: p.path as (string | number)[],
 			value: p.value,
-		}))
+		}));
 
 		const payload: StatePatchPayload = {
 			patches: statePatches,
 			timestamp: Date.now(),
-		}
+		};
 
-		this.io.to(this.roomId).emit("state:patch", payload)
+		this.io.to(this.roomId).emit("state:patch", payload);
 	}
 
 	/**
@@ -184,9 +189,9 @@ export class MutativeStateManager {
 	 */
 	appendLog(entry: BattleLogEvent): void {
 		this.mutateAndBroadcast((draft) => {
-			if (!draft.logs) draft.logs = []
-			draft.logs.push(entry)
-		})
+			if (!draft.logs) draft.logs = [];
+			draft.logs.push(entry);
+		});
 	}
 
 	/**
@@ -194,18 +199,18 @@ export class MutativeStateManager {
 	 * 只记录 tokens/** 下的变更，生成 BattleLogEdit 事件。
 	 */
 	private broadcastEditLogs(result: MutateResult, logContext: EditLogContext): void {
-		if (!this.io) return
+		if (!this.io) return;
 
 		for (const invPatch of result.inversePatches) {
-			const invPath = invPatch.path as (string | number)[]
-			const correspondingPatch = result.patches.find(
-				p => this.pathsEqual((p.path as (string | number)[]), invPath)
-			)
+			const invPath = invPatch.path as (string | number)[];
+			const correspondingPatch = result.patches.find((p) =>
+				this.pathsEqual(p.path as (string | number)[], invPath)
+			);
 
 			if (invPath.length >= 2 && invPath[0] === "tokens") {
-				const tokenId = String(invPath[1])
-				const token = this.state.tokens[tokenId]
-				const pathStr = invPath.slice(2).map(String).join("/")
+				const tokenId = String(invPath[1]);
+				const token = this.state.tokens[tokenId];
+				const pathStr = invPath.slice(2).map(String).join("/");
 
 				const log: BattleLogEvent = {
 					type: "edit",
@@ -220,9 +225,9 @@ export class MutativeStateManager {
 						newValue: correspondingPatch?.value,
 						reason: logContext.reason,
 					},
-				}
+				};
 
-				this.appendLog(log)
+				this.appendLog(log);
 			}
 		}
 	}
@@ -233,22 +238,22 @@ export class MutativeStateManager {
 	 */
 	private applyInversePatches(draft: Draft<GameRoomState>, inversePatches: Patch[]): void {
 		for (const patch of inversePatches.reverse()) {
-			const path = patch.path as (string | number)[]
-			if (path.length === 0) continue
-			const target = this.resolvePath(draft, path.slice(0, -1))
-			const key = path[path.length - 1]
+			const path = patch.path as (string | number)[];
+			if (path.length === 0) continue;
+			const target = this.resolvePath(draft, path.slice(0, -1));
+			const key = path[path.length - 1];
 
-			if (key === undefined) continue
+			if (key === undefined) continue;
 
 			if (patch.op === "add") {
 				// 逆补丁：add → 删除该 key
-				delete target[key]
+				delete target[key];
 			} else if (patch.op === "remove") {
 				// 逆补丁：remove → 恢复旧值
-				target[key] = patch.value
+				target[key] = patch.value;
 			} else if (patch.op === "replace") {
 				// 逆补丁：replace → 恢复旧值
-				target[key] = patch.value
+				target[key] = patch.value;
 			}
 		}
 	}
@@ -256,30 +261,21 @@ export class MutativeStateManager {
 	/** 沿路径解析目标对象 */
 	private resolvePath(obj: any, path: (string | number)[]): any {
 		for (const key of path) {
-			if (obj == null) return obj
-			obj = obj[key]
+			if (obj == null) return obj;
+			obj = obj[key];
 		}
-		return obj
+		return obj;
 	}
 
-	/** Mutative op → StatePatch op 映射 */
-	private patchOpToStateOp(op: string): StatePatch["op"] {
-		switch (op) {
-			case "add": return "add"
-			case "remove": return "remove"
-			case "replace": return "replace"
-			default:
-				throw new Error(`未知 patch 操作: ${op}`)
-		}
-	}
+	/** patchOpToStateOp 已移除 — Mutative 与 StatePatch 的 op 类型一致
 
 	/** 比较两个路径数组是否相等 */
 	private pathsEqual(a: (string | number)[], b: (string | number)[]): boolean {
-		if (a.length !== b.length) return false
+		if (a.length !== b.length) return false;
 		for (let i = 0; i < a.length; i++) {
-			if (a[i] !== b[i]) return false
+			if (a[i] !== b[i]) return false;
 		}
-		return true
+		return true;
 	}
 
 	// ======================================================
@@ -287,11 +283,11 @@ export class MutativeStateManager {
 	// ======================================================
 
 	getToken(tokenId: string): CombatToken | undefined {
-		return this.state.tokens[tokenId]
+		return this.state.tokens[tokenId];
 	}
 
 	getPlayer(playerId: string): GameRoomState["players"][string] | undefined {
-		return this.state.players[playerId]
+		return this.state.players[playerId];
 	}
 
 	/**
@@ -309,7 +305,7 @@ export class MutativeStateManager {
 	setToken(tokenId: string, token: CombatToken, logContext?: EditLogContext): void {
 		const mutator = (draft: Draft<GameRoomState>) => {
 			const spec = token.spec;
-			const existingRuntime = token.runtime ?? {} as TokenRuntime;
+			const existingRuntime = token.runtime ?? ({} as TokenRuntime);
 			const runtime: TokenRuntime = { ...existingRuntime };
 
 			// 资源初始化：满血、满护甲、清空辐能
@@ -318,7 +314,14 @@ export class MutativeStateManager {
 			}
 			if (!runtime.armor || runtime.armor.length !== 6) {
 				const armorMax = Math.round(spec?.armorMaxPerQuadrant ?? 0);
-				runtime.armor = [armorMax, armorMax, armorMax, armorMax, armorMax, armorMax] as [number, number, number, number, number, number];
+				runtime.armor = [armorMax, armorMax, armorMax, armorMax, armorMax, armorMax] as [
+					number,
+					number,
+					number,
+					number,
+					number,
+					number,
+				];
 			}
 			if (runtime.fluxSoft === undefined) runtime.fluxSoft = 0;
 			if (runtime.fluxHard === undefined) runtime.fluxHard = 0;
@@ -383,48 +386,52 @@ export class MutativeStateManager {
 	 * ⚠️ 不做类型校验，路径错误会静默无操作。
 	 */
 	updateToken(tokenId: string, path: string, value: unknown, logContext?: EditLogContext): void {
-		const pathParts = path.split("/").map(p => {
-			const num = Number(p)
-			return Number.isNaN(num) ? p : num
-		})
+		const pathParts = path.split("/").map((p) => {
+			const num = Number(p);
+			return Number.isNaN(num) ? p : num;
+		});
 
 		const mutator = (draft: Draft<GameRoomState>) => {
-			const token = draft.tokens[tokenId]
-			if (!token) return
+			const token = draft.tokens[tokenId];
+			if (!token) return;
 
-			if (pathParts.length === 0) return
-			const target = this.resolvePath(token, pathParts.slice(0, -1))
-			const key = pathParts[pathParts.length - 1]
+			if (pathParts.length === 0) return;
+			const target = this.resolvePath(token, pathParts.slice(0, -1));
+			const key = pathParts[pathParts.length - 1];
 			if (key !== undefined) {
-				target[key] = value
+				target[key] = value;
 			}
-		}
+		};
 
 		if (logContext) {
-			this.mutateWithLog(mutator, logContext)
+			this.mutateWithLog(mutator, logContext);
 		} else {
-			this.mutateAndBroadcast(mutator)
+			this.mutateAndBroadcast(mutator);
 		}
 	}
 
 	/**
 	 * 批量更新 token 运行时字段（带版本保护）。
 	 * 如果 token 的 actionSequence 与 expectedSequence 不匹配，拒绝更新。
-	 * 
+	 *
 	 * @returns true 更新成功, false 版本不匹配（并发冲突）
 	 */
-	updateTokenRuntimeAtomic(tokenId: string, runtimeUpdates: Partial<TokenRuntime>, expectedSequence: number): boolean {
-		let success = false
+	updateTokenRuntimeAtomic(
+		tokenId: string,
+		runtimeUpdates: Partial<TokenRuntime>,
+		expectedSequence: number
+	): boolean {
+		let success = false;
 		this.mutateAndBroadcast((draft) => {
-			const token = draft.tokens[tokenId]
+			const token = draft.tokens[tokenId];
 			if (token?.runtime) {
-				if (token.runtime.actionSequence !== expectedSequence) return
-				token.runtime.actionSequence = expectedSequence + 1
-				Object.assign(token.runtime, runtimeUpdates)
-				success = true
+				if (token.runtime.actionSequence !== expectedSequence) return;
+				token.runtime.actionSequence = expectedSequence + 1;
+				Object.assign(token.runtime, runtimeUpdates);
+				success = true;
 			}
-		})
-		return success
+		});
+		return success;
 	}
 
 	/**
@@ -433,94 +440,104 @@ export class MutativeStateManager {
 	 */
 	updateTokenRuntime(tokenId: string, runtimeUpdates: Partial<TokenRuntime>): void {
 		this.mutateAndBroadcast((draft) => {
-			const token = draft.tokens[tokenId]
+			const token = draft.tokens[tokenId];
 			if (token?.runtime) {
-				const currentSequence = token.runtime.actionSequence ?? 0
-				token.runtime.actionSequence = currentSequence + 1
-				Object.assign(token.runtime, runtimeUpdates)
+				const currentSequence = token.runtime.actionSequence ?? 0;
+				token.runtime.actionSequence = currentSequence + 1;
+				Object.assign(token.runtime, runtimeUpdates);
 			}
-		})
+		});
 	}
 
-	updateTokenSpec(tokenId: string, specUpdates: Partial<TokenSpec>, logContext?: EditLogContext): void {
+	updateTokenSpec(
+		tokenId: string,
+		specUpdates: Partial<TokenSpec>,
+		logContext?: EditLogContext
+	): void {
 		const mutator = (draft: Draft<GameRoomState>) => {
-			const token = draft.tokens[tokenId]
+			const token = draft.tokens[tokenId];
 			if (token?.spec) {
-				Object.assign(token.spec, specUpdates)
+				Object.assign(token.spec, specUpdates);
 			}
-		}
+		};
 
 		if (logContext) {
-			this.mutateWithLog(mutator, logContext)
+			this.mutateWithLog(mutator, logContext);
 		} else {
-			this.mutateAndBroadcast(mutator)
+			this.mutateAndBroadcast(mutator);
 		}
 	}
 
 	removeToken(tokenId: string, logContext?: EditLogContext): void {
 		const mutator = (draft: Draft<GameRoomState>) => {
-			delete draft.tokens[tokenId]
-		}
+			delete draft.tokens[tokenId];
+		};
 
 		if (logContext) {
-			this.mutateWithLog(mutator, logContext)
+			this.mutateWithLog(mutator, logContext);
 		} else {
-			this.mutateAndBroadcast(mutator)
+			this.mutateAndBroadcast(mutator);
 		}
 	}
 
 	clearTokens(): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.tokens = {}
-		})
+			draft.tokens = {};
+		});
 	}
 
-	addPlayer(playerId: string, player: {
-		sessionId: string
-		nickname: string
-		role: "HOST" | "PLAYER"
-		isReady: boolean
-		connected: boolean
-		tokenIds?: string[]
-		avatar?: string
-	}): void {
+	addPlayer(
+		playerId: string,
+		player: {
+			sessionId: string;
+			nickname: string;
+			role: "HOST" | "PLAYER";
+			isReady: boolean;
+			connected: boolean;
+			tokenIds?: string[];
+			avatar?: string;
+		}
+	): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.players[playerId] = player
-		})
+			draft.players[playerId] = player;
+		});
 	}
 
 	removePlayer(playerId: string): void {
 		this.mutateAndBroadcast((draft) => {
-			delete draft.players[playerId]
-		})
+			delete draft.players[playerId];
+		});
 	}
 
-	updatePlayer(playerId: string, updates: Partial<{
-		sessionId: string
-		nickname: string
-		role: "HOST" | "PLAYER"
-		isReady: boolean
-		connected: boolean
-		tokenIds: string[]
-		avatar: string
-		avatarAssetId: string
-		faction: string
-	}>): void {
+	updatePlayer(
+		playerId: string,
+		updates: Partial<{
+			sessionId: string;
+			nickname: string;
+			role: "HOST" | "PLAYER";
+			isReady: boolean;
+			connected: boolean;
+			tokenIds: string[];
+			avatar: string;
+			avatarAssetId: string;
+			faction: string;
+		}>
+	): void {
 		this.mutateAndBroadcast((draft) => {
-			const player = draft.players[playerId]
+			const player = draft.players[playerId];
 			if (player) {
-				Object.assign(player, updates)
+				Object.assign(player, updates);
 			}
-		})
+		});
 	}
 
 	updatePlayerConnection(playerId: string, connected: boolean): void {
 		this.mutateAndBroadcast((draft) => {
-			const player = draft.players[playerId]
+			const player = draft.players[playerId];
 			if (player) {
-				player.connected = connected
+				player.connected = connected;
 			}
-		})
+		});
 	}
 
 	/**
@@ -531,19 +548,19 @@ export class MutativeStateManager {
 	 */
 	changePhase(phase: GamePhase): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.phase = phase
-			draft.activeFaction = this.getFactionForPhase(phase)
-		})
+			draft.phase = phase;
+			draft.activeFaction = this.getFactionForPhase(phase);
+		});
 	}
 
 	resetAllPlayersReady(): void {
 		this.mutateAndBroadcast((draft) => {
 			for (const playerId in draft.players) {
 				if (draft.players[playerId]) {
-					draft.players[playerId].isReady = false
+					draft.players[playerId].isReady = false;
 				}
 			}
-		})
+		});
 	}
 
 	/**
@@ -554,7 +571,10 @@ export class MutativeStateManager {
 	private getFactionForPhase(phase: GamePhase): Faction | undefined {
 		if (phase === GamePhase.PLAYER_ACTION) {
 			// 根据回合数决定当前活跃派系（TURN_ORDER 循环）
-			const factionIndex = (this.state.turnCount - 1) % TURN_ORDER.length;
+			// turnCount=0时使用turnCount=1（部署阶段无回合，首次进入PLAYER_ACTION时视为第1回合）
+			// JS负数取模问题：(-1) % 2 = -1，需先取绝对值
+			const effectiveTurn = Math.max(1, this.state.turnCount);
+			const factionIndex = (effectiveTurn - 1) % TURN_ORDER.length;
 			return TURN_ORDER[factionIndex] as Faction;
 		}
 		return undefined;
@@ -562,52 +582,52 @@ export class MutativeStateManager {
 
 	changeTurn(turn: number): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = turn
-		})
+			draft.turnCount = turn;
+		});
 	}
 
 	changeFaction(faction: Faction): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.activeFaction = faction
-		})
+			draft.activeFaction = faction;
+		});
 	}
 
 	changeHost(newOwnerId: string): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.ownerId = newOwnerId
-		})
+			draft.ownerId = newOwnerId;
+		});
 	}
 
 	setGlobalModifier(key: string, value: number): void {
 		this.mutateAndBroadcast((draft) => {
 			if (!draft.globalModifiers) {
-				draft.globalModifiers = {}
+				draft.globalModifiers = {};
 			}
-			draft.globalModifiers[key] = value
-		})
+			draft.globalModifiers[key] = value;
+		});
 	}
 
 	removeGlobalModifier(key: string): void {
 		this.mutateAndBroadcast((draft) => {
 			if (draft.globalModifiers) {
-				delete draft.globalModifiers[key]
+				delete draft.globalModifiers[key];
 			}
-		})
+		});
 	}
 
 	startGame(): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = 1
-			draft.phase = GamePhase.PLAYER_ACTION
-			draft.activeFaction = TURN_ORDER[0] as Faction
-		})
+			draft.turnCount = 1;
+			draft.phase = GamePhase.PLAYER_ACTION;
+			draft.activeFaction = TURN_ORDER[0] as Faction;
+		});
 	}
 
 	getHistory(): HistoryEntry[] {
-		return [...this.history]
+		return [...this.history];
 	}
 
 	canUndo(): boolean {
-		return this.history.length > 0
+		return this.history.length > 0;
 	}
 }

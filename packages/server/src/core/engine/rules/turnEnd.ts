@@ -153,18 +153,21 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	if (runtime.weapons && runtime.weapons.length > 0) {
 		const spec = token.spec;
 		const weaponsList = runtime.weapons;
-		const updatedWeapons: (WeaponRuntime | undefined)[] = weaponsList.map((w: WeaponRuntime | undefined) => {
-			if (!w) return w;
-			const mount = spec.mounts?.find((m: MountSpec) => m.id === w.mountId);
-			const weaponSpec = mount?.weapon?.spec;
-			if (weaponSpec) {
-				return updateWeaponStateAtTurnEnd(w, weaponSpec);
+		const updatedWeapons: (WeaponRuntime | undefined)[] = weaponsList.map(
+			(w: WeaponRuntime | undefined) => {
+				if (!w) return w;
+				const mount = spec.mounts?.find((m: MountSpec) => m.id === w.mountId);
+				const weaponSpec = mount?.weapon?.spec;
+				if (weaponSpec) {
+					return updateWeaponStateAtTurnEnd(w, weaponSpec);
+				}
+				return updateWeaponStateAtTurnEnd(w);
 			}
-			return updateWeaponStateAtTurnEnd(w);
-		});
+		);
 
 		const hasChanges = updatedWeapons.some(
-			(w: WeaponRuntime | undefined, i: number) => w && weaponsList[i] && w.state !== weaponsList[i]?.state
+			(w: WeaponRuntime | undefined, i: number) =>
+				w && weaponsList[i] && w.state !== weaponsList[i]?.state
 		);
 
 		if (hasChanges) {
@@ -194,9 +197,13 @@ export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokens
 
 		const tokenResult = processTokenTurnEnd(token);
 
-		if (tokenResult.fluxDissipated || tokenResult.overloadEnded ||
-			tokenResult.weaponsUpdated || tokenResult.movementReset ||
-			tokenResult.ventingCleared) {
+		if (
+			tokenResult.fluxDissipated ||
+			tokenResult.overloadEnded ||
+			tokenResult.weaponsUpdated ||
+			tokenResult.movementReset ||
+			tokenResult.ventingCleared
+		) {
 			result.tokensUpdated.push(token.$id);
 		}
 
@@ -243,10 +250,12 @@ export function applyEndTurn(context: EngineContext): EngineResult {
 	if (!context.state.tokens[tokenId]) return { runtimeUpdates: [], events: [] };
 
 	return {
-		runtimeUpdates: [{
-			tokenId,
-			updates: { hasFired: true } as Record<string, unknown>,
-		}],
+		runtimeUpdates: [
+			{
+				tokenId,
+				updates: { hasFired: true } as Record<string, unknown>,
+			},
+		],
 		events: [createEngineEvent("end_turn", tokenId)],
 	};
 }
@@ -258,27 +267,31 @@ export function applyVent(context: EngineContext): EngineResult {
 	if (!ship) return { runtimeUpdates: [], events: [] };
 
 	const runtime = ship.runtime;
-	if (!runtime || runtime.destroyed || runtime.venting || runtime.hasFired) {
+	if (!runtime || runtime.destroyed || runtime.venting || runtime.hasFired || runtime.overloaded) {
 		return { runtimeUpdates: [], events: [] };
 	}
 
 	const fluxCleared = Math.round((runtime.fluxSoft ?? 0) + (runtime.fluxHard ?? 0));
 
 	return {
-		runtimeUpdates: [{
-			tokenId,
-			updates: {
-				fluxSoft: 0,
-				fluxHard: 0,
-				venting: true,
-			} as Record<string, unknown>,
-		}],
-		events: [createEngineEvent("vent", tokenId, {
-			tokenId,
-			tokenName: ship.metadata?.name ?? tokenId,
-			fluxCleared,
-			fluxSoftBefore: Math.round(runtime.fluxSoft ?? 0),
-			fluxHardBefore: Math.round(runtime.fluxHard ?? 0),
-		})],
+		runtimeUpdates: [
+			{
+				tokenId,
+				updates: {
+					fluxSoft: 0,
+					fluxHard: 0,
+					venting: true,
+				} as Record<string, unknown>,
+			},
+		],
+		events: [
+			createEngineEvent("vent", tokenId, {
+				tokenId,
+				tokenName: ship.metadata?.name ?? tokenId,
+				fluxCleared,
+				fluxSoftBefore: Math.round(runtime.fluxSoft ?? 0),
+				fluxHardBefore: Math.round(runtime.fluxHard ?? 0),
+			}),
+		],
 	};
 }

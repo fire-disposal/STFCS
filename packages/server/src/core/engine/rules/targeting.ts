@@ -5,7 +5,12 @@
  * 基于 @vt/data 权威 schema 设计
  */
 
-import { distanceBetween, angleBetween, normalizeAngleSigned, getMountWorldPosition, mountOffsetToScreen } from "@vt/data";
+import {
+	distanceBetween,
+	angleBetween,
+	normalizeAngleSigned,
+	getMountWorldPosition,
+} from "@vt/data";
 import { type CombatToken, type MountSpec, type WeaponRuntime, type WeaponSpec } from "@vt/data";
 
 /**
@@ -141,9 +146,7 @@ export function calculateShipWeaponTargets(
 	}
 
 	for (const mount of spec.mounts) {
-		const weaponRuntime = runtime?.weapons?.find(
-			(w) => w.mountId === mount.id
-		);
+		const weaponRuntime = runtime?.weapons?.find((w) => w.mountId === mount.id);
 
 		if (!weaponRuntime) {
 			continue;
@@ -185,11 +188,9 @@ function calculateWeaponTargets(
 	const mountOffset = mount.position || { x: 0, y: 0 };
 	const attackerPos = attacker.runtime?.position || { x: 0, y: 0 };
 	const attackerHeading = attacker.runtime?.heading || 0;
-	// 使用 mountOffsetToScreen 取反偏移后计算挂载点世界坐标
-	// getMountWorldPosition 将 offsetY 视为屏幕 +Y 向下，
-	// 但挂载点数据中 offsetY 正值为船头方向（航海北），需要取反
-	const mountScreenOffset = mountOffsetToScreen(mountOffset);
-	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountScreenOffset);
+	// getMountWorldPosition 接受 (右舷=+X, 船头=+Y) 坐标，
+	// 与挂载点数据格式一致，直接传入无需转换
+	const mountWorldPos = getMountWorldPosition(attackerPos, attackerHeading, mountOffset);
 
 	const arc = mount.arc;
 
@@ -271,10 +272,7 @@ function calculateWeaponTargets(
 
 		let inArc = true;
 		if (arc < 360) {
-			const targetAngle = angleBetween(
-				mountWorldPos,
-				target.runtime?.position ?? { x: 0, y: 0 }
-			);
+			const targetAngle = angleBetween(mountWorldPos, target.runtime?.position ?? { x: 0, y: 0 });
 			const heading = attacker.runtime?.heading || 0;
 			const weaponFacing = heading + mountFacing;
 			const relativeAngle = normalizeAngleSigned(targetAngle - weaponFacing);
@@ -282,11 +280,8 @@ function calculateWeaponTargets(
 		}
 
 		// 计算命中角度和护甲象限
-		const hitAngle = angleBetween(
-			mountWorldPos,
-			target.runtime?.position ?? { x: 0, y: 0 }
-		);
-		const relativeAngle = ((hitAngle - (target.runtime?.heading || 0) + 360) % 360);
+		const hitAngle = angleBetween(mountWorldPos, target.runtime?.position ?? { x: 0, y: 0 });
+		const relativeAngle = (hitAngle - (target.runtime?.heading || 0) + 360) % 360;
 		const targetQuadrant = Math.floor(relativeAngle / 60) % 6;
 
 		const targetInfo: WeaponTargetInfo = {
@@ -303,7 +298,7 @@ function calculateWeaponTargets(
 	}
 
 	// 检查是否有真正可行的目标（在射程内且在射界内）
-	const hasValidTargets = result.validTargets.some(t => t.inRange && t.inArc);
+	const hasValidTargets = result.validTargets.some((t) => t.inRange && t.inArc);
 
 	if (!hasValidTargets) {
 		result.isAvailable = false;
@@ -371,9 +366,7 @@ export function validateAttackAllocations(
 			continue;
 		}
 
-		const weaponRuntime = attacker.runtime?.weapons?.find(
-			(w) => w.mountId === allocation.mountId
-		);
+		const weaponRuntime = attacker.runtime?.weapons?.find((w) => w.mountId === allocation.mountId);
 		if (!weaponRuntime) {
 			result.valid = false;
 			result.errors.push(`No weapon on mount: ${allocation.mountId}`);
@@ -419,18 +412,14 @@ export function validateAttackAllocations(
 		// 检查多目标限制
 		if (!weaponSpec.allowsMultipleTargets && allocation.targets.length > 1) {
 			result.valid = false;
-			result.errors.push(
-				`Weapon ${allocation.mountId} does not allow multiple targets`
-			);
+			result.errors.push(`Weapon ${allocation.mountId} does not allow multiple targets`);
 			continue;
 		}
 
 		// 检查目标数量限制（单目标武器只能选1个）
 		if (!weaponSpec.allowsMultipleTargets && allocation.targets.length !== 1) {
 			result.valid = false;
-			result.errors.push(
-				`Single-target weapon ${allocation.mountId} must select exactly 1 target`
-			);
+			result.errors.push(`Single-target weapon ${allocation.mountId} must select exactly 1 target`);
 			continue;
 		}
 	}

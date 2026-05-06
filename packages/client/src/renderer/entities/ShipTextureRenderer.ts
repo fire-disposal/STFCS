@@ -58,7 +58,12 @@ export function useShipTextureRendering(
 
 			const texture = textureCache.get(assetId);
 			if (!texture) {
-				console.log("[ShipTextureRenderer] Texture not loaded for:", assetId, "cache keys:", Array.from(textureCache.keys()));
+				console.log(
+					"[ShipTextureRenderer] Texture not loaded for:",
+					assetId,
+					"cache keys:",
+					Array.from(textureCache.keys())
+				);
 				continue;
 			}
 
@@ -68,13 +73,19 @@ export function useShipTextureRendering(
 
 			// 与 ShipRenderer 保持一致：rotation = heading * π/180
 			const headingRad = (ship.runtime.heading * Math.PI) / 180;
-			
-			// 贴图偏移坐标系：
-			// offsetX：左舷为正（heading=0时指向屏幕左侧）
-			// offsetY：船头为正（heading=0时指向屏幕上方）
-			// offset 需要根据舰船朝向旋转到世界坐标系
-			const worldX = ship.runtime.position.x - offsetX * Math.cos(headingRad) + offsetY * Math.sin(headingRad);
-			const worldY = ship.runtime.position.y - offsetX * Math.sin(headingRad) - offsetY * Math.cos(headingRad);
+
+			// 贴图偏移坐标系（同 mountOffsetToScreen 约定）：
+			// offsetX 正值 = 右舷（heading=0时指向屏幕右侧 +X）
+			// offsetY 正值 = 船头（heading=0时指向屏幕上方 -Y）
+			// 旋转公式（与 getMountWorldPosition 一致）：
+			//   worldX = shipX + offsetX*cos + offsetY*sin
+			//   worldY = shipY + offsetX*sin - offsetY*cos
+			// 验证 heading=0°：worldX = shipX + offsetX（正=右舷 ✓）
+			//                worldY = shipY - offsetY（正=船头=向上 ✓）
+			const cos = Math.cos(headingRad);
+			const sin = Math.sin(headingRad);
+			const worldX = ship.runtime.position.x + offsetX * cos + offsetY * sin;
+			const worldY = ship.runtime.position.y + offsetX * sin - offsetY * cos;
 
 			const cached = cache.get(ship.$id);
 

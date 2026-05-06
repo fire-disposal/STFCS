@@ -9,7 +9,7 @@
  */
 
 import { io, Socket } from "socket.io-client";
-import { create } from "mutative";
+import { apply as applyMutativePatches } from "mutative";
 import type {
 	WsEventName,
 	WsPayload,
@@ -19,7 +19,6 @@ import type {
 	CombatToken,
 	WeaponJSON,
 	GameRoomState,
-	StatePatch,
 	StatePatchPayload,
 } from "@vt/data";
 
@@ -58,7 +57,14 @@ export class SocketNetworkManager {
 	private playerName: string | null = null;
 	private currentRoomId: string | null = null;
 	private gameState: GameRoomState | null = null;
-	private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timeout: ReturnType<typeof setTimeout> }> = new Map();
+	private pendingRequests: Map<
+		string,
+		{
+			resolve: (value: unknown) => void;
+			reject: (reason: Error) => void;
+			timeout: ReturnType<typeof setTimeout>;
+		}
+	> = new Map();
 	private stateListeners: Set<StateChangeListener> = new Set();
 
 	constructor(serverUrl: string) {
@@ -141,7 +147,11 @@ export class SocketNetworkManager {
 		}
 	}
 
-	async getProfile(): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
+	async getProfile(): Promise<{
+		success: boolean;
+		profile?: { nickname: string; avatar: string | null };
+		error?: string;
+	}> {
 		try {
 			const data = await this.request("profile:get", {});
 			return { success: true, profile: data.profile };
@@ -150,7 +160,11 @@ export class SocketNetworkManager {
 		}
 	}
 
-	async updateProfile(profile: { nickname?: string; avatar?: string }): Promise<{ success: boolean; profile?: { nickname: string; avatar: string | null }; error?: string }> {
+	async updateProfile(profile: { nickname?: string; avatar?: string }): Promise<{
+		success: boolean;
+		profile?: { nickname: string; avatar: string | null };
+		error?: string;
+	}> {
 		try {
 			const data = await this.request("profile:update", profile);
 			return { success: true, profile: data.profile };
@@ -180,7 +194,10 @@ export class SocketNetworkManager {
 
 	async createRoom(options: { roomName: string; maxPlayers?: number }): Promise<RoomJoinResult> {
 		try {
-			const data = await this.request("room:create", { name: options.roomName, maxPlayers: options.maxPlayers ?? 4 });
+			const data = await this.request("room:create", {
+				name: options.roomName,
+				maxPlayers: options.maxPlayers ?? 4,
+			});
 			logger.info("Room created", { roomId: data.roomId });
 			return { success: true, roomId: data.roomId };
 		} catch (error) {
@@ -234,7 +251,9 @@ export class SocketNetworkManager {
 		if (!this.currentRoomId) return;
 		try {
 			await this.request("room:leave", {});
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 		this.currentRoomId = null;
 		this.setGameState(null);
 	}
@@ -242,25 +261,33 @@ export class SocketNetworkManager {
 	async setReady(): Promise<void> {
 		try {
 			await this.request("room:action", { action: "ready" });
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async startGame(): Promise<void> {
 		try {
 			await this.request("room:action", { action: "start" });
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async kickPlayer(targetId: string): Promise<void> {
 		try {
 			await this.request("room:action", { action: "kick", targetId });
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async transferHost(targetId: string): Promise<void> {
 		try {
 			await this.request("room:action", { action: "transfer_host", targetId });
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async deleteRoom(roomId: string): Promise<{ success: boolean; error?: string }> {
@@ -278,12 +305,24 @@ export class SocketNetworkManager {
 		return `${window.location.origin}/join/${roomId}`;
 	}
 
-	getPlayerId(): string | null { return this.playerId; }
-	getPlayerName(): string | null { return this.playerName; }
-	getCurrentRoomId(): string | null { return this.currentRoomId; }
-	getGameState(): GameRoomState | null { return this.gameState; }
-	getSocket(): Socket | null { return this.socket; }
-	isConnected(): boolean { return this.socket?.connected ?? false; }
+	getPlayerId(): string | null {
+		return this.playerId;
+	}
+	getPlayerName(): string | null {
+		return this.playerName;
+	}
+	getCurrentRoomId(): string | null {
+		return this.currentRoomId;
+	}
+	getGameState(): GameRoomState | null {
+		return this.gameState;
+	}
+	getSocket(): Socket | null {
+		return this.socket;
+	}
+	isConnected(): boolean {
+		return this.socket?.connected ?? false;
+	}
 
 	subscribeState(listener: StateChangeListener): () => void {
 		this.stateListeners.add(listener);
@@ -292,7 +331,7 @@ export class SocketNetworkManager {
 
 	disconnect(): void {
 		if (this.socket) {
-			this.pendingRequests.forEach(p => {
+			this.pendingRequests.forEach((p) => {
 				clearTimeout(p.timeout);
 				p.reject(new Error("Disconnected"));
 			});
@@ -308,7 +347,7 @@ export class SocketNetworkManager {
 
 	private setGameState(state: GameRoomState | null): void {
 		this.gameState = state;
-		this.stateListeners.forEach(listener => listener(state));
+		this.stateListeners.forEach((listener) => listener(state));
 	}
 
 	private wasInRoom = false;
@@ -366,66 +405,14 @@ export class SocketNetworkManager {
 
 		this.socket.on("state:patch", (data: StatePatchPayload) => {
 			if (!this.gameState) return;
-			// 使用 Mutative create() 生成新引用，确保 Zustand Object.is() 检测到变化
-			const nextState = create(this.gameState, (draft) => {
-				this.applyPatchesToDraft(draft, data.patches);
-			});
+			// 使用 Mutative 的 apply() 应用 patches 并产生新引用
+			// 替代自定义 applyPatchesToDraft — 与服务端 patch 生成使用同一库
+			// patches 来自服务端 Mutative.create() 生成，格式与 mutative.apply() 兼容
+			// 唯一差异：Mutative.Patch.path 允许 string，但服务端始终发送 (string|number)[]
+			// 运行时安全，as any 消除类型不匹配
+			const nextState = applyMutativePatches(this.gameState, data.patches as any);
 			this.setGameState(nextState);
 		});
-	}
-
-	/**
-	 * 通用 JSON Patch (RFC 6902) 应用器
-	 *
-	 * 递归遍历 patch.path，在 target 对象上执行 add/remove/replace 操作。
-	 * 支持任意深度的嵌套路径，无需为每个顶层字段编写分支。
-	 *
-	 * 路径约定：
-	 * - path=["tokens", "id"] op="add" → 在 tokens 字典中添加条目
-	 * - path=["tokens", "id", "runtime", "heading"] op="replace" → 替换嵌套字段
-	 * - path=["phase"] op="replace" → 替换顶层标量字段
-	 * - path=["players", "id"] op="remove" → 删除字典条目
-	 */
-	/**
-	 * 对 draft 对象应用 patches（用于 Mutative produce 回调内部）
-	 * 与旧的 applyPatches 不同：它不依赖 this.gameState，直接操作传入的 target
-	 */
-	private applyPatchesToDraft(target: any, patches: StatePatch[]): void {
-		for (const patch of patches) {
-			if (patch.path.length === 0) continue;
-			this.applyPatchAt(target, patch.path, patch);
-		}
-	}
-
-	/**
-	 * 在 target 对象的 path 位置执行 patch 操作。
-	 * 递归直到 path 耗尽（叶子节点），然后执行 add/replace/remove。
-	 *
-	 * BUGFIX: remove 操作在非叶子路径上同样需要递归到叶子节点，
-	 * 而非只删除第一级子节点。
-	 * 原 Bug：path=["tokens","id","runtime","heading"], op="remove"
-	 * 错误行为：删除 target["tokens"]["id"]（整个 token）
-	 * 正确行为：递归删除 target["tokens"]["id"]["runtime"]["heading"]
-	 */
-	private applyPatchAt(target: any, path: (string | number)[], patch: StatePatch): void {
-		const [key, ...rest] = path;
-
-		if (rest.length === 0) {
-			// 叶子节点：直接执行操作
-			if (patch.op === "remove") {
-				delete target[key];
-			} else {
-				// add / replace 统一处理
-				target[key] = patch.value;
-			}
-			return;
-		}
-
-		// 非叶子节点：确保中间对象存在后递归
-		if (!target[key]) target[key] = {};
-
-		// 统一递归到叶子节点（add/replace/remove 都需要递归到叶子）
-		this.applyPatchAt(target[key], rest, patch);
 	}
 
 	private async attemptRejoinRoom(): Promise<void> {
@@ -460,10 +447,15 @@ export class SocketNetworkManager {
 		this.emitGlobalNotification("error", "重连失败，请刷新页面");
 	}
 
-	private emitGlobalNotification(type: "success" | "error" | "warning" | "info", message: string): void {
-		window.dispatchEvent(new CustomEvent("stfcs-notification", {
-			detail: { type, message, duration: 3000 }
-		}));
+	private emitGlobalNotification(
+		type: "success" | "error" | "warning" | "info",
+		message: string
+	): void {
+		window.dispatchEvent(
+			new CustomEvent("stfcs-notification", {
+				detail: { type, message, duration: 3000 },
+			})
+		);
 	}
 }
 

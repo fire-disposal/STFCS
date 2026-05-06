@@ -552,10 +552,38 @@ export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 // 战斗日志
 // ============================================================
 
+/**
+ * 富文本片段 - 用于战斗日志的格式化文本
+ * 每个片段可独立设置颜色、加粗、大小等属性
+ */
+export const RichTextSegmentSchema = z.object({
+	text: z.string(),
+	color: z.string().optional(),
+	bold: z.boolean().optional(),
+	italic: z.boolean().optional(),
+	size: z.enum(["xs", "sm", "md", "lg"]).optional(),
+	tag: z.string().optional(), // 语义标签: "ship_name", "weapon_name", "damage", "faction", "system" 等
+});
+export type RichTextSegment = z.infer<typeof RichTextSegmentSchema>;
+
+/**
+ * 战斗日志事件
+ *
+ * 设计原则：
+ * 1. type - 事件类型标识（用于渲染器匹配和过滤）
+ * 2. data - 结构化数据（机器可读，用于查询/统计）
+ * 3. richText - 可选的人类可读格式化文本（着色、加粗）
+ * 4. timestamp - 时间戳
+ *
+ * 渲染优先级：
+ * - 有 richText → 使用 richText 渲染（着色富文本）
+ * - 无 richText → 使用 type + data 渲染（兼容旧格式）
+ */
 export const BattleLogEventSchema = z.object({
   type: z.string(),
   timestamp: z.number(),
   data: z.record(z.string(), z.unknown()).default({}),
+  richText: z.array(RichTextSegmentSchema).optional(),
 })
 export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>
 

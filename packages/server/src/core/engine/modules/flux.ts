@@ -42,6 +42,7 @@ export function canVent(ship: CombatToken): { canVent: boolean; reason?: string 
 	if (runtime.destroyed) return { canVent: false, reason: "Ship is destroyed" };
 	if (runtime.venting) return { canVent: false, reason: "Already venting this turn" };
 	if (runtime.hasFired) return { canVent: false, reason: "Cannot vent after firing weapons" };
+	if (runtime.overloaded) return { canVent: false, reason: "Cannot vent while overloaded" };
 	return { canVent: true };
 }
 

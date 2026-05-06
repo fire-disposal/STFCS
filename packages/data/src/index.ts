@@ -56,6 +56,10 @@ export {
   createPatchPayload,
   createBattleLogEvent,
   createBattleLogEdit,
+  GAME_ACTION_NAMES,
+  segment,
+  LOG_COLORS,
+  RichTextSegmentSchema,
 } from "./core/index.js"
 
 export type {
@@ -78,6 +82,7 @@ export type {
   SaveActionPayload,
   AssetActionPayload,
   GameActionPayload,
+  GameActionName,
   GameQueryPayload,
   EditTokenPayload,
   EditRoomPayload,
@@ -87,6 +92,7 @@ export type {
   StatePatchPayload,
   BattleLogEvent,
   BattleLogPayload,
+  RichTextSegment,
   EditLogContext,
 } from "./core/index.js"
 

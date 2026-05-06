@@ -19,7 +19,7 @@ import {
   AssetListItemSchema,
   BattleLogEventSchema,
 } from "./GameSchemas.js"
-import type { BattleLogEvent } from "./GameSchemas.js"
+import type { BattleLogEvent, RichTextSegment } from "./GameSchemas.js"
 
 export const WsRequestSchema = z.object({
   requestId: z.string(),
@@ -322,9 +322,24 @@ export const PresetGetWeaponDef = {
 // game 命名空间
 // ============================================================
 
+/**
+ * 游戏 Action 名称枚举 — 单一起源
+ * 同时用于：
+ * 1. Zod schema 验证（网络层）
+ * 2. 服务端 ACTION_HANDLERS 类型约束
+ * 3. 客户端可用 action 类型
+ */
+export const GAME_ACTION_NAMES = [
+  "move", "rotate", "attack", "deviation",
+  "shield_toggle", "shield_rotate", "vent",
+  "end_turn", "advance_phase",
+] as const;
+
+export type GameActionName = typeof GAME_ACTION_NAMES[number];
+
 export const GameActionDef = {
   payload: z.object({
-    action: z.enum(["move", "rotate", "attack", "deviation", "shield_toggle", "shield_rotate", "vent", "end_turn", "advance_phase"]),
+    action: z.enum(GAME_ACTION_NAMES),
     tokenId: z.string(),
     forward: z.number().optional(),
     strafe: z.number().optional(),
@@ -530,14 +545,71 @@ export function createPatchPayload(patches: StatePatch[]): StatePatchPayload {
   return { patches, timestamp: Date.now() }
 }
 
+// ============================================================
 // BattleLog 工具函数
+// ============================================================
+
+/**
+ * 创建战斗日志事件。
+ * @param type 事件类型
+ * @param data 结构化数据
+ * @param timestamp 时间戳（默认当前时间）
+ * @param richText 可选富文本片段数组
+ */
 export function createBattleLogEvent(
   type: string,
   data: Record<string, unknown> = {},
-  timestamp?: number
+  timestamp?: number,
+  richText?: RichTextSegment[]
 ): BattleLogEvent {
-  return { type, data, timestamp: timestamp ?? Date.now() }
+  const event: BattleLogEvent = { type, data, timestamp: timestamp ?? Date.now() }
+  if (richText && richText.length > 0) {
+    event.richText = richText
+  }
+  return event
 }
+
+/**
+ * 创建一个纯文本段的便捷函数
+ */
+export function segment(text: string, options?: { color?: string; bold?: boolean; italic?: boolean; size?: "xs" | "sm" | "md" | "lg"; tag?: string }): RichTextSegment {
+  const s: RichTextSegment = { text }
+  if (options?.color) s.color = options.color
+  if (options?.bold) s.bold = options.bold
+  if (options?.italic) s.italic = options.italic
+  if (options?.size) s.size = options.size
+  if (options?.tag) s.tag = options.tag
+  return s
+}
+
+// ============================================================
+// 预设颜色常量
+// ============================================================
+
+export const LOG_COLORS = {
+  ATTACK: "#e74c3c",
+  ATTACK_ACCENT: "#ff6b6b",
+  DEVIATION: "#f39c12",
+  MOVE: "#3498db",
+  SHIELD: "#2ecc71",
+  SHIELD_ACCENT: "#27ae60",
+  VENT: "#f1c40f",
+  OVERLOAD: "#e74c3c",
+  OVERLOAD_ACCENT: "#ff4444",
+  DESTROYED: "#c0392b",
+  PHASE: "#9b59b6",
+  FACTION: "#9b59b6",
+  SYSTEM: "#4fc3ff",
+  SYSTEM_ACCENT: "#6b8aaa",
+  EDIT: "#6b8aaa",
+  DEPLOY: "#4fc3ff",
+  PLAYER: "#4fc3ff",
+  SHIP_NAME: "#ffffff",
+  FACTION_PA: "#4a9eff",
+  FACTION_FG: "#ff4a4a",
+  GRAY: "#667788",
+  WHITE: "#ffffff",
+} as const
 
 /** @deprecated 使用 createBattleLogEvent */
 export function createBattleLogEdit(
@@ -554,3 +626,5 @@ export function createBattleLogEdit(
     playerId, playerName, tokenId, tokenName, path, oldValue, newValue, reason,
   })
 }
+
+export type { RichTextSegment } from "./GameSchemas.js"

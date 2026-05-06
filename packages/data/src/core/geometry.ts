@@ -117,11 +117,16 @@ export function mathToNautical(mathAngle: number): number {
  * - heading=0°（船头向上）：mount在(offsetX, -offsetY)
  * - heading=90°（船头向右）：mount在(offsetY, offsetX)
  * 
- * 世界坐标：
- * worldX = shipX + offsetX*cos(heading) - offsetY*sin(heading)
- * worldY = shipY + offsetX*sin(heading) + offsetY*cos(heading)
+ * 世界坐标（屏幕坐标系）：
+ * worldX = shipX + offsetX*cos(heading) + offsetY*sin(heading)
+ * worldY = shipY + offsetX*sin(heading) - offsetY*cos(heading)
  * 
- * 注意：屏幕Y向下，所以船头(offsetY正)对应屏幕Y减小
+ * 验证 heading=0°（cos=1, sin=0）：
+ *   worldX = shipX + offsetX （正=右舷=屏幕右侧 ✓）
+ *   worldY = shipY - offsetY （正=船头=屏幕上方 ✓）
+ * 验证 heading=90°（cos=0, sin=1）：
+ *   worldX = shipX + offsetY （正=船头=右侧 ✓）
+ *   worldY = shipY + offsetX （正=右舷=下方 ✓）
  */
 export function getMountWorldPosition(
 	shipPos: Point,
@@ -133,8 +138,8 @@ export function getMountWorldPosition(
 	const sin = Math.sin(rad);
 
 	return {
-		x: shipPos.x + mountOffset.x * cos - mountOffset.y * sin,
-		y: shipPos.y + mountOffset.x * sin + mountOffset.y * cos
+		x: shipPos.x + mountOffset.x * cos + mountOffset.y * sin,
+		y: shipPos.y + mountOffset.x * sin - mountOffset.y * cos
 	};
 }
 
@@ -240,22 +245,23 @@ export function nauticalToPixiSectorRotation(nauticalAngle: number): number {
  * 挂载点偏移 → PixiJS 局部坐标偏移
  *
  * 挂载点偏移坐标系（航海坐标系）：
- * - offsetX 正值 = 左舷（heading=0时指向屏幕左侧 -X）
+ * - offsetX 正值 = 右舷（heading=0时指向屏幕右侧 +X）
  * - offsetY 正值 = 船头（heading=0时指向屏幕上方 -Y）
  *
  * PixiJS 局部坐标系：
  * - X向右为正
  * - Y向下为正
  *
- * 转换：取负（左舷/船头为正 → PixiJS 中取反）
+ * 转换：仅取反 Y（船头/屏幕上方为正 → PixiJS Y向下为正）
+ *       X 不变（右舷/屏幕右侧 X 方向一致）
  *
  * @example
- * const screenOffset = mountOffsetToScreen(mount.position);
- * // screenOffset.x = -mount.position.x
- * // screenOffset.y = -mount.position.y
+ * const screenOffset = mountOffsetToScreen({ x: -40, y: 55 });
+ * // screenOffset = { x: -40, y: -55 }
+ * // 左舷前方挂载点 → PixiJS 左上方（屏幕左侧 + 上方）
  */
 export function mountOffsetToScreen(mountOffset: Point): Point {
-	return { x: -mountOffset.x, y: -mountOffset.y };
+	return { x: mountOffset.x, y: -mountOffset.y };
 }
 
 /**
