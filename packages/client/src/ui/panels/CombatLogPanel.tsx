@@ -1,23 +1,14 @@
 /**
  * CombatLogPanel - 战斗日志面板
  *
- * 后端只存纯结构化数据（type + data + timestamp），
- * 前端按 event type 匹配规则自动着色/格式化。
- *
- * 渲染原则：
- * - 使用语义 CSS 类名，颜色在 combat-log.css 集中管理
- * - 伤害计算过程用不同颜色标注每步结果：
- *   · 伤害类型标签 = 小字着色徽标
- *   · 总伤害 = 亮白粗体
- *   · 护甲损伤 = 橙色
- *   · 结构损伤 = 红色粗体
- *   · 护盾辐能 = 绿色
- *   · 距离 = 暗灰小字
- *   · 未穿透 = 灰色斜体
- * - 纯文本导出 formatLogLine() 保持相同信息密度
+ * 特性：
+ * - 类型筛选栏（7 类 + 全部）
+ * - 筛选后自动滚顶 + 计数更新
+ * - 导出 TXT 限当前筛选结果
+ * - 重新挂载时保持筛选（组件内状态）
  */
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Flex, Box, IconButton, Tooltip } from "@radix-ui/themes";
 import { Download } from "lucide-react";
 import { useGameLogs, useGameTokens } from "@/state/stores/gameStore";
@@ -25,7 +16,70 @@ import { LOG_COLORS } from "@vt/data";
 import type { BattleLogEvent } from "@vt/data";
 import "./combat-log.css";
 
-// ==================== 工具函数 ====================
+// ══════════════════════════════════════════════════════
+//  筛选
+// ══════════════════════════════════════════════════════
+
+type LogFilterId =
+	| "all"
+	| "combat"
+	| "movement"
+	| "shield"
+	| "flux"
+	| "deploy"
+	| "player"
+	| "admin";
+
+interface FilterCategory {
+	id: LogFilterId;
+	label: string;
+	types: string[];
+}
+
+const FILTERS: FilterCategory[] = [
+	{ id: "all", label: "全部", types: [] },
+	{
+		id: "combat",
+		label: "战斗",
+		types: ["attack", "deviation", "destroyed", "overload", "overloaded", "overload_end"],
+	},
+	{ id: "movement", label: "移动", types: ["move", "rotate", "advance_phase", "end_turn"] },
+	{ id: "shield", label: "护盾", types: ["shield_toggle", "shield_rotate"] },
+	{ id: "flux", label: "辐能", types: ["vent", "flux_settlement"] },
+	{ id: "deploy", label: "部署", types: ["deploy"] },
+	{
+		id: "player",
+		label: "玩家",
+		types: [
+			"player_joined",
+			"player_left",
+			"player_disconnected",
+			"player_reconnected",
+			"host_changed",
+			"kick",
+		],
+	},
+	{
+		id: "admin",
+		label: "管理",
+		types: ["game_started", "faction_change", "game_reload", "edit", "room_edit", "system"],
+	},
+];
+
+/** 筛选函数 */
+function applyFilter(
+	logs: readonly BattleLogEvent[],
+	filter: LogFilterId
+): readonly BattleLogEvent[] {
+	if (filter === "all") return logs;
+	const cat = FILTERS.find((f) => f.id === filter);
+	if (!cat) return logs;
+	return logs.filter((l) => cat.types.includes(l.type));
+}
+
+// ══════════════════════════════════════════════════════
+//  工具函数
+// ══════════════════════════════════════════════════════
 
 function formatTime(ts: number): string {
 	const d = new Date(ts);
@@ -49,8 +103,6 @@ const FACTION_COLORS: Record<string, string> = {
 	PLAYER_ALLIANCE: LOG_COLORS.FACTION_PA,
 	FATE_GRIP: LOG_COLORS.FACTION_FG,
 };
-
-/** 伤害类型 → 中文 */
 const DMG_TYPE_LABELS: Record<string, string> = {
 	KINETIC: "动能",
 	HIGH_EXPLOSIVE: "高爆",
@@ -58,7 +110,29 @@ const DMG_TYPE_LABELS: Record<string, string> = {
 	FRAGMENTATION: "破片",
 };
 
-// ==================== 纯文本导出 ====================
+// ══════════════════════════════════════════════════════
+//  着色辅助组件
+// ══════════════════════════════════════════════════════
+
+const Val: React.FC<{ cls: string; v?: number; unit?: string; prefix?: string }> = ({
+	cls,
+	v,
+	unit,
+	prefix,
+}) => {
+	if (v === undefined || v === 0) return null;
+	return (
+		<span className={cls}>
+			{prefix}
+			{v}
+			{unit}
+		</span>
+	);
+};
+
+// ══════════════════════════════════════════════════════
+//  TXT 导出
+// ══════════════════════════════════════════════════════
 
 function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string {
 	const t = formatTimeFull(log.timestamp);
@@ -66,19 +140,16 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 	const s = (k: string, fb = ""): string => (d[k] as string | undefined) ?? fb;
 	const n = (k: string): number | undefined => d[k] as number | undefined;
 	const p = `[${t}]`;
-
 	switch (log.type) {
 		case "attack": {
 			const w = s("weaponName") || getTokenName(tokens, s("attackerId"));
 			const tg = s("targetName") || getTokenName(tokens, s("targetId"));
 			const dt = DMG_TYPE_LABELS[s("damageType")] || s("damageType");
-			const dist = n("distance");
-			const dmg = n("finalDamage") ?? n("hitDamage");
+			let l = `${p} ${w} → ${tg} [${dt}] ${n("distance")}u ${n("finalDamage") ?? n("hitDamage")}伤`;
 			const armor = n("armorDamage");
 			const aq = n("armorQuadrant");
 			const hull = n("hullDamage");
 			const sf = n("fluxGenerated");
-			let l = `${p} ${w} → ${tg} [${dt}] ${dist}u ${dmg}伤`;
 			if (armor && armor > 0) l += ` 装甲-${armor}(Q${aq})`;
 			if (hull && hull > 0) l += ` 结构-${hull}`;
 			else l += ` 未击穿`;
@@ -116,8 +187,7 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 			return `${p} ${s("tokenName") || getTokenName(tokens, s("tokenId"))} 排散${n("fluxCleared") ? ` (清${n("fluxCleared")}辐)` : ""}`;
 		case "flux_settlement": {
 			const c = n("fluxChange") ?? 0;
-			const cs = c > 0 ? `↑${c}` : c < 0 ? `↓${Math.abs(c)}` : "—";
-			return `${p} ${s("tokenName") || getTokenName(tokens, s("tokenId"))} 辐结算 ${n("fluxBefore")}→${n("fluxAfter")} ${cs}${n("shieldUpkeep") ? ` 维持+${n("shieldUpkeep")}` : ""}${n("dissipation") ? ` 散-${n("dissipation")}` : ""}`;
+			return `${p} ${s("tokenName") || getTokenName(tokens, s("tokenId"))} 辐结算 ${n("fluxBefore")}→${n("fluxAfter")} ${c > 0 ? "↑" : c < 0 ? "↓" : "—"}${Math.abs(c)}${n("shieldUpkeep") ? ` 维持+${n("shieldUpkeep")}` : ""}${n("dissipation") ? ` 散-${n("dissipation")}` : ""}`;
 		}
 		case "deploy":
 			return `${p} 部署 ${s("tokenName") || getTokenName(tokens, s("tokenId"))}${n("presetName") ? ` (${s("presetName")})` : ""} [${s("faction")}]`;
@@ -158,26 +228,9 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 	}
 }
 
-// ==================== 着色值组件 ====================
-
-/** 着色数值辅助组件：<span class="log-val-xxx">±{value}{unit}</span> */
-const Val: React.FC<{ cls: string; v?: number; unit?: string; prefix?: string }> = ({
-	cls,
-	v,
-	unit,
-	prefix,
-}) => {
-	if (v === undefined || v === 0) return null;
-	return (
-		<span className={cls}>
-			{prefix}
-			{v}
-			{unit}
-		</span>
-	);
-};
-
-// ==================== DataLogRenderer ====================
+// ══════════════════════════════════════════════════════
+//  DataLogRenderer（仅 switch-case，颜色行内控制）
+// ══════════════════════════════════════════════════════
 
 interface LogRendererProps {
 	log: BattleLogEvent;
@@ -191,11 +244,9 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 	const b = (k: string): boolean | undefined => d[k] as boolean | undefined;
 
 	switch (log.type) {
-		// ═══════ 战斗 ═══════
 		case "attack": {
-			const dmgType = s("damageType");
-			const dmgTypeLabel = DMG_TYPE_LABELS[dmgType] || dmgType;
-			const dmgTypeColor: Record<string, string> = {
+			const dt = s("damageType");
+			const dtc: Record<string, string> = {
 				KINETIC: "#3498db",
 				HIGH_EXPLOSIVE: "#e67e22",
 				ENERGY: "#9b59b6",
@@ -210,15 +261,11 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					<span className="log-target">
 						{s("targetName") || getTokenName(tokens, s("targetId"))}
 					</span>
-					<span
-						className="log-tag"
-						style={{ color: dmgTypeColor[dmgType] ?? "#888", marginLeft: 4 }}
-					>
-						[{dmgTypeLabel}]
+					<span className="log-tag" style={{ color: dtc[dt] ?? "#888", marginLeft: 4 }}>
+						[{DMG_TYPE_LABELS[dt] || dt}]
 					</span>
 					<Val cls="log-val-dist" v={n("distance")} prefix=" " unit="u" />
 					<Val cls="log-val-dmg" v={n("finalDamage") ?? n("hitDamage")} prefix=" 伤害" />
-					{/* 护甲/结构/护盾 用不同颜色标注 */}
 					<Val
 						cls="log-val-armor"
 						v={n("armorDamage")}
@@ -280,18 +327,16 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					<span style={{ color: LOG_COLORS.SHIELD }}> 过载恢复</span>
 				</span>
 			);
-
-		// ═══════ 移动 ═══════
 		case "move": {
-			const parts: string[] = [];
-			if (n("forward") != null && n("forward") !== 0) parts.push(`前后${n("forward")}`);
-			if (n("strafe") != null && n("strafe") !== 0) parts.push(`侧移${n("strafe")}`);
+			const p: string[] = [];
+			if (n("forward") != null && n("forward") !== 0) p.push(`前后${n("forward")}`);
+			if (n("strafe") != null && n("strafe") !== 0) p.push(`侧移${n("strafe")}`);
 			return (
 				<span className="log-line">
 					<span className="log-ship" style={{ color: LOG_COLORS.MOVE }}>
 						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
 					</span>
-					<span className="log-action"> {parts.join(" ")}</span>
+					<span className="log-action"> {p.join(" ")}</span>
 				</span>
 			);
 		}
@@ -326,8 +371,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					<span className="log-action"> 结束回合</span>
 				</span>
 			);
-
-		// ═══════ 护盾 ═══════
 		case "shield_toggle":
 			return (
 				<span className="log-line">
@@ -347,8 +390,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					<span className="log-val-dmg">{n("direction")}°</span>
 				</span>
 			);
-
-		// ═══════ 辐能 ═══════
 		case "vent":
 			return (
 				<span className="log-line">
@@ -356,9 +397,13 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
 					</span>
 					<span className="log-action"> 排散</span>
-					{n("fluxCleared") ? <span className="log-meta"> (清</span> : null}
-					<span className="log-val-flux">{n("fluxCleared")}</span>
-					{n("fluxCleared") ? <span className="log-meta">辐)</span> : null}
+					{n("fluxCleared") ? (
+						<>
+							<span className="log-meta"> (清</span>
+							<span className="log-val-flux">{n("fluxCleared")}</span>
+							<span className="log-meta">辐)</span>
+						</>
+					) : null}
 				</span>
 			);
 		case "flux_settlement": {
@@ -385,8 +430,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 				</span>
 			);
 		}
-
-		// ═══════ 部署 ═══════
 		case "deploy":
 			return (
 				<span className="log-line">
@@ -399,8 +442,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					</span>
 				</span>
 			);
-
-		// ═══════ 游戏管理 ═══════
 		case "game_started":
 			return (
 				<span className="log-line">
@@ -442,8 +483,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					{s("saveName") ? <span className="log-meta"> ({s("saveName")})</span> : null}
 				</span>
 			);
-
-		// ═══════ 玩家事件 ═══════
 		case "player_joined":
 			return (
 				<span className="log-line">
@@ -506,8 +545,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 					</span>
 				</span>
 			);
-
-		// ═══════ 编辑操作 ═══════
 		case "edit":
 			return (
 				<span className="log-line">
@@ -537,8 +574,6 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 				</span>
 			);
 		}
-
-		// ═══════ 系统/回退 ═══════
 		case "system":
 			return (
 				<span className="log-line">
@@ -556,30 +591,61 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 	}
 };
 
-// ==================== 面板 ====================
+// ══════════════════════════════════════════════════════
+//  面板
+// ══════════════════════════════════════════════════════
 
 export const CombatLogPanel: React.FC = () => {
+	const [activeFilter, setActiveFilter] = useState<LogFilterId>("all");
 	const logs = useGameLogs();
 	const tokens = useGameTokens();
-	const reversed = [...logs].reverse();
+	const scrollRef = useRef<HTMLDivElement>(null);
+
+	// 筛选后的日志（逆序用于展示）
+	const filtered = useMemo(() => {
+		const f = applyFilter(logs, activeFilter);
+		return [...f].reverse();
+	}, [logs, activeFilter]);
+
+	// 追踪已知日志 key，新条目获得动画 class
+	const seenKeysRef = useRef<Set<string>>(new Set());
+	const newKeysRef = useRef<Set<string>>(new Set());
+	useEffect(() => { seenKeysRef.current.clear(); }, [activeFilter]);
+	useMemo(() => {
+		const seen = seenKeysRef.current;
+		const fresh = new Set<string>();
+		for (const log of filtered) {
+			const k = `${log.timestamp}-${log.type}`;
+			if (!seen.has(k)) { fresh.add(k); seen.add(k); }
+		}
+		newKeysRef.current = fresh;
+	}, [filtered]);
+
+	// 筛选切换时滚到顶部
+	useEffect(() => {
+		scrollRef.current?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+	}, [activeFilter, logs.length]);
 
 	const handleExport = useCallback(() => {
-		const blob = new Blob([logs.map((l) => formatLogLine(l, tokens)).join("\n")], {
-			type: "text/plain;charset=utf-8",
-		});
+		const displayLogs = activeFilter === "all" ? logs : applyFilter(logs, activeFilter);
+		const text = displayLogs.map((l) => formatLogLine(l, tokens)).join("\n");
+		const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
 		a.download = `combat-log-${Date.now()}.txt`;
 		a.click();
 		URL.revokeObjectURL(url);
-	}, [logs, tokens]);
+	}, [logs, tokens, activeFilter]);
 
 	return (
 		<Flex direction="column" className="combat-log-panel" style={{ height: "100%" }}>
+			{/* 标题栏 */}
 			<Flex align="center" gap="2" px="3" py="2" className="combat-log-header">
 				<span className="log-header-title">战斗日志</span>
-				<span className="log-header-count">({logs.length})</span>
+				<span className="log-header-count">
+					({filtered.length}/{logs.length})
+				</span>
 				<Box style={{ flex: 1 }} />
 				<Tooltip content="导出TXT">
 					<IconButton size="1" variant="ghost" onClick={handleExport} disabled={logs.length === 0}>
@@ -587,22 +653,48 @@ export const CombatLogPanel: React.FC = () => {
 					</IconButton>
 				</Tooltip>
 			</Flex>
-			<Box className="combat-log-list">
-				{reversed.length === 0 ? (
-					<Flex align="center" justify="center" style={{ height: "100%", opacity: 0.5 }}>
-						<span style={{ color: "#556677", fontSize: 11 }}>暂无日志</span>
-					</Flex>
+
+			{/* 筛选栏 */}
+			<div className="log-filters">
+				{FILTERS.map((f) => {
+					const count = f.id === "all" ? logs.length : applyFilter(logs, f.id).length;
+					const active = activeFilter === f.id;
+					return (
+						<button
+							key={f.id}
+							className={`log-filter-btn${active ? " log-filter-btn--active" : ""}`}
+							onClick={() => setActiveFilter(f.id)}
+							title={`${f.label} (${count})`}
+						>
+							{f.label}
+							<span className="log-filter-count">{count}</span>
+						</button>
+					);
+				})}
+			</div>
+
+			{/* 日志列表 */}
+			<div className="combat-log-list" ref={scrollRef}>
+				{filtered.length === 0 ? (
+					<div className="log-empty">
+						<span style={{ color: "#556677", fontSize: 11 }}>
+							{logs.length === 0 ? "暂无日志" : "无匹配条目"}
+						</span>
+					</div>
 				) : (
-					reversed.map((log, i) => (
-						<div key={`${log.timestamp}-${i}`} className="combat-log-entry">
-							<div style={{ flex: 1, minWidth: 0 }}>
-								<DataLogRenderer log={log} tokens={tokens} />
+					filtered.map((log, i) => {
+						const isNew = newKeysRef.current.has(`${log.timestamp}-${log.type}`);
+						return (
+							<div key={`${log.timestamp}-${i}`} className={`combat-log-entry${isNew ? " log-entry-new" : ""}`}>
+								<div style={{ flex: 1, minWidth: 0 }}>
+									<DataLogRenderer log={log} tokens={tokens} />
+								</div>
+								<span className="log-time">{formatTime(log.timestamp)}</span>
 							</div>
-							<span className="log-time">{formatTime(log.timestamp)}</span>
-						</div>
-					))
+						);
+					})
 				)}
-			</Box>
+			</div>
 		</Flex>
 	);
 };
