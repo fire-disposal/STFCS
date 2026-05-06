@@ -69,6 +69,10 @@ export const useGamePlayerId = () => useGameStore((s) => s.playerId);
 export const useGameRoomId = () => useGameStore((s) => s.state?.roomId ?? null);
 export const useGameTokens = () => useGameStore((s) => s.state?.tokens ?? EMPTY_TOKENS);
 export const useGamePlayers = () => useGameStore((s) => s.state?.players ?? EMPTY_PLAYERS);
+/** 原始 mode 值 */
+export const useGameMode = () => useGameStore((s) => s.state?.mode ?? "DEPLOYMENT");
+
+/** @deprecated 使用 useGameMode，此函数将 mode 映射为传统 phase 名称 */
 export const useGamePhase = () =>
 	useGameStore((s) => {
 		if (!s.state) return "DEPLOYMENT";
