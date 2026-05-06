@@ -31,9 +31,9 @@ DEPLOYMENT ──→ PLAYER_ACTION (turn 1, faction A)
 ```typescript
 // ── 模式枚举 ──
 export const GameModeSchema = z.enum([
-  "DEPLOYMENT",         // 部署舰船，准备开始
-  "WORLD_EXPLORATION",  // 星图航行，GM 驱动叙事
-  "TACTICAL_COMBAT",    // 战术战斗，派系轮流
+  "DEPLOYMENT", // 部署舰船，准备开始
+  "WORLD_EXPLORATION", // 星图航行，GM 驱动叙事
+  "TACTICAL_COMBAT", // 战术战斗，派系轮流
 ]);
 ```
 
@@ -45,19 +45,19 @@ export const GameModeSchema = z.enum([
 // ── 战术战斗回合状态 ──
 export const TurnStateSchema = z.object({
   turnCount: z.number().default(0),
-  activeFactionIndex: z.number().default(0),  // TURN_ORDER 中的当前索引
+  activeFactionIndex: z.number().default(0), // TURN_ORDER 中的当前索引
 });
 ```
 
 ### 对比
 
-| 方面 | 当前（纠缠） | 重设计（分离） |
-|------|------------|--------------|
-| 阶段变量 | `phase: GamePhase` | `mode: GameMode` + `turn?: TurnState` |
-| 派系切换 | `phase + activeFaction` 联动 | `turn.activeFactionIndex` 独立 |
-| GM 操作 | `force_end_turn` 身兼数职 | `setMode()` 单独 + `advanceTurn()` 单独 |
-| WORLD_EXPLORATION 时 faction | 无意义，但必须定义 | `turn = undefined`，干净 |
-| 存档兼容 | 需要迁移 phase | `mode + turn` 可映射回旧 phase |
+| 方面                         | 当前（纠缠）                 | 重设计（分离）                          |
+| ---------------------------- | ---------------------------- | --------------------------------------- |
+| 阶段变量                     | `phase: GamePhase`           | `mode: GameMode` + `turn?: TurnState`   |
+| 派系切换                     | `phase + activeFaction` 联动 | `turn.activeFactionIndex` 独立          |
+| GM 操作                      | `force_end_turn` 身兼数职    | `setMode()` 单独 + `advanceTurn()` 单独 |
+| WORLD_EXPLORATION 时 faction | 无意义，但必须定义           | `turn = undefined`，干净                |
+| 存档兼容                     | 需要迁移 phase               | `mode + turn` 可映射回旧 phase          |
 
 ---
 
@@ -130,15 +130,15 @@ function getActiveFaction(state: GameRoomState): Faction | undefined {
 
 ## 5. GM 操作界面
 
-| GM 操作 | 效果 |
-|---------|------|
-| `edit:room.set_mode` | 切换 `mode`（DEPLOYMENT / WORLD_EXPLORATION / TACTICAL_COMBAT） |
-| `edit:room.advance_turn` | TACTICAL_COMBAT 下推进到下一派系/回合 |
-| `edit:room.set_turn_number` | 直接设置回合数（GM 调） |
-| `world:travel` | WORLD_EXPLORATION 下航行 |
-| `world:enter_combat` | WORLD_EXPLORATION → TACTICAL_COMBAT（含地形生成） |
-| `world:return` | TACTICAL_COMBAT → WORLD_EXPLORATION（战斗结束返回） |
-| `world:manage` | 编辑星图 |
+| GM 操作                     | 效果                                                            |
+| --------------------------- | --------------------------------------------------------------- |
+| `edit:room.set_mode`        | 切换 `mode`（DEPLOYMENT / WORLD_EXPLORATION / TACTICAL_COMBAT） |
+| `edit:room.advance_turn`    | TACTICAL_COMBAT 下推进到下一派系/回合                           |
+| `edit:room.set_turn_number` | 直接设置回合数（GM 调）                                         |
+| `world:travel`              | WORLD_EXPLORATION 下航行                                        |
+| `world:enter_combat`        | WORLD_EXPLORATION → TACTICAL_COMBAT（含地形生成）               |
+| `world:return`              | TACTICAL_COMBAT → WORLD_EXPLORATION（战斗结束返回）             |
+| `world:manage`              | 编辑星图                                                        |
 
 ---
 
@@ -162,6 +162,7 @@ changePhase(phase: GamePhase) {
 ```
 
 **这样做的好处**：
+
 - 现有代码渐进迁移，不需一次性重写
 - 新代码直接使用 `mode` + `turn`
 - 旧存档读取时自动映射
@@ -170,11 +171,11 @@ changePhase(phase: GamePhase) {
 
 ## 7. 为什么更好
 
-| 场景 | 当前（纠缠） | 重设计（分离） |
-|------|------------|--------------|
+| 场景                             | 当前（纠缠）                                                    | 重设计（分离）                                |
+| -------------------------------- | --------------------------------------------------------------- | --------------------------------------------- |
 | WORLD_EXPLORATION 时检查 faction | `phase=WORLD_EXPLORATION, activeFaction=undefined` 可理解但奇怪 | `mode=WORLD_EXPLORATION, turn=undefined` 清晰 |
-| GM 切换模式 | `changePhase()` 同时改 faction，需要加条件分支 | `setMode()` 只改模式，turn 自动创建/销毁 |
-| 多派系扩展 | faction 枚举在 schema 级别硬编码 | `TURN_ORDER` 数组可动态扩展 |
-| 世界观模式开关 | world 字段与 phase 无关联 | mode 自然区分世界观/传统 |
-| 战斗外查看星图 | phase 不允许 game:action | mode 为 NON_COMBAT 时直接拒绝 game 操作 |
-| 核心理念 | "游戏是一个巨大的状态机" | "游戏是两层独立的状态机" |
+| GM 切换模式                      | `changePhase()` 同时改 faction，需要加条件分支                  | `setMode()` 只改模式，turn 自动创建/销毁      |
+| 多派系扩展                       | faction 枚举在 schema 级别硬编码                                | `TURN_ORDER` 数组可动态扩展                   |
+| 世界观模式开关                   | world 字段与 phase 无关联                                       | mode 自然区分世界观/传统                      |
+| 战斗外查看星图                   | phase 不允许 game:action                                        | mode 为 NON_COMBAT 时直接拒绝 game 操作       |
+| 核心理念                         | "游戏是一个巨大的状态机"                                        | "游戏是两层独立的状态机"                      |
