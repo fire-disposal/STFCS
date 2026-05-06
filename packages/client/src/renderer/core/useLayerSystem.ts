@@ -150,27 +150,15 @@ export function useLayerSystem(): UseLayerSystemResult {
 			// - 实际屏幕偏移 = position - pivot = -x*factor（视差移动）
 			// factor 越大，星空移动越多（越近）
 			const parallaxBase = 0.5;
-			const nebulaFactor = parallaxBase * 0.2;  // 最远
+			const nebulaFactor = parallaxBase * 0.2; // 最远
 			const deepFactor = parallaxBase * 0.3;
 			const midFactor = parallaxBase * 0.5;
-			const nearFactor = parallaxBase * 0.8;    // 最近
+			const nearFactor = parallaxBase * 0.8; // 最近
 
-			currentLayers.starfieldNebula.position.set(
-				x * (1 - nebulaFactor),
-				y * (1 - nebulaFactor)
-			);
-			currentLayers.starfieldDeep.position.set(
-				x * (1 - deepFactor),
-				y * (1 - deepFactor)
-			);
-			currentLayers.starfieldMid.position.set(
-				x * (1 - midFactor),
-				y * (1 - midFactor)
-			);
-			currentLayers.starfieldNear.position.set(
-				x * (1 - nearFactor),
-				y * (1 - nearFactor)
-			);
+			currentLayers.starfieldNebula.position.set(x * (1 - nebulaFactor), y * (1 - nebulaFactor));
+			currentLayers.starfieldDeep.position.set(x * (1 - deepFactor), y * (1 - deepFactor));
+			currentLayers.starfieldMid.position.set(x * (1 - midFactor), y * (1 - midFactor));
+			currentLayers.starfieldNear.position.set(x * (1 - nearFactor), y * (1 - nearFactor));
 
 			// HUD 层：固定在画布中心，无变换
 			// HUD 元素位置通过 worldToScreen 计算，直接设置到元素上

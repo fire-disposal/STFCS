@@ -13,6 +13,7 @@ import { Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { WorldMap, WorldNode, WorldEdge } from "@vt/data";
+import { getGameActionSender } from "@/state/stores/gameStore";
 
 // ── 颜色 ──
 const C = {
@@ -52,8 +53,7 @@ function getEdgeColor(edge: WorldEdge): number {
 export function useStarMapRendering(
 	layers: LayerRegistry | null,
 	worldMap: WorldMap | undefined,
-	isHost: boolean,
-	onNodeClick?: (nodeId: string) => void
+	isHost: boolean
 ): void {
 	const edgesRef = useRef<Graphics | null>(null);
 	const nodesRef = useRef<Graphics | null>(null);
@@ -132,7 +132,13 @@ export function useStarMapRendering(
 			label.cursor = "pointer";
 
 			if (isHost && !isCurrent) {
-				label.on("pointertap", () => onNodeClick?.(node.id));
+				const nid = node.id;
+				label.on("pointertap", () => {
+					const sender = getGameActionSender();
+					if (sender.isAvailable()) {
+						sender.send("world:travel", { toNodeId: nid });
+					}
+				});
 			}
 
 			layers.starMapNodes.addChild(label);
@@ -140,6 +146,5 @@ export function useStarMapRendering(
 		}
 		layers.starMapNodes.addChild(nodeGfx);
 		nodesRef.current = nodeGfx;
-
-	}, [layers, world, nodes.length, edges.length, fleetNodeId, isHost, onNodeClick]);
+	}, [layers, world, nodes.length, edges.length, fleetNodeId, isHost]);
 }

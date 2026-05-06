@@ -29,7 +29,12 @@
 
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useAllTokens, useGamePlayers, useGameState, useGamePlayerId } from "@/state/stores/gameStore";
+import {
+	useAllTokens,
+	useGamePlayers,
+	useGameState,
+	useGamePlayerId,
+} from "@/state/stores/gameStore";
 import { Application } from "@pixi/react";
 
 import type { CombatToken } from "@vt/data";
@@ -70,19 +75,26 @@ interface GameCanvasProps {
 }
 
 const useStarfield = () => {
-	return useMemo(() => new StarfieldGenerator({
-		deepStars: 1000,
-		midStars: 300,
-		nearStars: 80,
-		range: 10000,
-		parallaxStrength: 0.6,
-		enableNebula: true,
-		nebulaCount: 4,
-		nebulaOpacity: 0.12,
-	}), []);
+	return useMemo(
+		() =>
+			new StarfieldGenerator({
+				deepStars: 1000,
+				midStars: 300,
+				nearStars: 80,
+				range: 10000,
+				parallaxStrength: 0.6,
+				enableNebula: true,
+				nebulaCount: 4,
+				nebulaOpacity: 0.12,
+			}),
+		[]
+	);
 };
 
-const noopFetchAssets = async (_assetIds: string[], _includeData: boolean): Promise<AssetBatchGetResult[]> => [];
+const noopFetchAssets = async (
+	_assetIds: string[],
+	_includeData: boolean
+): Promise<AssetBatchGetResult[]> => [];
 
 function collectAssetIds(ships: CombatToken[]): string[] {
 	const assetIds = new Set<string>();
@@ -137,21 +149,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		movementPreview,
 	} = useUIStore();
 
-	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, textures: showTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
+	const {
+		grid: showGrid,
+		background: showBackground,
+		movementRange: showMovementRange,
+		textures: showTextures,
+		hpBars: showHpBars,
+		fluxBars: showFluxBars,
+		shipNames: showShipNames,
+		ownerLabels: showOwnerLabels,
+		weaponLayer: showWeaponLayer,
+	} = toggles;
 
 	const cameraPositionRef = useRef(cameraPosition);
 	cameraPositionRef.current = cameraPosition;
 	const viewRotationRef = useRef(viewRotation);
 	viewRotationRef.current = viewRotation;
 
-	const handlePanDelta = useCallback((deltaX: number, deltaY: number) => {
-		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
-		setCameraPosition(cameraPositionRef.current.x - worldDelta.x, cameraPositionRef.current.y - worldDelta.y);
-	}, [setCameraPosition, zoom]);
+	const handlePanDelta = useCallback(
+		(deltaX: number, deltaY: number) => {
+			const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
+			setCameraPosition(
+				cameraPositionRef.current.x - worldDelta.x,
+				cameraPositionRef.current.y - worldDelta.y
+			);
+		},
+		[setCameraPosition, zoom]
+	);
 
-	const handleRotateDelta = useCallback((delta: number) => {
-		setViewRotation(normalizeRotation(viewRotationRef.current + delta));
-	}, [setViewRotation]);
+	const handleRotateDelta = useCallback(
+		(delta: number) => {
+			setViewRotation(normalizeRotation(viewRotationRef.current + delta));
+		},
+		[setViewRotation]
+	);
 
 	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
 	const interaction = useInteraction(handlePanDelta, handleRotateDelta);
@@ -207,40 +238,49 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	useArmorHexagonRendering(layerSystem.layers, ships);
 	useShieldArcRendering(layerSystem.layers, ships);
-	useMovementVisualRendering(layerSystem.layers, ships, selectedShipId ?? null, movementPreview ?? undefined, {
-		show: showMovementRange,
-	});
+	useMovementVisualRendering(
+		layerSystem.layers,
+		ships,
+		selectedShipId ?? null,
+		movementPreview ?? undefined,
+		{
+			show: showMovementRange,
+		}
+	);
 	useWeaponArcRendering(layerSystem.layers, ships, selectedShipId ?? null);
 	useGridRendering(layerSystem.layers, showGrid);
 
-	// 星图渲染（仅 WORLD 模式有 worldMap）
-	const handleNodeClick = useCallback((nodeId: string) => {
-		const { send } = require("@/hooks/useGameAction") as any;
-		send?.().send("world:travel", { toNodeId: nodeId });
-	}, []);
-	useStarMapRendering(layerSystem.layers, worldMap, isHost, handleNodeClick);
+	// 星图渲染
+	useStarMapRendering(layerSystem.layers, worldMap, isHost);
 
-	// 根据 viewMode 切换层可见性
-	const isTacticalView = viewMode === "COMBAT" || viewMode === "DEPLOYMENT";
-	const isWorldView = viewMode === "WORLD";
+	// 根据 viewMode 切换层可见性 + 相机位置
 	useEffect(() => {
 		if (!layerSystem.layers) return;
-		// 战术层
-		layerSystem.layers.tacticalTokens.visible = isTacticalView;
-		layerSystem.layers.weaponArcs.visible = isTacticalView;
-		layerSystem.layers.movementVisuals.visible = isTacticalView;
-		layerSystem.layers.shieldArcs.visible = isTacticalView;
-		layerSystem.layers.hexagonArmor.visible = isTacticalView;
-		layerSystem.layers.shipSprites.visible = isTacticalView && showTextures;
-		layerSystem.layers.weaponSprites.visible = isTacticalView && showTextures;
-		layerSystem.layers.grid.visible = isTacticalView;
-		layerSystem.layers.hud.visible = isTacticalView;
-		// 星图层
-		layerSystem.layers.starMapEdges.visible = isWorldView;
-		layerSystem.layers.starMapNodes.visible = isWorldView;
-		// 背景（星空在两种模式下都显示）
-		layerSystem.layers.background.visible = true;
-	}, [layerSystem.layers, viewMode, showTextures, isTacticalView, isWorldView]);
+
+		const isTactical = viewMode === "COMBAT" || viewMode === "DEPLOYMENT";
+		const isWorld = viewMode === "WORLD";
+
+		layerSystem.layers.tacticalTokens.visible = isTactical;
+		layerSystem.layers.weaponArcs.visible = isTactical;
+		layerSystem.layers.movementVisuals.visible = isTactical;
+		layerSystem.layers.shieldArcs.visible = isTactical;
+		layerSystem.layers.hexagonArmor.visible = isTactical;
+		layerSystem.layers.shipSprites.visible = isTactical && showTextures;
+		layerSystem.layers.weaponSprites.visible = isTactical && showTextures;
+		layerSystem.layers.grid.visible = isTactical;
+		layerSystem.layers.hud.visible = isTactical;
+		layerSystem.layers.starMapEdges.visible = isWorld;
+		layerSystem.layers.starMapNodes.visible = isWorld;
+
+		// WORLD 模式下自动定位到舰队节点
+		if (isWorld && worldMap?.fleetNodeId) {
+			const center = worldMap.nodes?.find((n: any) => n.id === worldMap.fleetNodeId);
+			if (center) {
+				camera.cameraRef.current.x = center.position.x;
+				camera.cameraRef.current.y = center.position.y;
+			}
+		}
+	}, [layerSystem.layers, viewMode, showTextures, worldMap]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;
@@ -270,7 +310,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		const handleMouseDown = () => {
 			if (
 				document.activeElement &&
-				(document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")
+				(document.activeElement.tagName === "INPUT" ||
+					document.activeElement.tagName === "TEXTAREA")
 			) {
 				(document.activeElement as HTMLElement).blur();
 			}
