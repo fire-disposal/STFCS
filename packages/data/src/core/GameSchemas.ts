@@ -31,6 +31,9 @@ export const PointSchema = z.object({
 });
 export type Point = z.infer<typeof PointSchema>;
 
+/** 世界观地图类型引用（WorldSchemas.ts 单独维护） */
+import type { WorldMap } from "./WorldSchemas.js";
+
 // ============================================================
 // 通用枚举（Zod 内联定义 + 值对象导出）
 // ============================================================
@@ -510,12 +513,58 @@ export const MapSizeSchema = z.object({
 });
 export type MapSize = z.infer<typeof MapSizeSchema>;
 
+/** 地形形状类型 */
+export const TerrainShapeSchema = z.enum(["circle", "rect", "ring", "polygon"]);
+export type TerrainShape = z.infer<typeof TerrainShapeSchema>;
+
+/** 地形的游戏效果 */
+export const TerrainEffectSchema = z.object({
+	/** 效果类型 */
+	type: z.enum([
+		"slow",          // 减速（移动力 × value）
+		"flux_damage",   // 辐能伤害（每回合 +value 硬辐能）
+		"shield_block",  // 护盾禁用（护盾效率 × (1-value)）
+		"vision_block",  // 视野遮挡（射程外不可选为目标）
+		"cover",         // 掩体（被攻击命中率 × (1-value)）
+		"gravity",       // 引力（移动方向偏向圆心）
+		"heal",          // 修复（每回合恢复 value hull）
+		"damage",        // 伤害（每回合 value 结构伤害）
+	]),
+	/** 效果强度（0-1 或绝对值，取决于 type） */
+	value: z.number(),
+	/** 持续回合数（可选，默认永久） */
+	duration: z.number().optional(),
+});
+export type TerrainEffect = z.infer<typeof TerrainEffectSchema>;
+
 export const MapTerrainSchema = z.object({
 	id: z.string(),
-	type: z.enum(["asteroid", "nebula", "station", "debris"]),
+	/** 地形视觉类型 */
+	type: z.enum([
+		"asteroid",       // 小行星带
+		"nebula",         // 星云
+		"station",        // 空间站
+		"debris",         // 残骸区
+		"planetary_ring", // 行星环
+		"jump_point",     // 跳跃点
+		"mine_field",     // 雷区
+		"radiation",      // 辐射区
+		"gravity_well",   // 引力井
+		"corona",         // 日冕
+	]),
 	position: PointSchema,
 	size: z.number(),
+	/** 内径（环形/环状地形用） */
+	innerSize: z.number().optional(),
+	shape: TerrainShapeSchema.default("circle"),
 	rotation: z.number().optional(),
+	/** 地形效果列表 */
+	effects: z.array(TerrainEffectSchema).optional(),
+	/** 视觉效果 */
+	color: z.number().optional(),
+	alpha: z.number().optional(),
+	/** 互联节点 ID（跳跃点用） */
+	connectsTo: z.string().optional(),
 	metadata: z.record(z.string(), z.any()).optional(),
 });
 export type MapTerrain = z.infer<typeof MapTerrainSchema>;
@@ -584,6 +633,8 @@ export const GameRoomStateSchema = z.object({
 	players: z.record(z.string(), RoomPlayerStateSchema),
 	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),
+	/** 世界观地图（可选，启用时覆盖传统单战斗地图模式。定义见 WorldSchemas.ts） */
+	world: z.custom<WorldMap>().optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
 	logs: z.array(BattleLogEventSchema).default([]).optional(),
 	createdAt: z.number(),
