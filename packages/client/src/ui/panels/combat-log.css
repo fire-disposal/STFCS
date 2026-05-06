@@ -1,7 +1,26 @@
 /**
  * CombatLogPanel 样式
  *
- * 字体大小统一行内设置，避免 Radix Text size 歧义
+ * 语义类名体系：
+ *   .log-line      行容器
+ *   .log-ship      舰船名（白/粗体）
+ *   .log-weapon    武器名（攻击色/粗体）
+ *   .log-target    目标名（白/粗体）
+ *   .log-player    玩家名（淡蓝/粗体）
+ *   .log-faction   派系名（蓝或红）
+ *   .log-label     标签（如"部署""游戏开始"）
+ *   .log-action    动作描述（淡灰）
+ *   .log-meta      元信息（灰/小字）
+ *   .log-arrow     → 箭头（暗灰）
+ *
+ *   .log-val-dmg   伤害值（白）
+ *   .log-val-armor 护甲损伤（橙）
+ *   .log-val-hull  结构损伤（红）
+ *   .log-val-shield 护盾辐能（绿）
+ *   .log-val-flux  辐能值（黄）
+ *   .log-val-dist  距离（暗灰）
+ *   .log-tag       类型标签（小字/斜体）
+ *   .log-nopen     未穿透（灰色）
  */
 
 .combat-log-panel {
@@ -20,82 +39,114 @@
 .combat-log-header .log-header-title {
 	font-size: 12px;
 	letter-spacing: 0.3px;
+	color: #cfe8ff;
 }
 
 .combat-log-header .log-header-count {
 	font-size: 10px;
+	color: #556677;
 }
 
 .combat-log-list {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
 	scrollbar-width: thin;
 	scrollbar-color: rgba(43, 66, 97, 0.4) transparent;
 }
 
 .combat-log-entry {
-	border-bottom: 1px solid rgba(43, 66, 97, 0.12);
+	border-bottom: 1px solid rgba(43, 66, 97, 0.1);
 	transition: background 0.1s;
-	min-height: 22px;
+	min-height: 20px;
 	align-items: center;
 	gap: 4px;
-	padding: 2px 12px;
+	padding: 1px 12px;
 }
 
 .combat-log-entry:hover {
 	background: rgba(74, 158, 255, 0.04);
 }
 
-/* ── 语义类名（由 DataLogRenderer 统一输出） ── */
+/* ── 行内语义类 ── */
 
 .log-line {
 	font-size: 11px;
-	line-height: 1.5;
+	line-height: 1.6;
 	display: inline;
 }
 
-.log-ship {
+.log-ship   { font-weight: 600; color: #e8eef5; }
+.log-weapon { font-weight: 600; }
+.log-target { font-weight: 600; color: #e8eef5; }
+.log-player { font-weight: 600; }
+.log-faction { font-weight: 600; }
+.log-label  { font-weight: 500; }
+.log-action { color: #b0c4de; font-weight: 400; }
+.log-meta   { color: #667788; font-size: 10px; }
+.log-arrow  { color: #445566; font-weight: 400; }
+
+/* ── 伤害计算值 ── */
+
+.log-tag {
+	font-size: 9px;
 	font-weight: 600;
-	color: #e8eef5;
+	padding: 0 3px;
+	border-radius: 2px;
+	letter-spacing: 0.3px;
 }
 
-.log-weapon {
+.log-val-dmg {
+	color: #f0f4fa;
 	font-weight: 600;
 }
 
-.log-target {
-	font-weight: 600;
-	color: #e8eef5;
-}
-
-.log-player {
+.log-val-armor {
+	color: #e67e22;
 	font-weight: 600;
 }
 
-.log-faction {
+.log-val-hull {
+	color: #e74c3c;
+	font-weight: 700;
+}
+
+.log-val-shield {
+	color: #27ae60;
 	font-weight: 600;
 }
 
-.log-label {
-	font-weight: 500;
+.log-val-flux {
+	color: #f1c40f;
+	font-weight: 600;
 }
 
-.log-action {
-	color: #b0c4de;
-	font-weight: 400;
-}
-
-.log-meta {
-	color: #667788;
+.log-val-dist {
+	color: #556677;
 	font-size: 10px;
 }
 
-.log-arrow {
+.log-nopen {
 	color: #556677;
-	font-weight: 400;
+	font-style: italic;
 }
+
+.log-icon-destroyed {
+	color: #ff3333;
+	font-weight: 700;
+}
+
+.log-icon-overload {
+	color: #ffaa00;
+	font-weight: 700;
+}
+
+/* ── 时间戳 ── */
 
 .log-time {
 	flex-shrink: 0;
 	font-size: 10px;
 	line-height: 18px;
-	opacity: 0.6;
+	opacity: 0.5;
+	color: #445566;
 }
