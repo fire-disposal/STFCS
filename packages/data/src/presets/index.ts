@@ -7,3 +7,4 @@
 
 export { presetShips, type PresetShip } from "./ships/index.js";
 export { presetWeapons, type PresetWeapon } from "./weapons/index.js";
+export { presetWorlds, type PresetWorldId } from "./world/index.js";

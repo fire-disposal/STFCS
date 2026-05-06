@@ -23,8 +23,9 @@ export type {
 export {
   presetShips,
   presetWeapons,
+  presetWorlds,
 } from "./presets/index.js"
-export type { PresetShip, PresetWeapon } from "./presets/index.js"
+export type { PresetShip, PresetWeapon, PresetWorldId } from "./presets/index.js"
 
 import {
   GameMode,

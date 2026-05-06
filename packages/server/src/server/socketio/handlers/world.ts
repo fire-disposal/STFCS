@@ -58,6 +58,25 @@ export const worldHandlers = {
 			draft.world = result.worldMap;
 		});
 
+		// 如果触发遭遇，自动切换到战斗模式并生成地形
+		if (result.encounterTriggered) {
+			ctx.state.setMode(GameMode.COMBAT);
+			if (result.currentNode?.terrainProfile) {
+				const terrain = generateTerrainFromProfile(result.currentNode.terrainProfile, 2000, 2000);
+				ctx.state.mutateAndBroadcast((draft) => {
+					if (!draft.map) {
+						draft.map = {
+							$id: `combat_${Date.now()}`,
+							name: result.currentNode?.name ?? "战斗区域",
+							size: { width: 2000, height: 2000 },
+							metadata: { name: result.currentNode?.name ?? "战斗区域" },
+						};
+					}
+					draft.map.terrain = terrain;
+				});
+			}
+		}
+
 		// 写入战斗日志
 		ctx.state.appendLog(
 			createBattleLogEvent("travel", {
