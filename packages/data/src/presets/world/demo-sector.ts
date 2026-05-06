@@ -30,7 +30,7 @@ export default
 			"type": "nebula",
 			"position": { "x": -180, "y": -120 },
 			"explored": false,
-			"state": "unknown",
+			"state": "threat",
 			"description": "一片稠密的星际尘埃云，传感器在这里几乎失效。",
 			"hiddenDescription": "星云深处有一座废弃的研究站。",
 			"terrainProfile": { "density": 0.6, "preferredTypes": ["nebula"] },
@@ -52,7 +52,7 @@ export default
 			"type": "anomaly",
 			"position": { "x": -100, "y": 180 },
 			"explored": false,
-			"state": "unknown",
+			"state": "threat",
 			"description": "轨道上有不明残骸，能量读数异常。",
 			"hiddenDescription": "这是某次超空间事故的现场，可能残留有珍贵科技。",
 			"tags": ["遗迹", "高风险"]

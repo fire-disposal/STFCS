@@ -9,6 +9,7 @@ export * from "./RpcClient.js"
 export * from "./geometry.js"
 export * from "./ErrorCodes.js"
 export { validatePresets } from "./validatePresets.js"
+export { validateWorldPresets } from "./validateWorldPreset.js"
 export type { PresetValidationResult, PresetValidationItem, PresetValidationIssue } from "./validatePresets.js"
 
 // WorldSchemas — 显式导出（GameSchemas 已含 PointSchema，避免歧义）

@@ -11,7 +11,7 @@ import { readFile } from "fs/promises";
 import { createLogger } from "./infra/simple-logger.js";
 import { RoomManager } from "./server/rooms/RoomManager.js";
 import { setupSocketIO } from "./server/socketio/handlers.js";
-import { validatePresets } from "@vt/data";
+import { validatePresets, validateWorldPresets } from "@vt/data";
 import { assetService } from "./services/AssetService.js";
 
 const logger = createLogger("server");
@@ -145,10 +145,26 @@ export class STFCServer {
 	private validatePresetsOnStartup(): void {
 		try {
 			const result = validatePresets();
+			// 世界预设验证
+			const worldResult = validateWorldPresets() as any;
+			if (worldResult.worlds?.length) {
+				const failedWorlds = (worldResult.worlds as any[]).filter((w: any) => !w.passed).length;
+				if (failedWorlds > 0) {
+					for (const w of worldResult.worlds as any[]) {
+						if (!w.passed) {
+							for (const issue of w.issues) {
+								logger.warn(`  [世界预设] ${w.name}: [${issue.path}] ${issue.message}`);
+							}
+						}
+					}
+				}
+			}
+
 			if (result.passed) {
 				logger.info("预设数据验证通过", {
 					ships: result.totalShips,
 					weapons: result.totalWeapons,
+					worlds: (worldResult.worlds as any[])?.length ?? 0,
 				});
 			} else {
 				const failedShips = result.ships.filter(s => !s.passed).length;
