@@ -196,7 +196,7 @@ const FactionSelector: React.FC<{
 
 const PlayerAvatars: React.FC<{
 	players: Record<string, RoomPlayerState>;
-	phase: GamePhase;
+	phase: string;
 	activeFaction: Faction | undefined;
 }> = ({ players, phase, activeFaction }) => {
 	const playerList = Object.values(players).filter((p) => p.connected);
@@ -250,7 +250,7 @@ const PlayerAvatars: React.FC<{
 
 const PlayerAvatar: React.FC<{
 	player: RoomPlayerState;
-	phase: GamePhase;
+	phase: string;
 	faction?: Faction;
 	activeFaction: Faction | undefined;
 }> = ({ player, phase, faction, activeFaction }) => {

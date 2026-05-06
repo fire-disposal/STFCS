@@ -398,7 +398,7 @@ export class SocketNetworkManager {
 		});
 
 		this.socket.on("sync:full", (state: GameRoomState) => {
-			logger.info("sync:full received", { roomId: state.roomId, phase: state.phase });
+			logger.info("sync:full received", { roomId: state.roomId, mode: state.mode });
 			this.currentRoomId = state.roomId;
 			this.setGameState(state);
 		});

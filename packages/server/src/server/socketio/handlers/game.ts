@@ -2,7 +2,7 @@
  * game namespace handlers — 玩家行动执行 + 游戏状态查询
  */
 import { err } from "./err.js";
-import { GamePhase, ErrorCodes, createBattleLogEvent } from "@vt/data";
+import { GameMode, ErrorCodes, createBattleLogEvent } from "@vt/data";
 import type { WsPayload, BattleLogEvent } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { calculateShipWeaponTargets } from "../../../core/engine/rules/targeting.js";
@@ -16,7 +16,7 @@ export const gameHandlers = {
 		const room = ctx.room!;
 
 		// 阶段检查
-		if (room.getStateManager().getState().phase !== GamePhase.PLAYER_ACTION) {
+		if (room.getStateManager().getState().mode !== GameMode.COMBAT) {
 			throw err("当前阶段不允许操作", ErrorCodes.INVALID_PHASE);
 		}
 

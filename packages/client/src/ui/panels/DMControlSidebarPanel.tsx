@@ -94,7 +94,7 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                         <Flex align="center" justify="between">
                             <Text size="1" color="gray">阵营</Text>
                             <Badge size="1" color={activeFaction === "PLAYER_ALLIANCE" ? "green" : "red"}>
-                                {FactionLabels[activeFaction]}
+                                {FactionLabels[activeFaction as keyof typeof FactionLabels]}
                             </Badge>
                         </Flex>
                     )}

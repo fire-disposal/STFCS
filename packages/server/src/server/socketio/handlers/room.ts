@@ -37,7 +37,7 @@ export const roomHandlers = {
 				ownerName: ctx.playerName,
 				playerCount: 0,
 				maxPlayers: room.maxPlayers,
-				phase: room.phase,
+				phase: room.mode,
 			},
 		});
 
@@ -52,7 +52,7 @@ export const roomHandlers = {
 			ownerName: r.creatorName ?? "未知",
 			playerCount: r.playerCount,
 			maxPlayers: r.maxPlayers,
-			phase: r.phase,
+			phase: r.mode,
 			turnCount: r.gameState?.turnCount ?? 0,
 			createdAt: r.createdAt,
 		}));
@@ -94,7 +94,7 @@ export const roomHandlers = {
 				ownerName: room.creatorName,
 				playerCount: room.getPlayerCount(),
 				maxPlayers: room.maxPlayers,
-				phase: room.phase,
+				phase: room.mode,
 			},
 		});
 
@@ -129,7 +129,7 @@ export const roomHandlers = {
 					ownerName: room.creatorName,
 					playerCount: playerCountAfter,
 					maxPlayers: room.maxPlayers,
-					phase: room.phase,
+					phase: room.mode,
 				},
 			});
 		}
@@ -175,7 +175,7 @@ export const roomHandlers = {
 				ownerName: room.creatorName,
 				playerCount: room.getPlayerCount(),
 				maxPlayers: room.maxPlayers,
-				phase: room.phase,
+				phase: room.mode,
 			},
 		});
 

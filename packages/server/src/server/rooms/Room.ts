@@ -7,7 +7,7 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
-import { GamePhase, Faction, createBattleLogEvent } from "@vt/data";
+import { GameMode, type GameMode as GameModeType, Faction, createBattleLogEvent } from "@vt/data";
 import { executeTurnAdvance } from "../../core/engine/flow/TurnFlowController.js";
 
 export interface RoomOptions {
@@ -57,8 +57,7 @@ export class Room {
 		this.stateManager = new MutativeStateManager(this.id, {
 			roomId: this.id,
 			ownerId: this.options.creatorSessionId,
-			phase: GamePhase.DEPLOYMENT,
-			turnCount: 0,
+			mode: GameMode.DEPLOYMENT,
 			players: {},
 			tokens: {},
 			globalModifiers: {},
@@ -331,7 +330,7 @@ export class Room {
 
 	startGame(): void {
 		this.stateManager.changeTurn(1);
-		this.stateManager.changePhase(GamePhase.PLAYER_ACTION);
+		this.stateManager.setMode(GameMode.COMBAT);
 		this.stateManager.resetAllPlayersReady();
 		this.logger.info("Game started");
 
@@ -346,16 +345,16 @@ export class Room {
 		const result = executeTurnAdvance(state);
 
 		// 应用状态更新
-		if (result.phaseChanged) {
-			this.stateManager.changePhase(result.newPhase);
+		if (result.modeChanged) {
+			this.stateManager.changePhase(result.newMode);
 		}
 
 		if (result.turnIncremented) {
-			this.stateManager.changeTurn(result.newTurnCount);
+			this.stateManager.changeTurn(result.newTurnNumber);
 		}
 
 		if (result.factionChanged && result.newFaction) {
-			this.stateManager.changeFaction(result.newFaction);
+			// faction derived from turn;
 		}
 
 		// 应用舰船状态更新
@@ -373,9 +372,9 @@ export class Room {
 		this.callbacks.broadcast({
 			type: "TURN_CHANGED",
 			payload: {
-				turn: newState.turnCount,
-				activeFaction: newState.activeFaction,
-				phase: newState.phase,
+				turn: newState.turn?.number ?? 0,
+				factionIndex: newState.turn?.factionIndex ?? 0,
+				mode: newState.mode,
 				changedAt: Date.now(),
 			},
 		});
@@ -395,9 +394,9 @@ export class Room {
 			id: this.id,
 			name: this.options.roomName,
 			createdAt: this.createdAt,
-			phase: state.phase,
-			turn: state.turnCount,
-			activeFaction: state.activeFaction,
+			phase: state.mode,
+			turn: state.turn?.number ?? 0,
+			factionIndex: state.turn?.factionIndex ?? 0,
 			playerCount: this.playerConnections.size,
 			maxPlayers: this.options.maxPlayers,
 			mapSize: { width: this.options.mapWidth, height: this.options.mapHeight },
@@ -452,8 +451,8 @@ export class Room {
 	get maxPlayers(): number {
 		return this.options.maxPlayers;
 	}
-	get phase(): GamePhase {
-		return this.stateManager.getState().phase;
+	get mode(): GameModeType {
+		return this.stateManager.getState().mode;
 	}
 
 	getCombatTokens(): CombatToken[] {
@@ -514,7 +513,7 @@ export class Room {
 					});
 					break;
 				case "START_GAME":
-					if (this.stateManager.getState().phase !== GamePhase.DEPLOYMENT) {
+					if (this.stateManager.getState().mode !== GameMode.DEPLOYMENT) {
 						this.callbacks.sendToPlayer(playerId, {
 							type: "ERROR",
 							payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" },
@@ -533,7 +532,7 @@ export class Room {
 					this.advancePhase();
 					this.callbacks.sendToPlayer(playerId, {
 						type: "NEXT_TURN_SUCCESS",
-						payload: { turn: this.stateManager.getState().turnCount },
+						payload: { turn: this.stateManager.getState().turn?.number ?? 0 },
 						requestId,
 					});
 					break;

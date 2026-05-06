@@ -11,7 +11,7 @@ import type { RoomPlayerState, CombatToken } from "@vt/data";
 import "./turn-bar.css";
 
 interface TurnBarProps {
-	phase: GamePhase;
+	phase: string;
 	turnCount: number;
 	activeFaction: Faction | undefined;
 	players: Record<string, RoomPlayerState>;
@@ -21,7 +21,7 @@ interface TurnBarProps {
 	onReadyToggle: () => void;
 }
 
-const PHASE_LABELS: Record<GamePhase, string> = {
+const PHASE_LABELS: Record<string, string> = {
 	DEPLOYMENT: "部署",
 	PLAYER_ACTION: "行动",
 };

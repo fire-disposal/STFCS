@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import type { GameRoomState, CombatToken, RoomPlayerState } from "@vt/data";
+import { DEFAULT_TURN_ORDER } from "@vt/data";
 
 interface GameActionSender {
-	send: <E extends import("@vt/data").WsEventName>(event: E, payload: import("@vt/data").WsPayload<E>) => Promise<import("@vt/data").WsResponseData<E>>;
+	send: <E extends import("@vt/data").WsEventName>(
+		event: E,
+		payload: import("@vt/data").WsPayload<E>
+	) => Promise<import("@vt/data").WsResponseData<E>>;
 	isAvailable: () => boolean;
 }
 
@@ -18,7 +22,9 @@ interface GameStore {
 }
 
 const emptySender: GameActionSender = {
-	send: async () => { throw new Error("Room not available"); },
+	send: async () => {
+		throw new Error("Room not available");
+	},
 	isAvailable: () => false,
 };
 
@@ -27,19 +33,21 @@ export const useGameStore = create<GameStore>((set) => ({
 	actionSender: emptySender,
 	playerId: null,
 
-	setRoom: (state, send, playerId) => set({
-		state,
-		playerId: playerId ?? null,
-		actionSender: {
-			send,
-			isAvailable: () => true,
-		},
-	}),
+	setRoom: (state, send, playerId) =>
+		set({
+			state,
+			playerId: playerId ?? null,
+			actionSender: {
+				send,
+				isAvailable: () => true,
+			},
+		}),
 
-	clearRoom: () => set({
-		state: null,
-		actionSender: emptySender,
-	}),
+	clearRoom: () =>
+		set({
+			state: null,
+			actionSender: emptySender,
+		}),
 
 	updateState: (state) => set({ state }),
 
@@ -61,9 +69,20 @@ export const useGamePlayerId = () => useGameStore((s) => s.playerId);
 export const useGameRoomId = () => useGameStore((s) => s.state?.roomId ?? null);
 export const useGameTokens = () => useGameStore((s) => s.state?.tokens ?? EMPTY_TOKENS);
 export const useGamePlayers = () => useGameStore((s) => s.state?.players ?? EMPTY_PLAYERS);
-export const useGamePhase = () => useGameStore((s) => s.state?.phase ?? "DEPLOYMENT");
-export const useGameTurnCount = () => useGameStore((s) => s.state?.turnCount ?? 0);
-export const useGameActiveFaction = () => useGameStore((s) => s.state?.activeFaction);
+export const useGamePhase = () =>
+	useGameStore((s) => {
+		if (!s.state) return "DEPLOYMENT";
+		// mode → 传统 phase 名称
+		if (s.state.mode === "COMBAT") return "PLAYER_ACTION";
+		return s.state.mode;
+	});
+export const useGameTurnCount = () => useGameStore((s) => s.state?.turn?.number ?? 0);
+export const useGameActiveFaction = () =>
+	useGameStore((s) => {
+		if (s.state?.mode !== "COMBAT" || !s.state.turn) return undefined;
+		const { DEFAULT_TURN_ORDER } = require("@vt/data");
+		return DEFAULT_TURN_ORDER[s.state.turn.factionIndex];
+	});
 export const useGameLogs = () => useGameStore((s) => s.state?.logs ?? EMPTY_ARRAY);
 const EMPTY_ARRAY: readonly any[] = [];
 

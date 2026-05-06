@@ -67,27 +67,29 @@ export const ArmorQuadrant = ArmorQuadrantSchema.enum;
 export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
 
 /**
- * 游戏阶段（GamePhase）- 顶层状态
+ * 游戏模式（GameMode）- 顶层状态
  *
- * Phase ↔ activeFaction 对应规则：
- * - DEPLOYMENT: activeFaction = undefined（部署）
- * - WORLD_EXPLORATION: activeFaction = undefined（世界观航行，GM 驱动）
- * - PLAYER_ACTION: activeFaction 由 TURN_ORDER 决定（战术战斗，派系轮流）
+ * 三种模式互斥，由 GM 切换：
+ * - DEPLOYMENT: 部署舰船
+ * - COMBAT: 战术战斗（此时 turn 字段有效，派系轮流行动）
+ * - WORLD: 世界观航行（仅 world 模式启用时，GM 驱动叙事）
  *
- * Phase 转换流程（世界观模式启用时）：
- * 1. DEPLOYMENT → WORLD_EXPLORATION（GM 开始探索）
- * 2. WORLD_EXPLORATION → PLAYER_ACTION（触发遭遇/GM 手动进入战斗）
- * 3. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
- * 4. 最后一个派系行动完毕后 → WORLD_EXPLORATION（返回星图）
- *
- * Phase 转换流程（传统模式）：
- * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后游戏开始）
- * 2. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
- * 3. 最后一个派系行动完毕后 turn++，回到第一个派系
+ * turn 字段仅在 COMBAT 模式下有效，其他模式下为 undefined。
  */
-export const GamePhaseSchema = z.enum(["DEPLOYMENT", "WORLD_EXPLORATION", "PLAYER_ACTION"]);
-export const GamePhase = GamePhaseSchema.enum;
-export type GamePhase = z.infer<typeof GamePhaseSchema>;
+export const GameModeSchema = z.enum(["DEPLOYMENT", "COMBAT", "WORLD"]);
+export const GameMode = GameModeSchema.enum;
+export type GameMode = z.infer<typeof GameModeSchema>;
+
+/**
+ * 战术回合状态 — 仅在 COMBAT 模式下有效
+ */
+export const TurnStateSchema = z.object({
+	/** 回合数 */
+	number: z.number().default(1),
+	/** 当前活跃派系在 turnOrder 中的索引 */
+	factionIndex: z.number().default(0),
+});
+export type TurnState = z.infer<typeof TurnStateSchema>;
 
 export const FactionSchema = z.enum(["PLAYER_ALLIANCE", "FATE_GRIP"]);
 export const Faction = FactionSchema.enum;
@@ -95,8 +97,6 @@ export type Faction = z.infer<typeof FactionSchema>;
 
 /**
  * 派系主题色映射
- * - PLAYER_ALLIANCE: 蓝色系（玩家联盟）
- * - FATE_GRIP: 红色系（命运之握）
  */
 export const FactionColors: Record<Faction, number> = {
 	[Faction.PLAYER_ALLIANCE]: 0x4a9eff,
@@ -112,16 +112,16 @@ export const FactionLabels: Record<Faction, string> = {
 };
 
 /**
- * 回合行动顺序
- * 定义每轮（turn）中各派系的行动顺序。
- * 添加新派系时只需在此数组中插入即可。
- * 系统按此顺序循环：每个派系行动完毕后切换到下一个，
- * 最后一个派系行动完毕后 turn++ 并回到第一个。
+ * 默认回合行动顺序
+ * 房间创建时自动设置为该值，GM 可通过接口修改。
  */
-export const TURN_ORDER: Faction[] = [
+export const DEFAULT_TURN_ORDER: Faction[] = [
 	Faction.PLAYER_ALLIANCE,
 	Faction.FATE_GRIP,
 ];
+
+/** @deprecated 使用 DEFAULT_TURN_ORDER */
+export const TURN_ORDER = DEFAULT_TURN_ORDER;
 
 export const PlayerRoleSchema = z.enum(["HOST", "PLAYER"]);
 export const PlayerRole = PlayerRoleSchema.enum;
@@ -622,28 +622,37 @@ export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>
 /**
  * 游戏房间状态
  *
- * 重要：phase 和 activeFaction 存在固定对应关系
- * 修改 phase 时必须同步更新 activeFaction：
- * - phase="DEPLOYMENT" → activeFaction=undefined
- * - phase="PLAYER_ACTION" → activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+ * 模式（mode）与回合（turn）分离：
+ * - mode = "DEPLOYMENT" | "COMBAT" | "WORLD"
+ * - turn 仅在 COMBAT 模式下有效
  */
 export const GameRoomStateSchema = z.object({
 	roomId: z.string(),
 	name: z.string().optional(),
 	ownerId: z.string(),
-	phase: GamePhaseSchema,
-	turnCount: z.number().default(0),
-	activeFaction: FactionSchema.optional(),
+	mode: GameModeSchema,
+	turn: TurnStateSchema.optional(),
 	players: z.record(z.string(), RoomPlayerStateSchema),
 	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),
-	/** 世界观地图（可选，启用时覆盖传统单战斗地图模式。定义见 WorldSchemas.ts） */
+	/** 世界观地图（可选） */
 	world: z.custom<WorldMap>().optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
 	logs: z.array(BattleLogEventSchema).default([]).optional(),
 	createdAt: z.number(),
 });
 export type GameRoomState = z.infer<typeof GameRoomStateSchema>;
+
+/** @deprecated 兼容层 — 从新 schema 推导旧 phase */
+export function getPhase(state: GameRoomState): string {
+	if (state.mode === "COMBAT") return "PLAYER_ACTION";
+	return state.mode;
+}
+/** @deprecated 兼容层 — 从新 schema 推导旧 activeFaction */
+export function getActiveFaction(state: GameRoomState): Faction | undefined {
+	if (state.mode !== "COMBAT" || !state.turn) return undefined;
+	return DEFAULT_TURN_ORDER[state.turn.factionIndex] as Faction | undefined;
+}
 
 // ============================================================
 // 存档类型（精简为单一权威定义）
@@ -833,3 +842,10 @@ export const RoomArchiveSchema = z.object({
 	updatedAt: z.number(),
 });
 export type RoomArchive = z.infer<typeof RoomArchiveSchema>;
+
+/** @deprecated 兼容层 — 映射到 GameMode */
+export const GamePhase = {
+  DEPLOYMENT: "DEPLOYMENT",
+  PLAYER_ACTION: "COMBAT",
+  WORLD_EXPLORATION: "WORLD",
+} as const;

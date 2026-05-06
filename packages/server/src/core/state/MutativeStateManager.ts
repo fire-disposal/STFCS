@@ -24,10 +24,14 @@ import type {
 	CombatToken,
 	TokenRuntime,
 	TokenSpec,
-	Faction,
 	EditLogContext,
 } from "@vt/data";
-import { TURN_ORDER, GamePhase } from "@vt/data";
+import {
+	DEFAULT_TURN_ORDER,
+	GameMode,
+	type GameMode as GameModeType,
+	type Faction,
+} from "@vt/data";
 
 export interface MutateResult {
 	patches: Patch[];
@@ -53,8 +57,7 @@ export class MutativeStateManager {
 		this.state = initialState ?? {
 			roomId,
 			ownerId: "",
-			phase: GamePhase.DEPLOYMENT,
-			turnCount: 0,
+			mode: GameMode.DEPLOYMENT,
 			players: {},
 			tokens: {},
 			globalModifiers: {},
@@ -540,17 +543,22 @@ export class MutativeStateManager {
 		});
 	}
 
-	/**
-	 * 切换阶段，同时自动更新 activeFaction。
-	 * phase ↔ activeFaction 对应关系：
-	 *   DEPLOYMENT   → undefined
-	 *   PLAYER_ACTION → TURN_ORDER 循环决定
-	 */
-	changePhase(phase: GamePhase): void {
+	setMode(mode: GameModeType): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.phase = phase;
-			draft.activeFaction = this.getFactionForPhase(phase);
+			draft.mode = mode;
+			if (mode === GameMode.COMBAT && !draft.turn) {
+				draft.turn = { number: 1, factionIndex: 0 };
+			} else if (mode !== GameMode.COMBAT) {
+				draft.turn = undefined;
+			}
 		});
+	}
+
+	/** @deprecated 使用 setMode */
+	changePhase(phase: string): void {
+		if (phase === "PLAYER_ACTION") this.setMode(GameMode.COMBAT);
+		else if (phase === "WORLD_EXPLORATION") this.setMode(GameMode.WORLD);
+		else this.setMode(GameMode.DEPLOYMENT);
 	}
 
 	resetAllPlayersReady(): void {
@@ -563,34 +571,31 @@ export class MutativeStateManager {
 		});
 	}
 
-	/**
-	 * 根据阶段获取当前活跃派系
-	 * PLAYER_ACTION 阶段使用 TURN_ORDER 决定当前派系
-	 * DEPLOYMENT 阶段无派系
-	 */
-	private getFactionForPhase(phase: GamePhase): Faction | undefined {
-		if (phase === GamePhase.PLAYER_ACTION) {
-			// 根据回合数决定当前活跃派系（TURN_ORDER 循环）
-			// turnCount=0时使用turnCount=1（部署阶段无回合，首次进入PLAYER_ACTION时视为第1回合）
-			// JS负数取模问题：(-1) % 2 = -1，需先取绝对值
-			const effectiveTurn = Math.max(1, this.state.turnCount);
-			const factionIndex = (effectiveTurn - 1) % TURN_ORDER.length;
-			return TURN_ORDER[factionIndex] as Faction;
-		}
-		return undefined;
+	advanceTurn(): void {
+		this.mutateAndBroadcast((draft) => {
+			if (!draft.turn) {
+				draft.turn = { number: 1, factionIndex: 0 };
+				return;
+			}
+			const nextIndex = draft.turn.factionIndex + 1;
+			if (nextIndex >= DEFAULT_TURN_ORDER.length) {
+				draft.turn.number += 1;
+				draft.turn.factionIndex = 0;
+			} else {
+				draft.turn.factionIndex = nextIndex;
+			}
+		});
 	}
 
+	/** @deprecated 使用 advanceTurn */
 	changeTurn(turn: number): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = turn;
+			if (draft.turn) draft.turn.number = turn;
 		});
 	}
 
-	changeFaction(faction: Faction): void {
-		this.mutateAndBroadcast((draft) => {
-			draft.activeFaction = faction;
-		});
-	}
+	/** @deprecated 不再需要 — faction 由 turn 推导 */
+	changeFaction(_faction: Faction): void {}
 
 	changeHost(newOwnerId: string): void {
 		this.mutateAndBroadcast((draft) => {
@@ -617,9 +622,8 @@ export class MutativeStateManager {
 
 	startGame(): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = 1;
-			draft.phase = GamePhase.PLAYER_ACTION;
-			draft.activeFaction = TURN_ORDER[0] as Faction;
+			draft.mode = GameMode.COMBAT;
+			draft.turn = { number: 1, factionIndex: 0 };
 		});
 	}
 

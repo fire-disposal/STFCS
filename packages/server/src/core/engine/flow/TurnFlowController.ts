@@ -1,97 +1,142 @@
 /**
- * 回合流程控制器
+ * 回合流程控制器 — 适配 GameMode + TurnState
  *
- * 统一管理：
- * 1. 回合推进逻辑（派系轮换、回合结算）
- * 2. 阶段切换逻辑（部署 → 行动）
- * 3. 辐能结算（护盾维持、自然散热、主动排散）
- * 4. 过载管理（触发、恢复）
+ * 操作在 TurnState（turn.number + turn.factionIndex）上，
+ * 不再依赖 phase/activeFaction 联动。
  *
- * 设计原则：
- * - 纯计算函数（返回结果，无副作用）
- * - 数值统一整数化
- * - 单一入口点，消除逻辑分散
+ * 三种模式：
+ * - DEPLOYMENT: 无 turn，calculateTurnAdvance → 初始化 turn 进入 COMBAT
+ * - COMBAT: turn 有效，推进 factionIndex/number
+ * - WORLD: 无 turn，由 world RPC 驱动
  */
 
 import type { GameRoomState, TokenRuntime, Faction, BattleLogEvent } from "@vt/data";
-import { TURN_ORDER, GamePhase, createBattleLogEvent } from "@vt/data";
+import { GameMode, DEFAULT_TURN_ORDER, createBattleLogEvent } from "@vt/data";
 import { processTokenTurnEnd, type TurnEndResult } from "../rules/turnEnd.js";
 
 export interface TurnAdvanceResult {
-	phaseChanged: boolean;
-	newPhase: GamePhase;
+	modeChanged: boolean;
+	newMode: GameMode;
 	factionChanged: boolean;
 	newFaction: Faction | undefined;
 	turnIncremented: boolean;
-	newTurnCount: number;
+	newTurnNumber: number;
+	returnedToWorld: boolean;
 	tokenResults: Map<string, TurnEndResult>;
 	stateUpdates: Map<string, Partial<TokenRuntime>>;
 	logEvents: BattleLogEvent[];
 }
 
-export interface PhaseChangeResult {
-	newPhase: GamePhase;
-	newFaction?: Faction;
-	turnIncremented: boolean;
-	newTurnCount: number;
+export interface TurnAdvanceValidation {
 	valid: boolean;
 	error?: string;
+	/** 是否应该返回 WORLD 模式（世界观模式启用时所有派系完成） */
+	shouldReturnToWorld: boolean;
 }
 
 /**
- * 计算回合推进结果（纯函数）
+ * 验证回合推进是否允许
  */
-export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
-	const currentPhase = state.phase;
-	const currentTurn = Math.round(state.turnCount);
-	const currentFaction = state.activeFaction;
+export function validateTurnAdvance(state: GameRoomState, isHost: boolean): TurnAdvanceValidation {
+	if (!isHost) return { valid: false, error: "只有房主可以推进回合", shouldReturnToWorld: false };
 
-	if (currentPhase === GamePhase.DEPLOYMENT) {
-		return {
-			newPhase: GamePhase.PLAYER_ACTION,
-			newFaction: TURN_ORDER[0] as Faction,
-			turnIncremented: true,
-			newTurnCount: 1,
-			valid: true,
-		};
-	}
-
-	if (currentPhase === GamePhase.PLAYER_ACTION) {
-		const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
-		const nextIndex = currentIndex + 1;
-		const incrementTurn = nextIndex >= TURN_ORDER.length;
-
-		if (incrementTurn) {
-			return {
-				newPhase: GamePhase.PLAYER_ACTION,
-				newFaction: TURN_ORDER[0] as Faction,
-				turnIncremented: true,
-				newTurnCount: currentTurn + 1,
-				valid: true,
-			};
-		} else {
-			return {
-				newPhase: GamePhase.PLAYER_ACTION,
-				newFaction: TURN_ORDER[nextIndex] as Faction,
-				turnIncremented: false,
-				newTurnCount: currentTurn,
-				valid: true,
-			};
+	if (state.mode === GameMode.DEPLOYMENT) {
+		if (Object.keys(state.tokens).length === 0) {
+			return { valid: false, error: "至少需要部署一艘舰船", shouldReturnToWorld: false };
 		}
 	}
 
-	return {
-		newPhase: currentPhase,
-		turnIncremented: false,
-		newTurnCount: currentTurn,
-		valid: false,
-		error: "未知阶段",
-	};
+	// 世界观模式：如果已经完成最后一个派系且世界模式启用，返回世界
+	const shouldReturnToWorld =
+		state.mode === GameMode.COMBAT &&
+		!!state.world &&
+		state.turn !== undefined &&
+		state.turn.factionIndex >= DEFAULT_TURN_ORDER.length - 1;
+
+	return { valid: true, shouldReturnToWorld };
 }
 
 /**
- * 处理回合结算（所有舰船）
- * 返回：状态更新 + 日志事件
+ * 执行回合推进
+ *
+ * 根据 mode 决定行为：
+ * - DEPLOYMENT → 初始化 turn，进入 COMBAT
+ * - COMBAT → factionIndex++，超出则 number++ 并重置
+ * - COMBAT + world 模式 + 最后派系 → 返回 WORLD
+ */
+export function executeTurnAdvance(state: GameRoomState): TurnAdvanceResult {
+	const result: TurnAdvanceResult = {
+		modeChanged: false,
+		newMode: state.mode,
+		factionChanged: false,
+		newFaction: undefined,
+		turnIncremented: false,
+		newTurnNumber: state.turn?.number ?? 0,
+		returnedToWorld: false,
+		tokenResults: new Map(),
+		stateUpdates: new Map(),
+		logEvents: [],
+	};
+
+	// DEPLOYMENT → COMBAT
+	if (state.mode === GameMode.DEPLOYMENT) {
+		result.modeChanged = true;
+		result.newMode = GameMode.COMBAT;
+		result.factionChanged = true;
+		result.newFaction = DEFAULT_TURN_ORDER[0] as Faction;
+		result.turnIncremented = true;
+		result.newTurnNumber = 1;
+		result.logEvents.push(
+			createBattleLogEvent("game_started", { firstFaction: DEFAULT_TURN_ORDER[0] })
+		);
+		return result;
+	}
+
+	if (state.mode !== GameMode.COMBAT || !state.turn) {
+		return result;
+	}
+
+	// COMBAT：推进 factionIndex
+	const nextIndex = state.turn.factionIndex + 1;
+	const isLastFaction = nextIndex >= DEFAULT_TURN_ORDER.length;
+
+	// 世界观模式 + 最后派系 → 返回 WORLD
+	if (isLastFaction && !!state.world) {
+		result.modeChanged = true;
+		result.newMode = GameMode.WORLD;
+		result.factionChanged = true;
+		result.newFaction = undefined;
+		result.returnedToWorld = true;
+		// 执行回合结算
+		const settlement = processTurnEndSettlement(state);
+		result.tokenResults = settlement.tokenResults;
+		result.stateUpdates = settlement.stateUpdates;
+		result.logEvents = settlement.logEvents;
+		return result;
+	}
+
+	if (isLastFaction) {
+		// 传统模式：回合递增
+		result.turnIncremented = true;
+		result.newTurnNumber = state.turn.number + 1;
+		result.factionChanged = true;
+		result.newFaction = DEFAULT_TURN_ORDER[0] as Faction;
+		// 回合结算
+		const settlement = processTurnEndSettlement(state);
+		result.tokenResults = settlement.tokenResults;
+		result.stateUpdates = settlement.stateUpdates;
+		result.logEvents = settlement.logEvents;
+	} else {
+		// 派系内推进
+		result.factionChanged = true;
+		result.newFaction = DEFAULT_TURN_ORDER[nextIndex] as Faction;
+	}
+
+	return result;
+}
+
+/**
+ * 处理所有舰船的回合结算
  */
 export function processTurnEndSettlement(state: GameRoomState): {
 	tokenResults: Map<string, TurnEndResult>;
@@ -109,7 +154,6 @@ export function processTurnEndSettlement(state: GameRoomState): {
 		const result = processTokenTurnEnd(token);
 		tokenResults.set(tokenId, result);
 
-		// 构建状态更新
 		const updates: Partial<TokenRuntime> = {
 			fluxSoft: Math.round(result.newFluxSoft),
 			fluxHard: Math.round(result.newFluxHard),
@@ -130,15 +174,11 @@ export function processTurnEndSettlement(state: GameRoomState): {
 			updates.overloaded = false;
 			updates.overloadTime = 0;
 		}
-
 		if (result.overloadTriggered) {
 			updates.overloaded = true;
 			updates.overloadTime = 1;
-			if (token.runtime.shield) {
-				updates.shield = { ...token.runtime.shield, active: false };
-			}
+			if (token.runtime.shield) updates.shield = { ...token.runtime.shield, active: false };
 		}
-
 		if (result.weaponsUpdated && result.updatedWeapons) {
 			updates.weapons = result.updatedWeapons;
 		}
@@ -146,97 +186,47 @@ export function processTurnEndSettlement(state: GameRoomState): {
 		stateUpdates.set(tokenId, updates);
 
 		// 辐能结算日志
-		if (result.shieldUpkeepAdded > 0 || result.dissipationReduced > 0 || result.ventingCleared || result.fluxChange !== 0) {
+		if (
+			result.shieldUpkeepAdded > 0 ||
+			result.dissipationReduced > 0 ||
+			result.ventingCleared ||
+			result.fluxChange !== 0
+		) {
 			const fluxBefore = Math.round((token.runtime.fluxSoft ?? 0) + (token.runtime.fluxHard ?? 0));
 			const fluxAfter = Math.round(result.newFluxSoft + result.newFluxHard);
-
-			logEvents.push(createBattleLogEvent("flux_settlement", {
-				tokenId,
-				tokenName: token.metadata?.name ?? tokenId,
-				shieldUpkeep: Math.round(result.shieldUpkeepAdded),
-				dissipation: Math.round(result.dissipationReduced),
-				ventingCleared: result.ventingCleared ? Math.round(result.ventingClearedAmount) : 0,
-				fluxBefore,
-				fluxAfter,
-				fluxChange: Math.round(result.fluxChange),
-				changeType: result.fluxChange > 0 ? "increase" : result.fluxChange < 0 ? "decrease" : "neutral",
-			}));
+			logEvents.push(
+				createBattleLogEvent("flux_settlement", {
+					tokenId,
+					tokenName: token.metadata?.name ?? tokenId,
+					shieldUpkeep: Math.round(result.shieldUpkeepAdded),
+					dissipation: Math.round(result.dissipationReduced),
+					ventingCleared: result.ventingCleared ? Math.round(result.ventingClearedAmount) : 0,
+					fluxBefore,
+					fluxAfter,
+					fluxChange: Math.round(result.fluxChange),
+					changeType:
+						result.fluxChange > 0 ? "increase" : result.fluxChange < 0 ? "decrease" : "neutral",
+				})
+			);
 		}
-
-		// 过载恢复日志
 		if (result.overloadEnded) {
-			logEvents.push(createBattleLogEvent("overload_end", {
-				tokenId,
-				tokenName: token.metadata?.name ?? tokenId,
-			}));
+			logEvents.push(
+				createBattleLogEvent("overload_end", {
+					tokenId,
+					tokenName: token.metadata?.name ?? tokenId,
+				})
+			);
 		}
-
-		// 过载触发日志（护盾维持导致）
 		if (result.overloadTriggered) {
-			logEvents.push(createBattleLogEvent("overload", {
-				tokenId,
-				tokenName: token.metadata?.name ?? tokenId,
-				reason: "shield_upkeep",
-			}));
+			logEvents.push(
+				createBattleLogEvent("overload", {
+					tokenId,
+					tokenName: token.metadata?.name ?? tokenId,
+					reason: "shield_upkeep",
+				})
+			);
 		}
 	}
 
 	return { tokenResults, stateUpdates, logEvents };
-}
-
-/**
- * 执行完整的回合推进流程（组合函数）
- */
-export function executeTurnAdvance(state: GameRoomState): TurnAdvanceResult {
-	const phaseResult = calculateTurnAdvance(state);
-
-	const result: TurnAdvanceResult = {
-		phaseChanged: state.phase !== phaseResult.newPhase,
-		newPhase: phaseResult.newPhase,
-		factionChanged: state.activeFaction !== phaseResult.newFaction,
-		newFaction: phaseResult.newFaction ?? undefined,
-		turnIncremented: phaseResult.turnIncremented,
-		newTurnCount: Math.round(phaseResult.newTurnCount),
-		tokenResults: new Map(),
-		stateUpdates: new Map(),
-		logEvents: [],
-	};
-
-	// 回合结算（仅在回合递增时执行）
-	if (phaseResult.turnIncremented && phaseResult.newPhase === GamePhase.PLAYER_ACTION) {
-		const settlement = processTurnEndSettlement(state);
-		result.tokenResults = settlement.tokenResults;
-		result.stateUpdates = settlement.stateUpdates;
-		result.logEvents = settlement.logEvents;
-	}
-
-	// 添加派系切换日志
-	if (phaseResult.newFaction) {
-		result.logEvents.push(createBattleLogEvent("faction_change", {
-			fromFaction: state.activeFaction,
-			toFaction: phaseResult.newFaction,
-			turn: result.newTurnCount,
-		}));
-	}
-
-	return result;
-}
-
-/**
- * 验证回合推进是否允许
- */
-export function validateTurnAdvance(state: GameRoomState, isHost: boolean): { valid: boolean; error?: string } {
-	if (!isHost) {
-		return { valid: false, error: "只有房主可以推进回合" };
-	}
-
-	if (state.phase === GamePhase.DEPLOYMENT) {
-		// 部署阶段开始游戏需要检查是否有舰船
-		const tokenCount = Object.keys(state.tokens).length;
-		if (tokenCount === 0) {
-			return { valid: false, error: "至少需要部署一艘舰船" };
-		}
-	}
-
-	return { valid: true };
 }

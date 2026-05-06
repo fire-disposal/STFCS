@@ -87,7 +87,7 @@ export class PlayerProfileService {
 				mapHeight: snapshot.map?.size?.height ?? 2000,
 				maxPlayers: Object.keys(snapshot.players).length,
 				playerCount: Object.keys(snapshot.players).length,
-				totalTurns: snapshot.turnCount,
+				totalTurns: snapshot.turn?.number ?? 0,
 				gameDuration: Date.now() - snapshot.createdAt,
 			},
 			playerIds: Object.keys(snapshot.players),

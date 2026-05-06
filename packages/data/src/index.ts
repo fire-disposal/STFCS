@@ -27,7 +27,7 @@ export {
 export type { PresetShip, PresetWeapon } from "./presets/index.js"
 
 import {
-  GamePhase,
+  GameMode,
   Faction,
   PlayerRole,
   DamageType,
@@ -36,7 +36,7 @@ import {
   ShipClass,
 } from "./core/GameSchemas.js"
 
-export type GamePhaseValue = (typeof GamePhase)[keyof typeof GamePhase]
+export type GameModeValue = (typeof GameMode)[keyof typeof GameMode]
 export type FactionValue = (typeof Faction)[keyof typeof Faction]
 export type PlayerRoleValue = (typeof PlayerRole)[keyof typeof PlayerRole]
 export type DamageTypeValue = (typeof DamageType)[keyof typeof DamageType]

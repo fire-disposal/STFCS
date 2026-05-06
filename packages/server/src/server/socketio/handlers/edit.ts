@@ -2,7 +2,7 @@
  * edit namespace handlers — 编辑态下的舰船/房间操作
  */
 import { err } from "./err.js";
-import { MovementPhase, ErrorCodes, createBattleLogEvent, GamePhase } from "@vt/data";
+import { MovementPhase, ErrorCodes, createBattleLogEvent, GameMode } from "@vt/data";
 import type { WsPayload, WsResponseData } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import {
@@ -224,12 +224,12 @@ export const editHandlers = {
 				const result = executeTurnAdvance(state);
 
 				// 应用状态更新
-				if (result.phaseChanged) {
-					ctx.state.changePhase(result.newPhase);
+				if (result.modeChanged) {
+					ctx.state.setMode(result.newMode);
 				}
 
 				if (result.turnIncremented) {
-					ctx.state.changeTurn(result.newTurnCount);
+					ctx.state.changeTurn(result.newTurnNumber);
 				}
 
 				if (result.factionChanged && result.newFaction) {
@@ -251,7 +251,7 @@ export const editHandlers = {
 			}
 			case "set_phase": {
 				if (!p.phase) throw err("需要 phase", ErrorCodes.PHASE_REQUIRED);
-				const validPhases = Object.values(GamePhase);
+				const validPhases = Object.values(GameMode);
 				if (!validPhases.includes(p.phase as any)) {
 					throw err(`无效阶段: ${p.phase}，有效值: ${validPhases.join(", ")}`, ErrorCodes.ERROR);
 				}
