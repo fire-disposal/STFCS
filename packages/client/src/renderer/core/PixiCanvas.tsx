@@ -277,6 +277,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 			const center = worldMap.nodes?.find((n: any) => n.id === worldMap.fleetNodeId);
 			if (center) {
 				camera.cameraRef.current.x = center.position.x;
+            camera.cameraRef.current.zoom = 0.8;
+            camera.cameraRef.current.viewRotation = 0;
 				camera.cameraRef.current.y = center.position.y;
 			}
 		}

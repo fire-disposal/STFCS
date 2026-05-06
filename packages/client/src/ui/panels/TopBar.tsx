@@ -18,6 +18,7 @@ import { SaveMenu } from "./SaveMenu";
 import { useUIStore } from "@/state/stores/uiStore";
 import {
 	useGamePhase,
+	useGameMode,
 	useGameTurnCount,
 	useGameActiveFaction,
 	useGamePlayers,
@@ -40,6 +41,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 	onFactionChange,
 }) => {
 	// 从 Zustand 直接获取所有游戏状态
+	const gameMode = useGameMode();
 	const phase = useGamePhase();
 	const turnCount = useGameTurnCount();
 	const activeFaction = useGameActiveFaction();
@@ -69,6 +71,9 @@ export const TopBar: React.FC<TopBarProps> = ({
 					isReady={isReady}
 					onReadyToggle={onReadyToggle}
 				/>
+				<span className={`top-bar__mode top-bar__mode--${gameMode.toLowerCase()}`}>
+					{gameMode === "COMBAT" ? "战斗" : gameMode === "WORLD" ? "星图" : "部署"}
+				</span>
 			</div>
 
 			<div className="top-bar__center">
@@ -114,12 +119,15 @@ const FactionSelector: React.FC<{
 }> = ({ currentFaction, currentPlayerId, onFactionChange }) => {
 	const [open, setOpen] = useState(false);
 
-	const handleSelect = useCallback((faction: Faction) => {
-		if (currentPlayerId && onFactionChange) {
-			onFactionChange(currentPlayerId, faction);
-		}
-		setOpen(false);
-	}, [currentPlayerId, onFactionChange]);
+	const handleSelect = useCallback(
+		(faction: Faction) => {
+			if (currentPlayerId && onFactionChange) {
+				onFactionChange(currentPlayerId, faction);
+			}
+			setOpen(false);
+		},
+		[currentPlayerId, onFactionChange]
+	);
 
 	if (!currentPlayerId || !onFactionChange) return null;
 
@@ -132,7 +140,9 @@ const FactionSelector: React.FC<{
 				onClick={() => setOpen(!open)}
 				title={currentFaction ? `${FactionLabels[currentFaction]}` : "选择派系"}
 				style={{
-					borderColor: currentFaction ? `#${FactionColors[currentFaction].toString(16).padStart(6, "0")}` : undefined,
+					borderColor: currentFaction
+						? `#${FactionColors[currentFaction].toString(16).padStart(6, "0")}`
+						: undefined,
 					borderWidth: 1,
 					borderStyle: "solid",
 				}}
@@ -174,7 +184,10 @@ const FactionSelector: React.FC<{
 								fontSize: 12,
 							}}
 							onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74, 158, 255, 0.1)")}
-							onMouseLeave={(e) => (e.currentTarget.style.background = currentFaction === faction ? "rgba(74, 158, 255, 0.15)" : "transparent")}
+							onMouseLeave={(e) =>
+								(e.currentTarget.style.background =
+									currentFaction === faction ? "rgba(74, 158, 255, 0.15)" : "transparent")
+							}
 						>
 							<span
 								style={{
@@ -278,15 +291,15 @@ const PlayerAvatar: React.FC<{
 		<div
 			className={`player-avatar player-avatar--${faction?.toLowerCase() ?? "none"}`}
 			title={`${player.nickname}${faction ? ` (${FactionLabels[faction]})` : ""}`}
-			style={factionColor ? {
-				borderColor: `#${factionColor.toString(16).padStart(6, "0")}`,
-			} : undefined}
+			style={
+				factionColor
+					? {
+							borderColor: `#${factionColor.toString(16).padStart(6, "0")}`,
+						}
+					: undefined
+			}
 		>
-			<Avatar
-				src={player.avatar}
-				size={28}
-				userName={player.nickname}
-			/>
+			<Avatar src={player.avatar} size={28} userName={player.nickname} />
 			<div className={`player-avatar__dot player-avatar__dot--${dotState}`} />
 		</div>
 	);
@@ -350,7 +363,9 @@ const ShipStatusBar: React.FC<{ ship: CombatToken }> = ({ ship }) => {
 							}}
 						/>
 					</div>
-					<span className="ship-status-bar__stat-value">{hull}/{hullMax}</span>
+					<span className="ship-status-bar__stat-value">
+						{hull}/{hullMax}
+					</span>
 				</div>
 			</div>
 
@@ -368,7 +383,9 @@ const ShipStatusBar: React.FC<{ ship: CombatToken }> = ({ ship }) => {
 							style={{ width: `${fluxSoftPct}%`, left: `${fluxHardPct}%` }}
 						/>
 					</div>
-					<span className="ship-status-bar__stat-value">{fluxTotal}/{fluxMax}</span>
+					<span className="ship-status-bar__stat-value">
+						{fluxTotal}/{fluxMax}
+					</span>
 				</div>
 			</div>
 
@@ -377,9 +394,7 @@ const ShipStatusBar: React.FC<{ ship: CombatToken }> = ({ ship }) => {
 				<span className="ship-status-bar__position-value">
 					({Math.round(position.x)}, {Math.round(position.y)})
 				</span>
-				<span className="ship-status-bar__position-heading">
-					{Math.round(heading)}°
-				</span>
+				<span className="ship-status-bar__position-heading">{Math.round(heading)}°</span>
 			</div>
 		</div>
 	);

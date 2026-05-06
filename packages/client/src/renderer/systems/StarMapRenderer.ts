@@ -133,10 +133,38 @@ export function useStarMapRendering(
 
 			if (isHost && !isCurrent) {
 				const nid = node.id;
+				const nname = node.name;
 				label.on("pointertap", () => {
 					const sender = getGameActionSender();
 					if (sender.isAvailable()) {
-						sender.send("world:travel", { toNodeId: nid });
+						sender
+							.send("world:travel", { toNodeId: nid })
+							.then((res: any) => {
+								if (res?.encounterTriggered) {
+									window.dispatchEvent(
+										new CustomEvent("stfcs-notification", {
+											detail: {
+												type: "warning",
+												message: `前往 ${nname} 途中遭遇敌情！`,
+												duration: 4000,
+											},
+										})
+									);
+								} else {
+									window.dispatchEvent(
+										new CustomEvent("stfcs-notification", {
+											detail: { type: "success", message: `已到达 ${nname}`, duration: 2000 },
+										})
+									);
+								}
+							})
+							.catch(() => {
+								window.dispatchEvent(
+									new CustomEvent("stfcs-notification", {
+										detail: { type: "error", message: `无法前往 ${nname}` },
+									})
+								);
+							});
 					}
 				});
 			}
