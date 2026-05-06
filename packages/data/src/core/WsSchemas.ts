@@ -19,7 +19,7 @@ import {
   AssetListItemSchema,
   BattleLogEventSchema,
 } from "./GameSchemas.js"
-import type { BattleLogEvent, RichTextSegment } from "./GameSchemas.js"
+import type { BattleLogEvent } from "./GameSchemas.js"
 
 export const WsRequestSchema = z.object({
   requestId: z.string(),
@@ -551,35 +551,17 @@ export function createPatchPayload(patches: StatePatch[]): StatePatchPayload {
 
 /**
  * 创建战斗日志事件。
+ * 后端只存纯结构化数据，前端按 event type 匹配规则着色。
  * @param type 事件类型
  * @param data 结构化数据
  * @param timestamp 时间戳（默认当前时间）
- * @param richText 可选富文本片段数组
  */
 export function createBattleLogEvent(
   type: string,
   data: Record<string, unknown> = {},
-  timestamp?: number,
-  richText?: RichTextSegment[]
+  timestamp?: number
 ): BattleLogEvent {
-  const event: BattleLogEvent = { type, data, timestamp: timestamp ?? Date.now() }
-  if (richText && richText.length > 0) {
-    event.richText = richText
-  }
-  return event
-}
-
-/**
- * 创建一个纯文本段的便捷函数
- */
-export function segment(text: string, options?: { color?: string; bold?: boolean; italic?: boolean; size?: "xs" | "sm" | "md" | "lg"; tag?: string }): RichTextSegment {
-  const s: RichTextSegment = { text }
-  if (options?.color) s.color = options.color
-  if (options?.bold) s.bold = options.bold
-  if (options?.italic) s.italic = options.italic
-  if (options?.size) s.size = options.size
-  if (options?.tag) s.tag = options.tag
-  return s
+  return { type, data, timestamp: timestamp ?? Date.now() }
 }
 
 // ============================================================
@@ -627,4 +609,3 @@ export function createBattleLogEdit(
   })
 }
 
-export type { RichTextSegment } from "./GameSchemas.js"

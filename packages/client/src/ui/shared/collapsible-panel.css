@@ -34,6 +34,15 @@
 	width: 280px;
 	height: 100%;
 	flex-shrink: 0;
+	min-height: 0;
+}
+
+/* Radix Tabs.Root 默认无 display:flex，导致 height:100% 断链 */
+.collapsible-panel--vertical [data-orientation="vertical"] {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
 }
 
 .collapsible-panel--vertical.collapsible-panel--collapsed {
