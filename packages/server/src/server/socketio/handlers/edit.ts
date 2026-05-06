@@ -228,13 +228,8 @@ export const editHandlers = {
 					ctx.state.setMode(result.newMode);
 				}
 
-				if (result.turnIncremented) {
-					ctx.state.changeTurn(result.newTurnNumber);
-				}
-
-				if (result.factionChanged && result.newFaction) {
-					ctx.state.changeFaction(result.newFaction);
-				}
+				// factionIndex 由 advanceTurn 管理，无需额外设置
+				// turnNumber 在 advanceTurn 内部递增
 
 				// 应用舰船状态更新
 				for (const [tokenId, updates] of result.stateUpdates) {
@@ -255,7 +250,7 @@ export const editHandlers = {
 				if (!validPhases.includes(p.phase as any)) {
 					throw err(`无效阶段: ${p.phase}，有效值: ${validPhases.join(", ")}`, ErrorCodes.ERROR);
 				}
-				ctx.state.changePhase(p.phase as any);
+				ctx.state.setMode(p.phase as any);
 				ctx.state.appendLog(
 					createBattleLogEvent("room_edit", {
 						playerId: ctx.playerId,
@@ -277,6 +272,20 @@ export const editHandlers = {
 						detail: `第${p.turn}回合`,
 					})
 				);
+				return;
+			}
+			case "return_to_world": {
+				// 从 COMBAT 返回 WORLD（GM 手动操作）
+				if (ctx.state.getState().world) {
+					ctx.state.setMode("WORLD" as any);
+					ctx.state.appendLog(
+						createBattleLogEvent("room_edit", {
+							playerId: ctx.playerId,
+							playerName: ctx.playerName,
+							action: "return_to_world",
+						})
+					);
+				}
 				return;
 			}
 			case "set_faction": {

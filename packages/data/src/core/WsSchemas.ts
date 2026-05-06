@@ -403,7 +403,7 @@ export type EditTokenPayload = z.infer<typeof EditTokenDef.payload>
 
 export const EditRoomDef = {
   payload: z.object({
-    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction"]),
+    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction", "return_to_world"]),
     key: z.string().optional(),
     value: z.number().optional(),
     duration: z.number().optional(),

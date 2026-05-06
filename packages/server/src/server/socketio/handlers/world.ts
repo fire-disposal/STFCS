@@ -13,7 +13,7 @@
  */
 
 import { err } from "./err.js";
-import { ErrorCodes, createBattleLogEvent } from "@vt/data";
+import { ErrorCodes, createBattleLogEvent, GameMode } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import {
 	executeTravel,
@@ -123,6 +123,64 @@ export const worldHandlers = {
 		return {
 			success: true,
 			node: result.node,
+		};
+	},
+
+	// ==================== 进入战斗 ====================
+
+	/**
+	 * world:enter_combat — 从 WORLD 模式进入 COMBAT 模式
+	 * 由 GM 手动触发（或 travel 自动触发时由客户端调用）
+	 * 效果：切换 mode、生成战术地形、初始化 turn
+	 */
+	enter_combat: async (_payload: unknown, ctx: RpcContext) => {
+		ctx.requireRoom();
+		ctx.requireHost();
+
+		const state = ctx.state.getState();
+		if (!state.world) {
+			throw err("未启用世界观模式", ErrorCodes.ERROR);
+		}
+		if (state.mode !== GameMode.WORLD) {
+			throw err("当前模式不允许进入战斗", ErrorCodes.ERROR);
+		}
+
+		// 获取当前节点的地形预设
+		const currentNode = state.world.nodes.find((n) => n.id === state.world?.fleetNodeId);
+		let generatedTerrain: any[] | undefined;
+		if (currentNode?.terrainProfile) {
+			generatedTerrain = generateTerrainFromProfile(currentNode.terrainProfile, 2000, 2000);
+		}
+
+		// 切换为 COMBAT 模式（setMode 会自动初始化 turn）
+		ctx.state.setMode(GameMode.COMBAT);
+
+		// 如果生成了地形，写入地图
+		if (generatedTerrain && generatedTerrain.length > 0) {
+			ctx.state.mutateAndBroadcast((draft) => {
+				if (!draft.map) {
+					draft.map = {
+						$id: `combat_${Date.now()}`,
+						name: currentNode?.name ?? "战斗区域",
+						size: { width: 2000, height: 2000 },
+						metadata: { name: currentNode?.name ?? "战斗区域" },
+					};
+				}
+				draft.map.terrain = generatedTerrain;
+			});
+		}
+
+		ctx.state.appendLog(
+			createBattleLogEvent("enter_combat", {
+				nodeId: state.world.fleetNodeId,
+				nodeName: currentNode?.name,
+				terrainCount: generatedTerrain?.length ?? 0,
+			})
+		);
+
+		return {
+			success: true,
+			terrain: generatedTerrain,
 		};
 	},
 

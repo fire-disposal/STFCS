@@ -346,15 +346,9 @@ export class Room {
 
 		// 应用状态更新
 		if (result.modeChanged) {
-			this.stateManager.changePhase(result.newMode);
-		}
-
-		if (result.turnIncremented) {
-			this.stateManager.changeTurn(result.newTurnNumber);
-		}
-
-		if (result.factionChanged && result.newFaction) {
-			// faction derived from turn;
+			this.stateManager.setMode(result.newMode);
+		} else if (result.turnIncremented || result.factionChanged) {
+			this.stateManager.advanceTurn();
 		}
 
 		// 应用舰船状态更新
