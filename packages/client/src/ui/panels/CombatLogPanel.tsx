@@ -610,13 +610,18 @@ export const CombatLogPanel: React.FC = () => {
 	// 追踪已知日志 key，新条目获得动画 class
 	const seenKeysRef = useRef<Set<string>>(new Set());
 	const newKeysRef = useRef<Set<string>>(new Set());
-	useEffect(() => { seenKeysRef.current.clear(); }, [activeFilter]);
+	useEffect(() => {
+		seenKeysRef.current.clear();
+	}, [activeFilter]);
 	useMemo(() => {
 		const seen = seenKeysRef.current;
 		const fresh = new Set<string>();
 		for (const log of filtered) {
 			const k = `${log.timestamp}-${log.type}`;
-			if (!seen.has(k)) { fresh.add(k); seen.add(k); }
+			if (!seen.has(k)) {
+				fresh.add(k);
+				seen.add(k);
+			}
 		}
 		newKeysRef.current = fresh;
 	}, [filtered]);
@@ -685,7 +690,10 @@ export const CombatLogPanel: React.FC = () => {
 					filtered.map((log, i) => {
 						const isNew = newKeysRef.current.has(`${log.timestamp}-${log.type}`);
 						return (
-							<div key={`${log.timestamp}-${i}`} className={`combat-log-entry${isNew ? " log-entry-new" : ""}`}>
+							<div
+								key={`${log.timestamp}-${i}`}
+								className={`combat-log-entry${isNew ? " log-entry-new" : ""}`}
+							>
 								<div style={{ flex: 1, minWidth: 0 }}>
 									<DataLogRenderer log={log} tokens={tokens} />
 								</div>
