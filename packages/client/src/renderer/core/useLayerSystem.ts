@@ -58,7 +58,11 @@ export interface LayerRegistry {
 	grid: Container;
 	/** [zIndex 5] 世界坐标系光标 */
 	cursor: Container;
-	/** [zIndex 7] 舰船战术标记（箭头 token + 挂载点 + 武器标记） */
+	/** [zIndex 6] 星图连线层 */
+	starMapEdges: Container;
+	/** [zIndex 7] 星图节点和标签层 */
+	starMapNodes: Container;
+	/** [zIndex 8] 舰船战术标记 */
 	tacticalTokens: Container;
 	/** [zIndex 8] 武器射界可视化 */
 	weaponArcs: Container;

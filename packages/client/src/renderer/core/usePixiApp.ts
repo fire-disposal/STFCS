@@ -190,6 +190,14 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			cursorLayer.eventMode = "none";
 			cursorLayer.sortableChildren = true;
 
+			const starMapEdgesLayer = new Container();
+			starMapEdgesLayer.zIndex = 6;
+			starMapEdgesLayer.eventMode = "none";
+
+			const starMapNodesLayer = new Container();
+			starMapNodesLayer.zIndex = 7;
+			starMapNodesLayer.eventMode = "static";
+
 			const tacticalTokensLayer = new Container();
 			tacticalTokensLayer.zIndex = 7;
 			tacticalTokensLayer.eventMode = "static";
@@ -227,6 +235,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				starfieldNear,
 				grid,
 				cursorLayer,
+				starMapEdgesLayer,
+				starMapNodesLayer,
 				tacticalTokensLayer,
 				weaponArcsLayer,
 				movementVisualsLayer,
@@ -278,6 +288,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				cursor: cursorLayer,
 				shipSprites: shipSpritesLayer,
 				weaponSprites: weaponSpritesLayer,
+				starMapEdges: starMapEdgesLayer,
+				starMapNodes: starMapNodesLayer,
 				tacticalTokens: tacticalTokensLayer,
 				weaponArcs: weaponArcsLayer,
 				movementVisuals: movementVisualsLayer,

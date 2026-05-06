@@ -131,6 +131,8 @@ function createLayers(app: any): LayerRegistry {
         starfieldNear,
         grid,
         cursor,
+        starMapEdges: world,
+        starMapNodes: world,
         shipSprites,
         weaponSprites,
         tacticalTokens,

@@ -291,9 +291,9 @@ export const editHandlers = {
 				} else {
 					throw err("需要 preset 名称或完整 world 数据", ErrorCodes.ERROR);
 				}
+				ctx.state.setMode(GameMode.DEPLOYMENT);
 				ctx.state.mutateAndBroadcast((draft) => {
 					draft.world = worldData;
-					draft.mode = GameMode.DEPLOYMENT;
 				});
 				ctx.state.appendLog(
 					createBattleLogEvent("room_edit", {

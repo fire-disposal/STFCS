@@ -7,7 +7,7 @@
  */
 
 import PixiCanvas from "@/renderer/core/PixiCanvas";
-import StarMap from "@/ui/panels/StarMap";
+
 import { useUIStore } from "@/state/stores/uiStore";
 import {
 	useGameState,
@@ -173,7 +173,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-					{isTacticalMode ? <PixiCanvas fetchAssets={assetSocket.batchGet} /> : <StarMap />}
+					<PixiCanvas fetchAssets={assetSocket.batchGet} viewMode={gameMode} />
 				</Box>
 				<RightSidebar networkManager={networkManager} />
 			</Box>

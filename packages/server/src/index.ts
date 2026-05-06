@@ -167,8 +167,8 @@ export class STFCServer {
 					worlds: (worldResult.worlds as any[])?.length ?? 0,
 				});
 			} else {
-				const failedShips = result.ships.filter(s => !s.passed).length;
-				const failedWeapons = result.weapons.filter(w => !w.passed).length;
+				const failedShips = result.ships.filter((s) => !s.passed).length;
+				const failedWeapons = result.weapons.filter((w) => !w.passed).length;
 				logger.warn("预设数据发现验证问题", {
 					totalIssues: result.totalIssues,
 					failedShips,

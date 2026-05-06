@@ -29,7 +29,7 @@
 
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useAllTokens, useGamePlayers } from "@/state/stores/gameStore";
+import { useAllTokens, useGamePlayers, useGameState, useGamePlayerId } from "@/state/stores/gameStore";
 import { Application } from "@pixi/react";
 
 import type { CombatToken } from "@vt/data";
@@ -51,6 +51,7 @@ import { useShieldArcRendering } from "../entities/ShieldArcRenderer";
 import { useZoomInteraction } from "../interactions/ZoomHandler";
 import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSystem";
 import { useTextureLoader } from "../systems/useTextureLoader";
+import { useStarMapRendering } from "../systems/StarMapRenderer";
 import { useShipTextureRendering } from "../entities/ShipTextureRenderer";
 import { useWeaponTextureRendering } from "../entities/WeaponTextureRenderer";
 import type { AssetListItem } from "@vt/data";
@@ -64,6 +65,8 @@ interface AssetBatchGetResult {
 interface GameCanvasProps {
 	onClick?: (x: number, y: number) => void;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
+	/** 当前视图模式：COMBAT/DEPLOYMENT 显示战术层，WORLD 显示星图层 */
+	viewMode?: string;
 }
 
 const useStarfield = () => {
@@ -106,9 +109,15 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	onClick,
 	fetchAssets = noopFetchAssets,
+	viewMode = "COMBAT",
 }) => {
 	const ships = useAllTokens();
+	const gameState = useGameState();
+	const worldMap = gameState?.world as any;
 	const players = useGamePlayers();
+	const playerId = useGamePlayerId();
+	const currentPlayer = playerId ? players[playerId] : undefined;
+	const isHost = currentPlayer?.role === "HOST";
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
@@ -204,12 +213,34 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useWeaponArcRendering(layerSystem.layers, ships, selectedShipId ?? null);
 	useGridRendering(layerSystem.layers, showGrid);
 
+	// 星图渲染（仅 WORLD 模式有 worldMap）
+	const handleNodeClick = useCallback((nodeId: string) => {
+		const { send } = require("@/hooks/useGameAction") as any;
+		send?.().send("world:travel", { toNodeId: nodeId });
+	}, []);
+	useStarMapRendering(layerSystem.layers, worldMap, isHost, handleNodeClick);
+
+	// 根据 viewMode 切换层可见性
+	const isTacticalView = viewMode === "COMBAT" || viewMode === "DEPLOYMENT";
+	const isWorldView = viewMode === "WORLD";
 	useEffect(() => {
 		if (!layerSystem.layers) return;
-		layerSystem.layers.tacticalTokens.visible = true;
-		layerSystem.layers.shipSprites.visible = showTextures;
-		layerSystem.layers.weaponSprites.visible = showTextures;
-	}, [layerSystem.layers, showTextures]);
+		// 战术层
+		layerSystem.layers.tacticalTokens.visible = isTacticalView;
+		layerSystem.layers.weaponArcs.visible = isTacticalView;
+		layerSystem.layers.movementVisuals.visible = isTacticalView;
+		layerSystem.layers.shieldArcs.visible = isTacticalView;
+		layerSystem.layers.hexagonArmor.visible = isTacticalView;
+		layerSystem.layers.shipSprites.visible = isTacticalView && showTextures;
+		layerSystem.layers.weaponSprites.visible = isTacticalView && showTextures;
+		layerSystem.layers.grid.visible = isTacticalView;
+		layerSystem.layers.hud.visible = isTacticalView;
+		// 星图层
+		layerSystem.layers.starMapEdges.visible = isWorldView;
+		layerSystem.layers.starMapNodes.visible = isWorldView;
+		// 背景（星空在两种模式下都显示）
+		layerSystem.layers.background.visible = true;
+	}, [layerSystem.layers, viewMode, showTextures, isTacticalView, isWorldView]);
 
 	const updateWorldTransformsRef = useRef(layerSystem.updateWorldTransforms);
 	updateWorldTransformsRef.current = layerSystem.updateWorldTransforms;
