@@ -83,8 +83,8 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 			if (hull && hull > 0) l += ` 结构-${hull}`;
 			else l += ` 未击穿`;
 			if (sf && sf > 0) l += ` 护盾+${sf}辐`;
-			if (d["destroyed"]) l += " 💀";
-			if (d["overloaded"]) l += " ⚡";
+			if (d["destroyed"]) l += " [沉没]";
+			if (d["overloaded"]) l += " [过载]";
 			return l;
 		}
 		case "deviation":
@@ -142,7 +142,13 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 		case "edit":
 			return `${p} ${s("playerName") || "系统"} 编 ${s("tokenName") || getTokenName(tokens, s("tokenId"))}${s("reason") ? ` (${s("reason")})` : ""}`;
 		case "room_edit": {
-			const lb: Record<string, string> = { set_modifier: "修正", remove_modifier: "移除修正", set_phase: "阶段", set_turn: "回合", set_faction: "派系" };
+			const lb: Record<string, string> = {
+				set_modifier: "修正",
+				remove_modifier: "移除修正",
+				set_phase: "阶段",
+				set_turn: "回合",
+				set_faction: "派系",
+			};
 			return `${p} ${s("playerName") || "DM"} ${lb[s("action")] || s("action")}${s("detail") ? ` ${s("detail")}` : ""}`;
 		}
 		case "system":
@@ -155,14 +161,28 @@ function formatLogLine(log: BattleLogEvent, tokens: Record<string, any>): string
 // ==================== 着色值组件 ====================
 
 /** 着色数值辅助组件：<span class="log-val-xxx">±{value}{unit}</span> */
-const Val: React.FC<{ cls: string; v?: number; unit?: string; prefix?: string }> = ({ cls, v, unit, prefix }) => {
+const Val: React.FC<{ cls: string; v?: number; unit?: string; prefix?: string }> = ({
+	cls,
+	v,
+	unit,
+	prefix,
+}) => {
 	if (v === undefined || v === 0) return null;
-	return <span className={cls}>{prefix}{v}{unit}</span>;
+	return (
+		<span className={cls}>
+			{prefix}
+			{v}
+			{unit}
+		</span>
+	);
 };
 
 // ==================== DataLogRenderer ====================
 
-interface LogRendererProps { log: BattleLogEvent; tokens: Record<string, any>; }
+interface LogRendererProps {
+	log: BattleLogEvent;
+	tokens: Record<string, any>;
+}
 
 const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 	const d = log.data as Record<string, unknown>;
@@ -176,7 +196,10 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 			const dmgType = s("damageType");
 			const dmgTypeLabel = DMG_TYPE_LABELS[dmgType] || dmgType;
 			const dmgTypeColor: Record<string, string> = {
-				KINETIC: "#3498db", HIGH_EXPLOSIVE: "#e67e22", ENERGY: "#9b59b6", FRAGMENTATION: "#95a5a6",
+				KINETIC: "#3498db",
+				HIGH_EXPLOSIVE: "#e67e22",
+				ENERGY: "#9b59b6",
+				FRAGMENTATION: "#95a5a6",
 			};
 			return (
 				<span className="log-line">
@@ -184,20 +207,32 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 						{s("weaponName") || getTokenName(tokens, s("attackerId"))}
 					</span>
 					<span className="log-arrow"> → </span>
-					<span className="log-target">{s("targetName") || getTokenName(tokens, s("targetId"))}</span>
-					<span className="log-tag" style={{ color: dmgTypeColor[dmgType] ?? "#888", marginLeft: 4 }}>
+					<span className="log-target">
+						{s("targetName") || getTokenName(tokens, s("targetId"))}
+					</span>
+					<span
+						className="log-tag"
+						style={{ color: dmgTypeColor[dmgType] ?? "#888", marginLeft: 4 }}
+					>
 						[{dmgTypeLabel}]
 					</span>
 					<Val cls="log-val-dist" v={n("distance")} prefix=" " unit="u" />
 					<Val cls="log-val-dmg" v={n("finalDamage") ?? n("hitDamage")} prefix=" 伤害" />
 					{/* 护甲/结构/护盾 用不同颜色标注 */}
-					<Val cls="log-val-armor" v={n("armorDamage")} prefix=" 装甲-" unit={`(Q${n("armorQuadrant") ?? ""})`} />
-					{n("hullDamage") && n("hullDamage")! > 0
-						? <Val cls="log-val-hull" v={n("hullDamage")} prefix=" 结构-" />
-						: <span className="log-nopen"> 未击穿</span>}
+					<Val
+						cls="log-val-armor"
+						v={n("armorDamage")}
+						prefix=" 装甲-"
+						unit={`(Q${n("armorQuadrant") ?? ""})`}
+					/>
+					{n("hullDamage") && n("hullDamage")! > 0 ? (
+						<Val cls="log-val-hull" v={n("hullDamage")} prefix=" 结构-" />
+					) : (
+						<span className="log-nopen"> 未击穿</span>
+					)}
 					<Val cls="log-val-shield" v={n("fluxGenerated")} prefix=" 护盾+" unit="辐" />
-					{b("destroyed") ? <span className="log-icon-destroyed"> 💀</span> : null}
-					{b("overloaded") ? <span className="log-icon-overload"> ⚡</span> : null}
+					{b("destroyed") ? <span className="log-icon-destroyed"> [沉没]</span> : null}
+					{b("overloaded") ? <span className="log-icon-overload"> [过载]</span> : null}
 				</span>
 			);
 		}
@@ -208,85 +243,316 @@ const DataLogRenderer: React.FC<LogRendererProps> = ({ log, tokens }) => {
 						{s("weaponName") || getTokenName(tokens, s("attackerId"))}
 					</span>
 					<span className="log-arrow"> → </span>
-					<span className="log-target">{s("targetName") || getTokenName(tokens, s("targetId"))}</span>
+					<span className="log-target">
+						{s("targetName") || getTokenName(tokens, s("targetId"))}
+					</span>
 					<span className="log-nopen"> 偏差未命中</span>
 				</span>
 			);
 		case "destroyed":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.DESTROYED }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span style={{ color: LOG_COLORS.DESTROYED }}> 被摧毁</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.DESTROYED }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span style={{ color: LOG_COLORS.DESTROYED }}> 被摧毁</span>
+				</span>
+			);
 		case "overload":
 		case "overloaded":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.OVERLOAD }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span style={{ color: LOG_COLORS.OVERLOAD_ACCENT }}> 过载{s("reason") ? ` (${s("reason")})` : ""}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.OVERLOAD }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span style={{ color: LOG_COLORS.OVERLOAD_ACCENT }}>
+						{" "}
+						过载{s("reason") ? ` (${s("reason")})` : ""}
+					</span>
+				</span>
+			);
 		case "overload_end":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span style={{ color: LOG_COLORS.SHIELD }}> 过载恢复</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span style={{ color: LOG_COLORS.SHIELD }}> 过载恢复</span>
+				</span>
+			);
 
 		// ═══════ 移动 ═══════
 		case "move": {
 			const parts: string[] = [];
 			if (n("forward") != null && n("forward") !== 0) parts.push(`前后${n("forward")}`);
 			if (n("strafe") != null && n("strafe") !== 0) parts.push(`侧移${n("strafe")}`);
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.MOVE }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> {parts.join(" ")}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.MOVE }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> {parts.join(" ")}</span>
+				</span>
+			);
 		}
 		case "rotate":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.MOVE }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> 旋转</span><span className="log-val-dmg">{n("angle")}°</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.MOVE }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> 旋转</span>
+					<span className="log-val-dmg">{n("angle")}°</span>
+				</span>
+			);
 		case "advance_phase":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.PHASE }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> {s("fromPhase")}→{s("toPhase")}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.PHASE }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action">
+						{" "}
+						{s("fromPhase")}→{s("toPhase")}
+					</span>
+				</span>
+			);
 		case "end_turn":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.PHASE }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> 结束回合</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.PHASE }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> 结束回合</span>
+				</span>
+			);
 
 		// ═══════ 护盾 ═══════
 		case "shield_toggle":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> {b("active") ? "开启" : "关闭"}护盾</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> {b("active") ? "开启" : "关闭"}护盾</span>
+				</span>
+			);
 		case "shield_rotate":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> 护盾→</span><span className="log-val-dmg">{n("direction")}°</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.SHIELD }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> 护盾→</span>
+					<span className="log-val-dmg">{n("direction")}°</span>
+				</span>
+			);
 
 		// ═══════ 辐能 ═══════
 		case "vent":
-			return <span className="log-line"><span className="log-ship" style={{ color: LOG_COLORS.VENT }}>{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-action"> 排散</span>{n("fluxCleared") ? <span className="log-meta"> (清</span> : null}<span className="log-val-flux">{n("fluxCleared")}</span>{n("fluxCleared") ? <span className="log-meta">辐)</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship" style={{ color: LOG_COLORS.VENT }}>
+						{s("tokenName") || getTokenName(tokens, s("tokenId"))}
+					</span>
+					<span className="log-action"> 排散</span>
+					{n("fluxCleared") ? <span className="log-meta"> (清</span> : null}
+					<span className="log-val-flux">{n("fluxCleared")}</span>
+					{n("fluxCleared") ? <span className="log-meta">辐)</span> : null}
+				</span>
+			);
 		case "flux_settlement": {
 			const ch = n("fluxChange") ?? 0;
-			return <span className="log-line"><span className="log-ship">{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-meta"> 辐结算</span><span className="log-val-dmg"> {n("fluxBefore")}→{n("fluxAfter")}</span><span className={ch > 0 ? "log-val-shield" : ch < 0 ? "log-val-flux" : "log-meta"} style={{ marginLeft: 2 }}> {ch > 0 ? "↑" : ch < 0 ? "↓" : "—"}{Math.abs(ch)}</span><Val cls="log-val-shield" v={n("shieldUpkeep")} prefix=" 维持+" unit="辐" /><Val cls="log-val-flux" v={n("dissipation")} prefix=" 散-" unit="辐" /><Val cls="log-val-armor" v={n("ventingCleared")} prefix=" 排清清" unit="辐" /></span>;
+			return (
+				<span className="log-line">
+					<span className="log-ship">{s("tokenName") || getTokenName(tokens, s("tokenId"))}</span>
+					<span className="log-meta"> 辐结算</span>
+					<span className="log-val-dmg">
+						{" "}
+						{n("fluxBefore")}→{n("fluxAfter")}
+					</span>
+					<span
+						className={ch > 0 ? "log-val-shield" : ch < 0 ? "log-val-flux" : "log-meta"}
+						style={{ marginLeft: 2 }}
+					>
+						{" "}
+						{ch > 0 ? "↑" : ch < 0 ? "↓" : "—"}
+						{Math.abs(ch)}
+					</span>
+					<Val cls="log-val-shield" v={n("shieldUpkeep")} prefix=" 维持+" unit="辐" />
+					<Val cls="log-val-flux" v={n("dissipation")} prefix=" 散-" unit="辐" />
+					<Val cls="log-val-armor" v={n("ventingCleared")} prefix=" 排清清" unit="辐" />
+				</span>
+			);
 		}
 
 		// ═══════ 部署 ═══════
 		case "deploy":
-			return <span className="log-line"><span className="log-label" style={{ color: LOG_COLORS.DEPLOY }}>部署</span><span className="log-ship"> {s("tokenName") || getTokenName(tokens, s("tokenId"))}</span><span className="log-meta">{s("faction") ? ` [${FACTION_LABELS[s("faction")] || s("faction")}]` : ""}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-label" style={{ color: LOG_COLORS.DEPLOY }}>
+						部署
+					</span>
+					<span className="log-ship"> {s("tokenName") || getTokenName(tokens, s("tokenId"))}</span>
+					<span className="log-meta">
+						{s("faction") ? ` [${FACTION_LABELS[s("faction")] || s("faction")}]` : ""}
+					</span>
+				</span>
+			);
 
 		// ═══════ 游戏管理 ═══════
 		case "game_started":
-			return <span className="log-line"><span className="log-label" style={{ color: LOG_COLORS.SYSTEM }}>游戏开始</span><span className="log-meta"> — 首轮 {s("firstFaction")}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-label" style={{ color: LOG_COLORS.SYSTEM }}>
+						游戏开始
+					</span>
+					<span className="log-meta"> — 首轮 {s("firstFaction")}</span>
+				</span>
+			);
 		case "faction_change":
-			return <span className="log-line"><span className="log-faction" style={{ color: FACTION_COLORS[s("fromFaction")] ?? LOG_COLORS.FACTION }}>{FACTION_LABELS[s("fromFaction")] || s("fromFaction")}</span><span className="log-action"> → </span><span className="log-faction" style={{ color: FACTION_COLORS[s("toFaction")] ?? LOG_COLORS.SYSTEM }}>{FACTION_LABELS[s("toFaction")] || s("toFaction")}</span>{n("turn") ? <span className="log-meta"> (R{n("turn")})</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span
+						className="log-faction"
+						style={{ color: FACTION_COLORS[s("fromFaction")] ?? LOG_COLORS.FACTION }}
+					>
+						{FACTION_LABELS[s("fromFaction")] || s("fromFaction")}
+					</span>
+					<span className="log-action"> → </span>
+					<span
+						className="log-faction"
+						style={{ color: FACTION_COLORS[s("toFaction")] ?? LOG_COLORS.SYSTEM }}
+					>
+						{FACTION_LABELS[s("toFaction")] || s("toFaction")}
+					</span>
+					{n("turn") ? <span className="log-meta"> (R{n("turn")})</span> : null}
+				</span>
+			);
 		case "game_reload":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.EDIT }}>{s("playerName") || "系统"}</span><span className="log-action" style={{ color: LOG_COLORS.SYSTEM }}> 读档</span>{s("saveName") ? <span className="log-meta"> ({s("saveName")})</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.EDIT }}>
+						{s("playerName") || "系统"}
+					</span>
+					<span className="log-action" style={{ color: LOG_COLORS.SYSTEM }}>
+						{" "}
+						读档
+					</span>
+					{s("saveName") ? <span className="log-meta"> ({s("saveName")})</span> : null}
+				</span>
+			);
 
 		// ═══════ 玩家事件 ═══════
 		case "player_joined":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.PLAYER }}>{s("playerName")}</span><span className="log-action"> 加入</span>{n("totalPlayers") ? <span className="log-meta"> ({n("totalPlayers")}人)</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.PLAYER }}>
+						{s("playerName")}
+					</span>
+					<span className="log-action"> 加入</span>
+					{n("totalPlayers") ? <span className="log-meta"> ({n("totalPlayers")}人)</span> : null}
+				</span>
+			);
 		case "player_left":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.OVERLOAD }}>{s("playerName")}</span><span className="log-action"> 离开</span>{n("totalPlayers") ? <span className="log-meta"> ({n("totalPlayers")}人)</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.OVERLOAD }}>
+						{s("playerName")}
+					</span>
+					<span className="log-action"> 离开</span>
+					{n("totalPlayers") ? <span className="log-meta"> ({n("totalPlayers")}人)</span> : null}
+				</span>
+			);
 		case "player_disconnected":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.DEVIATION }}>{s("playerName")}</span><span className="log-action"> 断线</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.DEVIATION }}>
+						{s("playerName")}
+					</span>
+					<span className="log-action"> 断线</span>
+				</span>
+			);
 		case "player_reconnected":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.SHIELD }}>{s("playerName")}</span><span className="log-action"> 重连</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.SHIELD }}>
+						{s("playerName")}
+					</span>
+					<span className="log-action"> 重连</span>
+				</span>
+			);
 		case "host_changed":
-			return <span className="log-line"><span className="log-label" style={{ color: LOG_COLORS.SYSTEM }}>房主→</span><span className="log-player" style={{ color: LOG_COLORS.PLAYER }}>{s("newHostName") || s("newHostId")}</span>{b("previousHostDisconnected") ? <span className="log-meta"> (原断线)</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-label" style={{ color: LOG_COLORS.SYSTEM }}>
+						房主→
+					</span>
+					<span className="log-player" style={{ color: LOG_COLORS.PLAYER }}>
+						{s("newHostName") || s("newHostId")}
+					</span>
+					{b("previousHostDisconnected") ? <span className="log-meta"> (原断线)</span> : null}
+				</span>
+			);
 		case "kick":
-			return <span className="log-line"><span className="log-label" style={{ color: LOG_COLORS.OVERLOAD_ACCENT }}>踢出</span><span className="log-player"> {s("targetName") || getTokenName(tokens, s("targetId"))}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-label" style={{ color: LOG_COLORS.OVERLOAD_ACCENT }}>
+						踢出
+					</span>
+					<span className="log-player">
+						{" "}
+						{s("targetName") || getTokenName(tokens, s("targetId"))}
+					</span>
+				</span>
+			);
 
 		// ═══════ 编辑操作 ═══════
 		case "edit":
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.EDIT }}>{s("playerName") || "系统"}</span><span className="log-action"> 编</span><span className="log-ship"> {s("tokenName") || getTokenName(tokens, s("tokenId"))}</span>{s("reason") ? <span className="log-meta"> ({s("reason")})</span> : null}</span>;
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.EDIT }}>
+						{s("playerName") || "系统"}
+					</span>
+					<span className="log-action"> 编</span>
+					<span className="log-ship"> {s("tokenName") || getTokenName(tokens, s("tokenId"))}</span>
+					{s("reason") ? <span className="log-meta"> ({s("reason")})</span> : null}
+				</span>
+			);
 		case "room_edit": {
-			const lb: Record<string, string> = { set_modifier: "修正", remove_modifier: "移除修正", set_phase: "阶段→", set_turn: "回合→", set_faction: "派系→" };
-			return <span className="log-line"><span className="log-player" style={{ color: LOG_COLORS.EDIT }}>{s("playerName") || "DM"}</span><span className="log-action"> {lb[s("action")] || s("action")}</span>{s("detail") ? <span className="log-meta"> {s("detail")}</span> : null}</span>;
+			const lb: Record<string, string> = {
+				set_modifier: "修正",
+				remove_modifier: "移除修正",
+				set_phase: "阶段→",
+				set_turn: "回合→",
+				set_faction: "派系→",
+			};
+			return (
+				<span className="log-line">
+					<span className="log-player" style={{ color: LOG_COLORS.EDIT }}>
+						{s("playerName") || "DM"}
+					</span>
+					<span className="log-action"> {lb[s("action")] || s("action")}</span>
+					{s("detail") ? <span className="log-meta"> {s("detail")}</span> : null}
+				</span>
+			);
 		}
 
 		// ═══════ 系统/回退 ═══════
 		case "system":
-			return <span className="log-line"><span className="log-meta">{s("message") || JSON.stringify(d)}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-meta">{s("message") || JSON.stringify(d)}</span>
+				</span>
+			);
 		default:
-			return <span className="log-line"><span className="log-meta">{log.type}: {JSON.stringify(d)}</span></span>;
+			return (
+				<span className="log-line">
+					<span className="log-meta">
+						{log.type}: {JSON.stringify(d)}
+					</span>
+				</span>
+			);
 	}
 };
 
@@ -298,10 +564,14 @@ export const CombatLogPanel: React.FC = () => {
 	const reversed = [...logs].reverse();
 
 	const handleExport = useCallback(() => {
-		const blob = new Blob([logs.map(l => formatLogLine(l, tokens)).join("\n")], { type: "text/plain;charset=utf-8" });
+		const blob = new Blob([logs.map((l) => formatLogLine(l, tokens)).join("\n")], {
+			type: "text/plain;charset=utf-8",
+		});
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
-		a.href = url; a.download = `combat-log-${Date.now()}.txt`; a.click();
+		a.href = url;
+		a.download = `combat-log-${Date.now()}.txt`;
+		a.click();
 		URL.revokeObjectURL(url);
 	}, [logs, tokens]);
 
