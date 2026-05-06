@@ -18,7 +18,14 @@ import {
   PointSchema,
   AssetListItemSchema,
   BattleLogEventSchema,
+  MapTerrainSchema,
 } from "./GameSchemas.js"
+import {
+  WorldMapSchema,
+  WorldNodeSchema,
+  WorldEdgeSchema,
+  TimelineEventSchema,
+} from "./WorldSchemas.js"
 import type { BattleLogEvent } from "./GameSchemas.js"
 
 export const WsRequestSchema = z.object({
@@ -460,6 +467,43 @@ export const BattleLogPayloadSchema = z.object({
 export type BattleLogPayload = z.infer<typeof BattleLogPayloadSchema>
 
 // ============================================================
+// world 命名空间（世界观地图操作）
+// ============================================================
+
+export const WorldTravelDef = {
+  payload: z.object({ toNodeId: z.string() }),
+  response: z.object({
+    success: z.boolean(),
+    worldMap: WorldMapSchema,
+    currentNode: WorldNodeSchema.optional(),
+    encounterTriggered: z.boolean().optional(),
+    terrain: z.array(MapTerrainSchema).optional(),
+    logEvent: TimelineEventSchema.optional(),
+  }),
+} as const satisfies WsEventDef<any, any>
+
+export const WorldExploreDef = {
+  payload: z.object({ nodeId: z.string() }),
+  response: z.object({ success: z.boolean(), node: WorldNodeSchema }),
+} as const satisfies WsEventDef<any, any>
+
+export const WorldQueryDef = {
+  payload: z.object({}),
+  response: z.object({ worldMap: WorldMapSchema, stats: z.any() }),
+} as const satisfies WsEventDef<any, any>
+
+export const WorldManageDef = {
+  payload: z.object({
+    action: z.enum(["add_node", "remove_node", "update_node", "add_edge", "remove_edge", "update_edge"]),
+    node: WorldNodeSchema.optional(),
+    edge: WorldEdgeSchema.optional(),
+    nodeId: z.string().optional(),
+    edgeId: z.string().optional(),
+  }),
+  response: z.object({ success: z.boolean() }),
+} as const satisfies WsEventDef<any, any>
+
+// ============================================================
 // WsEventDefinitions（合并后的接口）
 // ============================================================
 
@@ -490,6 +534,10 @@ export const WsEventDefinitions = {
   "edit:token": EditTokenDef,
   "edit:room": EditRoomDef,
   "deploy:token": DeployTokenDef,
+  "world:travel": WorldTravelDef,
+  "world:explore": WorldExploreDef,
+  "world:query": WorldQueryDef,
+  "world:manage": WorldManageDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 

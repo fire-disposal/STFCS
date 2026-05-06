@@ -8,6 +8,7 @@ import { deployHandlers } from "./handlers/deploy.js";
 import { roomHandlers } from "./handlers/room.js";
 import { customizeHandlers } from "./handlers/customize.js";
 import { gameHandlers } from "./handlers/game.js";
+import { worldHandlers } from "./handlers/world.js";
 import {
 	playerInfoService,
 	playerProfileService,
@@ -26,6 +27,7 @@ rpc.namespace("deploy", deployHandlers);
 rpc.namespace("room", roomHandlers);
 rpc.namespace("customize", customizeHandlers);
 rpc.namespace("game", gameHandlers);
+rpc.namespace("world", worldHandlers);
 
 // ===== auth =====
 rpc.namespace("auth", {
