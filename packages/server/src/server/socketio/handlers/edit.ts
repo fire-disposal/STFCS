@@ -2,7 +2,14 @@
  * edit namespace handlers — 编辑态下的舰船/房间操作
  */
 import { err } from "./err.js";
-import { MovementPhase, ErrorCodes, createBattleLogEvent, GameMode, presetWorlds, validateWorldMap } from "@vt/data";
+import {
+	MovementPhase,
+	ErrorCodes,
+	createBattleLogEvent,
+	GameMode,
+	presetWorlds,
+	validateWorldMap,
+} from "@vt/data";
 import type { WsPayload, WsResponseData } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import {
@@ -288,10 +295,14 @@ export const editHandlers = {
 					draft.world = worldData;
 					draft.mode = GameMode.DEPLOYMENT;
 				});
-				ctx.state.appendLog(createBattleLogEvent("room_edit", {
-					playerId: ctx.playerId, playerName: ctx.playerName,
-					action: "set_world", detail: wp.preset ?? "自定义",
-				}));
+				ctx.state.appendLog(
+					createBattleLogEvent("room_edit", {
+						playerId: ctx.playerId,
+						playerName: ctx.playerName,
+						action: "set_world",
+						detail: wp.preset ?? "自定义",
+					})
+				);
 				return;
 			}
 			case "return_to_world": {

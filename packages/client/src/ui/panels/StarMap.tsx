@@ -80,12 +80,14 @@ export const StarMap: React.FC = () => {
 			if (!isHost || !fleetNodeId) return;
 			// GM 点击可达节点触发航行
 			// 通知：GM 发起了航行，服务端会自动处理遭遇判定和模式转换
-	void send("world:travel", { toNodeId: nodeId }).then((res: any) => {
-		if (res?.encounterTriggered) {
-			// 遭遇触发，服务端已切换 mode = COMBAT，前端自动重新渲染
-			console.log("[StarMap] 遭遇触发，进入战斗模式");
-		}
-	}).catch(() => {});
+			void send("world:travel", { toNodeId: nodeId })
+				.then((res: any) => {
+					if (res?.encounterTriggered) {
+						// 遭遇触发，服务端已切换 mode = COMBAT，前端自动重新渲染
+						console.log("[StarMap] 遭遇触发，进入战斗模式");
+					}
+				})
+				.catch(() => {});
 		},
 		[isHost, fleetNodeId, send]
 	);

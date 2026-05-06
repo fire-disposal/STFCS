@@ -411,6 +411,10 @@ export const EditRoomDef = {
     phase: z.string().optional(),
     turn: z.number().optional(),
     playerId: z.string().optional(),
+    /** set_world 用 */
+    preset: z.string().optional(),
+    /** set_world 用：完整世界地图数据 */
+    world: WorldMapSchema.optional(),
   }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
