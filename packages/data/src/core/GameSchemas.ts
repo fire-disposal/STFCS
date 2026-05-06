@@ -70,18 +70,22 @@ export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
  * 游戏阶段（GamePhase）- 顶层状态
  *
  * Phase ↔ activeFaction 对应规则：
- * - DEPLOYMENT: activeFaction = undefined（部署阶段不区分派系）
- * - PLAYER_ACTION: activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+ * - DEPLOYMENT: activeFaction = undefined（部署）
+ * - WORLD_EXPLORATION: activeFaction = undefined（世界观航行，GM 驱动）
+ * - PLAYER_ACTION: activeFaction 由 TURN_ORDER 决定（战术战斗，派系轮流）
  *
- * Phase 转换流程：
- * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后，游戏开始）
+ * Phase 转换流程（世界观模式启用时）：
+ * 1. DEPLOYMENT → WORLD_EXPLORATION（GM 开始探索）
+ * 2. WORLD_EXPLORATION → PLAYER_ACTION（触发遭遇/GM 手动进入战斗）
+ * 3. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
+ * 4. 最后一个派系行动完毕后 → WORLD_EXPLORATION（返回星图）
+ *
+ * Phase 转换流程（传统模式）：
+ * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后游戏开始）
  * 2. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
  * 3. 最后一个派系行动完毕后 turn++，回到第一个派系
- *
- * 注意：phase 和 activeFaction 存在固定对应关系，
- * 修改 phase 时应同步更新 activeFaction。
  */
-export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION"]);
+export const GamePhaseSchema = z.enum(["DEPLOYMENT", "WORLD_EXPLORATION", "PLAYER_ACTION"]);
 export const GamePhase = GamePhaseSchema.enum;
 export type GamePhase = z.infer<typeof GamePhaseSchema>;
 

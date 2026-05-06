@@ -56,11 +56,7 @@ export function isPointInTerrain(point: Point, terrain: MapTerrain): boolean {
 /**
  * 判断线段是否穿过地形区域（用于移动路径检测）
  */
-export function doesPathCrossTerrain(
-	from: Point,
-	to: Point,
-	terrain: MapTerrain
-): boolean {
+export function doesPathCrossTerrain(from: Point, to: Point, terrain: MapTerrain): boolean {
 	// 起点或终点在地形内 → 穿过
 	if (isPointInTerrain(from, terrain) || isPointInTerrain(to, terrain)) return true;
 
@@ -101,10 +97,7 @@ export function getTerrainEffectValue(
 /**
  * 获取某位置的所有地形效果
  */
-export function getTerrainEffectsAt(
-	point: Point,
-	terrains: MapTerrain[]
-): TerrainEffect[] {
+export function getTerrainEffectsAt(point: Point, terrains: MapTerrain[]): TerrainEffect[] {
 	const results: TerrainEffect[] = [];
 	for (const terrain of terrains) {
 		if (!terrain.effects?.length) continue;
@@ -120,11 +113,7 @@ export function getTerrainEffectsAt(
  * 计算移动路径上的减速倍率
  * 穿过多个地形时取最小值（最严重的减速）
  */
-export function getMovementSlowFactor(
-	from: Point,
-	to: Point,
-	terrains: MapTerrain[]
-): number {
+export function getMovementSlowFactor(from: Point, to: Point, terrains: MapTerrain[]): number {
 	let minFactor = 1.0;
 
 	for (const terrain of terrains) {
@@ -141,11 +130,7 @@ export function getMovementSlowFactor(
 /**
  * 检查移动路径是否被阻挡（不可通行）
  */
-export function isPathBlocked(
-	from: Point,
-	to: Point,
-	terrains: MapTerrain[]
-): boolean {
+export function isPathBlocked(from: Point, to: Point, terrains: MapTerrain[]): boolean {
 	// 小行星带和空间站阻挡通行
 	const blockingTypes = ["asteroid", "station"];
 	for (const terrain of terrains) {
@@ -200,9 +185,9 @@ export function isVisionBlocked(
 // ==================== 回合结算 ====================
 
 export interface TerrainTurnEndEffect {
-	fluxDamage: number;   // 辐能伤害（硬辐能）
-	hullHeal: number;     // 修复船体
-	hullDamage: number;   // 结构伤害
+	fluxDamage: number; // 辐能伤害（硬辐能）
+	hullHeal: number; // 修复船体
+	hullDamage: number; // 结构伤害
 }
 
 /**
@@ -250,7 +235,11 @@ export function calculateTerrainTurnEndEffects(
  * 用于从世界观节点进入战斗时自动生成战术地图
  */
 export function generateTerrainFromProfile(
-	profile: { density: number; preferredTypes?: string[] | undefined; fixedFeatures?: { type: string; count: number }[] | undefined },
+	profile: {
+		density: number;
+		preferredTypes?: string[] | undefined;
+		fixedFeatures?: { type: string; count: number }[] | undefined;
+	},
 	mapWidth: number,
 	mapHeight: number,
 	_seed?: number

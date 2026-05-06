@@ -74,11 +74,7 @@ export const worldHandlers = {
 		if (result.encounterTriggered && result.currentNode?.terrainProfile) {
 			const mapWidth = 2000;
 			const mapHeight = 2000;
-			terrain = generateTerrainFromProfile(
-				result.currentNode.terrainProfile,
-				mapWidth,
-				mapHeight
-			);
+			terrain = generateTerrainFromProfile(result.currentNode.terrainProfile, mapWidth, mapHeight);
 		}
 
 		return {

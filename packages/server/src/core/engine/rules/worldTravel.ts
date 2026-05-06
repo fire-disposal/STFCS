@@ -45,11 +45,7 @@ export interface TravelValidation {
 /**
  * 验证航行请求
  */
-export function validateTravel(
-	worldMap: WorldMap,
-	fromId: string,
-	toId: string
-): TravelValidation {
+export function validateTravel(worldMap: WorldMap, fromId: string, toId: string): TravelValidation {
 	const reachable = getReachableNodes(worldMap, fromId);
 	const target = reachable.find((r) => r.node.id === toId);
 
@@ -103,11 +99,7 @@ export function rollEncounter(edge: WorldEdge): EncounterRollResult {
  * @param toId 目标节点 ID
  * @returns 航行结果
  */
-export function executeTravel(
-	worldMap: WorldMap,
-	fromId: string,
-	toId: string
-): TravelResult {
+export function executeTravel(worldMap: WorldMap, fromId: string, toId: string): TravelResult {
 	const validation = validateTravel(worldMap, fromId, toId);
 	if (!validation.valid || !validation.edge) {
 		return {
@@ -204,9 +196,7 @@ export function getWorldStats(worldMap: WorldMap): {
 	reachableNodes: { node: WorldNode; edge: WorldEdge }[];
 } {
 	const currentNode = worldMap.nodes.find((n) => n.id === worldMap.fleetNodeId);
-	const reachable = worldMap.fleetNodeId
-		? getReachableNodes(worldMap, worldMap.fleetNodeId)
-		: [];
+	const reachable = worldMap.fleetNodeId ? getReachableNodes(worldMap, worldMap.fleetNodeId) : [];
 
 	return {
 		totalNodes: worldMap.nodes.length,
