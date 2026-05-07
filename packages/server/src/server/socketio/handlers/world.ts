@@ -63,9 +63,7 @@ export const worldHandlers = {
 				draft.turn = { number: 1, factionIndex: 0 };
 
 				if (result.currentNode?.terrainProfile) {
-					const terrain = generateTerrainFromProfile(
-						result.currentNode.terrainProfile, 2000, 2000
-					);
+					const terrain = generateTerrainFromProfile(result.currentNode.terrainProfile, 2000, 2000);
 					if (!draft.map) {
 						draft.map = {
 							$id: `combat_${Date.now()}`,

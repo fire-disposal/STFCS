@@ -13,7 +13,8 @@
 	},
 	"scripts": {
 		"build": "tsup src/index.ts --format esm --dts --clean",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"validate": "tsx src/scripts/validate-presets.ts"
 	},
 	"devDependencies": {
 		"tsup": "^8.5.1",
