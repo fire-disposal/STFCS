@@ -52,8 +52,8 @@ export const roomHandlers = {
 			ownerName: r.creatorName ?? "未知",
 			playerCount: r.playerCount,
 			maxPlayers: r.maxPlayers,
-			phase: r.mode,
-			turnCount: r.gameState?.turnCount ?? 0,
+			phase: r.phase,
+			turnCount: r.gameState?.turn?.number ?? 0,
 			createdAt: r.createdAt,
 		}));
 		return { rooms };

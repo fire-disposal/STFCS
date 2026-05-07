@@ -447,7 +447,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 					</Dialog.Description>
 
 					<Flex direction="column" gap="3">
-						<Text size="2" weight="bold">房间名称</Text>
+						<Text size="2" weight="bold">
+							房间名称
+						</Text>
 						<TextField.Root
 							value={roomName}
 							onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoomName(e.target.value)}
@@ -456,7 +458,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
 						<Separator size="4" />
 
-						<Text size="2" weight="bold">世界观模式（可选）</Text>
+						<Text size="2" weight="bold">
+							世界观模式（可选）
+						</Text>
 						<Text size="1" color="gray">
 							启用后将加载预设星图，玩家可以在星系间航行探索。
 						</Text>
