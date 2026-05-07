@@ -24,7 +24,18 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info } from "lucide-react";
+import {
+	DoorOpen,
+	LogOut,
+	RefreshCw,
+	Upload,
+	UserCircle,
+	Wrench,
+	Play,
+	Plus,
+	Save,
+	Info,
+} from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import AboutDialog from "@/ui/overlays/AboutDialog";
 
@@ -63,6 +74,31 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 }) => {
 	const [showCustomizer, setShowCustomizer] = useState(false);
 	const [showProfile, setShowProfile] = useState(false);
+	const [showCreateDialog, setShowCreateDialog] = useState(false);
+	const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
+	const [roomName, setRoomName] = useState(`${playerName}的房间`);
+
+	const handleCreateWithWorld = useCallback(async () => {
+		try {
+			// 先创建房间
+			const result = await networkManager.createRoom({ roomName, maxPlayers: 4 });
+			if (!result.success || !result.roomId) {
+				notify.error("创建房间失败");
+				return;
+			}
+			// 如果选择了世界预设，在加入房间前加载
+			if (selectedWorld) {
+				await networkManager.request("edit:room", {
+					action: "set_world",
+					preset: selectedWorld,
+				});
+			}
+			setShowCreateDialog(false);
+			onEnterMyRoom();
+		} catch {
+			notify.error("创建失败");
+		}
+	}, [networkManager, roomName, selectedWorld, onEnterMyRoom]);
 	const [showAbout, setShowAbout] = useState(false);
 	const [roomTab, setRoomTab] = useState("all");
 	const [nickname, setNickname] = useState(profile.nickname);
@@ -173,7 +209,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							<Avatar src={profile.avatar} size="medium" />
 							<Box>
 								<Heading size="5">🏠 游戏大厅</Heading>
-								<Text color="gray" size="2">欢迎，{profile.nickname || playerName}</Text>
+								<Text color="gray" size="2">
+									欢迎，{profile.nickname || playerName}
+								</Text>
 							</Box>
 						</Flex>
 						<Flex gap="2" align="center" wrap="wrap">
@@ -214,7 +252,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 						) : visibleRooms.length === 0 ? (
 							<Box className="radix-empty-state">
 								<Text size="4">暂无可用房间</Text>
-								<Text color="gray" size="2">点击右侧“创建新房间”开始游戏</Text>
+								<Text color="gray" size="2">
+									点击右侧“创建新房间”开始游戏
+								</Text>
 							</Box>
 						) : (
 							<ScrollArea type="always" scrollbars="vertical" className="radix-room-scroll">
@@ -226,10 +266,16 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 													<Flex align="center" gap="2" mb="2" wrap="wrap">
 														<Heading size="3">{room.name}</Heading>
 														{/* 后端没有 isPrivate 属性，暂时移除私密标记 */}
-														{isOwnRoom(room) && <Badge color="blue" variant="soft">你的房间</Badge>}
+														{isOwnRoom(room) && (
+															<Badge color="blue" variant="soft">
+																你的房间
+															</Badge>
+														)}
 													</Flex>
 													<Flex gap="2" wrap="wrap">
-														<Badge variant="soft">{room.playerCount}/{room.maxPlayers} 玩家</Badge>
+														<Badge variant="soft">
+															{room.playerCount}/{room.maxPlayers} 玩家
+														</Badge>
 														<Badge variant="soft">阶段：{room.phase}</Badge>
 														{room.turnCount !== undefined && room.turnCount > 0 && (
 															<Badge variant="soft">回合：{room.turnCount}</Badge>
@@ -237,7 +283,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 														{room.ownerName ? (
 															<Badge variant="soft">房主：{room.ownerName}</Badge>
 														) : (
-															<Badge color="amber" variant="soft">等待房主</Badge>
+															<Badge color="amber" variant="soft">
+																等待房主
+															</Badge>
 														)}
 													</Flex>
 												</Box>
@@ -246,7 +294,12 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 														<DoorOpen size={14} /> 进入
 													</Button>
 													{isOwnRoom(room) && (
-														<Button color="red" variant="soft" onClick={() => onDeleteRoom(room.roomId)} data-magnetic>
+														<Button
+															color="red"
+															variant="soft"
+															onClick={() => onDeleteRoom(room.roomId)}
+															data-magnetic
+														>
 															删除
 														</Button>
 													)}
@@ -262,32 +315,64 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 					<Flex direction="column" gap="3">
 						<Card className="radix-surface-card" size="3">
 							{myRoom ? (
-								<Button size="3" color="green" className="radix-full-btn" onClick={onEnterMyRoom} data-magnetic>
+								<Button
+									size="3"
+									color="green"
+									className="radix-full-btn"
+									onClick={onEnterMyRoom}
+									data-magnetic
+								>
 									<Play size={16} /> 进入我的房间
 								</Button>
 							) : (
-								<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>
+								<Button
+									size="3"
+									className="radix-full-btn"
+									onClick={() => setShowCreateDialog(true)}
+									data-magnetic
+								>
 									<Plus size={16} /> 创建新房间
 								</Button>
 							)}
 						</Card>
 
 						<Card className="radix-surface-card" size="3">
-							<Heading size="3" mb="3">📊 实时统计</Heading>
+							<Heading size="3" mb="3">
+								📊 实时统计
+							</Heading>
 							<Flex direction="column" gap="2">
-								<Flex justify="between"><Text color="gray">活跃房间</Text><Badge color="blue">{stats.totalRooms}</Badge></Flex>
-								<Flex justify="between"><Text color="gray">在线玩家</Text><Badge color="green">{stats.totalPlayers}</Badge></Flex>
-								<Flex justify="between"><Text color="gray">已满房间</Text><Badge color="red">{stats.fullRooms}</Badge></Flex>
+								<Flex justify="between">
+									<Text color="gray">活跃房间</Text>
+									<Badge color="blue">{stats.totalRooms}</Badge>
+								</Flex>
+								<Flex justify="between">
+									<Text color="gray">在线玩家</Text>
+									<Badge color="green">{stats.totalPlayers}</Badge>
+								</Flex>
+								<Flex justify="between">
+									<Text color="gray">已满房间</Text>
+									<Badge color="red">{stats.fullRooms}</Badge>
+								</Flex>
 							</Flex>
 						</Card>
 
 						<Card className="radix-surface-card" size="3">
-							<Heading size="3" mb="3">📖 快速指南</Heading>
+							<Heading size="3" mb="3">
+								📖 快速指南
+							</Heading>
 							<Flex direction="column" gap="2">
-								<Text size="2" color="gray">1. 创建或加入房间</Text>
-								<Text size="2" color="gray">2. 首个玩家自动成为 DM</Text>
-								<Text size="2" color="gray">3. 等待其他玩家加入</Text>
-								<Text size="2" color="gray">4. DM 开始游戏</Text>
+								<Text size="2" color="gray">
+									1. 创建或加入房间
+								</Text>
+								<Text size="2" color="gray">
+									2. 首个玩家自动成为 DM
+								</Text>
+								<Text size="2" color="gray">
+									3. 等待其他玩家加入
+								</Text>
+								<Text size="2" color="gray">
+									4. DM 开始游戏
+								</Text>
 							</Flex>
 						</Card>
 					</Flex>
@@ -297,7 +382,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 			<Dialog.Root open={showProfile} onOpenChange={setShowProfile}>
 				<Dialog.Content maxWidth="420px">
 					<Dialog.Title>玩家档案</Dialog.Title>
-					<Dialog.Description size="2" mb="3">调整昵称与头像，保存后立即生效。</Dialog.Description>
+					<Dialog.Description size="2" mb="3">
+						调整昵称与头像，保存后立即生效。
+					</Dialog.Description>
 					<Flex direction="column" gap="3">
 						<Flex align="center" gap="3">
 							<Avatar src={previewAvatar} size="large" />
@@ -313,7 +400,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							/>
 						</Flex>
 						<Box>
-							<Text as="label" size="2" color="gray" mb="2" className="radix-label">昵称</Text>
+							<Text as="label" size="2" color="gray" mb="2" className="radix-label">
+								昵称
+							</Text>
 							<TextField.Root
 								value={nickname}
 								onChange={(e) => setNickname(e.target.value)}
@@ -323,7 +412,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 						</Box>
 					</Flex>
 					<Flex justify="end" gap="2" mt="4">
-						<Button variant="soft" color="gray" onClick={() => setShowProfile(false)}>取消</Button>
+						<Button variant="soft" color="gray" onClick={() => setShowProfile(false)}>
+							取消
+						</Button>
 						<Button
 							onClick={() => {
 								onUpdateProfile({
@@ -345,10 +436,68 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				networkManager={networkManager}
 			/>
 
-			<AboutDialog
-				open={showAbout}
-				onOpenChange={setShowAbout}
-			/>
+			<AboutDialog open={showAbout} onOpenChange={setShowAbout} />
+
+			{/* 创建房间对话框 */}
+			<Dialog.Root open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+				<Dialog.Content maxWidth="420px">
+					<Dialog.Title>创建新房间</Dialog.Title>
+					<Dialog.Description size="2" mb="3">
+						设置房间名称，选择是否启用世界观模式。
+					</Dialog.Description>
+
+					<Flex direction="column" gap="3">
+						<Text size="2" weight="bold">房间名称</Text>
+						<TextField.Root
+							value={roomName}
+							onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoomName(e.target.value)}
+							placeholder="输入房间名称"
+						/>
+
+						<Separator size="4" />
+
+						<Text size="2" weight="bold">世界观模式（可选）</Text>
+						<Text size="1" color="gray">
+							启用后将加载预设星图，玩家可以在星系间航行探索。
+						</Text>
+
+						<Flex gap="2" wrap="wrap">
+							<Button
+								size="2"
+								variant={selectedWorld === null ? "solid" : "soft"}
+								onClick={() => setSelectedWorld(null)}
+								style={{ flex: 1 }}
+							>
+								传统模式
+							</Button>
+							<Button
+								size="2"
+								variant={selectedWorld === "demo" ? "solid" : "soft"}
+								color="green"
+								onClick={() => setSelectedWorld("demo")}
+								style={{ flex: 1 }}
+							>
+								演示星域
+							</Button>
+						</Flex>
+
+						{selectedWorld && (
+							<Text size="1" style={{ color: "#4fc3ff" }}>
+								已选择：演示星域 — 5个节点、6条航线
+							</Text>
+						)}
+					</Flex>
+
+					<Flex justify="end" gap="2" mt="4">
+						<Button variant="soft" color="gray" onClick={() => setShowCreateDialog(false)}>
+							取消
+						</Button>
+						<Button onClick={handleCreateWithWorld}>
+							<Plus size={14} /> 创建
+						</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
 		</div>
 	);
 };
