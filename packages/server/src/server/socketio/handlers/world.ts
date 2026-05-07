@@ -53,17 +53,19 @@ export const worldHandlers = {
 			throw err(result.error ?? "航行失败", ErrorCodes.ERROR);
 		}
 
-		// 更新房间状态中的世界地图
+		// 批量更新：世界地图 + 模式切换 + 地形 在同一个 patch 中发送
+		// 防止客户端看到中间状态（模式已切换但地形未生成）
 		ctx.state.mutateAndBroadcast((draft) => {
 			draft.world = result.worldMap;
-		});
 
-		// 如果触发遭遇，自动切换到战斗模式并生成地形
-		if (result.encounterTriggered) {
-			ctx.state.setMode(GameMode.COMBAT);
-			if (result.currentNode?.terrainProfile) {
-				const terrain = generateTerrainFromProfile(result.currentNode.terrainProfile, 2000, 2000);
-				ctx.state.mutateAndBroadcast((draft) => {
+			if (result.encounterTriggered) {
+				draft.mode = GameMode.COMBAT;
+				draft.turn = { number: 1, factionIndex: 0 };
+
+				if (result.currentNode?.terrainProfile) {
+					const terrain = generateTerrainFromProfile(
+						result.currentNode.terrainProfile, 2000, 2000
+					);
 					if (!draft.map) {
 						draft.map = {
 							$id: `combat_${Date.now()}`,
@@ -72,10 +74,10 @@ export const worldHandlers = {
 							metadata: { name: result.currentNode?.name ?? "战斗区域" },
 						};
 					}
-					draft.map.terrain = terrain;
-				});
+					draft.map!.terrain = terrain;
+				}
 			}
-		}
+		});
 
 		// 写入战斗日志
 		ctx.state.appendLog(

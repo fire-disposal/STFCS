@@ -117,7 +117,12 @@ export function useStarMapRendering(
 		layers.starMapNodes.removeChildren();
 
 		const toDestroy: any[] = [];
-		const cleanup = () => toDestroy.forEach((obj) => { try { obj.destroy?.(); } catch {} });
+		const cleanup = () =>
+			toDestroy.forEach((obj) => {
+				try {
+					obj.destroy?.();
+				} catch {}
+			});
 		cleanupRef.current = cleanup;
 
 		if (!world || nodes.length === 0) return;
@@ -239,5 +244,11 @@ export function useStarMapRendering(
 	}, [layers, world, nodes.length, edges.length, fleetNodeId, isHost]);
 
 	// 组件卸载时清理
-	useEffect(() => () => { cleanupRef.current?.(); cleanupRef.current = null; }, []);
+	useEffect(
+		() => () => {
+			cleanupRef.current?.();
+			cleanupRef.current = null;
+		},
+		[]
+	);
 }

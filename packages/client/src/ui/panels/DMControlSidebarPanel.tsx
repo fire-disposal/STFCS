@@ -84,21 +84,27 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 			} else {
 				await send("edit:room", { action: "force_end_turn" });
 			}
-		} catch { notify.error("操作失败"); }
+		} catch {
+			notify.error("操作失败");
+		}
 	};
 
 	const handleSetMode = async (m: string) => {
 		try {
 			await send("edit:room", { action: "set_phase", phase: m });
 			notify.success(`模式切换为 ${MODE_LABELS[m] ?? m}`);
-		} catch { notify.error("模式切换失败"); }
+		} catch {
+			notify.error("模式切换失败");
+		}
 	};
 
 	const handleLoadWorld = async () => {
 		try {
 			await send("edit:room", { action: "set_world", preset: "demo" });
 			notify.success("已加载演示星域");
-		} catch { notify.error("加载失败"); }
+		} catch {
+			notify.error("加载失败");
+		}
 	};
 
 	const handleEnterCombat = async () => {
@@ -114,7 +120,9 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 		try {
 			await send("edit:room", { action: "return_to_world" });
 			notify.success("已返回星图");
-		} catch { notify.error("返回失败"); }
+		} catch {
+			notify.error("返回失败");
+		}
 	};
 
 	const isLastFaction =

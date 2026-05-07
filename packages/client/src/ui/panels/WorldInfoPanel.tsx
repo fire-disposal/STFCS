@@ -69,10 +69,13 @@ export const WorldInfoPanel: React.FC = () => {
 	}, [isHost, pendingNodeId, send]);
 
 	// 揭示节点（仅 DM）
-	const handleExplore = useCallback(async (nodeId: string) => {
-		if (!isHost) return;
-		await send("world:explore", { nodeId } as any).catch(() => notify.error("揭示失败"));
-	}, [isHost, send]);
+	const handleExplore = useCallback(
+		async (nodeId: string) => {
+			if (!isHost) return;
+			await send("world:explore", { nodeId } as any).catch(() => notify.error("揭示失败"));
+		},
+		[isHost, send]
+	);
 
 	if (!world)
 		return (
