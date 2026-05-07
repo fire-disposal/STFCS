@@ -93,7 +93,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const isHost = currentPlayer?.role === "HOST";
 
 	// 是否为战术战斗模式（显示 PixiCanvas + 战术面板）
-	const isTacticalMode = gameMode === "DEPLOYMENT" || gameMode === "COMBAT";
+	const hasWorld = !!gameState?.world;
+	const isTacticalMode = gameMode === "COMBAT" || (gameMode === "DEPLOYMENT" && !hasWorld);
 
 	// 底部栏 Tab（仅战术模式显示）
 	const tacticalTabs: TabConfig[] = useMemo(

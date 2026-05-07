@@ -257,8 +257,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	useEffect(() => {
 		if (!layerSystem.layers) return;
 
-		const isTactical = viewMode === "COMBAT" || viewMode === "DEPLOYMENT";
-		const isWorld = viewMode === "WORLD";
+		const isTactical = viewMode === "COMBAT" || (viewMode === "DEPLOYMENT" && !worldMap);
+		const isWorld = viewMode === "WORLD" || (viewMode === "DEPLOYMENT" && !!worldMap);
 
 		layerSystem.layers.tacticalTokens.visible = isTactical;
 		layerSystem.layers.weaponArcs.visible = isTactical;
