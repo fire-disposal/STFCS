@@ -166,15 +166,14 @@ export function useStarMapRendering(
 			}
 			edgeGfx.stroke({ color: style.color, width: style.width, alpha: style.alpha });
 
-			// 航道标签：耗时 + 概率
+			// 航道标签：仅显示航行耗时（遭遇概率由 GM 口述）
 			const midX = (from.position.x + to.position.x) / 2;
 			const midY = (from.position.y + to.position.y) / 2;
 			const edgeLabel = new Text({
-				text: `${edge.travelCost}日${edge.encounterChance > 0 ? ` ${Math.round(edge.encounterChance * 100)}%` : ""}`,
+				text: `${edge.travelCost}日`,
 				style: new TextStyle({ fontSize: 9, fill: C.textEdge }),
 			});
 			edgeLabel.anchor.set(0.5, 0.5);
-			// 偏移一点避免压线
 			const nx = -(to.position.y - from.position.y);
 			const ny = to.position.x - from.position.x;
 			const nl = Math.sqrt(nx * nx + ny * ny) || 1;
