@@ -14,12 +14,20 @@ import type { WorldMap } from "@vt/data";
 import { getReachableNodes } from "@vt/data";
 
 const TYPE_LABELS: Record<string, string> = {
-	star_system: "恒星系", nebula: "星云", anomaly: "异常区",
-	waypoint: "航标", safe_haven: "安全港", hostile_zone: "敌对区", unknown: "未知",
+	star_system: "恒星系",
+	nebula: "星云",
+	anomaly: "异常区",
+	waypoint: "航标",
+	safe_haven: "安全港",
+	hostile_zone: "敌对区",
+	unknown: "未知",
 };
 
 const STATE_LABELS: Record<string, string> = {
-	safe: "安全", threat: "威胁", cleared: "已清理", active: "活跃",
+	safe: "安全",
+	threat: "威胁",
+	cleared: "已清理",
+	active: "活跃",
 };
 
 export const WorldInfoPanel: React.FC = () => {
@@ -35,28 +43,50 @@ export const WorldInfoPanel: React.FC = () => {
 		return getReachableNodes(world, world.fleetNodeId);
 	}, [world]);
 
-	const handleTravel = useCallback(async (nodeId: string) => {
-		if (!isHost) return;
-		try { await send("world:travel", { toNodeId: nodeId }); }
-		catch { notify.error("航行失败"); }
-	}, [isHost, send]);
+	const handleTravel = useCallback(
+		async (nodeId: string) => {
+			if (!isHost) return;
+			try {
+				await send("world:travel", { toNodeId: nodeId });
+			} catch {
+				notify.error("航行失败");
+			}
+		},
+		[isHost, send]
+	);
 
-	const handleExplore = useCallback(async (nodeId: string) => {
-		if (!isHost) return;
-		try { await send("world:explore", { nodeId } as any); notify.success("节点已揭示"); }
-		catch { notify.error("揭示失败"); }
-	}, [isHost, send]);
+	const handleExplore = useCallback(
+		async (nodeId: string) => {
+			if (!isHost) return;
+			try {
+				await send("world:explore", { nodeId } as any);
+				notify.success("节点已揭示");
+			} catch {
+				notify.error("揭示失败");
+			}
+		},
+		[isHost, send]
+	);
 
-	if (!world) return <Text size="1" color="gray">未加载星图</Text>;
+	if (!world)
+		return (
+			<Text size="1" color="gray">
+				未加载星图
+			</Text>
+		);
 
 	return (
 		<Flex direction="column" gap="2" style={{ height: "100%" }}>
-			<Text size="1" weight="bold" style={{ color: "#4fc3ff" }}>星图信息</Text>
+			<Text size="1" weight="bold" style={{ color: "#4fc3ff" }}>
+				星图信息
+			</Text>
 			<Separator size="4" />
 
 			{/* 当前节点 */}
 			<Card style={{ padding: "6px 8px" }}>
-				<Text size="1" color="gray">当前位置</Text>
+				<Text size="1" color="gray">
+					当前位置
+				</Text>
 				<Text size="2" weight="bold" style={{ color: "#cfe8ff" }}>
 					{currentNode?.name ?? "未知"}
 				</Text>
@@ -70,7 +100,10 @@ export const WorldInfoPanel: React.FC = () => {
 						<Text size="1" style={{ color: "#667788" }}>
 							{TYPE_LABELS[currentNode.type] ?? currentNode.type}
 						</Text>
-						<Text size="1" style={{ color: currentNode.state === "threat" ? "#ff6b6b" : "#2ecc71" }}>
+						<Text
+							size="1"
+							style={{ color: currentNode.state === "threat" ? "#ff6b6b" : "#2ecc71" }}
+						>
 							{STATE_LABELS[currentNode.state] ?? currentNode.state}
 						</Text>
 					</Flex>
@@ -78,9 +111,13 @@ export const WorldInfoPanel: React.FC = () => {
 			</Card>
 
 			{/* 可达节点 */}
-			<Text size="1" weight="bold" style={{ color: "#8ba4c7" }}>航线</Text>
+			<Text size="1" weight="bold" style={{ color: "#8ba4c7" }}>
+				航线
+			</Text>
 			{reachable.length === 0 ? (
-				<Text size="1" color="gray">无可达节点</Text>
+				<Text size="1" color="gray">
+					无可达节点
+				</Text>
 			) : (
 				<Flex direction="column" gap="1">
 					{reachable.map(({ node, edge }) => {
@@ -89,15 +126,28 @@ export const WorldInfoPanel: React.FC = () => {
 							<Card key={node.id} style={{ padding: "4px 8px" }}>
 								<Flex align="center" justify="between" gap="2">
 									<Flex direction="column" style={{ flex: 1, minWidth: 0 }}>
-										<Text size="1" weight="bold" style={{ color: explored ? "#cfe8ff" : "#445566" }}>
+										<Text
+											size="1"
+											weight="bold"
+											style={{ color: explored ? "#cfe8ff" : "#445566" }}
+										>
 											{explored ? node.name : "???"}
 										</Text>
 									</Flex>
 									{isHost && explored && node.id !== world?.fleetNodeId && (
-										<Button size="1" variant="soft" onClick={() => handleTravel(node.id)}>前往</Button>
+										<Button size="1" variant="soft" onClick={() => handleTravel(node.id)}>
+											前往
+										</Button>
 									)}
 									{isHost && !explored && (
-										<Button size="1" variant="soft" color="gray" onClick={() => handleExplore(node.id)}>揭示</Button>
+										<Button
+											size="1"
+											variant="soft"
+											color="gray"
+											onClick={() => handleExplore(node.id)}
+										>
+											揭示
+										</Button>
 									)}
 								</Flex>
 							</Card>
@@ -110,7 +160,9 @@ export const WorldInfoPanel: React.FC = () => {
 			{world.timeline && (
 				<>
 					<Separator size="4" />
-					<Text size="1" style={{ color: "#667788" }}>第 {world.timeline.currentDay} 日</Text>
+					<Text size="1" style={{ color: "#667788" }}>
+						第 {world.timeline.currentDay} 日
+					</Text>
 				</>
 			)}
 		</Flex>

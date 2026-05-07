@@ -15,7 +15,7 @@
  */
 
 import { Graphics, Text, TextStyle } from "pixi.js";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { WorldMap, WorldNode, WorldEdge } from "@vt/data";
 import { getGameActionSender } from "@/state/stores/gameStore";
@@ -114,8 +114,6 @@ export function useStarMapRendering(
 	worldMap: WorldMap | undefined,
 	isHost: boolean
 ): void {
-	const containerRef = useRef<{ edges: Graphics; nodes: Graphics } | null>(null);
-
 	const world = worldMap;
 	const nodes = world?.nodes ?? [];
 	const edges = world?.edges ?? [];
@@ -141,6 +139,8 @@ export function useStarMapRendering(
 		if (!world || nodes.length === 0) return;
 
 		// ═══════ 航道层 ═══════
+		// 超空间航道：底层辉光（lane glow）+ 上层线，营造「通道」感
+		const laneGlow = new Graphics();
 		const edgeGfx = new Graphics();
 		for (const edge of edges) {
 			const from = nodes.find((n) => n.id === edge.from);
@@ -148,15 +148,24 @@ export function useStarMapRendering(
 			if (!from || !to) continue;
 
 			const style = edgeStyle(edge);
+			const connected = from.id === fleetNodeId || to.id === fleetNodeId;
+
+			// 底层辉光——航道越宽越「繁忙」
+			laneGlow.moveTo(from.position.x, from.position.y);
+			laneGlow.lineTo(to.position.x, to.position.y);
+			laneGlow.stroke({
+				color: style.color,
+				width: style.width * (connected ? 5 : 3),
+				alpha: style.alpha * 0.1,
+			});
+
+			// 上层线
 			edgeGfx.moveTo(from.position.x, from.position.y);
 			edgeGfx.lineTo(to.position.x, to.position.y);
-			// 虚线：用多个小线段模拟
 			if (style.dashed) {
 				const dx = to.position.x - from.position.x;
 				const dy = to.position.y - from.position.y;
-				const len = Math.sqrt(dx * dx + dy * dy);
 				const seg = 8;
-				const segLen = len / seg;
 				for (let i = 0; i < seg; i += 2) {
 					const t0 = i / seg;
 					const t1 = Math.min((i + 1) / seg, 1);
@@ -166,20 +175,23 @@ export function useStarMapRendering(
 			}
 			edgeGfx.stroke({ color: style.color, width: style.width, alpha: style.alpha });
 
-			// 航道标签：仅显示航行耗时（遭遇概率由 GM 口述）
-			const midX = (from.position.x + to.position.x) / 2;
-			const midY = (from.position.y + to.position.y) / 2;
-			const edgeLabel = new Text({
-				text: `${edge.travelCost}日`,
-				style: new TextStyle({ fontSize: 9, fill: C.textEdge }),
-			});
-			edgeLabel.anchor.set(0.5, 0.5);
-			const nx = -(to.position.y - from.position.y);
-			const ny = to.position.x - from.position.x;
-			const nl = Math.sqrt(nx * nx + ny * ny) || 1;
-			edgeLabel.position.set(midX + (nx / nl) * 10, midY + (ny / nl) * 10);
-			layers.starMapEdges.addChild(edgeLabel);
+			// 航道标签：航行耗时
+			if (edge.travelCost > 0) {
+				const mx = (from.position.x + to.position.x) / 2;
+				const my = (from.position.y + to.position.y) / 2;
+				const lbl = new Text({
+					text: `${edge.travelCost}d`,
+					style: new TextStyle({ fontSize: 9, fill: C.textEdge }),
+				});
+				lbl.anchor.set(0.5, 0.5);
+				const nx = -(to.position.y - from.position.y);
+				const ny = to.position.x - from.position.x;
+				const nl = Math.sqrt(nx * nx + ny * ny) || 1;
+				lbl.position.set(mx + (nx / nl) * 10, my + (ny / nl) * 10);
+				layers.starMapEdges.addChild(lbl);
+			}
 		}
+		layers.starMapEdges.addChild(laneGlow);
 		layers.starMapEdges.addChild(edgeGfx);
 
 		// ═══════ 节点层 ═══════
