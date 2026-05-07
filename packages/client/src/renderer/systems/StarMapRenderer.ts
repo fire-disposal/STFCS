@@ -95,6 +95,7 @@ export function useStarMapRendering(
 	worldMap: WorldMap | undefined,
 	isHost: boolean
 ): void {
+	const cleanupRef = useRef<(() => void) | null>(null);
 
 	const world = worldMap;
 	const nodes = world?.nodes ?? [];
@@ -108,9 +109,17 @@ export function useStarMapRendering(
 	);
 
 	useEffect(() => {
+		// 清理旧对象（destroy 防止内存泄露）
+		if (cleanupRef.current) cleanupRef.current();
+
 		if (!layers) return;
 		layers.starMapEdges.removeChildren();
 		layers.starMapNodes.removeChildren();
+
+		const toDestroy: any[] = [];
+		const cleanup = () => toDestroy.forEach((obj) => { try { obj.destroy?.(); } catch {} });
+		cleanupRef.current = cleanup;
+
 		if (!world || nodes.length === 0) return;
 
 		// ── 航道层 ──
@@ -160,6 +169,7 @@ export function useStarMapRendering(
 				layers.starMapEdges.addChild(lbl);
 			}
 		}
+		toDestroy.push(laneGlow, edgeGfx);
 		layers.starMapEdges.addChild(laneGlow);
 		layers.starMapEdges.addChild(edgeGfx);
 
@@ -214,14 +224,20 @@ export function useStarMapRendering(
 				const nid = node.id;
 				label.on("pointertap", () => {
 					// 触发节点选择事件（WorldInfoPanel 监听此事件）
-					window.dispatchEvent(new CustomEvent("starmap:node-select", {
-						detail: { nodeId: nid },
-					}));
+					window.dispatchEvent(
+						new CustomEvent("starmap:node-select", {
+							detail: { nodeId: nid },
+						})
+					);
 				});
 			}
 
 			layers.starMapNodes.addChild(label);
 		}
 		layers.starMapNodes.addChild(nodeGfx);
+		toDestroy.push(nodeGfx);
 	}, [layers, world, nodes.length, edges.length, fleetNodeId, isHost]);
+
+	// 组件卸载时清理
+	useEffect(() => () => { cleanupRef.current?.(); cleanupRef.current = null; }, []);
 }

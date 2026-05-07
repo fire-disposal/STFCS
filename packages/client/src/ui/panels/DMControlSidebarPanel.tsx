@@ -77,25 +77,28 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 	if (!isHost) return null;
 
 	const handleAdvanceTurn = async () => {
-		if (mode === "DEPLOYMENT") {
-			if (hasWorld) {
-				await send("edit:room", { action: "set_phase", phase: "WORLD" });
+		try {
+			if (mode === "DEPLOYMENT") {
+				if (hasWorld) await send("edit:room", { action: "set_phase", phase: "WORLD" });
+				else await send("room:action", { action: "start" });
 			} else {
-				await send("room:action", { action: "start" });
+				await send("edit:room", { action: "force_end_turn" });
 			}
-		} else {
-			await send("edit:room", { action: "force_end_turn" });
-		}
+		} catch { notify.error("操作失败"); }
 	};
 
 	const handleSetMode = async (m: string) => {
-		await send("edit:room", { action: "set_phase", phase: m });
-		notify.success(`模式切换为 ${MODE_LABELS[m] ?? m}`);
+		try {
+			await send("edit:room", { action: "set_phase", phase: m });
+			notify.success(`模式切换为 ${MODE_LABELS[m] ?? m}`);
+		} catch { notify.error("模式切换失败"); }
 	};
 
 	const handleLoadWorld = async () => {
-		await send("edit:room", { action: "set_world", preset: "demo" });
-		notify.success("已加载演示星域");
+		try {
+			await send("edit:room", { action: "set_world", preset: "demo" });
+			notify.success("已加载演示星域");
+		} catch { notify.error("加载失败"); }
 	};
 
 	const handleEnterCombat = async () => {
@@ -108,8 +111,10 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 	};
 
 	const handleReturnToWorld = async () => {
-		await send("edit:room", { action: "return_to_world" });
-		notify.success("已返回星图");
+		try {
+			await send("edit:room", { action: "return_to_world" });
+			notify.success("已返回星图");
+		} catch { notify.error("返回失败"); }
 	};
 
 	const isLastFaction =

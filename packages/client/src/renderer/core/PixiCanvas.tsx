@@ -276,10 +276,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		if (isWorld && worldMap?.fleetNodeId) {
 			const center = worldMap.nodes?.find((n: any) => n.id === worldMap.fleetNodeId);
 			if (center) {
-				camera.cameraRef.current.x = center.position.x;
-            camera.cameraRef.current.zoom = 0.8;
-            camera.cameraRef.current.viewRotation = 0;
-				camera.cameraRef.current.y = center.position.y;
+				camera.cameraRef.current = { x: center.position.x, y: center.position.y, zoom: 0.8, viewRotation: 0 };
 			}
 		}
 	}, [layerSystem.layers, viewMode, showTextures, worldMap]);
