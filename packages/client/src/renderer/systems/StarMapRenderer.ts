@@ -16,17 +16,23 @@ import { Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { WorldMap, WorldNode, WorldEdge } from "@vt/data";
-import { getGameActionSender } from "@/state/stores/gameStore";
-
 // ── 颜色映射 ──
 const C = {
-	nodeDefault: 0x2a3d55, nodeExplored: 0x4a9eff, nodeCurrent: 0x4fc3ff,
-	nodeHostile: 0xff4a4a, nodeSafe: 0x2ecc71,
-	edgeTrade: 0x3a5a8a, edgePerilous: 0xe67e22,
-	edgeHidden: 0x334455, edgeUnexplored: 0x445566,
-	text: 0x8ba4c7, textBright: 0xcfe8ff, textDim: 0x556677, textEdge: 0x556677,
-	glow: 0x4fc3ff, reachableGlow: 0x4a9eff,
-	travelTarget: 0xffd54f, // 航行目标高亮色
+	nodeDefault: 0x2a3d55,
+	nodeExplored: 0x4a9eff,
+	nodeCurrent: 0x4fc3ff,
+	nodeHostile: 0xff4a4a,
+	nodeSafe: 0x2ecc71,
+	edgeTrade: 0x3a5a8a,
+	edgePerilous: 0xe67e22,
+	edgeHidden: 0x334455,
+	edgeUnexplored: 0x445566,
+	text: 0x8ba4c7,
+	textBright: 0xcfe8ff,
+	textDim: 0x556677,
+	textEdge: 0x556677,
+	glow: 0x4fc3ff,
+	reachableGlow: 0x4a9eff,
 };
 
 const R = { node: 14, current: 20, reachable: 16 };
@@ -35,25 +41,35 @@ const R = { node: 14, current: 20, reachable: 16 };
 function drawShape(g: Graphics, x: number, y: number, r: number, type: string) {
 	switch (type) {
 		case "safe_haven":
-			g.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4); break;
+			g.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
+			break;
 		case "nebula":
-			g.poly([x, y - r, x + r, y, x, y + r, x - r, y]); break;
+			g.poly([x, y - r, x + r, y, x, y + r, x - r, y]);
+			break;
 		case "anomaly":
-			g.poly([x, y - r, x + r, y + r * 0.7, x - r, y + r * 0.7]); break;
+			g.poly([x, y - r, x + r, y + r * 0.7, x - r, y + r * 0.7]);
+			break;
 		case "waypoint": {
 			const pts: number[] = [];
-			for (let i = 0; i < 6; i++) pts.push(x + r * Math.cos((Math.PI / 3) * i - Math.PI / 6), y + r * Math.sin((Math.PI / 3) * i - Math.PI / 6));
-			g.poly(pts); break;
+			for (let i = 0; i < 6; i++)
+				pts.push(
+					x + r * Math.cos((Math.PI / 3) * i - Math.PI / 6),
+					y + r * Math.sin((Math.PI / 3) * i - Math.PI / 6)
+				);
+			g.poly(pts);
+			break;
 		}
 		case "hostile_zone":
 			for (let i = 0; i < 5; i++) {
-				const a = (Math.PI * 2 / 5) * i - Math.PI / 2;
+				const a = ((Math.PI * 2) / 5) * i - Math.PI / 2;
 				if (i === 0) g.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
 				else g.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
 				g.lineTo(x + r * 0.4 * Math.cos(a + Math.PI / 5), y + r * 0.4 * Math.sin(a + Math.PI / 5));
 			}
-			g.closePath(); break;
-		default: g.circle(x, y, r);
+			g.closePath();
+			break;
+		default:
+			g.circle(x, y, r);
 	}
 }
 
@@ -67,8 +83,10 @@ function nodeColor(node: WorldNode, isCurrent: boolean): number {
 function edgeStyle(edge: WorldEdge) {
 	const hidden = edge.hidden && !edge.discovered;
 	if (hidden) return { color: C.edgeHidden, width: 1, alpha: 0.15, dashed: true };
-	if (edge.type === "perilous") return { color: C.edgePerilous, width: 2, alpha: 0.6, dashed: false };
-	if (edge.type === "unexplored") return { color: C.edgeUnexplored, width: 1.5, alpha: 0.35, dashed: true };
+	if (edge.type === "perilous")
+		return { color: C.edgePerilous, width: 2, alpha: 0.6, dashed: false };
+	if (edge.type === "unexplored")
+		return { color: C.edgeUnexplored, width: 1.5, alpha: 0.35, dashed: true };
 	return { color: C.edgeTrade, width: 2, alpha: 0.5, dashed: false };
 }
 
@@ -77,7 +95,6 @@ export function useStarMapRendering(
 	worldMap: WorldMap | undefined,
 	isHost: boolean
 ): void {
-	const travelingRef = useRef(false);
 
 	const world = worldMap;
 	const nodes = world?.nodes ?? [];
@@ -85,8 +102,9 @@ export function useStarMapRendering(
 	const fleetNodeId = world?.fleetNodeId;
 
 	const reachableIds = new Set(
-		edges.filter((e) => !e.hidden || e.discovered)
-			.flatMap((e) => e.from === fleetNodeId ? [e.to] : e.to === fleetNodeId ? [e.from] : [])
+		edges
+			.filter((e) => !e.hidden || e.discovered)
+			.flatMap((e) => (e.from === fleetNodeId ? [e.to] : e.to === fleetNodeId ? [e.from] : []))
 	);
 
 	useEffect(() => {
@@ -107,14 +125,20 @@ export function useStarMapRendering(
 
 			laneGlow.moveTo(from.position.x, from.position.y);
 			laneGlow.lineTo(to.position.x, to.position.y);
-			laneGlow.stroke({ color: s.color, width: s.width * (connected ? 5 : 3), alpha: s.alpha * 0.1 });
+			laneGlow.stroke({
+				color: s.color,
+				width: s.width * (connected ? 5 : 3),
+				alpha: s.alpha * 0.1,
+			});
 
 			edgeGfx.moveTo(from.position.x, from.position.y);
 			edgeGfx.lineTo(to.position.x, to.position.y);
 			if (s.dashed) {
-				const dx = to.position.x - from.position.x, dy = to.position.y - from.position.y;
+				const dx = to.position.x - from.position.x,
+					dy = to.position.y - from.position.y;
 				for (let i = 0; i < 8; i += 2) {
-					const t0 = i / 8, t1 = Math.min((i + 1) / 8, 1);
+					const t0 = i / 8,
+						t1 = Math.min((i + 1) / 8, 1);
 					edgeGfx.moveTo(from.position.x + dx * t0, from.position.y + dy * t0);
 					edgeGfx.lineTo(from.position.x + dx * t1, from.position.y + dy * t1);
 				}
@@ -122,10 +146,15 @@ export function useStarMapRendering(
 			edgeGfx.stroke({ color: s.color, width: s.width, alpha: s.alpha });
 
 			if (edge.travelCost > 0) {
-				const mx = (from.position.x + to.position.x) / 2, my = (from.position.y + to.position.y) / 2;
-				const lbl = new Text({ text: `${edge.travelCost}d`, style: new TextStyle({ fontSize: 9, fill: C.textEdge }) });
+				const mx = (from.position.x + to.position.x) / 2,
+					my = (from.position.y + to.position.y) / 2;
+				const lbl = new Text({
+					text: `${edge.travelCost}d`,
+					style: new TextStyle({ fontSize: 9, fill: C.textEdge }),
+				});
 				lbl.anchor.set(0.5, 0.5);
-				const nx = -(to.position.y - from.position.y), ny = to.position.x - from.position.x;
+				const nx = -(to.position.y - from.position.y),
+					ny = to.position.x - from.position.x;
 				const nl = Math.sqrt(nx * nx + ny * ny) || 1;
 				lbl.position.set(mx + (nx / nl) * 10, my + (ny / nl) * 10);
 				layers.starMapEdges.addChild(lbl);
@@ -139,7 +168,6 @@ export function useStarMapRendering(
 		for (const node of nodes) {
 			const isCurrent = node.id === fleetNodeId;
 			const isReachable = reachableIds.has(node.id);
-			const isTraveling = travelingRef.current;
 			const visible = node.explored || isHost;
 			const r = isCurrent ? R.current : isReachable && !isCurrent ? R.reachable : R.node;
 			const color = nodeColor(node, isCurrent);
@@ -160,14 +188,14 @@ export function useStarMapRendering(
 			}
 
 			drawShape(nodeGfx, node.position.x, node.position.y, r, node.type);
-			nodeGfx.fill({ color, alpha: isTraveling && isReachable && !isCurrent ? 0.4 : 0.9 });
+			nodeGfx.fill({ color, alpha: 0.9 });
 
 			if (isCurrent) {
 				drawShape(nodeGfx, node.position.x, node.position.y, r, node.type);
 				nodeGfx.stroke({ color: 0xffffff, width: 2, alpha: 0.7 });
 			}
 
-			// 节点名称
+			// 节点名称（所有人可见、可点击标记，不触发行动）
 			const label = new Text({
 				text: node.name,
 				style: new TextStyle({
@@ -179,39 +207,16 @@ export function useStarMapRendering(
 			label.anchor.set(0.5, 0);
 			label.position.set(node.position.x, node.position.y + r + 3);
 			label.eventMode = "static";
-			label.cursor = isHost && isReachable && !isCurrent && !isTraveling ? "pointer" : "default";
+			label.cursor = isReachable && !isCurrent ? "pointer" : "default";
 
-			// 点击航行：禁用重复点击 + 即时视觉反馈
-			if (isHost && isReachable && !isCurrent) {
+			// 所有人可点击节点进行「指向」— 不触发航行，仅用于讨论
+			if (isReachable && !isCurrent) {
 				const nid = node.id;
-				const nname = node.name;
 				label.on("pointertap", () => {
-					if (travelingRef.current) return;
-					travelingRef.current = true;
-
-					// 立即视觉反馈：高亮目标节点
-					nodeGfx.circle(node.position.x, node.position.y, r + 3);
-					nodeGfx.fill({ color: C.travelTarget, alpha: 0.25 });
-
-					const sender = getGameActionSender();
-					if (sender.isAvailable()) {
-						sender.send("world:travel", { toNodeId: nid })
-							.then((res: any) => {
-								travelingRef.current = false;
-								const msg = res?.encounterTriggered
-									? `前往 ${nname} 途中遭遇！`
-									: `已到达 ${nname}`;
-								window.dispatchEvent(new CustomEvent("stfcs-notification", {
-									detail: { type: res?.encounterTriggered ? "warning" : "success", message: msg, duration: 3000 },
-								}));
-							})
-							.catch(() => {
-								travelingRef.current = false;
-								window.dispatchEvent(new CustomEvent("stfcs-notification", {
-									detail: { type: "error", message: `无法前往 ${nname}` },
-								}));
-							});
-					}
+					// 触发节点选择事件（WorldInfoPanel 监听此事件）
+					window.dispatchEvent(new CustomEvent("starmap:node-select", {
+						detail: { nodeId: nid },
+					}));
 				});
 			}
 
