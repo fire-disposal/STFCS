@@ -496,6 +496,11 @@ export const WorldQueryDef = {
   response: z.object({ worldMap: WorldMapSchema, stats: z.any() }),
 } as const satisfies WsEventDef<any, any>
 
+export const WorldEnterCombatDef = {
+  payload: z.object({}),
+  response: z.object({ success: z.boolean(), terrain: z.array(MapTerrainSchema).optional() }),
+} as const satisfies WsEventDef<any, any>
+
 export const WorldManageDef = {
   payload: z.object({
     action: z.enum(["add_node", "remove_node", "update_node", "add_edge", "remove_edge", "update_edge"]),
@@ -542,6 +547,7 @@ export const WsEventDefinitions = {
   "world:explore": WorldExploreDef,
   "world:query": WorldQueryDef,
   "world:manage": WorldManageDef,
+  "world:enter_combat": WorldEnterCombatDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 

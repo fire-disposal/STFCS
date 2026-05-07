@@ -98,6 +98,13 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 		notify.success("已加载演示星域");
 	};
 
+	const handleEnterCombat = async () => {
+		try {
+			await send("world:enter_combat", {});
+			notify.success("进入战斗模式");
+		} catch { notify.error("进入战斗失败"); }
+	};
+
 	const handleReturnToWorld = async () => {
 		await send("edit:room", { action: "return_to_world" });
 		notify.success("已返回星图");
@@ -162,7 +169,7 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 						size="1"
 						variant="solid"
 						color="green"
-						onClick={() => handleSetMode("COMBAT")}
+						onClick={handleEnterCombat}
 						style={{ width: "100%", marginBottom: 4 }}
 					>
 						<Play size={12} /> 进入战斗
