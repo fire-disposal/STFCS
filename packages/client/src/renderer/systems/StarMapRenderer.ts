@@ -2,90 +2,61 @@
  * StarMapRenderer — 星图渲染 Hook
  *
  * 在 PixiJS 中渲染超空间节点网络。
- * 复用相机的缩放/平移，与战术地图共用一套交互。
  *
- * 渲染层：
- * - starMapEdges (zIndex 6): 航道连线 + 标签
- * - starMapNodes (zIndex 7): 节点 + 名称
+ * 交互流程：
+ * 1. GM 点击可达节点 → 目标节点高亮 + 禁用重复点击
+ * 2. 等待 world:travel 响应
+ * 3. 响应到达 → 自动重新渲染（数据层已更新 fleetNodeId）
+ * 4. camera 自动定位到新位置（由 PixiCanvas 的 effect 处理）
  *
- * 可视化层次：
- * 1. 航道：连线颜色=安全等级，虚线=未勘测，文字=耗时+概率
- * 2. 节点：形状=类型，颜色=状态，大小=是否当前
- * 3. 可达性：当前节点高亮，可达节点浅色光晕
+ * 不依赖每帧动画，所有状态由 React 数据流驱动。
  */
 
 import { Graphics, Text, TextStyle } from "pixi.js";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { WorldMap, WorldNode, WorldEdge } from "@vt/data";
 import { getGameActionSender } from "@/state/stores/gameStore";
 
 // ── 颜色映射 ──
 const C = {
-	nodeDefault: 0x2a3d55,
-	nodeExplored: 0x4a9eff,
-	nodeCurrent: 0x4fc3ff,
-	nodeHostile: 0xff4a4a,
-	nodeSafe: 0x2ecc71,
-	edgeTrade: 0x3a5a8a,
-	edgePerilous: 0xe67e22,
-	edgeHidden: 0x334455,
-	edgeUnexplored: 0x445566,
-	text: 0x8ba4c7,
-	textBright: 0xcfe8ff,
-	textDim: 0x556677,
-	textEdge: 0x556677,
-	glow: 0x4fc3ff,
-	reachableGlow: 0x4a9eff,
-	bg: 0x0a0e14,
+	nodeDefault: 0x2a3d55, nodeExplored: 0x4a9eff, nodeCurrent: 0x4fc3ff,
+	nodeHostile: 0xff4a4a, nodeSafe: 0x2ecc71,
+	edgeTrade: 0x3a5a8a, edgePerilous: 0xe67e22,
+	edgeHidden: 0x334455, edgeUnexplored: 0x445566,
+	text: 0x8ba4c7, textBright: 0xcfe8ff, textDim: 0x556677, textEdge: 0x556677,
+	glow: 0x4fc3ff, reachableGlow: 0x4a9eff,
+	travelTarget: 0xffd54f, // 航行目标高亮色
 };
 
 const R = { node: 14, current: 20, reachable: 16 };
 
-// ── 节点类型 → 绘制形状 ──
-function drawNodeShape(g: Graphics, x: number, y: number, r: number, type: string) {
+// ── 节点类型形状 ──
+function drawShape(g: Graphics, x: number, y: number, r: number, type: string) {
 	switch (type) {
 		case "safe_haven":
-			// 方形（安全港）
-			g.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
-			break;
+			g.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4); break;
 		case "nebula":
-			// 菱形（星云）
-			g.poly([x, y - r, x + r, y, x, y + r, x - r, y]);
-			break;
+			g.poly([x, y - r, x + r, y, x, y + r, x - r, y]); break;
 		case "anomaly":
-			// 三角形（异常区）
-			g.poly([x, y - r, x + r, y + r * 0.7, x - r, y + r * 0.7]);
-			break;
-		case "waypoint":
-			// 六边形（航标）
+			g.poly([x, y - r, x + r, y + r * 0.7, x - r, y + r * 0.7]); break;
+		case "waypoint": {
 			const pts: number[] = [];
-			for (let i = 0; i < 6; i++) {
-				const a = (Math.PI / 3) * i - Math.PI / 6;
-				pts.push(x + r * Math.cos(a), y + r * Math.sin(a));
-			}
-			g.poly(pts);
-			break;
+			for (let i = 0; i < 6; i++) pts.push(x + r * Math.cos((Math.PI / 3) * i - Math.PI / 6), y + r * Math.sin((Math.PI / 3) * i - Math.PI / 6));
+			g.poly(pts); break;
+		}
 		case "hostile_zone":
-			// 星形（敌对区）
 			for (let i = 0; i < 5; i++) {
-				const a = ((Math.PI * 2) / 5) * i - Math.PI / 2;
-				const inner = a + Math.PI / 5;
-				const outerR = r;
-				const innerR = r * 0.4;
-				if (i === 0) g.moveTo(x + outerR * Math.cos(a), y + outerR * Math.sin(a));
-				else g.lineTo(x + outerR * Math.cos(a), y + outerR * Math.sin(a));
-				g.lineTo(x + innerR * Math.cos(inner), y + innerR * Math.sin(inner));
+				const a = (Math.PI * 2 / 5) * i - Math.PI / 2;
+				if (i === 0) g.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+				else g.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
+				g.lineTo(x + r * 0.4 * Math.cos(a + Math.PI / 5), y + r * 0.4 * Math.sin(a + Math.PI / 5));
 			}
-			g.closePath();
-			break;
-		default:
-			// 圆形（标准恒星系）
-			g.circle(x, y, r);
+			g.closePath(); break;
+		default: g.circle(x, y, r);
 	}
 }
 
-// ── 节点状态 → 颜色 ──
 function nodeColor(node: WorldNode, isCurrent: boolean): number {
 	if (isCurrent) return C.nodeCurrent;
 	if (node.state === "threat") return C.nodeHostile;
@@ -93,19 +64,11 @@ function nodeColor(node: WorldNode, isCurrent: boolean): number {
 	return C.nodeExplored;
 }
 
-// ── 航道类型 → 颜色 + 样式 ──
-function edgeStyle(edge: WorldEdge): {
-	color: number;
-	width: number;
-	alpha: number;
-	dashed: boolean;
-} {
+function edgeStyle(edge: WorldEdge) {
 	const hidden = edge.hidden && !edge.discovered;
 	if (hidden) return { color: C.edgeHidden, width: 1, alpha: 0.15, dashed: true };
-	if (edge.type === "perilous")
-		return { color: C.edgePerilous, width: 2, alpha: 0.6, dashed: false };
-	if (edge.type === "unexplored")
-		return { color: C.edgeUnexplored, width: 1.5, alpha: 0.35, dashed: true };
+	if (edge.type === "perilous") return { color: C.edgePerilous, width: 2, alpha: 0.6, dashed: false };
+	if (edge.type === "unexplored") return { color: C.edgeUnexplored, width: 1.5, alpha: 0.35, dashed: true };
 	return { color: C.edgeTrade, width: 2, alpha: 0.5, dashed: false };
 }
 
@@ -114,78 +77,55 @@ export function useStarMapRendering(
 	worldMap: WorldMap | undefined,
 	isHost: boolean
 ): void {
+	const travelingRef = useRef(false);
+
 	const world = worldMap;
 	const nodes = world?.nodes ?? [];
 	const edges = world?.edges ?? [];
 	const fleetNodeId = world?.fleetNodeId;
 
-	// 可达节点 ID 集合
 	const reachableIds = new Set(
-		edges
-			.filter((e) => !e.hidden || e.discovered)
-			.flatMap((e) => {
-				if (e.from === fleetNodeId) return [e.to];
-				if (e.to === fleetNodeId) return [e.from];
-				return [];
-			})
+		edges.filter((e) => !e.hidden || e.discovered)
+			.flatMap((e) => e.from === fleetNodeId ? [e.to] : e.to === fleetNodeId ? [e.from] : [])
 	);
 
 	useEffect(() => {
 		if (!layers) return;
-
 		layers.starMapEdges.removeChildren();
 		layers.starMapNodes.removeChildren();
-
 		if (!world || nodes.length === 0) return;
 
-		// ═══════ 航道层 ═══════
-		// 超空间航道：底层辉光（lane glow）+ 上层线，营造「通道」感
+		// ── 航道层 ──
 		const laneGlow = new Graphics();
 		const edgeGfx = new Graphics();
 		for (const edge of edges) {
 			const from = nodes.find((n) => n.id === edge.from);
 			const to = nodes.find((n) => n.id === edge.to);
 			if (!from || !to) continue;
-
-			const style = edgeStyle(edge);
+			const s = edgeStyle(edge);
 			const connected = from.id === fleetNodeId || to.id === fleetNodeId;
 
-			// 底层辉光——航道越宽越「繁忙」
 			laneGlow.moveTo(from.position.x, from.position.y);
 			laneGlow.lineTo(to.position.x, to.position.y);
-			laneGlow.stroke({
-				color: style.color,
-				width: style.width * (connected ? 5 : 3),
-				alpha: style.alpha * 0.1,
-			});
+			laneGlow.stroke({ color: s.color, width: s.width * (connected ? 5 : 3), alpha: s.alpha * 0.1 });
 
-			// 上层线
 			edgeGfx.moveTo(from.position.x, from.position.y);
 			edgeGfx.lineTo(to.position.x, to.position.y);
-			if (style.dashed) {
-				const dx = to.position.x - from.position.x;
-				const dy = to.position.y - from.position.y;
-				const seg = 8;
-				for (let i = 0; i < seg; i += 2) {
-					const t0 = i / seg;
-					const t1 = Math.min((i + 1) / seg, 1);
+			if (s.dashed) {
+				const dx = to.position.x - from.position.x, dy = to.position.y - from.position.y;
+				for (let i = 0; i < 8; i += 2) {
+					const t0 = i / 8, t1 = Math.min((i + 1) / 8, 1);
 					edgeGfx.moveTo(from.position.x + dx * t0, from.position.y + dy * t0);
 					edgeGfx.lineTo(from.position.x + dx * t1, from.position.y + dy * t1);
 				}
 			}
-			edgeGfx.stroke({ color: style.color, width: style.width, alpha: style.alpha });
+			edgeGfx.stroke({ color: s.color, width: s.width, alpha: s.alpha });
 
-			// 航道标签：航行耗时
 			if (edge.travelCost > 0) {
-				const mx = (from.position.x + to.position.x) / 2;
-				const my = (from.position.y + to.position.y) / 2;
-				const lbl = new Text({
-					text: `${edge.travelCost}d`,
-					style: new TextStyle({ fontSize: 9, fill: C.textEdge }),
-				});
+				const mx = (from.position.x + to.position.x) / 2, my = (from.position.y + to.position.y) / 2;
+				const lbl = new Text({ text: `${edge.travelCost}d`, style: new TextStyle({ fontSize: 9, fill: C.textEdge }) });
 				lbl.anchor.set(0.5, 0.5);
-				const nx = -(to.position.y - from.position.y);
-				const ny = to.position.x - from.position.x;
+				const nx = -(to.position.y - from.position.y), ny = to.position.x - from.position.x;
 				const nl = Math.sqrt(nx * nx + ny * ny) || 1;
 				lbl.position.set(mx + (nx / nl) * 10, my + (ny / nl) * 10);
 				layers.starMapEdges.addChild(lbl);
@@ -194,40 +134,36 @@ export function useStarMapRendering(
 		layers.starMapEdges.addChild(laneGlow);
 		layers.starMapEdges.addChild(edgeGfx);
 
-		// ═══════ 节点层 ═══════
+		// ── 节点层 ──
 		const nodeGfx = new Graphics();
 		for (const node of nodes) {
 			const isCurrent = node.id === fleetNodeId;
 			const isReachable = reachableIds.has(node.id);
+			const isTraveling = travelingRef.current;
 			const visible = node.explored || isHost;
 			const r = isCurrent ? R.current : isReachable && !isCurrent ? R.reachable : R.node;
 			const color = nodeColor(node, isCurrent);
 
 			if (!visible) {
-				// 未探索：灰点
 				nodeGfx.circle(node.position.x, node.position.y, 4);
 				nodeGfx.fill({ color: C.nodeDefault, alpha: 0.25 });
 				continue;
 			}
 
-			// 可达光晕
 			if (isReachable && !isCurrent) {
 				nodeGfx.circle(node.position.x, node.position.y, r + 5);
 				nodeGfx.fill({ color: C.reachableGlow, alpha: 0.08 });
 			}
-
-			// 当前位置脉冲
 			if (isCurrent) {
 				nodeGfx.circle(node.position.x, node.position.y, r + 8);
 				nodeGfx.fill({ color: C.glow, alpha: 0.12 });
 			}
 
-			// 节点形状
-			drawNodeShape(nodeGfx, node.position.x, node.position.y, r, node.type);
-			nodeGfx.fill({ color, alpha: 0.9 });
+			drawShape(nodeGfx, node.position.x, node.position.y, r, node.type);
+			nodeGfx.fill({ color, alpha: isTraveling && isReachable && !isCurrent ? 0.4 : 0.9 });
 
 			if (isCurrent) {
-				drawNodeShape(nodeGfx, node.position.x, node.position.y, r, node.type);
+				drawShape(nodeGfx, node.position.x, node.position.y, r, node.type);
 				nodeGfx.stroke({ color: 0xffffff, width: 2, alpha: 0.7 });
 			}
 
@@ -243,37 +179,37 @@ export function useStarMapRendering(
 			label.anchor.set(0.5, 0);
 			label.position.set(node.position.x, node.position.y + r + 3);
 			label.eventMode = "static";
-			label.cursor = isHost && isReachable && !isCurrent ? "pointer" : "default";
+			label.cursor = isHost && isReachable && !isCurrent && !isTraveling ? "pointer" : "default";
 
-			// 点击航行 (仅 GM，仅可达非当前节点)
+			// 点击航行：禁用重复点击 + 即时视觉反馈
 			if (isHost && isReachable && !isCurrent) {
 				const nid = node.id;
 				const nname = node.name;
 				label.on("pointertap", () => {
+					if (travelingRef.current) return;
+					travelingRef.current = true;
+
+					// 立即视觉反馈：高亮目标节点
+					nodeGfx.circle(node.position.x, node.position.y, r + 3);
+					nodeGfx.fill({ color: C.travelTarget, alpha: 0.25 });
+
 					const sender = getGameActionSender();
 					if (sender.isAvailable()) {
-						sender
-							.send("world:travel", { toNodeId: nid })
+						sender.send("world:travel", { toNodeId: nid })
 							.then((res: any) => {
+								travelingRef.current = false;
 								const msg = res?.encounterTriggered
-									? `前往 ${nname} 途中遭遇敌情！`
+									? `前往 ${nname} 途中遭遇！`
 									: `已到达 ${nname}`;
-								window.dispatchEvent(
-									new CustomEvent("stfcs-notification", {
-										detail: {
-											type: res?.encounterTriggered ? "warning" : "success",
-											message: msg,
-											duration: 3000,
-										},
-									})
-								);
+								window.dispatchEvent(new CustomEvent("stfcs-notification", {
+									detail: { type: res?.encounterTriggered ? "warning" : "success", message: msg, duration: 3000 },
+								}));
 							})
 							.catch(() => {
-								window.dispatchEvent(
-									new CustomEvent("stfcs-notification", {
-										detail: { type: "error", message: `无法前往 ${nname}` },
-									})
-								);
+								travelingRef.current = false;
+								window.dispatchEvent(new CustomEvent("stfcs-notification", {
+									detail: { type: "error", message: `无法前往 ${nname}` },
+								}));
 							});
 					}
 				});

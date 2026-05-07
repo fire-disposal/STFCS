@@ -102,7 +102,9 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({ ne
 		try {
 			await send("world:enter_combat", {});
 			notify.success("进入战斗模式");
-		} catch { notify.error("进入战斗失败"); }
+		} catch {
+			notify.error("进入战斗失败");
+		}
 	};
 
 	const handleReturnToWorld = async () => {
