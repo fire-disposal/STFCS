@@ -76,17 +76,23 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	const [showProfile, setShowProfile] = useState(false);
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
 	const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
+	const [createError, setCreateError] = useState<string | null>(null);
 	const [roomName, setRoomName] = useState(`${playerName}的房间`);
 
 	const handleCreateWithWorld = useCallback(async () => {
 		try {
-			// 先创建房间
 			const result = await networkManager.createRoom({ roomName, maxPlayers: 4 });
 			if (!result.success || !result.roomId) {
-				notify.error("创建房间失败");
+				notify.error(result.error ?? "创建房间失败");
 				return;
 			}
-			// 如果选择了世界预设，在加入房间前加载
+			// 先加入房间（让 socket 进入 room context）
+			const joinResult = await networkManager.joinRoom(result.roomId);
+			if (!joinResult.success) {
+				notify.error(joinResult.error ?? "加入房间失败");
+				return;
+			}
+			// 再加载世界预设（此时 socket 已在房间内）
 			if (selectedWorld) {
 				await networkManager.request("edit:room", {
 					action: "set_world",
@@ -96,7 +102,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 			setShowCreateDialog(false);
 			onEnterMyRoom();
 		} catch {
-			notify.error("创建失败");
+			setCreateError("创建失败");
 		}
 	}, [networkManager, roomName, selectedWorld, onEnterMyRoom]);
 	const [showAbout, setShowAbout] = useState(false);
@@ -487,7 +493,12 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
 						{selectedWorld && (
 							<Text size="1" style={{ color: "#4fc3ff" }}>
-								已选择：演示星域 — 5个节点、6条航线
+								已选择：演示星域
+							</Text>
+						)}
+						{createError && (
+							<Text size="1" style={{ color: "#ff6b6b" }}>
+								{createError}
 							</Text>
 						)}
 					</Flex>
