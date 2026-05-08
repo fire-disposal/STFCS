@@ -165,8 +165,10 @@ export const RoomRejoinDef = {
 
 export const RoomActionDef = {
   payload: z.object({
-    action: z.enum(["ready", "start", "kick", "transfer_host"]),
+    action: z.enum(["ready", "start", "kick", "transfer_host", "set_factions"]),
     targetId: z.string().optional(),
+    factions: z.array(z.string()).optional(),
+    initiativeOrder: z.array(z.string()).optional(),
   }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>

@@ -205,6 +205,22 @@ export const roomHandlers = {
                 ctx.socket.data.role = PlayerRole.PLAYER;
                 ctx.state.changeHost(p.targetId);
                 return;
+            case "set_factions":
+                ctx.requireHost();
+                if (!p.factions || !p.initiativeOrder) throw err("需要 factions 和 initiativeOrder", ErrorCodes.KEY_REQUIRED);
+                const factionIds = p.factions;
+                const order = p.initiativeOrder;
+                ctx.state.mutateAndBroadcast((draft: any) => {
+                    const existingMap = draft.factions ?? {};
+                    const newMap: Record<string, unknown> = {};
+                    for (const id of factionIds) {
+                        newMap[id] = existingMap[id] ?? { $id: id, name: id, color: "#888" };
+                    }
+                    draft.factions = newMap;
+                    draft.initiativeOrder = order;
+                    draft.initiativeIndex = 0;
+                });
+                return;
         }
     },
 

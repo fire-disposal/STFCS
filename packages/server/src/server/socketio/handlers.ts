@@ -8,6 +8,7 @@ import { deployHandlers } from "./handlers/deploy.js";
 import { roomHandlers } from "./handlers/room.js";
 import { customizeHandlers } from "./handlers/customize.js";
 import { gameHandlers } from "./handlers/game.js";
+import { factionHandlers, editFactionHandlers } from "./handlers/faction.js";
 import { playerInfoService, playerProfileService, presetService, assetService } from "./handlers/services.js";
 import { PlayerRole, ErrorCodes } from "@vt/data";
 import type { WsPayload, PlayerInfo } from "@vt/data";
@@ -21,6 +22,8 @@ rpc.namespace("deploy", deployHandlers);
 rpc.namespace("room", roomHandlers);
 rpc.namespace("customize", customizeHandlers);
 rpc.namespace("game", gameHandlers);
+rpc.namespace("faction", factionHandlers);
+rpc.namespace("edit:faction", editFactionHandlers);
 
 // ===== auth =====
 rpc.namespace("auth", {
