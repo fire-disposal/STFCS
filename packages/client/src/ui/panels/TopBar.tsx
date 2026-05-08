@@ -65,8 +65,6 @@ export const TopBar: React.FC<TopBarProps> = ({
 					phase={phase}
 					turnCount={turnCount}
 					activeFaction={activeFaction}
-					isReady={isReady}
-					onReadyToggle={onReadyToggle}
 					initiativeOrder={gameState?.initiativeOrder}
 					factions={gameState?.factions as Record<string, { name: string; color: string }> | undefined}
 				/>

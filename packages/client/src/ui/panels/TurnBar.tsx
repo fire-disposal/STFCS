@@ -1,7 +1,5 @@
 /**
  * TurnBar - 阶段标签 + 回合数 + 派系线（含三角指针）
- *
- * 在任何阶段都显示派系线预览，FACTION_ACTION 阶段有活跃指针。
  */
 
 import React from "react";
@@ -12,8 +10,6 @@ interface TurnBarProps {
 	phase: GamePhase;
 	turnCount: number;
 	activeFaction: string | undefined;
-	isReady: boolean;
-	onReadyToggle: () => void;
 	initiativeOrder?: string[];
 	factions?: Record<string, { name: string; color: string; flagAssetId?: string }>;
 }
@@ -29,8 +25,6 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	phase,
 	turnCount,
 	activeFaction,
-	isReady,
-	onReadyToggle,
 	initiativeOrder,
 	factions,
 }) => {
@@ -41,26 +35,20 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 
 	return (
 		<div className="turn-bar">
-			{/* 阶段标签 */}
 			<span className={`turn-bar__phase turn-bar__phase--${phase.toLowerCase()}`}>
 				{PHASE_LABELS[phase] ?? phase}
 			</span>
 
-			{/* 回合数 */}
 			{phase !== GamePhase.DEPLOYMENT && (
 				<span className="turn-bar__round">轮 {turnCount}</span>
 			)}
 
-			{/* 派系线 */}
 			{initiativeOrder && initiativeOrder.length > 0 && (
 				<div className="turn-bar__faction-line">
-					{/* 三角指针（仅行动阶段显示） */}
 					{isActionPhase && currentIndex >= 0 && (
 						<div
 							className="turn-bar__pointer"
-							style={{
-								left: `calc(${(currentIndex / (initiativeOrder.length - 1 || 1)) * 100}% - 10px)`,
-							}}
+							style={{ left: `calc(${(currentIndex / (initiativeOrder.length - 1 || 1)) * 100}% - 10px)` }}
 						>
 							<div className="turn-bar__pointer-triangle" />
 						</div>
@@ -82,16 +70,6 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 					})}
 				</div>
 			)}
-
-			{/* 准备按钮 */}
-			<button
-				className={`turn-bar__btn ${activeFaction ? "turn-bar__btn--active" : ""}`}
-				onClick={onReadyToggle}
-			>
-				{phase === GamePhase.DEPLOYMENT
-					? (isReady ? "✓ 已就绪" : "准备")
-					: (isReady ? "✓ 完毕" : "待命")}
-			</button>
 		</div>
 	);
 };
