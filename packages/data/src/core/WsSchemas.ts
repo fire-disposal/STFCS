@@ -427,18 +427,27 @@ export const FactionGetDef = {
   response: z.object({ faction: FactionDefSchema.nullable() }),
 } as const satisfies WsEventDef<any, any>
 
-export const EditFactionDef = {
-  payload: z.object({
-    action: z.enum(["create", "update", "delete", "reorder"]),
-    factionId: z.string().optional(),
-    name: z.string().optional(),
-    color: z.string().optional(),
-    flagAssetId: z.string().optional(),
-    initiativeOrder: z.array(z.string()).optional(),
-  }),
+export const EditFactionCreateDef = {
+  payload: z.object({ name: z.string(), color: z.string(), flagAssetId: z.string().optional() }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
 
+export const EditFactionUpdateDef = {
+  payload: z.object({ factionId: z.string(), name: z.string().optional(), color: z.string().optional(), flagAssetId: z.string().optional() }),
+  response: VoidSchema,
+} as const satisfies WsEventDef<any, any>
+
+export const EditFactionDeleteDef = {
+  payload: z.object({ factionId: z.string() }),
+  response: VoidSchema,
+} as const satisfies WsEventDef<any, any>
+
+export const EditFactionReorderDef = {
+  payload: z.object({ initiativeOrder: z.array(z.string()) }),
+  response: VoidSchema,
+} as const satisfies WsEventDef<any, any>
+
+// ---- 旧 EditFactionDef 删除，替换为上面 4 个 ----
 // ============================================================
 // sync 命名空间（Patch 格式）
 // ============================================================
@@ -507,7 +516,10 @@ export const WsEventDefinitions = {
   "deploy:token": DeployTokenDef,
   "faction:list": FactionListDef,
   "faction:get": FactionGetDef,
-  "edit:faction": EditFactionDef,
+  "edit:faction:create": EditFactionCreateDef,
+  "edit:faction:update": EditFactionUpdateDef,
+  "edit:faction:delete": EditFactionDeleteDef,
+  "edit:faction:reorder": EditFactionReorderDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 

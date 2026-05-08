@@ -1,17 +1,17 @@
 /**
- * faction handlers — 派系查询
+ * faction handlers — 派系查询 + CRUD
  */
-import type { WsPayload, WsResponseData } from "@vt/data";
+import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 
 export const factionHandlers = {
-    list: async (_payload: unknown, ctx: RpcContext): Promise<WsResponseData<"faction:list">> => {
+    list: async (_payload: unknown, ctx: RpcContext) => {
         const state = ctx.state.getState();
         const factionMap = state.factions ?? {};
         return { factions: Object.values(factionMap) };
     },
 
-    get: async (payload: unknown, ctx: RpcContext): Promise<WsResponseData<"faction:get">> => {
+    get: async (payload: unknown, ctx: RpcContext) => {
         const p = payload as WsPayload<"faction:get">;
         const state = ctx.state.getState();
         const faction = state.factions?.[p.factionId] ?? null;
@@ -19,17 +19,10 @@ export const factionHandlers = {
     },
 };
 
-/**
- * edit:faction handlers — 派系 CRUD（仅 DM）
- */
 export const editFactionHandlers = {
-    /**
-     * 创建/更新/删除/排序 派系
-     * 直接操作 state.factions / initiativeOrder
-     */
     create: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
-        const p = payload as WsPayload<"edit:faction">;
+        const p = payload as WsPayload<"edit:faction:create">;
         const factionId = `custom:faction:${Date.now()}`;
 
         ctx.state.mutateAndBroadcast((draft: any) => {
@@ -47,27 +40,27 @@ export const editFactionHandlers = {
 
     update: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
-        const p = payload as WsPayload<"edit:faction">;
+        const p = payload as WsPayload<"edit:faction:update">;
         const state = ctx.state.getState();
-        const faction = state.factions?.[p.factionId ?? ""];
+        const faction = state.factions?.[p.factionId];
         if (!faction) throw new Error("派系不存在");
 
         ctx.state.mutateAndBroadcast((draft: any) => {
-            if (draft.factions?.[p.factionId!]) {
-                if (p.name !== undefined) draft.factions[p.factionId!].name = p.name;
-                if (p.color !== undefined) draft.factions[p.factionId!].color = p.color;
-                if (p.flagAssetId !== undefined) draft.factions[p.factionId!].flagAssetId = p.flagAssetId;
+            if (draft.factions?.[p.factionId]) {
+                if (p.name !== undefined) draft.factions[p.factionId].name = p.name;
+                if (p.color !== undefined) draft.factions[p.factionId].color = p.color;
+                if (p.flagAssetId !== undefined) draft.factions[p.factionId].flagAssetId = p.flagAssetId;
             }
         });
     },
 
     delete: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
-        const p = payload as WsPayload<"edit:faction">;
-        if (p.factionId?.startsWith("preset:")) throw new Error("预设派系不可删除");
+        const p = payload as WsPayload<"edit:faction:delete">;
+        if (p.factionId.startsWith("preset:")) throw new Error("预设派系不可删除");
 
         ctx.state.mutateAndBroadcast((draft: any) => {
-            if (draft.factions) delete draft.factions[p.factionId!];
+            if (draft.factions) delete draft.factions[p.factionId];
             if (draft.initiativeOrder) {
                 draft.initiativeOrder = draft.initiativeOrder.filter((id: string) => id !== p.factionId);
             }
@@ -76,7 +69,7 @@ export const editFactionHandlers = {
 
     reorder: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
-        const p = payload as WsPayload<"edit:faction">;
+        const p = payload as WsPayload<"edit:faction:reorder">;
         ctx.state.mutateAndBroadcast((draft: any) => {
             draft.initiativeOrder = p.initiativeOrder;
         });
