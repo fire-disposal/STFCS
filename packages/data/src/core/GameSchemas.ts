@@ -300,150 +300,6 @@ export const TokenModifierSchema = z.object({
 });
 export type TokenModifier = z.infer<typeof TokenModifierSchema>;
 
-// ============================================================
-// 预定义修正模板（工厂函数）
-// ============================================================
-
-/** 创建增伤修正（造成伤害倍率） */
-export function createDamageBoostModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `damageBoost_${Date.now()}`,
-		source,
-		stat: "damageDealt",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "damageDealt",
-	};
-}
-
-/** 创建减伤修正（受到伤害倍率） */
-export function createDamageReductionModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `damageReduction_${Date.now()}`,
-		source,
-		stat: "damageTaken",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "damageTaken",
-	};
-}
-
-/** 创建易伤修正（受到伤害增加） */
-export function createVulnerabilityModifier(percent: number, duration: number, source = "system"): TokenModifier {
-	return {
-		id: `vulnerability_${Date.now()}`,
-		source,
-		stat: "damageTaken",
-		value: 1 + percent / 100, // percent=50 → value=1.5
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "vulnerability",
-	};
-}
-
-/** 创建航速修正 */
-export function createSpeedModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `speed_${Date.now()}`,
-		source,
-		stat: "speed",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "speed",
-	};
-}
-
-/** 创建转向速度修正 */
-export function createTurnRateModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `turnRate_${Date.now()}`,
-		source,
-		stat: "turnRate",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "turnRate",
-	};
-}
-
-/** 创建护盾效率修正 */
-export function createShieldEfficiencyModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `shieldEfficiency_${Date.now()}`,
-		source,
-		stat: "shieldEfficiency",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "shieldEfficiency",
-	};
-}
-
-/** 创建辐散修正 */
-export function createFluxDissipationModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `fluxDissipation_${Date.now()}`,
-		source,
-		stat: "fluxDissipation",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "fluxDissipation",
-	};
-}
-
-/** 创建射程修正 */
-export function createRangeModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `range_${Date.now()}`,
-		source,
-		stat: "range",
-		value,
-		operation: "multiply",
-		duration,
-		stacks: false,
-		stackKey: "range",
-	};
-}
-
-/** 创建命中率修正（加法） */
-export function createAccuracyModifier(value: number, duration = 999, source = "system"): TokenModifier {
-	return {
-		id: `accuracy_${Date.now()}`,
-		source,
-		stat: "accuracy",
-		value,
-		operation: "add",
-		duration,
-		stacks: true, // 命中率修正可叠加
-	};
-}
-
-/** 预定义修正模板常量 */
-export const MODIFIER_TEMPLATES = {
-	DAMAGE_BOOST_50: () => createDamageBoostModifier(1.5),
-	DAMAGE_BOOST_100: () => createDamageBoostModifier(2.0),
-	DAMAGE_REDUCTION_25: () => createDamageReductionModifier(0.75),
-	DAMAGE_REDUCTION_50: () => createDamageReductionModifier(0.5),
-	VULNERABILITY_50_3TURNS: () => createVulnerabilityModifier(50, 3),
-	SPEED_HALVED: () => createSpeedModifier(0.5),
-	SPEED_DOUBLE: () => createSpeedModifier(2.0),
-	TURN_RATE_HALVED: () => createTurnRateModifier(0.5),
-	RANGE_BOOST_30: () => createRangeModifier(1.3),
-	FLUX_DISSIPATION_BOOST_50: () => createFluxDissipationModifier(1.5),
-	ACCURACY_BOOST_20: () => createAccuracyModifier(0.2),
-} as const;
-
 export const TokenRuntimeSchema = z.object({
 	position: PointSchema,
 	heading: z.number(),
@@ -491,14 +347,6 @@ export const CombatTokenSchema = z.object({
 	metadata: MetadataSchema,
 });
 export type CombatToken = z.infer<typeof CombatTokenSchema>;
-
-export type TokenJSON = CombatToken & {
-	token: TokenSpec;
-};
-export const TokenJSONSchema = CombatTokenSchema.extend({
-	token: TokenSpecSchema,
-});
-
 
 // ============================================================
 // 地图类型
@@ -652,18 +500,6 @@ export const AssetSchema = z.object({
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
-export const AssetUploadRequestSchema = z.object({
-	type: AssetTypeSchema,
-	filename: z.string(),
-	mimeType: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]),
-	buffer: z.custom<Uint8Array>(
-		(val): val is Uint8Array => val instanceof Uint8Array,
-		{ message: "Expected Uint8Array or Buffer" }
-	),
-	metadata: AssetSchema.shape.metadata.optional(),
-});
-export type AssetUploadRequest = z.infer<typeof AssetUploadRequestSchema>;
-
 export const AssetListItemSchema = z.object({
 	$id: z.string(),
 	type: AssetTypeSchema,
@@ -688,62 +524,10 @@ export const AssetFilterSchema = z.object({
 });
 export type AssetFilter = z.infer<typeof AssetFilterSchema>;
 
-export const AssetStatsSchema = z.object({
-	total: z.number(),
-	byType: z.record(AssetTypeSchema, z.number()),
-	byVisibility: z.record(z.string(), z.number()),
-	totalSize: z.number(),
-	oldest: z.date().nullable(),
-	newest: z.date().nullable(),
-});
-export type AssetStats = z.infer<typeof AssetStatsSchema>;
-
-// ============================================================
-// 导出 / 序列化辅助类型
-// ============================================================
-
-export const ExportJSONSchema = z.object({
-	$schema: z.string(),
-	$type: z.enum(["TOKEN", "WEAPON", "FLEET"]),
-	$exportedAt: z.string(),
-	token: CombatTokenSchema.optional(),
-	weapon: WeaponJSONSchema.optional(),
-	fleet: z.object({
-		name: z.string(),
-		description: z.string().optional(),
-		tokens: z.array(CombatTokenSchema),
-	}).optional(),
-});
-export type ExportJSON = z.infer<typeof ExportJSONSchema>;
-
-// ============================================================
-// 验证函数工厂
-// ============================================================
-
 /** 创建严格验证函数（parse 模式） */
 function createValidator<T>(schema: z.ZodTypeAny): (data: unknown) => T {
 	return (data: unknown): T => schema.parse(data) as T;
 }
-
-/** 创建宽松类型守卫（safeParse 模式） */
-function createTypeGuard<T>(schema: z.ZodTypeAny): (data: unknown) => data is T {
-	return (data: unknown): data is T => schema.safeParse(data).success;
-}
-
-// ============================================================
-// 验证函数导出（由工厂生成）
-// ============================================================
-
-export const validateCombatToken = createValidator<CombatToken>(CombatTokenSchema);
-export const validateInventoryToken = createValidator<InventoryToken>(InventoryTokenSchema);
-export const validateWeaponJSON = createValidator<WeaponJSON>(WeaponJSONSchema);
-export const validateGameSave = createValidator<GameSave>(GameSaveSchema);
-export const validateGameMap = createValidator<GameMap>(GameMapSchema);
-export const validateGameRoomState = createValidator<GameRoomState>(GameRoomStateSchema);
-
-export const isValidCombatToken = createTypeGuard<CombatToken>(CombatTokenSchema);
-export const isValidInventoryToken = createTypeGuard<InventoryToken>(InventoryTokenSchema);
-export const isValidWeaponJSON = createTypeGuard<WeaponJSON>(WeaponJSONSchema);
 
 export const RoomArchiveMetadataSchema = z.object({
 	roomId: z.string(),

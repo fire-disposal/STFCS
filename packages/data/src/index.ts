@@ -70,7 +70,6 @@ export type {
   SaveBuild,
   InventoryToken,
   CombatToken,
-  TokenJSON,
   TokenSpec,
   TokenRuntime,
   CustomizeTokenPayload,
@@ -93,7 +92,6 @@ export type {
 export {
   CombatTokenSchema,
   InventoryTokenSchema,
-  TokenJSONSchema,
   WeaponJSONSchema,
   PlayerInfoSchema,
   GameSaveSchema,
