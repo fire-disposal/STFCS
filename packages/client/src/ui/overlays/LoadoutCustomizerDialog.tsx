@@ -30,7 +30,6 @@ import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
-import { getGameActionSender } from "@/state/stores/gameStore";
 import MiniShipPreview from "../shared/MiniShipPreview";
 import MiniWeaponPreview from "../shared/MiniWeaponPreview";
 import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
@@ -177,7 +176,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         };
     }, [socket, assetSocket.handleResponse]);
 
-    const send = useMemo(() => getGameActionSender().send, []);
+    const send = networkManager.request.bind(networkManager);
 
     const reloadData = useCallback(async () => {
         if (!open) return;

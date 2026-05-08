@@ -44,7 +44,11 @@ export const WeaponSlotSize = WeaponSlotSizeSchema.enum;
 export type WeaponSlotSize = z.infer<typeof WeaponSlotSizeSchema>;
 
 export const WeaponTagValues = ["EMP", "PD"] as const;
-export const WeaponTagSchema = z.enum(WeaponTagValues);
+/**
+ * WeaponTag 采用宽松字符串验证以兼容旧预设数据中多样化的标签值。
+ * WeaponTagValues 常量记录当前已知的有效标签，作为 UI 建议值使用。
+ */
+export const WeaponTagSchema = z.string();
 export type WeaponTag = z.infer<typeof WeaponTagSchema>;
 
 export const HullSizeSchema = z.enum(["FRIGATE", "DESTROYER", "CRUISER", "CAPITAL"]);

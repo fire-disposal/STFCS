@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useMemo, useState } from "react"
 import { Application } from "@pixi/react";
 import { Graphics } from "pixi.js";
 import type { WeaponJSON } from "@vt/data";
-import "./ship-customization-modal.css";
+import "../overlays/ship-customization-modal.css";
 import { UI_CONFIG } from "@/config/constants";
 
 const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE_PIXI;
