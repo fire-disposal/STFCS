@@ -142,6 +142,7 @@ export const FactionDefSchema = z.object({
 	name: z.string(),
 	color: z.string(),
 	flagAssetId: z.string().optional(),
+	ownerId: z.string().optional(),
 });
 export type FactionDef = z.infer<typeof FactionDefSchema>;
 

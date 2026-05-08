@@ -23,7 +23,7 @@ export const factionHandlers = {
 
 export const editFactionHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
-        ctx.requireHost();
+        ctx.requireAuth();
         const p = payload as WsPayload<"edit:faction:create">;
         const factionId = `custom:faction:${Date.now()}`;
 
@@ -34,6 +34,7 @@ export const editFactionHandlers = {
                 name: p.name,
                 color: p.color,
                 flagAssetId: p.flagAssetId,
+                ownerId: ctx.playerId,
             };
             if (!draft.initiativeOrder) draft.initiativeOrder = [];
             draft.initiativeOrder.push(factionId);
@@ -41,7 +42,7 @@ export const editFactionHandlers = {
     },
 
     update: async (payload: unknown, ctx: RpcContext) => {
-        ctx.requireHost();
+        ctx.requireAuth();
         const p = payload as WsPayload<"edit:faction:update">;
         const state = ctx.state.getState();
         const faction = state.factions?.[p.factionId];
@@ -57,9 +58,16 @@ export const editFactionHandlers = {
     },
 
     delete: async (payload: unknown, ctx: RpcContext) => {
-        ctx.requireHost();
+        ctx.requireAuth();
         const p = payload as WsPayload<"edit:faction:delete">;
         if (p.factionId.startsWith("preset:")) throw err("预设派系不可删除", ErrorCodes.PRESET_NOT_FOUND);
+
+        const state = ctx.state.getState();
+        const faction = state.factions?.[p.factionId];
+        if (!faction) throw err("派系不存在", ErrorCodes.TOKEN_NOT_FOUND);
+        if (faction.ownerId && faction.ownerId !== ctx.playerId && ctx.playerId !== state.ownerId) {
+            throw err("只能删除自己创建的派系", ErrorCodes.NOT_HOST);
+        }
 
         ctx.state.mutateAndBroadcast((draft: any) => {
             if (draft.factions) delete draft.factions[p.factionId];
