@@ -27,7 +27,6 @@ export interface RpcContext {
   role: "HOST" | "PLAYER" | null;
   room: Room | null;
   roomManager: RoomManager;
-  services: RpcServices;
   state: MutativeStateManager;
   data: SocketData;
 
@@ -41,15 +40,6 @@ export interface RpcContext {
   broadcastTo(excludePlayerId: string, event: string, data: unknown): void;
   
   editLogContext(reason?: string): EditLogContext;
-}
-
-export interface RpcServices {
-  playerProfile: unknown;
-  playerInfo: unknown;
-  shipBuild: unknown;
-  weapon: unknown;
-  preset: unknown;
-  asset: unknown;
 }
 
 type HandlerFn = (payload: WsPayload<WsEventName>, ctx: RpcContext) => WsResponseData<WsEventName> | void | Promise<WsResponseData<WsEventName> | void>;
@@ -70,8 +60,8 @@ export class RpcRegistry {
     return this;
   }
 
-  createMiddleware(): (socket: Socket, io: IOServer, roomManager: RoomManager, services: RpcServices) => void {
-    return (socket, io, roomManager, services) => {
+  createMiddleware(): (socket: Socket, io: IOServer, roomManager: RoomManager) => void {
+    return (socket, io, roomManager) => {
       socket.on("request", async (data: { event: WsEventName; requestId: string; payload: unknown }) => {
         const { event, requestId, payload } = data;
         const sd = socket.data as SocketData;
@@ -93,7 +83,6 @@ export class RpcRegistry {
           role: sd.role ?? null,
           room,
           roomManager,
-          services,
           state,
           data: sd,
 

@@ -216,7 +216,6 @@ rpc.on("sync:request_full", async (_, ctx) => {
 
 // ===== setup =====
 export function setupSocketIO(io: any, roomManager: any): void {
-  const services = { playerProfile: playerProfileService, playerInfo: playerInfoService, shipBuild: null as any, weapon: null as any, preset: presetService, asset: assetService };
   const middleware = rpc.createMiddleware();
 
   roomManager.setOnRoomRemove(async (room: any, roomId: string) => {
@@ -255,7 +254,7 @@ export function setupSocketIO(io: any, roomManager: any): void {
   });
 
   io.on("connection", (socket: any) => {
-    middleware(socket, io, roomManager, services);
+    middleware(socket, io, roomManager);
 
     socket.on("disconnect", () => {
       const sd = socket.data as { playerId?: string; roomId?: string; role?: string };
