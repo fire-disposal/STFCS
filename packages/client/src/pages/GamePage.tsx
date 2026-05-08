@@ -19,7 +19,7 @@ import {
 	Switch,
 	Separator,
 } from "@radix-ui/themes";
-import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield, Flag } from "lucide-react";
+import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import type { SocketNetworkManager } from "@/network";
 import { ErrorBoundary } from "@/ui/shared/ErrorBoundary";
@@ -33,7 +33,6 @@ import RightSidebar from "@/ui/panels/RightSidebar";
 import { useGameAction } from "@/hooks/useGameAction";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
-import FactionCustomizerDialog from "@/ui/overlays/FactionCustomizerDialog";
 import "@/ui/panels/room-player-list.css";
 
 interface GamePageProps {
@@ -46,7 +45,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
-	const [showFactionDialog, setShowFactionDialog] = useState(false);
 	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
 
 	const socket = networkManager.getSocket();
@@ -149,7 +147,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				onReadyToggle={() => networkManager.setReady()}
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
-				onManageFactions={() => setShowFactionDialog(true)}
 				onFactionChange={(playerId, faction) => {
 					send("edit:room", { action: "set_faction", playerId, faction });
 				}}
@@ -260,13 +257,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>
-
-			<FactionCustomizerDialog
-				open={showFactionDialog}
-				onOpenChange={setShowFactionDialog}
-				networkManager={networkManager}
-				playerId={playerId}
-			/>
 		</Box>
 		</ErrorBoundary>
 	);

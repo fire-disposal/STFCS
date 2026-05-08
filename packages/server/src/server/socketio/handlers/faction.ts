@@ -1,23 +1,32 @@
 /**
- * faction handlers — 派系查询 + CRUD
+ * faction handlers — 派系查询 + 全局CRUD
+ *
+ * 预设派系（@vt/data）始终可见；自定义派系通过 FactionService 全局存储。
+ * 进入房间后 faction:list 还合并 room.state.factions 中的派系快照。
  */
 import type { WsPayload } from "@vt/data";
 import { ErrorCodes } from "@vt/data";
 import { err } from "./err.js";
 import type { RpcContext } from "../RpcServer.js";
-import { assetService } from "./services.js";
+import { assetService, factionService } from "./services.js";
 import { presetFactions } from "@vt/data";
+
+function mergeFactionMaps(roomFactions: Record<string, any> | undefined, globalFactions: any[], presets: any[]) {
+    const map: Record<string, any> = { ...roomFactions };
+    for (const f of globalFactions) {
+        if (!map[f.$id]) map[f.$id] = f;
+    }
+    for (const p of presets) {
+        if (!map[p.$id]) map[p.$id] = p;
+    }
+    return map;
+}
 
 export const factionHandlers = {
     list: async (_payload: unknown, ctx: RpcContext) => {
         const state = ctx.state.getState();
-        const factionMap: Record<string, any> = { ...state.factions };
-        // 预设派系始终可见（作为基线），自定义派系叠加其上
-        for (const p of presetFactions) {
-            if (!factionMap[p.$id]) {
-                factionMap[p.$id] = p;
-            }
-        }
+        const globalFactions = await factionService.list();
+        const factionMap = mergeFactionMaps(state.factions, globalFactions, presetFactions);
         return { factions: Object.values(factionMap) };
     },
 
@@ -25,6 +34,7 @@ export const factionHandlers = {
         const p = payload as WsPayload<"faction:get">;
         const state = ctx.state.getState();
         const faction = state.factions?.[p.factionId]
+            ?? await factionService.get(p.factionId)
             ?? presetFactions.find((pf) => pf.$id === p.factionId)
             ?? null;
         return { faction };
@@ -34,11 +44,9 @@ export const factionHandlers = {
 export const editFactionHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireAuth();
-        ctx.requireRoom();
         const p = payload as WsPayload<"edit:faction:create">;
         const factionId = `custom:faction:${Date.now()}`;
 
-        // 若提供了旗帜数据，先上传
         let flagAssetId = p.flagAssetId;
         if (p.flagData && !flagAssetId) {
             try {
@@ -55,33 +63,26 @@ export const editFactionHandlers = {
             }
         }
 
-        ctx.state.mutateAndBroadcast((draft: any) => {
-            if (!draft.factions) draft.factions = {};
-            draft.factions[factionId] = {
-                $id: factionId,
-                name: p.name,
-                color: p.color,
-                flagAssetId,
-                ownerId: ctx.playerId,
-            };
-            if (!draft.initiativeOrder) draft.initiativeOrder = [];
-            draft.initiativeOrder.push(factionId);
+        await factionService.create({
+            $id: factionId,
+            name: p.name,
+            color: p.color,
+            flagAssetId,
+            ownerId: ctx.playerId,
         });
     },
 
     update: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireAuth();
         const p = payload as WsPayload<"edit:faction:update">;
-        const state = ctx.state.getState();
-        const faction = state.factions?.[p.factionId];
+        const faction = await factionService.get(p.factionId);
         if (!faction) throw err("派系不存在", ErrorCodes.TOKEN_NOT_FOUND);
 
-        ctx.state.mutateAndBroadcast((draft: any) => {
-            if (draft.factions?.[p.factionId]) {
-                if (p.name !== undefined) draft.factions[p.factionId].name = p.name;
-                if (p.color !== undefined) draft.factions[p.factionId].color = p.color;
-                if (p.flagAssetId !== undefined) draft.factions[p.factionId].flagAssetId = p.flagAssetId;
-            }
+        await factionService.create({
+            ...faction,
+            name: p.name ?? faction.name,
+            color: p.color ?? faction.color,
+            flagAssetId: p.flagAssetId ?? faction.flagAssetId,
         });
     },
 
@@ -90,19 +91,14 @@ export const editFactionHandlers = {
         const p = payload as WsPayload<"edit:faction:delete">;
         if (p.factionId.startsWith("preset:")) throw err("预设派系不可删除", ErrorCodes.PRESET_NOT_FOUND);
 
-        const state = ctx.state.getState();
-        const faction = state.factions?.[p.factionId];
+        const faction = await factionService.get(p.factionId);
         if (!faction) throw err("派系不存在", ErrorCodes.TOKEN_NOT_FOUND);
-        if (faction.ownerId && faction.ownerId !== ctx.playerId && ctx.playerId !== state.ownerId) {
+        if (faction.ownerId && faction.ownerId !== ctx.playerId) {
+            // 非所有者不能删除；host 例外在 delete handler 中不会调用到这里（因为全局存储无 room）
             throw err("只能删除自己创建的派系", ErrorCodes.NOT_HOST);
         }
 
-        ctx.state.mutateAndBroadcast((draft: any) => {
-            if (draft.factions) delete draft.factions[p.factionId];
-            if (draft.initiativeOrder) {
-                draft.initiativeOrder = draft.initiativeOrder.filter((id: string) => id !== p.factionId);
-            }
-        });
+        await factionService.delete(p.factionId);
     },
 
     reorder: async (payload: unknown, ctx: RpcContext) => {

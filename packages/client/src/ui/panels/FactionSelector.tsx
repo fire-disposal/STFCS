@@ -1,16 +1,15 @@
 import React, { useState, useCallback } from "react";
-import { Flag, Wrench } from "lucide-react";
+import { Flag } from "lucide-react";
 
 interface FactionSelectorProps {
 	currentFaction: string | undefined;
 	currentPlayerId: string | null;
 	factions: Record<string, { name: string; color: string; flagAssetId?: string }>;
 	onFactionChange?: (playerId: string, faction: string) => void;
-	onManageFactions: () => void;
 }
 
 export const FactionSelector: React.FC<FactionSelectorProps> = ({
-	currentFaction, currentPlayerId, factions, onFactionChange, onManageFactions,
+	currentFaction, currentPlayerId, factions, onFactionChange,
 }) => {
 	const [open, setOpen] = useState(false);
 
@@ -60,7 +59,7 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
 					<div style={{
 						position: "absolute", top: "100%", right: 0, marginTop: 4,
 						background: "#0f1923", border: "1px solid #2a3440",
-						borderRadius: 8, padding: 6, zIndex: 100, minWidth: 200,
+						borderRadius: 8, padding: 6, zIndex: 100, minWidth: 180,
 						boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
 					}}>
 						<div style={{ color: "#6b8aaa", fontSize: 10, fontWeight: 600, padding: "4px 8px 6px", letterSpacing: 0.5, textTransform: "uppercase" }}>
@@ -112,33 +111,9 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
 
 						{factionEntries.length === 0 && (
 							<div style={{ padding: "12px 8px", color: "#5a7085", fontSize: 12, textAlign: "center" }}>
-								尚无派系
+								暂无活跃派系
 							</div>
 						)}
-
-						<div style={{ borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 4 }}>
-							<button
-								onClick={() => { setOpen(false); onManageFactions(); }}
-								style={{
-									display: "flex", alignItems: "center", gap: 6,
-									padding: "6px 8px", borderRadius: 6,
-									background: "transparent", border: "1px dashed #2a3440",
-									color: "#6b8aaa", cursor: "pointer", fontSize: 12,
-									textAlign: "left", width: "100%",
-								}}
-								onMouseEnter={(e) => {
-									e.currentTarget.style.borderColor = "#4a9eff";
-									e.currentTarget.style.color = "#4a9eff";
-								}}
-								onMouseLeave={(e) => {
-									e.currentTarget.style.borderColor = "#2a3440";
-									e.currentTarget.style.color = "#6b8aaa";
-								}}
-							>
-								<Wrench size={12} />
-								管理派系...
-							</button>
-						</div>
 					</div>
 				</>
 			)}

@@ -10,8 +10,7 @@ import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Avatar } from "@/ui/shared/Avatar";
 import LoadoutCustomizerDialog from "@/ui/overlays/LoadoutCustomizerDialog";
-// FactionCustomizerDialog moved to GamePage (room context required)
-
+import FactionCustomizerDialog from "@/ui/overlays/FactionCustomizerDialog";
 import {
 	Badge,
 	Box,
@@ -26,7 +25,7 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info } from "lucide-react";
+import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info, Flag } from "lucide-react";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import AboutDialog from "@/ui/overlays/AboutDialog";
 
@@ -64,6 +63,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	onUpdateProfile,
 }) => {
 	const [showCustomizer, setShowCustomizer] = useState(false);
+	const [showFactions, setShowFactions] = useState(false);
 	const [showProfile, setShowProfile] = useState(false);
 	const [showAbout, setShowAbout] = useState(false);
 	const [roomTab, setRoomTab] = useState("all");
@@ -184,6 +184,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 							</Button>
 							<Button variant="soft" onClick={() => setShowCustomizer(true)} data-magnetic>
 								<Wrench size={16} /> 舰船/武器工坊
+							</Button>
+							<Button variant="soft" onClick={() => setShowFactions(true)} data-magnetic>
+								<Flag size={16} /> 派系工坊
 							</Button>
 							<Button variant="soft" onClick={() => setShowProfile(true)} data-magnetic>
 								<UserCircle size={16} /> 玩家档案
@@ -345,6 +348,13 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				open={showCustomizer}
 				onOpenChange={setShowCustomizer}
 				networkManager={networkManager}
+			/>
+
+			<FactionCustomizerDialog
+				open={showFactions}
+				onOpenChange={setShowFactions}
+				networkManager={networkManager}
+				playerId={playerId}
 			/>
 
 			<AboutDialog

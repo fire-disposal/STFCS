@@ -7,6 +7,7 @@ import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
 import { assetService } from "./services.js";
+import { factionService } from "./services.js";
 
 export const roomHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
@@ -186,6 +187,20 @@ export const roomHandlers = {
                 return;
             case "start":
                 ctx.requireHost();
+
+                // 开始前将全局自定义派系注入房间状态
+                const globalFactions = await factionService.list();
+                if (globalFactions.length > 0) {
+                    ctx.state.mutateAndBroadcast((draft: any) => {
+                        if (!draft.factions) draft.factions = {};
+                        for (const f of globalFactions) {
+                            if (!draft.factions[f.$id]) {
+                                draft.factions[f.$id] = { ...f };
+                            }
+                        }
+                    });
+                }
+
                 ctx.state.startGame();
                 ctx.state.resetAllPlayersReady();
                 ctx.state.appendLog(createBattleLogEvent("game_started", {
