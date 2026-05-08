@@ -425,7 +425,7 @@ export const FactionGetDef = {
 } as const satisfies WsEventDef<any, any>
 
 export const EditFactionCreateDef = {
-  payload: z.object({ name: z.string(), color: z.string(), flagAssetId: z.string().optional() }),
+  payload: z.object({ name: z.string(), color: z.string(), flagAssetId: z.string().optional(), flagData: z.string().optional() }),
   response: VoidSchema,
 } as const satisfies WsEventDef<any, any>
 

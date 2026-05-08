@@ -5,6 +5,7 @@ import type { WsPayload } from "@vt/data";
 import { ErrorCodes } from "@vt/data";
 import { err } from "./err.js";
 import type { RpcContext } from "../RpcServer.js";
+import { assetService } from "./services.js";
 
 export const factionHandlers = {
     list: async (_payload: unknown, ctx: RpcContext) => {
@@ -27,13 +28,30 @@ export const editFactionHandlers = {
         const p = payload as WsPayload<"edit:faction:create">;
         const factionId = `custom:faction:${Date.now()}`;
 
+        // 若提供了旗帜数据，先上传
+        let flagAssetId = p.flagAssetId;
+        if (p.flagData && !flagAssetId) {
+            try {
+                const asset = await assetService.uploadAsset(
+                    ctx.playerId,
+                    "faction_flag",
+                    `${p.name}_flag.png`,
+                    "image/png",
+                    Buffer.from(p.flagData, "base64"),
+                );
+                flagAssetId = asset.$id;
+            } catch (e) {
+                // flag upload fails silently — create without flag
+            }
+        }
+
         ctx.state.mutateAndBroadcast((draft: any) => {
             if (!draft.factions) draft.factions = {};
             draft.factions[factionId] = {
                 $id: factionId,
                 name: p.name,
                 color: p.color,
-                flagAssetId: p.flagAssetId,
+                flagAssetId,
                 ownerId: ctx.playerId,
             };
             if (!draft.initiativeOrder) draft.initiativeOrder = [];

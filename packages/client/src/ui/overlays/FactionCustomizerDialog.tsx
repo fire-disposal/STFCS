@@ -1,11 +1,11 @@
 /**
  * FactionCustomizerDialog - 派系工坊
- * 支持旗帜上传（方形裁剪 + 预览）和全局派系管理
+ * 浏览全局派系、创建自定义派系（含旗帜裁剪上传 + 取色器）
  */
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Dialog, Flex, Text, Button, TextField, Card, ScrollArea } from "@radix-ui/themes";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2, Upload, Pipette } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import type { FactionDef } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
@@ -17,14 +17,11 @@ interface Props {
     playerId: string | null;
 }
 
-/** Canvas 裁剪：取图像中心正方形区域，缩放至 64×64 */
 function cropSquareFromImage(img: HTMLImageElement, size: number): string | null {
     const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-
     const side = Math.min(img.naturalWidth, img.naturalHeight);
     const sx = (img.naturalWidth - side) / 2;
     const sy = (img.naturalHeight - side) / 2;
@@ -32,20 +29,8 @@ function cropSquareFromImage(img: HTMLImageElement, size: number): string | null
     return canvas.toDataURL("image/png");
 }
 
-/** File → data URL */
-function fileToDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-/** data URL → Blob → base64 buffer string (no prefix) */
-function dataUrlToBase64(dataUrl: string): string {
-    const comma = dataUrl.indexOf(",");
-    return dataUrl.slice(comma + 1);
+function rgbToHex(r: number, g: number, b: number) {
+    return "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
 }
 
 export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, networkManager, playerId }) => {
@@ -53,17 +38,16 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
     const [newName, setNewName] = useState("");
     const [newColor, setNewColor] = useState("#4a9eff");
     const [loading, setLoading] = useState(false);
-
-    // flag upload state
+    const [flagData, setFlagData] = useState<string | null>(null);
     const [flagPreview, setFlagPreview] = useState<string | null>(null);
-    const [flagBase64, setFlagBase64] = useState<string | null>(null); // cropped result
     const fileRef = useRef<HTMLInputElement>(null);
+    const previewRef = useRef<HTMLDivElement>(null);
 
     const loadFactions = useCallback(async () => {
         try {
             const res = await networkManager.request("faction:list", {}) as { factions: FactionDef[] };
             setFactions(res.factions ?? []);
-        } catch { /* ignore */ }
+        } catch {}
     }, [networkManager]);
 
     useEffect(() => { if (open) loadFactions(); }, [open, loadFactions]);
@@ -72,117 +56,125 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         const file = e.target.files?.[0];
         if (!file) return;
         try {
-            const dataUrl = await fileToDataUrl(file);
-            const img = new Image();
-            img.onload = () => {
-                // 方形裁剪 128×128
-                const cropped = cropSquareFromImage(img, 128);
-                setFlagPreview(cropped);
-                setFlagBase64(cropped ? dataUrlToBase64(cropped) : null);
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const cropped = cropSquareFromImage(img, 128);
+                    setFlagPreview(cropped);
+                    setFlagData(cropped ? cropped.split(",")[1] : null);
+                };
+                img.src = reader.result as string;
             };
-            img.src = dataUrl;
-        } catch {
-            notify.error("图片加载失败");
-        }
+            reader.readAsDataURL(file);
+        } catch { notify.error("图片加载失败"); }
+    };
+
+    /** 点击旗帜预览取色 */
+    const handlePickColor = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!flagPreview || !previewRef.current) return;
+        const rect = previewRef.current.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) / rect.width * 128);
+        const y = Math.round((e.clientY - rect.top) / rect.height * 128);
+
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = 128;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            ctx.drawImage(img, 0, 0);
+            const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+            setNewColor(rgbToHex(r, g, b));
+        };
+        img.src = flagPreview;
     };
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
         setLoading(true);
         try {
-            let flagAssetId: string | undefined;
-
-            // 先上传旗帜
-            if (flagBase64) {
-                try {
-                    const uploadRes = await networkManager.request("asset:upload", {
-                        type: "faction_flag",
-                        filename: `${newName.trim()}_flag.png`,
-                        mimeType: "image/png",
-                        data: flagBase64,
-                    } as any) as { assetId?: string };
-                    flagAssetId = uploadRes?.assetId;
-                } catch {
-                    // flag upload optional
-                }
-            }
-
             await networkManager.request("edit:faction:create", {
                 name: newName.trim(),
                 color: newColor,
-                flagAssetId,
-            });
-
+                flagData: flagData ?? undefined,
+            } as any);
             notify.success("派系已创建");
             setNewName("");
+            setNewColor("#4a9eff");
+            setFlagData(null);
             setFlagPreview(null);
-            setFlagBase64(null);
             loadFactions();
         } catch (e: any) {
             notify.error(e?.message ?? "创建失败");
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
 
-    const handleDelete = async (factionId: string) => {
+    const handleDelete = async (fid: string) => {
         setLoading(true);
         try {
-            await networkManager.request("edit:faction:delete", { factionId });
+            await networkManager.request("edit:faction:delete", { factionId: fid });
             notify.success("派系已删除");
             loadFactions();
-        } catch (e: any) {
-            notify.error(e?.message ?? "删除失败");
-        } finally {
-            setLoading(false);
-        }
+        } catch (e: any) { notify.error(e?.message ?? "删除失败"); }
+        finally { setLoading(false); }
     };
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
-            <Dialog.Content style={{ maxWidth: 520, maxHeight: "80vh" }}>
+            <Dialog.Content style={{ maxWidth: 460, maxHeight: "85vh" }}>
                 <Dialog.Title>派系工坊</Dialog.Title>
                 <Dialog.Description size="1" color="gray" mb="3">
-                    浏览和创建全局派系。上传旗帜将自动裁剪为正方形。
+                    旗帜图片将自动裁剪为正方形，点击旗帜可吸取颜色。
                 </Dialog.Description>
 
                 {/* 创建新派系 */}
-                <Card style={{ padding: "10px 12px", marginBottom: 12 }}>
-                    <Text size="1" weight="bold" mb="2" color="gray">创建新派系</Text>
-                    <Flex gap="2" wrap="wrap" align="start">
-                        {/* 旗帜上传预览 */}
-                        <Flex direction="column" align="center" gap="1">
-                            <div
-                                onClick={() => fileRef.current?.click()}
-                                style={{
-                                    width: 64, height: 64, borderRadius: 6,
-                                    border: "1px dashed rgba(74,158,255,0.3)",
-                                    background: flagPreview ? `url(${flagPreview}) center/cover` : "rgba(20,30,45,0.5)",
-                                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                {!flagPreview && <Upload size={18} style={{ color: "#4a9eff", opacity: 0.6 }} />}
-                            </div>
-                            <input ref={fileRef} type="file" accept="image/png" hidden onChange={handleFlagSelect} />
-                            <Text size="1" color="gray">旗帜</Text>
-                        </Flex>
+                <Card style={{ padding: 12, marginBottom: 12 }}>
+                    <Text size="1" weight="bold" color="gray" mb="3">创建新派系</Text>
 
-                        <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 200 }}>
-                            <label>
-                                <Text size="1" color="gray">名称</Text>
-                                <TextField.Root size="1" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="派系名称" style={{ width: "100%" }} />
-                            </label>
-                            <label>
-                                <Text size="1" color="gray">颜色</Text>
-                                <Flex gap="1" align="center">
-                                    <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ width: 32, height: 28, border: "none", cursor: "pointer", background: "transparent" }} />
-                                    <TextField.Root size="1" value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ width: 90 }} />
-                                </Flex>
-                            </label>
+                    {/* 旗帜上传区 */}
+                    <Flex justify="center" mb="2">
+                        <div
+                            ref={previewRef}
+                            onClick={() => fileRef.current?.click()}
+                            title="点击上传，右键取色"
+                            style={{
+                                width: 100, height: 100, borderRadius: 8,
+                                border: flagPreview ? "2px solid rgba(74,158,255,0.3)" : "2px dashed rgba(74,158,255,0.3)",
+                                background: flagPreview ? `url(${flagPreview}) center/cover` : "rgba(20,30,45,0.4)",
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                                flexShrink: 0,
+                                position: "relative",
+                            }}
+                        >
+                            {!flagPreview && <Upload size={24} style={{ color: "#4a9eff", opacity: 0.5 }} />}
+                            {flagPreview && (
+                                <div style={{
+                                    position: "absolute", bottom: 2, right: 2,
+                                    background: "rgba(0,0,0,0.6)", borderRadius: 4,
+                                    padding: "2px 6px", fontSize: 10,
+                                    color: "#aaccff",
+                                    pointerEvents: "none",
+                                }}>
+                                    <Pipette size={10} style={{ verticalAlign: "middle", marginRight: 3 }} />
+                                    取色
+                                </div>
+                            )}
+                        </div>
+                        <input ref={fileRef} type="file" accept="image/png" hidden onChange={handleFlagSelect} />
+                    </Flex>
+
+                    {/* 名称 + 颜色输入 */}
+                    <Flex direction="column" gap="2">
+                        <TextField.Root size="1" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="派系名称" />
+                        <Flex gap="2" align="center">
+                            <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
+                                style={{ width: 36, height: 28, border: "1px solid #2a3440", borderRadius: 4, cursor: "pointer", background: "transparent", padding: 2 }} />
+                            <TextField.Root size="1" value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ flex: 1, fontFamily: "Fira Code, monospace", fontSize: 12 }} />
                         </Flex>
                     </Flex>
-                    <Flex justify="end" mt="2">
+
+                    <Flex justify="end" mt="3">
                         <Button size="1" onClick={handleCreate} disabled={loading || !newName.trim()}>
                             <Plus size={12} /> 创建
                         </Button>
@@ -190,13 +182,13 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                 </Card>
 
                 {/* 派系列表 */}
-                <ScrollArea style={{ maxHeight: 320 }}>
+                <ScrollArea style={{ maxHeight: 280 }}>
                     <Flex direction="column" gap="1">
                         {factions.map((f) => (
                             <Flex key={f.$id} align="center" gap="2" style={{
                                 padding: "6px 10px", borderRadius: 6,
-                                background: "rgba(20, 30, 45, 0.4)",
-                                border: "1px solid rgba(74, 158, 255, 0.08)",
+                                background: "rgba(20,30,45,0.4)",
+                                border: "1px solid rgba(74,158,255,0.08)",
                             }}>
                                 <span style={{ width: 20, height: 20, borderRadius: 4, background: f.color, flexShrink: 0 }} />
                                 <Text size="1" style={{ flex: 1 }}>{f.name}</Text>
@@ -208,9 +200,7 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                                 )}
                             </Flex>
                         ))}
-                        {factions.length === 0 && (
-                            <Text size="1" color="gray" align="center" mt="4">暂无派系</Text>
-                        )}
+                        {factions.length === 0 && <Text size="1" color="gray" align="center" mt="4">暂无派系</Text>}
                     </Flex>
                 </ScrollArea>
 
