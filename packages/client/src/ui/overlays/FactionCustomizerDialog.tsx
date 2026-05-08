@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Dialog, Flex, Text, Button, TextField, Card, ScrollArea } from "@radix-ui/themes";
-import { Plus, Trash2, Upload, Pipette } from "lucide-react";
+import { Plus, Trash2, Upload, Pipette, Undo2 } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import type { FactionDef } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
@@ -15,6 +15,11 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     networkManager: SocketNetworkManager;
     playerId: string | null;
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+    const toHex = (v: number) => v.toString(16).padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 function cropSquareFromImage(img: HTMLImageElement, size: number): string | null {
@@ -29,10 +34,6 @@ function cropSquareFromImage(img: HTMLImageElement, size: number): string | null
     return canvas.toDataURL("image/png");
 }
 
-function rgbToHex(r: number, g: number, b: number) {
-    return "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
-}
-
 export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, networkManager, playerId }) => {
     const [factions, setFactions] = useState<FactionDef[]>([]);
     const [newName, setNewName] = useState("");
@@ -40,8 +41,9 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
     const [loading, setLoading] = useState(false);
     const [flagData, setFlagData] = useState<string | null>(null);
     const [flagPreview, setFlagPreview] = useState<string | null>(null);
+    const [isPicking, setIsPicking] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
-    const previewRef = useRef<HTMLDivElement>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
 
     const loadFactions = useCallback(async () => {
         try {
@@ -63,6 +65,7 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                     const cropped = cropSquareFromImage(img, 128);
                     setFlagPreview(cropped);
                     setFlagData(cropped ? cropped.split(",")[1] : null);
+                    setIsPicking(false);
                 };
                 img.src = reader.result as string;
             };
@@ -70,25 +73,31 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         } catch { notify.error("图片加载失败"); }
     };
 
-    /** 点击旗帜预览取色 */
-    const handlePickColor = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!flagPreview || !previewRef.current) return;
-        const rect = previewRef.current.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) / rect.width * 128);
-        const y = Math.round((e.clientY - rect.top) / rect.height * 128);
+    /** 从旗帜预览像素取色，对标 ColorKeyPickerPanel 的实现 */
+    const handlePreviewClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        if (!isPicking) return;
+        const img = imgRef.current;
+        if (!img) return;
 
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = canvas.height = 128;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-            ctx.drawImage(img, 0, 0);
-            const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
-            setNewColor(rgbToHex(r, g, b));
-        };
-        img.src = flagPreview;
-    };
+        const rect = img.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+
+        const x = Math.floor((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+        const y = Math.floor((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(img, 0, 0);
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
+        setNewColor(hex);
+        setIsPicking(false);
+        notify.success(`已取色 ${hex}`);
+    }, [isPicking]);
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
@@ -125,52 +134,70 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
             <Dialog.Content style={{ maxWidth: 460, maxHeight: "85vh" }}>
                 <Dialog.Title>派系工坊</Dialog.Title>
                 <Dialog.Description size="1" color="gray" mb="3">
-                    旗帜图片将自动裁剪为正方形，点击旗帜可吸取颜色。
+                    自定义旗帜将自动裁剪为正方形，点击"从预览取色"后可在旗帜上点选颜色。
                 </Dialog.Description>
 
                 {/* 创建新派系 */}
                 <Card style={{ padding: 12, marginBottom: 12 }}>
                     <Text size="1" weight="bold" color="gray" mb="3">创建新派系</Text>
 
-                    {/* 旗帜上传区 */}
+                    {/* 旗帜上传 + 预览 */}
                     <Flex justify="center" mb="2">
                         <div
-                            ref={previewRef}
-                            onClick={() => fileRef.current?.click()}
-                            title="点击上传，右键取色"
+                            onClick={() => { if (!isPicking) fileRef.current?.click(); }}
                             style={{
-                                width: 100, height: 100, borderRadius: 8,
-                                border: flagPreview ? "2px solid rgba(74,158,255,0.3)" : "2px dashed rgba(74,158,255,0.3)",
-                                background: flagPreview ? `url(${flagPreview}) center/cover` : "rgba(20,30,45,0.4)",
-                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                                flexShrink: 0,
-                                position: "relative",
+                                width: 120, height: 120, borderRadius: 8,
+                                border: flagPreview
+                                    ? "2px solid rgba(74,158,255,0.3)"
+                                    : "2px dashed rgba(74,158,255,0.3)",
+                                background: flagPreview ? undefined : "rgba(20,30,45,0.4)",
+                                cursor: isPicking ? "crosshair" : "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                flexShrink: 0, overflow: "hidden",
                             }}
                         >
-                            {!flagPreview && <Upload size={24} style={{ color: "#4a9eff", opacity: 0.5 }} />}
-                            {flagPreview && (
-                                <div style={{
-                                    position: "absolute", bottom: 2, right: 2,
-                                    background: "rgba(0,0,0,0.6)", borderRadius: 4,
-                                    padding: "2px 6px", fontSize: 10,
-                                    color: "#aaccff",
-                                    pointerEvents: "none",
-                                }}>
-                                    <Pipette size={10} style={{ verticalAlign: "middle", marginRight: 3 }} />
-                                    取色
-                                </div>
+                            {flagPreview ? (
+                                <img
+                                    ref={imgRef}
+                                    src={flagPreview}
+                                    alt="faction-flag"
+                                    onClick={isPicking ? handlePreviewClick : undefined}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                />
+                            ) : (
+                                <Upload size={28} style={{ color: "#4a9eff", opacity: 0.4 }} />
                             )}
                         </div>
                         <input ref={fileRef} type="file" accept="image/png" hidden onChange={handleFlagSelect} />
                     </Flex>
 
+                    {/* 取色按钮（预览外部，对标 ColorKeyPickerPanel） */}
+                    <Flex justify="center" gap="2" mb="2">
+                        {flagPreview && (
+                            isPicking ? (
+                                <Button size="1" variant="solid" onClick={() => setIsPicking(false)} data-magnetic>
+                                    <Undo2 size={12} /> 退出取色
+                                </Button>
+                            ) : (
+                                <Button size="1" variant="soft" onClick={() => setIsPicking(true)} data-magnetic>
+                                    <Pipette size={12} /> 从预览取色
+                                </Button>
+                            )
+                        )}
+                        {isPicking && (
+                            <Text size="1" color="gray" style={{ lineHeight: "24px" }}>
+                                点击预览图中的颜色
+                            </Text>
+                        )}
+                    </Flex>
+
                     {/* 名称 + 颜色输入 */}
                     <Flex direction="column" gap="2">
-                        <TextField.Root size="1" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="派系名称" />
+                        <TextField.Root size="1" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="派系名称" style={{ maxWidth: 200 }} />
                         <Flex gap="2" align="center">
                             <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
                                 style={{ width: 36, height: 28, border: "1px solid #2a3440", borderRadius: 4, cursor: "pointer", background: "transparent", padding: 2 }} />
-                            <TextField.Root size="1" value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ flex: 1, fontFamily: "Fira Code, monospace", fontSize: 12 }} />
+                            <TextField.Root size="1" value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ width: 110, fontFamily: "Fira Code, monospace", fontSize: 12 }} />
                         </Flex>
                     </Flex>
 
