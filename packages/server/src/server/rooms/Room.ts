@@ -95,12 +95,15 @@ export class Room {
 
 		this.emptiedAt = null;
 
-		const playerData: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string } = {
+		const playerData: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string; faction?: string } = {
 			sessionId: connectionId,
 			nickname: playerName,
 			role: this.options.creatorSessionId === playerId ? "HOST" : "PLAYER",
 			isReady: false,
 			connected: true,
+			faction: this.options.creatorSessionId === playerId
+				? "preset:faction:fate-grip"
+				: "preset:faction:player-alliance",
 		};
 		if (avatar) playerData.avatar = avatar;
 

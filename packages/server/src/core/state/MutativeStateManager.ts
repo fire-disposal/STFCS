@@ -493,6 +493,7 @@ export class MutativeStateManager {
 		connected: boolean
 		tokenIds?: string[]
 		avatar?: string
+		faction?: string
 	}): void {
 		this.mutateAndBroadcast((draft) => {
 			draft.players[playerId] = player
