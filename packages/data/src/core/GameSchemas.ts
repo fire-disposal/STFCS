@@ -331,20 +331,18 @@ export type TokenRuntime = z.infer<typeof TokenRuntimeSchema>;
  * 库存Token - 用户保存的舰船配置
  * 不含runtime，持久化到数据库时只保存这部分
  */
-export const InventoryTokenSchema = z.object({
+const TokenBaseSchema = z.object({
 	$id: z.string(),
 	$presetRef: z.string().optional(),
 	spec: TokenSpecSchema,
 	metadata: MetadataSchema,
 });
+
+export const InventoryTokenSchema = TokenBaseSchema;
 export type InventoryToken = z.infer<typeof InventoryTokenSchema>;
 
-export const CombatTokenSchema = z.object({
-	$id: z.string(),
-	$presetRef: z.string().optional(),
-	spec: TokenSpecSchema,
+export const CombatTokenSchema = TokenBaseSchema.extend({
 	runtime: TokenRuntimeSchema,
-	metadata: MetadataSchema,
 });
 export type CombatToken = z.infer<typeof CombatTokenSchema>;
 
@@ -500,17 +498,7 @@ export const AssetSchema = z.object({
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
-export const AssetListItemSchema = z.object({
-	$id: z.string(),
-	type: AssetTypeSchema,
-	filename: z.string(),
-	mimeType: z.string(),
-	size: z.number(),
-	metadata: AssetSchema.shape.metadata.optional(),
-	ownerId: z.string(),
-	uploadedAt: z.number(),
-	updatedAt: z.number().optional(),
-});
+export const AssetListItemSchema = AssetSchema;
 export type AssetListItem = z.infer<typeof AssetListItemSchema>;
 
 export const AssetFilterSchema = z.object({
