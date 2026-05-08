@@ -1,142 +1,121 @@
-/**
- * TurnBar - 回合指示条样式（简洁版）
- */
+/* TurnBar - 阶段 + 回合 + 派系线 + 准备按钮 */
 
 .turn-bar {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 4px 8px;
-	background: rgba(10, 14, 20, 0.7);
-	border: 1px solid rgba(74, 158, 255, 0.2);
+	gap: 10px;
+	padding: 4px 10px;
+	background: rgba(10, 14, 20, 0.85);
+	border: 1px solid rgba(74, 158, 255, 0.18);
 	border-radius: 6px;
 	font-size: 12px;
+	height: 36px;
+	box-sizing: border-box;
 }
 
+/* -- 阶段标签 -- */
 .turn-bar__phase {
-	padding: 3px 8px;
+	padding: 2px 8px;
 	font-weight: 600;
 	border-radius: 4px;
 	letter-spacing: 0.3px;
+	font-size: 11px;
+	flex-shrink: 0;
 }
+.turn-bar__phase--deployment       { color: #a78bfa; background: rgba(167, 139, 250, 0.12); }
+.turn-bar__phase--player_action    { color: #4a9eff; background: rgba(74, 158, 255, 0.12); }
+.turn-bar__phase--faction_action   { color: #4a9eff; background: rgba(74, 158, 255, 0.15); }
+.turn-bar__phase--settlement       { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
 
-.turn-bar__phase--deployment {
-	color: #9b59b6;
-	background: rgba(155, 89, 182, 0.15);
-}
-
-.turn-bar__phase--player_action {
-	color: #4a9eff;
-	background: rgba(74, 158, 255, 0.15);
-}
-
-.turn-bar__turn {
-	padding: 3px 6px;
-	background: rgba(20, 30, 45, 0.5);
-	border-radius: 4px;
+/* -- 回合数 -- */
+.turn-bar__round {
 	font-weight: 700;
-	color: #4a9eff;
+	color: #60a5fa;
+	white-space: nowrap;
+	flex-shrink: 0;
 }
 
-.turn-bar__info {
-	display: flex;
-	align-items: center;
-	gap: 1px;
-	padding: 3px 8px;
-	background: rgba(20, 30, 45, 0.4);
-	border-radius: 4px;
-}
-
-.turn-bar__ready {
-	font-weight: 700;
+/* -- 就绪计数 -- */
+.turn-bar__ready-count {
 	color: #2ecc71;
-}
-
-.turn-bar__slash {
-	color: #6b8ca8;
-}
-
-.turn-bar__total {
 	font-weight: 600;
-	color: #9aa8b8;
+	flex-shrink: 0;
 }
 
-.turn-bar__faction {
+/* ====== 派系线 ====== */
+.turn-bar__faction-line {
+	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	padding: 3px 8px;
-	background: rgba(20, 30, 45, 0.4);
-	border-radius: 4px;
-	font-weight: 600;
+	gap: 0;
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding-bottom: 14px; /* 给指针留空间 */
 }
 
-.turn-bar__faction--player_alliance { color: #4a9eff; }
-.turn-bar__faction--fate_grip { color: #ef4444; }
-
-.turn-bar__ships {
-	font-size: 10px;
-	color: #6b8ca8;
-	padding: 1px 4px;
-	background: rgba(100, 120, 140, 0.15);
-	border-radius: 3px;
-}
-
-.turn-bar__track {
-	display: flex;
-	align-items: center;
-	gap: 3px;
-	padding: 2px 4px;
-}
-
-.turn-bar__arrow {
-	font-size: 9px;
-	color: rgba(74, 158, 255, 0.35);
-}
-
-.turn-bar__dot {
-	width: 18px;
-	height: 18px;
+/* -- 派系格子 -- */
+.turn-bar__faction-slot {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	gap: 5px;
+	flex: 1;
+	padding: 3px 6px;
 	border-radius: 4px;
-	font-size: 10px;
-	font-weight: 700;
-	transition: all 0.2s;
+	font-size: 11px;
+	font-weight: 500;
+	transition: opacity 0.25s, transform 0.25s;
+	cursor: default;
+	user-select: none;
+}
+.turn-bar__faction-slot--done {
+	opacity: 0.35;
+}
+.turn-bar__faction-slot--active {
+	opacity: 1;
+	transform: scale(1.06);
+}
+.turn-bar__faction-slot:not(.turn-bar__faction-slot--active):not(.turn-bar__faction-slot--done) {
+	opacity: 0.55;
 }
 
-.turn-bar__dot--done { opacity: 0.35; }
-.turn-bar__dot--done svg { color: #2ecc71; }
-
-.turn-bar__dot--active {
-	animation: dot-pulse 1.5s ease-in-out infinite;
-	transform: scale(1.05);
+.turn-bar__faction-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	flex-shrink: 0;
 }
 
-@keyframes dot-pulse {
-	0%, 100% { box-shadow: 0 0 4px rgba(74, 158, 255, 0.3); }
-	50% { box-shadow: 0 0 8px rgba(74, 158, 255, 0.5); }
+.turn-bar__faction-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.turn-bar__dot--pending { opacity: 0.55; }
-
-.turn-bar__dot--player_alliance {
-	background: rgba(74, 158, 255, 0.2);
-	color: #4a9eff;
+/* -- 三角指针 -- */
+.turn-bar__pointer {
+	position: absolute;
+	bottom: 0;
+	z-index: 2;
+	transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.turn-bar__pointer-triangle {
+	width: 0;
+	height: 0;
+	border-left: 10px solid transparent;
+	border-right: 10px solid transparent;
+	border-bottom: 8px solid #4a9eff;
+	filter: drop-shadow(0 0 3px rgba(74, 158, 255, 0.5));
 }
 
-.turn-bar__dot--fate_grip {
-	background: rgba(239, 68, 68, 0.2);
-	color: #ef4444;
-}
-
+/* ====== 准备按钮 ====== */
 .turn-bar__btn {
 	display: flex;
 	align-items: center;
 	gap: 4px;
 	padding: 4px 10px;
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 500;
 	border-radius: 4px;
 	cursor: pointer;
@@ -144,19 +123,18 @@
 	border: 1px solid rgba(245, 158, 11, 0.35);
 	background: rgba(245, 158, 11, 0.12);
 	color: #f59e0b;
+	flex-shrink: 0;
+	white-space: nowrap;
 }
-
 .turn-bar__btn:hover {
 	background: rgba(245, 158, 11, 0.22);
 }
-
 .turn-bar__btn--active {
 	border-color: rgba(74, 158, 255, 0.5);
 	background: rgba(74, 158, 255, 0.2);
 	color: #4a9eff;
 	animation: btn-active 2s ease-in-out infinite;
 }
-
 @keyframes btn-active {
 	0%, 100% { box-shadow: 0 0 3px rgba(74, 158, 255, 0.3); }
 	50% { box-shadow: 0 0 6px rgba(74, 158, 255, 0.5); }

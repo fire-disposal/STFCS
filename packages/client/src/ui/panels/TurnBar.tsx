@@ -1,7 +1,8 @@
 /**
- * TurnBar - 回合指示条（简洁版）
+ * TurnBar - 阶段标签 + 回合数 + 派系线 + 准备按钮
  *
- * 显示：阶段 | 轮次 | 当前派系 | 进度条 | 准备按钮
+ * 派系线：initiativeOrder 的各个 faction 从左到右排列，
+ * 当前活跃的派系下方有一个带滑动动画的三角指针。
  */
 
 import React, { useMemo } from "react";
@@ -20,10 +21,10 @@ interface TurnBarProps {
 	isReady: boolean;
 	onReadyToggle: () => void;
 	initiativeOrder?: string[];
-	factions?: Record<string, { name: string; color: string }>;
+	factions?: Record<string, { name: string; color: string; flagAssetId?: string }>;
 }
 
-const PHASE_LABELS: Record<GamePhase, string> = {
+const PHASE_LABELS: Record<string, string> = {
 	DEPLOYMENT: "部署",
 	PLAYER_ACTION: "行动",
 	FACTION_ACTION: "派系行动",
@@ -42,80 +43,74 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	initiativeOrder,
 	factions,
 }) => {
-	const factionTrackItems = useMemo(() => {
-		if (!activeFaction || !initiativeOrder) return [];
-		const order = initiativeOrder;
-		const currentIndex = order.indexOf(activeFaction);
-		return order.map((factionId, index) => {
-			const def = factions?.[factionId];
-			return {
-				faction: factionId,
-				status: index < currentIndex ? "done" : index === currentIndex ? "active" : "pending",
-				label: def?.name ?? factionId.slice(factionId.lastIndexOf(":") + 1),
-				color: def?.color ?? "#888",
-			};
-		});
-	}, [activeFaction, initiativeOrder, factions]);
-
-	const readyCount = useMemo(() => 
+	const readyCount = useMemo(() =>
 		Object.values(players).filter((p) => p.connected && p.isReady).length,
 		[players]
 	);
-
-	const totalPlayers = useMemo(() => 
+	const totalPlayers = useMemo(() =>
 		Object.values(players).filter((p) => p.connected).length,
 		[players]
 	);
 
-	const shipCount = useMemo(() => {
-		const isActionPhase = phase === GamePhase.PLAYER_ACTION || phase === GamePhase.FACTION_ACTION;
-		if (!isActionPhase || !activeFaction || !tokens) return 0;
-		return tokens.filter((t) => 
-			t.runtime?.faction === activeFaction && 
-			!t.runtime?.destroyed &&
-			t.runtime?.position
-		).length;
-	}, [phase, activeFaction, tokens]);
-
 	const isActionPhase = phase === GamePhase.PLAYER_ACTION || phase === GamePhase.FACTION_ACTION;
 	const isMyTurn = isActionPhase && activeFaction === currentFaction;
 
+	const currentIndex = activeFaction && initiativeOrder
+		? initiativeOrder.indexOf(activeFaction)
+		: -1;
+
 	return (
 		<div className="turn-bar">
-			<div className={`turn-bar__phase turn-bar__phase--${phase.toLowerCase()}`}>
-				{PHASE_LABELS[phase]}
-			</div>
+			{/* 阶段标签 */}
+			<span className={`turn-bar__phase turn-bar__phase--${phase.toLowerCase()}`}>
+				{PHASE_LABELS[phase] ?? phase}
+			</span>
 
+			{/* 回合数 */}
 			{phase !== GamePhase.DEPLOYMENT && (
-				<div className="turn-bar__turn">轮{turnCount}</div>
+				<span className="turn-bar__round">轮 {turnCount}</span>
 			)}
 
-			{phase === GamePhase.DEPLOYMENT ? (
-				<div className="turn-bar__info">
-					<span className="turn-bar__ready">{readyCount}</span>
-					<span className="turn-bar__slash">/</span>
-					<span className="turn-bar__total">{totalPlayers}</span>
-				</div>
-			) : activeFaction && (
-				<div className={`turn-bar__faction`}>
-					<span>{factions?.[activeFaction]?.name ?? activeFaction}</span>
-					<span className="turn-bar__ships">{shipCount}舰</span>
+			{/* 部署阶段：就绪人数 */}
+			{phase === GamePhase.DEPLOYMENT && (
+				<span className="turn-bar__ready-count">
+					{readyCount}/{totalPlayers}
+				</span>
+			)}
+
+			{/* 派系线（含指针） */}
+			{isActionPhase && initiativeOrder && initiativeOrder.length > 0 && (
+				<div className="turn-bar__faction-line">
+					{/* 三角指针：CSS left 动画滑动 */}
+					{currentIndex >= 0 && (
+						<div
+							className="turn-bar__pointer"
+							style={{
+								left: `calc(${(currentIndex / (initiativeOrder.length - 1 || 1)) * 100}% - 10px)`,
+							}}
+						>
+							<div className="turn-bar__pointer-triangle" />
+						</div>
+					)}
+					{initiativeOrder.map((fid, i) => {
+						const def = factions?.[fid];
+						const isActive = i === currentIndex;
+						const done = i < currentIndex;
+						return (
+							<div
+								key={fid}
+								className={`turn-bar__faction-slot ${isActive ? "turn-bar__faction-slot--active" : done ? "turn-bar__faction-slot--done" : ""}`}
+								style={{ color: def?.color }}
+							>
+								<span className="turn-bar__faction-dot" style={{ background: def?.color ?? "#888" }} />
+								<span className="turn-bar__faction-name">{def?.name ?? fid}</span>
+							</div>
+						);
+					})}
 				</div>
 			)}
 
-			{factionTrackItems.length > 0 && (
-				<div className="turn-bar__track">
-					{factionTrackItems.map((item, i) => (
-						<React.Fragment key={item.faction}>
-							<span className={`turn-bar__dot turn-bar__dot--${item.status}`} style={{ color: item.color }}>
-								{item.status === "done" ? <CheckCircle size={10} /> : item.label}
-							</span>
-							{i < factionTrackItems.length - 1 && <span className="turn-bar__arrow">→</span>}
-						</React.Fragment>
-					))}
-				</div>
-			)}
-
+			{/* 准备按钮 */}
 			<button
 				className={`turn-bar__btn ${isMyTurn ? "turn-bar__btn--active" : ""}`}
 				onClick={onReadyToggle}
