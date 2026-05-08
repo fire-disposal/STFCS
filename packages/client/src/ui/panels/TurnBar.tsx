@@ -1,5 +1,5 @@
 /**
- * TurnBar - 阶段标签 + 回合数 + 派系线（含三角指针）
+ * TurnBar - 阶段标签 + 回合数 + 派系卡片列 + 三角指针
  */
 
 import React from "react";
@@ -45,14 +45,6 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 
 			{initiativeOrder && initiativeOrder.length > 0 && (
 				<div className="turn-bar__faction-line">
-					{isActionPhase && currentIndex >= 0 && (
-						<div
-							className="turn-bar__pointer"
-							style={{ left: `calc(${(currentIndex / (initiativeOrder.length - 1 || 1)) * 100}% - 10px)` }}
-						>
-							<div className="turn-bar__pointer-triangle" />
-						</div>
-					)}
 					{initiativeOrder.map((fid, i) => {
 						const def = factions?.[fid];
 						const isActive = isActionPhase && i === currentIndex;
@@ -60,11 +52,23 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 						return (
 							<div
 								key={fid}
-								className={`turn-bar__faction-slot ${isActive ? "turn-bar__faction-slot--active" : done ? "turn-bar__faction-slot--done" : ""}`}
-								style={{ color: def?.color }}
+								className={`turn-bar__card ${isActive ? "turn-bar__card--active" : done ? "turn-bar__card--done" : ""}`}
+								style={{ borderColor: isActive ? def?.color ?? "#4a9eff" : "transparent" }}
 							>
-								<span className="turn-bar__faction-dot" style={{ background: def?.color ?? "#888" }} />
-								<span className="turn-bar__faction-name">{def?.name ?? fid}</span>
+								<div
+									className="turn-bar__flag"
+									style={def ? { background: def.color } : { background: "#888" }}
+								>
+									<span className="turn-bar__flag-initial">
+										{def?.name?.charAt(0) ?? "?"}
+									</span>
+								</div>
+								<span className="turn-bar__card-name">{def?.name ?? fid}</span>
+								{isActive && (
+									<div className="turn-bar__pointer">
+										<div className="turn-bar__pointer-triangle" />
+									</div>
+								)}
 							</div>
 						);
 					})}
