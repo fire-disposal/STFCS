@@ -8,7 +8,6 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "./locales";
 import App from "./App";
 import "@radix-ui/themes/styles.css";
-import "./styles/fonts.css";
 import "./styles.css";
 import { NotificationContainer } from "@/ui/shared/Notification";
 import { ensureFontsReady } from "@/utils/fontLoader";
