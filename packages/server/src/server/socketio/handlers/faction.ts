@@ -6,18 +6,27 @@ import { ErrorCodes } from "@vt/data";
 import { err } from "./err.js";
 import type { RpcContext } from "../RpcServer.js";
 import { assetService } from "./services.js";
+import { presetFactions } from "@vt/data";
 
 export const factionHandlers = {
     list: async (_payload: unknown, ctx: RpcContext) => {
         const state = ctx.state.getState();
-        const factionMap = state.factions ?? {};
+        const factionMap: Record<string, any> = { ...state.factions };
+        // 预设派系始终可见（作为基线），自定义派系叠加其上
+        for (const p of presetFactions) {
+            if (!factionMap[p.$id]) {
+                factionMap[p.$id] = p;
+            }
+        }
         return { factions: Object.values(factionMap) };
     },
 
     get: async (payload: unknown, ctx: RpcContext) => {
         const p = payload as WsPayload<"faction:get">;
         const state = ctx.state.getState();
-        const faction = state.factions?.[p.factionId] ?? null;
+        const faction = state.factions?.[p.factionId]
+            ?? presetFactions.find((pf) => pf.$id === p.factionId)
+            ?? null;
         return { faction };
     },
 };

@@ -641,13 +641,12 @@ export class MutativeStateManager {
 			draft.turnCount = 1;
 			draft.phase = GamePhase.FACTION_ACTION;
 
-			// 自动初始化派系：如果未设置，从内置预设加载
-			if (!draft.factions || Object.keys(draft.factions).length === 0) {
-				const map: Record<string, any> = {};
-				for (const p of presetFactions) {
-					map[p.$id] = { ...p };
+			// 自动初始化派系：预设始终为基线，自定义派系叠加其上
+			if (!draft.factions) draft.factions = {};
+			for (const p of presetFactions) {
+				if (!draft.factions[p.$id]) {
+					draft.factions[p.$id] = { ...p };
 				}
-				draft.factions = map;
 			}
 			if (!draft.initiativeOrder || draft.initiativeOrder.length === 0) {
 				draft.initiativeOrder = Object.keys(draft.factions!);
