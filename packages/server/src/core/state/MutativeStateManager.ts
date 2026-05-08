@@ -557,14 +557,17 @@ export class MutativeStateManager {
 
 	/**
 	 * 根据阶段获取当前活跃派系
-	 * PLAYER_ACTION 阶段使用 TURN_ORDER 决定当前派系
-	 * DEPLOYMENT 阶段无派系
+	 * FACTION_ACTION: 从 initiativeOrder 读取
+	 * PLAYER_ACTION (旧): 使用 TURN_ORDER 循环
+	 * 其他阶段无派系
 	 */
-	private getFactionForPhase(phase: GamePhase): Faction | undefined {
+	private getFactionForPhase(phase: GamePhase): string | undefined {
 		if (phase === GamePhase.PLAYER_ACTION) {
-			// 根据回合数决定当前活跃派系（TURN_ORDER 循环）
 			const factionIndex = (this.state.turnCount - 1) % TURN_ORDER.length;
-			return TURN_ORDER[factionIndex] as Faction;
+			return TURN_ORDER[factionIndex] as string;
+		}
+		if (phase === GamePhase.FACTION_ACTION) {
+			return this.state.initiativeOrder?.[this.state.initiativeIndex ?? 0];
 		}
 		return undefined;
 	}
@@ -582,19 +585,26 @@ export class MutativeStateManager {
 	}
 
 	/**
-	 * 应用回合推进结果（原子操作：阶段+回合+派系+token更新+日志 一条 mutate）
+	 * 应用回合推进结果（原子操作）
 	 */
 	applyTurnAdvanceResult(result: TurnAdvanceResult): void {
 		this.mutateAndBroadcast((draft) => {
 			if (result.phaseChanged) {
 				draft.phase = result.newPhase;
 				draft.activeFaction = this.getFactionForPhase(result.newPhase);
+				draft.initiativeIndex = result.newPhase === GamePhase.FACTION_ACTION ? (draft.initiativeIndex ?? 0) : undefined;
 			}
 			if (result.turnIncremented) {
 				draft.turnCount = result.newTurnCount;
+				if (result.newPhase === GamePhase.FACTION_ACTION || result.newPhase === GamePhase.SETTLEMENT) {
+					draft.initiativeIndex = 0;
+				}
 			}
 			if (result.factionChanged && result.newFaction && !result.phaseChanged) {
 				draft.activeFaction = result.newFaction;
+				const order = draft.initiativeOrder ?? [];
+				const idx = order.indexOf(result.newFaction);
+				if (idx >= 0) draft.initiativeIndex = idx;
 			}
 			for (const [tokenId, updates] of result.stateUpdates) {
 				const token = draft.tokens[tokenId];
@@ -632,9 +642,16 @@ export class MutativeStateManager {
 
 	startGame(): void {
 		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = 1
-			draft.phase = GamePhase.PLAYER_ACTION
-			draft.activeFaction = TURN_ORDER[0] as Faction
+			draft.turnCount = 1;
+			const order = draft.initiativeOrder;
+			if (order && order.length > 0) {
+				draft.phase = GamePhase.FACTION_ACTION;
+				draft.activeFaction = order[0];
+				draft.initiativeIndex = 0;
+			} else {
+				draft.phase = GamePhase.PLAYER_ACTION;
+				draft.activeFaction = TURN_ORDER[0] as any;
+			}
 		})
 	}
 

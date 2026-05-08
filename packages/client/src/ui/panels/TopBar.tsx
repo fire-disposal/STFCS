@@ -197,13 +197,13 @@ const FactionSelector: React.FC<{
 const PlayerAvatars: React.FC<{
 	players: Record<string, RoomPlayerState>;
 	phase: GamePhase;
-	activeFaction: Faction | undefined;
+	activeFaction: string | undefined;
 }> = ({ players, phase, activeFaction }) => {
 	const playerList = Object.values(players).filter((p) => p.connected);
 
 	// 按 TURN_ORDER 排序阵营，同阵营内按昵称排序
 	const grouped = useMemo(() => {
-		const result: { faction: Faction | undefined; players: RoomPlayerState[] }[] = [];
+		const result: { faction: string | undefined; players: RoomPlayerState[] }[] = [];
 
 		// 按 TURN_ORDER 顺序处理有派系的玩家
 		for (const faction of TURN_ORDER) {
@@ -251,8 +251,8 @@ const PlayerAvatars: React.FC<{
 const PlayerAvatar: React.FC<{
 	player: RoomPlayerState;
 	phase: GamePhase;
-	faction?: Faction;
-	activeFaction: Faction | undefined;
+	faction?: string;
+	activeFaction: string | undefined;
 }> = ({ player, phase, faction, activeFaction }) => {
 	/**
 	 * 指示灯颜色逻辑：
@@ -272,12 +272,12 @@ const PlayerAvatar: React.FC<{
 
 	const dotState = getDotState();
 
-	const factionColor = faction ? FactionColors[faction] : undefined;
+	const factionColor = faction ? (faction.includes("fate-grip") ? 0xff4a4a : faction.includes("player-alliance") ? 0x4a9eff : undefined) : undefined;
 
 	return (
 		<div
 			className={`player-avatar player-avatar--${faction?.toLowerCase() ?? "none"}`}
-			title={`${player.nickname}${faction ? ` (${FactionLabels[faction]})` : ""}`}
+			title={`${player.nickname}${faction ? ` (${faction})` : ""}`}
 			style={factionColor ? {
 				borderColor: `#${factionColor.toString(16).padStart(6, "0")}`,
 			} : undefined}

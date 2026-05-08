@@ -423,7 +423,7 @@ export const GameRoomStateSchema = z.object({
 	ownerId: z.string(),
 	phase: GamePhaseSchema,
 	turnCount: z.number().default(0),
-	activeFaction: FactionSchema.optional(),
+	activeFaction: z.string().optional(),
 	factions: z.record(z.string(), FactionDefSchema).optional(),
 	initiativeOrder: z.array(z.string()).optional(),
 	initiativeIndex: z.number().optional(),

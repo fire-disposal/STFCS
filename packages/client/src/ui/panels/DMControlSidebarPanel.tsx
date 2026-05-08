@@ -15,8 +15,9 @@ import {
     useGameTurnCount,
     useGameActiveFaction,
     useGamePlayerId,
+    useGameState,
 } from "@/state/stores/gameStore";
-import { GamePhase, FactionLabels, TURN_ORDER } from "@vt/data";
+import { GamePhase } from "@vt/data";
 
 interface DMControlSidebarPanelProps {
     networkManager: SocketNetworkManager;
@@ -31,6 +32,7 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
     const phase = useGamePhase();
     const turnCount = useGameTurnCount();
     const activeFaction = useGameActiveFaction();
+    const gameState = useGameState();
     const playerId = useGamePlayerId();
     const currentPlayer = playerId ? players[playerId] : undefined;
     const isHost = currentPlayer?.role === "HOST";
@@ -69,7 +71,9 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
         }
     };
 
-    const isLastFaction = activeFaction && TURN_ORDER.indexOf(activeFaction) === TURN_ORDER.length - 1;
+    const isLastFaction = activeFaction && gameState?.initiativeOrder
+        ? gameState.initiativeOrder.indexOf(activeFaction) === gameState.initiativeOrder.length - 1
+        : false;
 
     return (
         <Flex direction="column" gap="2" style={{ height: "100%" }}>
@@ -93,8 +97,8 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                     {activeFaction && (
                         <Flex align="center" justify="between">
                             <Text size="1" color="gray">阵营</Text>
-                            <Badge size="1" color={activeFaction === "PLAYER_ALLIANCE" ? "green" : "red"}>
-                                {FactionLabels[activeFaction]}
+                            <Badge size="1" color={activeFaction.includes("fate-grip") ? "red" : activeFaction.includes("player-alliance") ? "green" : "blue"}>
+                                {activeFaction}
                             </Badge>
                         </Flex>
                     )}

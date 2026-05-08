@@ -13,12 +13,14 @@ import "./turn-bar.css";
 interface TurnBarProps {
 	phase: GamePhase;
 	turnCount: number;
-	activeFaction: Faction | undefined;
+	activeFaction: string | undefined;
 	players: Record<string, RoomPlayerState>;
 	tokens?: CombatToken[];
-	currentFaction?: Faction | undefined;
+	currentFaction?: string | undefined;
 	isReady: boolean;
 	onReadyToggle: () => void;
+	initiativeOrder?: string[];
+	factions?: Record<string, { name: string; color: string }>;
 }
 
 const PHASE_LABELS: Record<GamePhase, string> = {
@@ -42,16 +44,23 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	currentFaction,
 	isReady,
 	onReadyToggle,
+	initiativeOrder,
+	factions,
 }) => {
 	const factionTrackItems = useMemo(() => {
-		if (phase !== GamePhase.PLAYER_ACTION || !activeFaction) return [];
-		const currentIndex = TURN_ORDER.indexOf(activeFaction);
-		return TURN_ORDER.map((faction, index) => ({
-			faction,
-			status: index < currentIndex ? "done" : index === currentIndex ? "active" : "pending",
-			label: FACTION_SHORT[faction] ?? faction.slice(0, 1),
-		}));
-	}, [phase, activeFaction]);
+		if (!activeFaction) return [];
+		const order = initiativeOrder ?? Object.values(TURN_ORDER);
+		const currentIndex = order.indexOf(activeFaction);
+		return order.map((factionId, index) => {
+			const def = factions?.[factionId];
+			return {
+				faction: factionId,
+				status: index < currentIndex ? "done" : index === currentIndex ? "active" : "pending",
+				label: def?.name ?? factionId.slice(factionId.lastIndexOf(":") + 1),
+				color: def?.color ?? "#888",
+			};
+		}) as Array<{ faction: string; status: string; label: string; color: string }>;
+	}, [activeFaction, initiativeOrder, factions]);
 
 	const readyCount = useMemo(() => 
 		Object.values(players).filter((p) => p.connected && p.isReady).length,
@@ -64,7 +73,8 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	);
 
 	const shipCount = useMemo(() => {
-		if (phase !== GamePhase.PLAYER_ACTION || !activeFaction || !tokens) return 0;
+		const isActionPhase = phase === GamePhase.PLAYER_ACTION || phase === GamePhase.FACTION_ACTION;
+		if (!isActionPhase || !activeFaction || !tokens) return 0;
 		return tokens.filter((t) => 
 			t.runtime?.faction === activeFaction && 
 			!t.runtime?.destroyed &&
@@ -72,7 +82,8 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 		).length;
 	}, [phase, activeFaction, tokens]);
 
-	const isMyTurn = phase === GamePhase.PLAYER_ACTION && activeFaction === currentFaction;
+	const isActionPhase = phase === GamePhase.PLAYER_ACTION || phase === GamePhase.FACTION_ACTION;
+	const isMyTurn = isActionPhase && activeFaction === currentFaction;
 
 	return (
 		<div className="turn-bar">
@@ -91,8 +102,8 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 					<span className="turn-bar__total">{totalPlayers}</span>
 				</div>
 			) : activeFaction && (
-				<div className={`turn-bar__faction turn-bar__faction--${activeFaction.toLowerCase()}`}>
-					<span>{FactionLabels[activeFaction]}</span>
+				<div className={`turn-bar__faction`}>
+					<span>{factions?.[activeFaction]?.name ?? activeFaction}</span>
 					<span className="turn-bar__ships">{shipCount}舰</span>
 				</div>
 			)}

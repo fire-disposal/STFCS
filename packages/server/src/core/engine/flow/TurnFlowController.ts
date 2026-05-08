@@ -2,8 +2,8 @@
  * 回合流程控制器
  *
  * 统一管理：
- * 1. 回合推进逻辑（派系轮换、回合结算）
- * 2. 阶段切换逻辑（部署 → 行动）
+ * 1. 回合推进逻辑（派系轮换 → 结算 → 下一轮）
+ * 2. 阶段切换逻辑（部署 → 行动 → 结算）
  * 3. 辐能结算（护盾维持、自然散热、主动排散）
  * 4. 过载管理（触发、恢复）
  *
@@ -13,7 +13,7 @@
  * - 单一入口点，消除逻辑分散
  */
 
-import type { GameRoomState, TokenRuntime, Faction, BattleLogEvent } from "@vt/data";
+import type { GameRoomState, TokenRuntime, BattleLogEvent } from "@vt/data";
 import { TURN_ORDER, GamePhase, createBattleLogEvent } from "@vt/data";
 import { processTokenTurnEnd, type TurnEndResult } from "../rules/turnEnd.js";
 
@@ -21,7 +21,7 @@ export interface TurnAdvanceResult {
 	phaseChanged: boolean;
 	newPhase: GamePhase;
 	factionChanged: boolean;
-	newFaction: Faction | undefined;
+	newFaction: string | undefined;
 	turnIncremented: boolean;
 	newTurnCount: number;
 	tokenResults: Map<string, TurnEndResult>;
@@ -31,59 +31,119 @@ export interface TurnAdvanceResult {
 
 export interface PhaseChangeResult {
 	newPhase: GamePhase;
-	newFaction?: Faction;
+	newFaction: string | undefined;
 	turnIncremented: boolean;
 	newTurnCount: number;
+	settlementNeeded: boolean;
 	valid: boolean;
 	error?: string;
 }
 
 /**
  * 计算回合推进结果（纯函数）
+ *
+ * 新流程：
+ *   DEPLOYMENT → FACTION_ACTION (initiativeOrder[0])
+ *   FACTION_ACTION → FACTION_ACTION (next) 或 SETTLEMENT (last)
+ *   SETTLEMENT → FACTION_ACTION (initiativeOrder[0], turn++)
+ *
+ * 向后兼容：无 initiativeOrder 时回退到旧 TURN_ORDER 逻辑
  */
 export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	const currentPhase = state.phase;
 	const currentTurn = Math.round(state.turnCount);
-	const currentFaction = state.activeFaction;
+	const order = state.initiativeOrder;
 
 	if (currentPhase === GamePhase.DEPLOYMENT) {
+		if (order && order.length > 0) {
+			return {
+				newPhase: GamePhase.FACTION_ACTION,
+				newFaction: order[0],
+				turnIncremented: true,
+				newTurnCount: 1,
+				settlementNeeded: false,
+				valid: true,
+			};
+		}
+		// 向后兼容：无 initiativeOrder 时用旧逻辑
 		return {
 			newPhase: GamePhase.PLAYER_ACTION,
-			newFaction: TURN_ORDER[0] as Faction,
+			newFaction: TURN_ORDER[0],
 			turnIncremented: true,
 			newTurnCount: 1,
+			settlementNeeded: false,
 			valid: true,
 		};
 	}
 
+	if (currentPhase === GamePhase.FACTION_ACTION) {
+		if (!order || order.length === 0) {
+			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
+		}
+
+		const currentIdx = state.initiativeIndex ?? order.indexOf(state.activeFaction ?? "");
+		const nextIdx = currentIdx + 1;
+
+		if (nextIdx >= order.length) {
+			// 最后一个派系 → 进入结算
+			return {
+				newPhase: GamePhase.SETTLEMENT,
+				newFaction: undefined,
+				turnIncremented: true,
+				newTurnCount: currentTurn + 1,
+				settlementNeeded: true,
+				valid: true,
+			};
+		}
+
+		// 下一个派系
+		return {
+			newPhase: GamePhase.FACTION_ACTION,
+			newFaction: order[nextIdx],
+			turnIncremented: false,
+			newTurnCount: currentTurn,
+			settlementNeeded: false,
+			valid: true,
+		};
+	}
+
+	if (currentPhase === GamePhase.SETTLEMENT) {
+		if (order && order.length > 0) {
+			return {
+				newPhase: GamePhase.FACTION_ACTION,
+				newFaction: order[0],
+				turnIncremented: true,
+				newTurnCount: currentTurn + 1,
+				settlementNeeded: false,
+				valid: true,
+			};
+		}
+		return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
+	}
+
+	// 向后兼容：PLAYER_ACTION 旧逻辑
 	if (currentPhase === GamePhase.PLAYER_ACTION) {
+		const currentFaction = state.activeFaction;
 		const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
 		const nextIndex = currentIndex + 1;
 		const incrementTurn = nextIndex >= TURN_ORDER.length;
 
-		if (incrementTurn) {
-			return {
-				newPhase: GamePhase.PLAYER_ACTION,
-				newFaction: TURN_ORDER[0] as Faction,
-				turnIncremented: true,
-				newTurnCount: currentTurn + 1,
-				valid: true,
-			};
-		} else {
-			return {
-				newPhase: GamePhase.PLAYER_ACTION,
-				newFaction: TURN_ORDER[nextIndex] as Faction,
-				turnIncremented: false,
-				newTurnCount: currentTurn,
-				valid: true,
-			};
-		}
+		return {
+			newPhase: GamePhase.PLAYER_ACTION,
+			newFaction: incrementTurn ? TURN_ORDER[0] : TURN_ORDER[nextIndex],
+			turnIncremented: incrementTurn,
+			newTurnCount: incrementTurn ? currentTurn + 1 : currentTurn,
+			settlementNeeded: incrementTurn,
+			valid: true,
+		};
 	}
 
 	return {
 		newPhase: currentPhase,
+		newFaction: undefined,
 		turnIncremented: false,
 		newTurnCount: currentTurn,
+		settlementNeeded: false,
 		valid: false,
 		error: "未知阶段",
 	};
@@ -202,12 +262,18 @@ export function executeTurnAdvance(state: GameRoomState): TurnAdvanceResult {
 		logEvents: [],
 	};
 
-	// 回合结算（仅在回合递增时执行）
-	if (phaseResult.turnIncremented && phaseResult.newPhase === GamePhase.PLAYER_ACTION) {
+	// 回合结算（仅在进入 SETTLEMENT 或旧 turn++ 时执行）
+	if (phaseResult.settlementNeeded) {
 		const settlement = processTurnEndSettlement(state);
 		result.tokenResults = settlement.tokenResults;
 		result.stateUpdates = settlement.stateUpdates;
 		result.logEvents = settlement.logEvents;
+
+		// 回合结束播报
+		result.logEvents.push(createBattleLogEvent("round_end", {
+			round: result.newTurnCount - 1,
+			phase: state.phase,
+		}));
 	}
 
 	// 添加派系切换日志
@@ -231,7 +297,6 @@ export function validateTurnAdvance(state: GameRoomState, isHost: boolean): { va
 	}
 
 	if (state.phase === GamePhase.DEPLOYMENT) {
-		// 部署阶段开始游戏需要检查是否有舰船
 		const tokenCount = Object.keys(state.tokens).length;
 		if (tokenCount === 0) {
 			return { valid: false, error: "至少需要部署一艘舰船" };
