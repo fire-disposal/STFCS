@@ -28,6 +28,7 @@ import type {
 	EditLogContext,
 } from "@vt/data"
 import { TURN_ORDER, GamePhase } from "@vt/data"
+import type { TurnAdvanceResult } from "../engine/flow/TurnFlowController.js"
 
 export interface MutateResult {
 	patches: Patch[]
@@ -570,6 +571,32 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			draft.activeFaction = faction
 		})
+	}
+
+	/**
+	 * 应用回合推进结果（原子操作：阶段+回合+派系+token更新+日志 一条 mutate）
+	 */
+	applyTurnAdvanceResult(result: TurnAdvanceResult): void {
+		this.mutateAndBroadcast((draft) => {
+			if (result.phaseChanged) {
+				draft.phase = result.newPhase;
+				draft.activeFaction = this.getFactionForPhase(result.newPhase);
+			}
+			if (result.turnIncremented) {
+				draft.turnCount = result.newTurnCount;
+			}
+			if (result.factionChanged && result.newFaction && !result.phaseChanged) {
+				draft.activeFaction = result.newFaction;
+			}
+			for (const [tokenId, updates] of result.stateUpdates) {
+				const token = draft.tokens[tokenId];
+				if (token?.runtime) {
+					Object.assign(token.runtime, updates);
+				}
+			}
+			if (!draft.logs) draft.logs = [];
+			draft.logs.push(...result.logEvents);
+		});
 	}
 
 	changeHost(newOwnerId: string): void {

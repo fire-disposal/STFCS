@@ -1,13 +1,7 @@
 import { WeaponJSONSchema, type WeaponJSON } from "@vt/data";
 import { PlayerInfoService } from "../PlayerInfoService.js";
 import { PresetService } from "../preset/PresetService.js";
-
-let idCounter = 0;
-
-function generateId(prefix: string): string {
-	idCounter++;
-	return `${prefix}:${Date.now().toString(36)}_${idCounter.toString(36)}`;
-}
+import { generateId } from "../../utils/id.js";
 
 export class WeaponService {
 	private presetService: PresetService;

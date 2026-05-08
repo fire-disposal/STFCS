@@ -130,29 +130,7 @@ export const editHandlers = {
 
                 const result = executeTurnAdvance(state);
 
-                // 应用状态更新
-                if (result.phaseChanged) {
-                    ctx.state.changePhase(result.newPhase);
-                }
-
-                if (result.turnIncremented) {
-                    ctx.state.changeTurn(result.newTurnCount);
-                }
-
-                if (result.factionChanged && result.newFaction) {
-                    ctx.state.changeFaction(result.newFaction);
-                }
-
-                // 应用舰船状态更新
-                for (const [tokenId, updates] of result.stateUpdates) {
-                    ctx.state.updateTokenRuntime(tokenId, updates);
-                }
-
-                // 写入日志
-                for (const logEvent of result.logEvents) {
-                    ctx.state.appendLog(logEvent);
-                }
-
+                ctx.state.applyTurnAdvanceResult(result);
                 ctx.state.resetAllPlayersReady();
                 return;
             }

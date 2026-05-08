@@ -265,28 +265,7 @@ advancePhase(): void {
 		const state = this.stateManager.getState();
 		const result = executeTurnAdvance(state);
 
-		// 应用状态更新
-		if (result.phaseChanged) {
-			this.stateManager.changePhase(result.newPhase);
-		}
-
-		if (result.turnIncremented) {
-			this.stateManager.changeTurn(result.newTurnCount);
-		}
-
-		if (result.factionChanged && result.newFaction) {
-			this.stateManager.changeFaction(result.newFaction);
-		}
-
-		// 应用舰船状态更新
-		for (const [tokenId, updates] of result.stateUpdates) {
-			this.stateManager.updateTokenRuntime(tokenId, updates);
-		}
-
-		// 写入日志
-		for (const logEvent of result.logEvents) {
-			this.stateManager.appendLog(logEvent);
-		}
+		this.stateManager.applyTurnAdvanceResult(result);
 
 		// 广播回合变更
 		const newState = this.stateManager.getState();

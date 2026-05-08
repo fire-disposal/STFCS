@@ -1,13 +1,7 @@
 import { presetShips, presetWeapons, type InventoryToken, type WeaponJSON, type GameSave } from "@vt/data";
 import type { RoomArchive } from "@vt/data";
 import { PlayerInfoService } from "./PlayerInfoService.js";
-
-let idCounter = 0;
-
-function generateId(prefix: string, userId: string): string {
-	idCounter++;
-	return `${prefix}:${userId}_${Date.now().toString(36)}_${idCounter.toString(36)}`;
-}
+import { generateId } from "../utils/id.js";
 
 export class PlayerProfileService {
 	constructor(private playerInfoService: PlayerInfoService) { }
