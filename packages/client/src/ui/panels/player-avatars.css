@@ -1,0 +1,23 @@
+/* 玩家头像组 */
+.player-avatar {
+	display: flex; align-items: center; justify-content: center;
+	width: 32px; height: 32px; border-radius: 4px;
+	position: relative; cursor: default; transition: all 0.15s ease;
+	border: 2px solid rgba(128, 128, 128, 0.3);
+}
+.player-avatar:hover { transform: scale(1.08); }
+.player-avatar--player_alliance { border-color: rgba(74, 158, 255, 0.4); }
+.player-avatar--fate_grip { border-color: rgba(255, 74, 74, 0.4); }
+.player-avatar--none { border-color: rgba(128, 128, 128, 0.3); }
+
+/* 就绪状态指示灯 */
+.player-avatar__dot {
+	position: absolute; bottom: -2px; right: -2px;
+	width: 8px; height: 8px; border-radius: 50%;
+	border: 1px solid rgba(10, 20, 35, 0.8);
+	transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.player-avatar__dot--default { background: #6b7280; box-shadow: none; }
+.player-avatar__dot--current-not-ready { background: #4a9eff; box-shadow: 0 0 4px rgba(74, 158, 255, 0.5); }
+.player-avatar__dot--current-ready { background: #2ecc71; box-shadow: 0 0 4px rgba(46, 204, 113, 0.5); }
+.player-avatar__dot--other-turn { background: #ff4a4a; box-shadow: 0 0 4px rgba(255, 74, 74, 0.3); }
