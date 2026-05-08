@@ -34,6 +34,7 @@ export const factionHandlers = {
 export const editFactionHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireAuth();
+        ctx.requireRoom();
         const p = payload as WsPayload<"edit:faction:create">;
         const factionId = `custom:faction:${Date.now()}`;
 

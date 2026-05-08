@@ -1,15 +1,16 @@
 import React, { useState, useCallback } from "react";
-import { Flag } from "lucide-react";
+import { Flag, Wrench } from "lucide-react";
 
 interface FactionSelectorProps {
 	currentFaction: string | undefined;
 	currentPlayerId: string | null;
-	factions: Record<string, { name: string; color: string }>;
+	factions: Record<string, { name: string; color: string; flagAssetId?: string }>;
 	onFactionChange?: (playerId: string, faction: string) => void;
+	onManageFactions: () => void;
 }
 
 export const FactionSelector: React.FC<FactionSelectorProps> = ({
-	currentFaction, currentPlayerId, factions, onFactionChange,
+	currentFaction, currentPlayerId, factions, onFactionChange, onManageFactions,
 }) => {
 	const [open, setOpen] = useState(false);
 
@@ -26,18 +27,28 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
 	const currentDef = currentFaction ? factions[currentFaction] : undefined;
 
 	return (
-		<div className="faction-selector" style={{ position: "relative" }}>
+		<div style={{ position: "relative" }}>
 			<button
-				className="top-bar__action-btn"
 				onClick={() => setOpen(!open)}
 				title={currentDef?.name ?? "选择派系"}
 				style={{
+					display: "flex", alignItems: "center", gap: 6,
+					padding: "5px 10px", borderRadius: 6,
+					background: "rgba(20,30,45,0.6)", border: "1px solid #2a3440",
+					color: "#cfe8ff", cursor: "pointer", fontSize: 13,
+					transition: "border-color 0.2s",
 					borderColor: currentDef?.color ?? undefined,
-					borderWidth: 1, borderStyle: "solid",
 				}}
 			>
-				<Flag size={16} />
-				{currentDef?.name ?? currentFaction ?? "派系"}
+				{currentDef ? (
+					<span style={{
+						width: 16, height: 16, borderRadius: 3,
+						background: currentDef.color, flexShrink: 0,
+					}} />
+				) : (
+					<Flag size={14} />
+				)}
+				{currentDef?.name ?? "派系"}
 			</button>
 
 			{open && (
@@ -46,53 +57,87 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
 						style={{ position: "fixed", inset: 0, zIndex: 99 }}
 						onClick={() => setOpen(false)}
 					/>
-					<div className="faction-selector__popup" style={{
-						position: "absolute", top: "100%", right: 0,
-						background: "#111826", border: "1px solid #2a3440",
-						borderRadius: 8, padding: 10, zIndex: 100, minWidth: 200,
-						boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+					<div style={{
+						position: "absolute", top: "100%", right: 0, marginTop: 4,
+						background: "#0f1923", border: "1px solid #2a3440",
+						borderRadius: 8, padding: 6, zIndex: 100, minWidth: 200,
+						boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
 					}}>
-						<div style={{ color: "#6b8aaa", fontSize: 11, fontWeight: 600, marginBottom: 8, letterSpacing: 0.5, textTransform: "uppercase" }}>
+						<div style={{ color: "#6b8aaa", fontSize: 10, fontWeight: 600, padding: "4px 8px 6px", letterSpacing: 0.5, textTransform: "uppercase" }}>
 							选择派系
 						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-							{factionEntries.map(([fid, def]) => {
-								const selected = fid === currentFaction;
-								return (
-									<button
-										key={fid}
-										onClick={() => handleSelect(fid)}
-										style={{
-											display: "flex", alignItems: "center", gap: 10,
-											padding: "8px 10px", borderRadius: 6,
-											background: selected ? "rgba(74,158,255,0.12)" : "transparent",
-											border: selected ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent",
-											color: "#cfe8ff", cursor: "pointer", fontSize: 13,
-											textAlign: "left", width: "100%",
-											transition: "background 0.15s",
-										}}
-										onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "rgba(74,158,255,0.06)"; }}
-										onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
-									>
-										<span style={{
-											width: 24, height: 24, borderRadius: 4,
-											background: def.color,
-											display: "flex", alignItems: "center", justifyContent: "center",
-											fontSize: 12, fontWeight: 800,
-											color: "rgba(255,255,255,0.8)",
-											flexShrink: 0,
-										}}>
-											{def.name.charAt(0)}
-										</span>
-										<span style={{ flex: 1, fontWeight: selected ? 600 : 400 }}>
-											{def.name}
-										</span>
-										{selected && (
-											<span style={{ color: "#4a9eff", fontSize: 10, fontWeight: 600 }}>当前</span>
-										)}
-									</button>
-								);
-							})}
+
+						{factionEntries.map(([fid, def]) => {
+							const selected = fid === currentFaction;
+							return (
+								<button
+									key={fid}
+									onClick={() => handleSelect(fid)}
+									style={{
+										display: "flex", alignItems: "center", gap: 8,
+										padding: "6px 8px", margin: "2px 0", borderRadius: 6,
+										background: selected ? "rgba(74,158,255,0.12)" : "transparent",
+										border: selected ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent",
+										color: selected ? "#cfe8ff" : "#8a9db0",
+										cursor: "pointer", fontSize: 13,
+										textAlign: "left", width: "100%",
+										transition: "background 0.15s, color 0.15s",
+									}}
+									onMouseEnter={(e) => {
+										if (!selected) e.currentTarget.style.background = "rgba(74,158,255,0.05)";
+									}}
+									onMouseLeave={(e) => {
+										if (!selected) e.currentTarget.style.background = "transparent";
+									}}
+								>
+									<span style={{
+										width: 20, height: 20, borderRadius: 4,
+										background: def.color,
+										display: "flex", alignItems: "center", justifyContent: "center",
+										fontSize: 10, fontWeight: 700,
+										color: "rgba(255,255,255,0.85)",
+										flexShrink: 0,
+									}}>
+										{def.name.charAt(0)}
+									</span>
+									<span style={{ flex: 1, fontWeight: selected ? 600 : 400 }}>
+										{def.name}
+									</span>
+									{selected && (
+										<span style={{ color: "#4a9eff", fontSize: 10, fontWeight: 600 }}>当前</span>
+									)}
+								</button>
+							);
+						})}
+
+						{factionEntries.length === 0 && (
+							<div style={{ padding: "12px 8px", color: "#5a7085", fontSize: 12, textAlign: "center" }}>
+								尚无派系
+							</div>
+						)}
+
+						<div style={{ borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 4 }}>
+							<button
+								onClick={() => { setOpen(false); onManageFactions(); }}
+								style={{
+									display: "flex", alignItems: "center", gap: 6,
+									padding: "6px 8px", borderRadius: 6,
+									background: "transparent", border: "1px dashed #2a3440",
+									color: "#6b8aaa", cursor: "pointer", fontSize: 12,
+									textAlign: "left", width: "100%",
+								}}
+								onMouseEnter={(e) => {
+									e.currentTarget.style.borderColor = "#4a9eff";
+									e.currentTarget.style.color = "#4a9eff";
+								}}
+								onMouseLeave={(e) => {
+									e.currentTarget.style.borderColor = "#2a3440";
+									e.currentTarget.style.color = "#6b8aaa";
+								}}
+							>
+								<Wrench size={12} />
+								管理派系...
+							</button>
 						</div>
 					</div>
 				</>
