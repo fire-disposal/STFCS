@@ -320,15 +320,15 @@ export function applyShieldToggle(context: EngineContext): EngineResult {
 	const payload = context.payload as Record<string, unknown>;
 	const tokenId = payload["tokenId"] as string;
 	const ship = context.state.tokens[tokenId];
-	if (!ship) return { runtimeUpdates: [], events: [] };
+	if (!ship) return { runtimeUpdates: [], events: [], error: { code: "TOKEN_NOT_FOUND", message: "舰船不存在" } };
 
 	const active = !!payload["active"];
 	const shieldRuntime = ship.runtime?.shield;
 	const shieldSpec = ship.spec.shield;
 
 	if (!shieldSpec || !shieldRuntime) return { runtimeUpdates: [], events: [] };
-	if (ship.runtime?.overloaded) return { runtimeUpdates: [], events: [] };
-	if (active && ship.runtime?.venting) return { runtimeUpdates: [], events: [] };
+	if (ship.runtime?.overloaded) return { runtimeUpdates: [], events: [], error: { code: "SHIELD_OVERLOADED", message: "过载中无法操作护盾" } };
+	if (active && ship.runtime?.venting) return { runtimeUpdates: [], events: [], error: { code: "SHIELD_VENTING", message: "排散中无法开启护盾" } };
 
 	const updates: Record<string, unknown> = {
 		shield: {
@@ -355,14 +355,14 @@ export function applyShieldRotate(context: EngineContext): EngineResult {
 	const payload = context.payload as Record<string, unknown>;
 	const tokenId = payload["tokenId"] as string;
 	const ship = context.state.tokens[tokenId];
-	if (!ship) return { runtimeUpdates: [], events: [] };
+	if (!ship) return { runtimeUpdates: [], events: [], error: { code: "TOKEN_NOT_FOUND", message: "舰船不存在" } };
 
 	const direction = (payload["direction"] ?? 0) as number;
 	const shieldRuntime = ship.runtime?.shield;
 	if (!shieldRuntime) return { runtimeUpdates: [], events: [] };
 
 	const validation = validateShieldRotate(ship, direction);
-	if (!validation.valid) return { runtimeUpdates: [], events: [] };
+	if (!validation.valid) return { runtimeUpdates: [], events: [], error: { code: "SHIELD_ROTATE_INVALID", message: validation.error ?? "无效的护盾转向" } };
 
 	return {
 		runtimeUpdates: [{

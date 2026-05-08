@@ -406,7 +406,7 @@ export function applyMove(context: EngineContext): EngineResult {
   const payload = context.payload as Record<string, unknown>;
   const tokenId = payload["tokenId"] as string;
   const ship = context.state.tokens[tokenId];
-  if (!ship) return { runtimeUpdates: [], events: [] };
+  if (!ship) return { runtimeUpdates: [], events: [], error: { code: "TOKEN_NOT_FOUND", message: "舰船不存在" } };
 
   const forward = (payload["forward"] ?? 0) as number;
   const strafe = (payload["strafe"] ?? 0) as number;
@@ -437,7 +437,7 @@ export function applyRotate(context: EngineContext): EngineResult {
   const payload = context.payload as Record<string, unknown>;
   const tokenId = payload["tokenId"] as string;
   const ship = context.state.tokens[tokenId];
-  if (!ship) return { runtimeUpdates: [], events: [] };
+  if (!ship) return { runtimeUpdates: [], events: [], error: { code: "TOKEN_NOT_FOUND", message: "舰船不存在" } };
 
   const angle = (payload["angle"] ?? 0) as number;
   const allTokens = Object.values(context.state.tokens);
@@ -467,10 +467,10 @@ export function applyAdvancePhase(context: EngineContext): EngineResult {
   const payload = context.payload as Record<string, unknown>;
   const tokenId = payload["tokenId"] as string;
   const ship = context.state.tokens[tokenId];
-  if (!ship) return { runtimeUpdates: [], events: [] };
+  if (!ship) return { runtimeUpdates: [], events: [], error: { code: "TOKEN_NOT_FOUND", message: "舰船不存在" } };
 
   const validation = validatePhaseAdvance(ship);
-  if (!validation.valid) return { runtimeUpdates: [], events: [] };
+  if (!validation.valid) return { runtimeUpdates: [], events: [], error: { code: "INVALID_PHASE", message: validation.error || "阶段推进无效" } };
 
   const phaseResult = advancePhase(ship);
 
