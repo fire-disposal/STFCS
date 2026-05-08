@@ -169,7 +169,7 @@ export const StatusEffectSchema = z.object({
 	source: z.string().optional(),
 	duration: z.number().optional(),
 	stackCount: z.number().optional(),
-	data: z.record(z.string(), z.any()).optional(),
+	data: z.record(z.string(), z.unknown()).optional(),
 });
 export type StatusEffect = z.infer<typeof StatusEffectSchema>;
 
@@ -296,7 +296,7 @@ export const TokenModifierSchema = z.object({
 	stackKey: z.string().optional(), // 不可叠加时的标识键
 	/** 持续回合数。999 = 永久，具体数值 = 限时 */
 	duration: z.number().default(999),
-	metadata: z.record(z.string(), z.any()).optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type TokenModifier = z.infer<typeof TokenModifierSchema>;
 
@@ -364,7 +364,7 @@ export const MapTerrainSchema = z.object({
 	position: PointSchema,
 	size: z.number(),
 	rotation: z.number().optional(),
-	metadata: z.record(z.string(), z.any()).optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type MapTerrain = z.infer<typeof MapTerrainSchema>;
 
@@ -426,7 +426,7 @@ export const GameRoomStateSchema = z.object({
 	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),
 	globalModifiers: z.record(z.string(), z.number()).optional(),
-	logs: z.array(BattleLogEventSchema).default([]).optional(),
+	logs: z.array(BattleLogEventSchema).default([]),
 	createdAt: z.number(),
 });
 export type GameRoomState = z.infer<typeof GameRoomStateSchema>;

@@ -64,6 +64,7 @@ export class Room {
 			turnCount: 0,
 			players: {},
 			tokens: {},
+			logs: [],
 			globalModifiers: {},
 			createdAt: this.createdAt,
 		});
