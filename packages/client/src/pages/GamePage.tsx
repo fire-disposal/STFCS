@@ -147,6 +147,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				onReadyToggle={() => networkManager.setReady()}
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
+				socket={socket}
 				onFactionChange={(playerId, faction) => {
 					send("edit:room", { action: "set_faction", playerId, faction });
 				}}

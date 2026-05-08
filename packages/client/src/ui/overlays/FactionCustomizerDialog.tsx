@@ -1,6 +1,6 @@
 /**
  * FactionCustomizerDialog - 派系工坊
- * 浏览全局派系、创建自定义派系（含旗帜裁剪上传 + 取色器）
+ * 浏览全局派系、创建自定义派系（含旗帜裁剪上传 + 取色器 + 旗帜预览）
  */
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -9,6 +9,7 @@ import { Plus, Trash2, Upload, Pipette, Undo2 } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import type { FactionDef } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
+import { useAssetSocket } from "@/hooks/useAssetSocket";
 
 interface Props {
     open: boolean;
@@ -34,8 +35,13 @@ function cropSquareFromImage(img: HTMLImageElement, size: number): string | null
     return canvas.toDataURL("image/png");
 }
 
+function toDataUrl(mimeType: string, base64: string): string {
+    return `data:${mimeType};base64,${base64}`;
+}
+
 export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, networkManager, playerId }) => {
     const [factions, setFactions] = useState<FactionDef[]>([]);
+    const [flagDataUrls, setFlagDataUrls] = useState<Record<string, string>>({});
     const [newName, setNewName] = useState("");
     const [newColor, setNewColor] = useState("#4a9eff");
     const [loading, setLoading] = useState(false);
@@ -45,12 +51,40 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
     const fileRef = useRef<HTMLInputElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
+    const socket = networkManager.getSocket();
+    const assetSocket = useAssetSocket(socket);
+
+    // 接线 asset socket 的 response handler
+    useEffect(() => {
+        if (!socket) return;
+        socket.on("response", assetSocket.handleResponse);
+        return () => { socket.off("response", assetSocket.handleResponse); };
+    }, [socket, assetSocket.handleResponse]);
+
+    /** 批量加载旗帜图片 */
+    const loadFlagImages = useCallback(async (list: FactionDef[]) => {
+        try {
+            const ids = list.filter((f) => f.flagAssetId).map((f) => f.flagAssetId!);
+            if (ids.length === 0) return;
+            const results = await assetSocket.batchGet(ids, true);
+            const urls: Record<string, string> = {};
+            for (const item of results) {
+                if (item.data && item.info?.mimeType) {
+                    urls[item.assetId] = toDataUrl(item.info.mimeType, item.data);
+                }
+            }
+            setFlagDataUrls(urls);
+        } catch {}
+    }, [assetSocket]);
+
     const loadFactions = useCallback(async () => {
         try {
             const res = await networkManager.request("faction:list", {}) as { factions: FactionDef[] };
-            setFactions(res.factions ?? []);
+            const list = res.factions ?? [];
+            setFactions(list);
+            loadFlagImages(list);
         } catch {}
-    }, [networkManager]);
+    }, [networkManager, loadFlagImages]);
 
     useEffect(() => { if (open) loadFactions(); }, [open, loadFactions]);
 
@@ -73,7 +107,6 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         } catch { notify.error("图片加载失败"); }
     };
 
-    /** 从旗帜预览像素取色，对标 ColorKeyPickerPanel 的实现 */
     const handlePreviewClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
         if (!isPicking) return;
         const img = imgRef.current;
@@ -171,7 +204,7 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                         <input ref={fileRef} type="file" accept="image/png" hidden onChange={handleFlagSelect} />
                     </Flex>
 
-                    {/* 取色按钮（预览外部，对标 ColorKeyPickerPanel） */}
+                    {/* 取色按钮 */}
                     <Flex justify="center" gap="2" mb="2">
                         {flagPreview && (
                             isPicking ? (
@@ -211,22 +244,38 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                 {/* 派系列表 */}
                 <ScrollArea style={{ maxHeight: 280 }}>
                     <Flex direction="column" gap="1">
-                        {factions.map((f) => (
-                            <Flex key={f.$id} align="center" gap="2" style={{
-                                padding: "6px 10px", borderRadius: 6,
-                                background: "rgba(20,30,45,0.4)",
-                                border: "1px solid rgba(74,158,255,0.08)",
-                            }}>
-                                <span style={{ width: 20, height: 20, borderRadius: 4, background: f.color, flexShrink: 0 }} />
-                                <Text size="1" style={{ flex: 1 }}>{f.name}</Text>
-                                <Text size="1" color="gray">{f.$id.startsWith("preset:") ? "预设" : "自定义"}</Text>
-                                {!f.$id.startsWith("preset:") && f.ownerId === playerId && (
-                                    <Button size="1" variant="soft" color="red" onClick={() => handleDelete(f.$id)} disabled={loading}>
-                                        <Trash2 size={10} />
-                                    </Button>
-                                )}
-                            </Flex>
-                        ))}
+                        {factions.map((f) => {
+                            const flagUrl = f.flagAssetId ? flagDataUrls[f.flagAssetId] : undefined;
+                            return (
+                                <Flex key={f.$id} align="center" gap="2" style={{
+                                    padding: "6px 10px", borderRadius: 6,
+                                    background: "rgba(20,30,45,0.4)",
+                                    border: "1px solid rgba(74,158,255,0.08)",
+                                }}>
+                                    {/* 旗帜图片或色块 */}
+                                    <span style={{
+                                        width: 28, height: 28, borderRadius: 4,
+                                        background: flagUrl
+                                            ? `url(${flagUrl}) center/cover`
+                                            : f.color,
+                                        flexShrink: 0,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 10, fontWeight: 700,
+                                        color: flagUrl ? "transparent" : "rgba(255,255,255,0.85)",
+                                        overflow: "hidden",
+                                    }}>
+                                        {flagUrl ? undefined : f.name.charAt(0)}
+                                    </span>
+                                    <Text size="1" style={{ flex: 1 }}>{f.name}</Text>
+                                    <Text size="1" color="gray">{f.$id.startsWith("preset:") ? "预设" : "自定义"}</Text>
+                                    {!f.$id.startsWith("preset:") && f.ownerId === playerId && (
+                                        <Button size="1" variant="soft" color="red" onClick={() => handleDelete(f.$id)} disabled={loading}>
+                                            <Trash2 size={10} />
+                                        </Button>
+                                    )}
+                                </Flex>
+                            );
+                        })}
                         {factions.length === 0 && <Text size="1" color="gray" align="center" mt="4">暂无派系</Text>}
                     </Flex>
                 </ScrollArea>
