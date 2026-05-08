@@ -227,7 +227,7 @@ export function setupSocketIO(io: any, roomManager: any): void {
     if (gameState && creatorId && tokenCount > 0) {
       const archiveId = `save_${roomId}_${Date.now()}`;
       const archive = {
-        id: archiveId,
+        $id: archiveId,
         name: room.name,
         saveJson: gameState,
         metadata: {

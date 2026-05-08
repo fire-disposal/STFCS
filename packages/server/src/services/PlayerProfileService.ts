@@ -77,7 +77,7 @@ export class PlayerProfileService {
 		};
 
 		const archive: RoomArchive = {
-			id: save.$id,
+			$id: save.$id,
 			name,
 			saveJson: save,
 			metadata: {

@@ -120,14 +120,6 @@ export const PlayerRoleSchema = z.enum(["HOST", "PLAYER"]);
 export const PlayerRole = PlayerRoleSchema.enum;
 export type PlayerRole = z.infer<typeof PlayerRoleSchema>;
 
-export const FluxStateSchema = z.enum(["NORMAL", "HIGH", "OVERLOADED", "VENTING"]);
-export const FluxState = FluxStateSchema.enum;
-export type FluxState = z.infer<typeof FluxStateSchema>;
-
-export const ShieldTypeSchema = z.enum(["OMNI", "FRONT", "NONE"]);
-export const ShieldType = ShieldTypeSchema.enum;
-export type ShieldType = z.infer<typeof ShieldTypeSchema>;
-
 export const MovementPhaseSchema = z.enum(["A", "B", "C", "DONE"]);
 export const MovementPhase = MovementPhaseSchema.enum;
 export type MovementPhase = z.infer<typeof MovementPhaseSchema>;
@@ -399,11 +391,11 @@ export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 // ============================================================
 
 export const BattleLogEventSchema = z.object({
-  type: z.string(),
-  timestamp: z.number(),
-  data: z.record(z.string(), z.unknown()).default({}),
-})
-export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>
+	type: z.string(),
+	timestamp: z.number(),
+	data: z.record(z.string(), z.unknown()).default({}),
+});
+export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>;
 
 /**
  * 游戏房间状态
@@ -430,29 +422,8 @@ export const GameRoomStateSchema = z.object({
 export type GameRoomState = z.infer<typeof GameRoomStateSchema>;
 
 // ============================================================
-// 存档类型（精简为单一权威定义）
+// 玩家信息
 // ============================================================
-
-export const SaveMetadataSchema = z.object({
-	name: z.string(),
-	description: z.string().optional(),
-	tags: z.array(z.string()).optional(),
-	version: z.string().optional(),
-	thumbnail: z.string().optional(),
-	createdAt: z.number().optional(),
-	updatedAt: z.number().optional(),
-	roomId: z.string().optional(),
-});
-export type SaveMetadata = z.infer<typeof SaveMetadataSchema>;
-
-export const GameSaveSchema = z.object({
-	$id: z.string(),
-	metadata: SaveMetadataSchema,
-	snapshot: GameRoomStateSchema,
-	createdAt: z.number(),
-	updatedAt: z.number().optional(),
-});
-export type GameSave = z.infer<typeof GameSaveSchema>;
 
 export const PlayerInfoSchema = z.object({
 	playerId: z.string(),
@@ -469,7 +440,33 @@ export const PlayerInfoSchema = z.object({
 	lastLogin: z.number().optional(),
 });
 export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
-export const validatePlayerInfo = createValidator<PlayerInfo>(PlayerInfoSchema);
+export const validatePlayerInfo = (data: unknown): PlayerInfo => PlayerInfoSchema.parse(data);
+
+// ============================================================
+// 存档类型
+// ============================================================
+
+export const SaveMetadataSchema = MetadataSchema.pick({
+	name: true,
+	description: true,
+	tags: true,
+	createdAt: true,
+	updatedAt: true,
+}).extend({
+	version: z.string().optional(),
+	thumbnail: z.string().optional(),
+	roomId: z.string().optional(),
+});
+export type SaveMetadata = z.infer<typeof SaveMetadataSchema>;
+
+export const GameSaveSchema = z.object({
+	$id: z.string(),
+	metadata: SaveMetadataSchema,
+	snapshot: GameRoomStateSchema,
+	createdAt: z.number(),
+	updatedAt: z.number().optional(),
+});
+export type GameSave = z.infer<typeof GameSaveSchema>;
 
 // ============================================================
 // 资产类型（简化：所有资产公开）
@@ -498,7 +495,7 @@ export const AssetSchema = z.object({
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
-export const AssetListItemSchema = AssetSchema;
+export const AssetListItemSchema = AssetSchema; // 语义别名：列表项与完整资产结构相同
 export type AssetListItem = z.infer<typeof AssetListItemSchema>;
 
 export const AssetFilterSchema = z.object({
@@ -511,11 +508,6 @@ export const AssetFilterSchema = z.object({
 	sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 export type AssetFilter = z.infer<typeof AssetFilterSchema>;
-
-/** 创建严格验证函数（parse 模式） */
-function createValidator<T>(schema: z.ZodTypeAny): (data: unknown) => T {
-	return (data: unknown): T => schema.parse(data) as T;
-}
 
 export const RoomArchiveMetadataSchema = z.object({
 	roomId: z.string(),
@@ -531,7 +523,7 @@ export const RoomArchiveMetadataSchema = z.object({
 export type RoomArchiveMetadata = z.infer<typeof RoomArchiveMetadataSchema>;
 
 export const RoomArchiveSchema = z.object({
-	id: z.string(),
+	$id: z.string(),
 	name: z.string(),
 	description: z.string().optional(),
 	saveJson: GameSaveSchema,

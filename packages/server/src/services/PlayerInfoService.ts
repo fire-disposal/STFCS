@@ -203,7 +203,7 @@ export class PlayerInfoService {
 	async deleteRoomSave(playerId: string, saveId: string): Promise<boolean> {
 		const result = await this.findByPlayerId(playerId);
 		if (!result) return false;
-		const idx = result.file.roomSaves.findIndex((s) => s.id === saveId);
+		const idx = result.file.roomSaves.findIndex((s) => s.$id === saveId);
 		if (idx === -1) return false;
 		result.file.roomSaves.splice(idx, 1);
 		await this.savePlayerFile(result.path, result.file);
