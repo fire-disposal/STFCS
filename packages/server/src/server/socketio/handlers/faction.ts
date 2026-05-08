@@ -10,6 +10,9 @@ import { err } from "./err.js";
 import type { RpcContext } from "../RpcServer.js";
 import { assetService, factionService } from "./services.js";
 import { presetFactions } from "@vt/data";
+import { createLogger } from "../../../infra/simple-logger.js";
+
+const logger = createLogger("faction-handler");
 
 function mergeFactionMaps(roomFactions: Record<string, any> | undefined, globalFactions: any[], presets: any[]) {
     const map: Record<string, any> = { ...roomFactions };
@@ -59,7 +62,7 @@ export const editFactionHandlers = {
                 );
                 flagAssetId = asset.$id;
             } catch (e) {
-                // flag upload fails silently — create without flag
+                logger.error(`Flag upload failed for faction "${p.name}": ${e instanceof Error ? e.message : String(e)}`);
             }
         }
 
