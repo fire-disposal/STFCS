@@ -112,7 +112,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				<div className="turn-bar__track">
 					{factionTrackItems.map((item, i) => (
 						<React.Fragment key={item.faction}>
-							<span className={`turn-bar__dot turn-bar__dot--${item.status} turn-bar__dot--${item.faction.toLowerCase()}`}>
+							<span className={`turn-bar__dot turn-bar__dot--${item.status}`} style={{ color: item.color }}>
 								{item.status === "done" ? <CheckCircle size={10} /> : item.label}
 							</span>
 							{i < factionTrackItems.length - 1 && <span className="turn-bar__arrow">→</span>}

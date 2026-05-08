@@ -1,10 +1,10 @@
 /**
  * DMControlSidebarPanel - DM控制面板
- * 房主专用：回合推进、阶段切换、玩家管理
+ * 房主专用：回合推进、阶段切换、派系管理、玩家管理
  */
 
 import React, { useMemo } from "react";
-import { ChevronDown, Users, UserX, Plus, Minus, FastForward, Play } from "lucide-react";
+import { ChevronDown, Users, UserX, Plus, Minus, FastForward, Play, GripVertical } from "lucide-react";
 import { Button, Flex, Text, Badge, DropdownMenu, Card, Separator } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -75,6 +75,11 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
         ? gameState.initiativeOrder.indexOf(activeFaction) === gameState.initiativeOrder.length - 1
         : false;
 
+    const factions = gameState?.factions ?? {};
+    const currentFactionDef = activeFaction ? factions[activeFaction] : undefined;
+    const phaseLabel = phase === GamePhase.DEPLOYMENT ? "部署" : phase === GamePhase.FACTION_ACTION ? "派系行动" : phase === GamePhase.SETTLEMENT ? "结算中" : phase;
+    const initiativeOrder = gameState?.initiativeOrder ?? [];
+
     return (
         <Flex direction="column" gap="2" style={{ height: "100%" }}>
             {/* 标题 */}
@@ -92,18 +97,48 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                     </Flex>
                     <Flex align="center" justify="between">
                         <Text size="1" color="gray">阶段</Text>
-                        <Badge size="1" color="blue">{phase}</Badge>
+                        <Badge size="1" color="blue">{phaseLabel}</Badge>
                     </Flex>
-                    {activeFaction && (
+                    {currentFactionDef && (
                         <Flex align="center" justify="between">
                             <Text size="1" color="gray">阵营</Text>
-                            <Badge size="1" color={activeFaction.includes("fate-grip") ? "red" : activeFaction.includes("player-alliance") ? "green" : "blue"}>
-                                {activeFaction}
+                            <Badge size="1" style={{ background: currentFactionDef.color }}>
+                                {currentFactionDef.name}
                             </Badge>
                         </Flex>
                     )}
                 </Flex>
             </Card>
+
+            {/* 先攻顺序 */}
+            {initiativeOrder.length > 0 && (
+                <Card style={{ padding: "6px 8px" }}>
+                    <Text size="1" color="gray" mb="1">先攻顺序</Text>
+                    <Flex direction="column" gap="1">
+                        {initiativeOrder.map((fid, idx) => {
+                            const def = factions[fid];
+                            const isActive = fid === activeFaction;
+                            return (
+                                <Flex key={fid} align="center" gap="1" style={{
+                                    padding: "3px 6px",
+                                    borderRadius: 4,
+                                    background: isActive ? "rgba(74, 158, 255, 0.15)" : "transparent",
+                                    fontWeight: isActive ? "bold" : "normal",
+                                }}>
+                                    <Text size="1" color="gray">{idx + 1}.</Text>
+                                    <span style={{
+                                        width: 10, height: 10, borderRadius: 2,
+                                        background: def?.color ?? "#888",
+                                        flexShrink: 0,
+                                    }} />
+                                    <Text size="1" style={{ flex: 1 }}>{def?.name ?? fid}</Text>
+                                    {isActive && <Badge size="1" color="blue">当前</Badge>}
+                                </Flex>
+                            );
+                        })}
+                    </Flex>
+                </Card>
+            )}
 
             {/* 回合推进 */}
             <Card style={{ padding: "6px 8px" }}>
@@ -132,7 +167,9 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                 <Text size="1" color="gray" mb="1">阶段切换</Text>
                 <Flex gap="1" wrap="wrap">
                     <Button size="1" variant="soft" onClick={() => handleSetPhase("DEPLOYMENT")}>部署</Button>
-                    <Button size="1" variant="soft" onClick={() => handleSetPhase("PLAYER_ACTION")}>行动</Button>
+                    <Button size="1" variant="soft" onClick={() => handleSetPhase("PLAYER_ACTION")}>旧行动</Button>
+                    <Button size="1" variant="soft" onClick={() => handleSetPhase("FACTION_ACTION")}>派系行动</Button>
+                    <Button size="1" variant="soft" onClick={() => handleSetPhase("SETTLEMENT")}>结算</Button>
                 </Flex>
             </Card>
 

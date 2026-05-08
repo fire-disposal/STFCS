@@ -21,6 +21,7 @@ import {
 	useGameTurnCount,
 	useGameActiveFaction,
 	useGamePlayers,
+	useGameState,
 	useAllTokens,
 	useGamePlayerId,
 } from "@/state/stores/gameStore";
@@ -45,6 +46,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 	const activeFaction = useGameActiveFaction();
 	const players = useGamePlayers();
 	const tokens = useAllTokens();
+	const gameState = useGameState();
 	const playerId = useGamePlayerId();
 	const currentPlayer = playerId ? players[playerId] : undefined;
 	const currentFaction = currentPlayer?.faction;
@@ -68,6 +70,8 @@ export const TopBar: React.FC<TopBarProps> = ({
 					currentFaction={currentFaction}
 					isReady={isReady}
 					onReadyToggle={onReadyToggle}
+					initiativeOrder={gameState?.initiativeOrder}
+					factions={gameState?.factions as Record<string, { name: string; color: string }> | undefined}
 				/>
 			</div>
 
