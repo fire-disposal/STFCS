@@ -87,34 +87,12 @@ export const Faction = FactionSchema.enum;
 export type Faction = z.infer<typeof FactionSchema>;
 
 /**
- * 派系主题色映射
- * - PLAYER_ALLIANCE: 蓝色系（玩家联盟）
- * - FATE_GRIP: 红色系（命运之握）
+ * 派系主题色映射（legacy，已由 FactionDef.color 替代）
  */
 export const FactionColors: Record<Faction, number> = {
 	[Faction.PLAYER_ALLIANCE]: 0x4a9eff,
 	[Faction.FATE_GRIP]: 0xff4a4a,
 };
-
-/**
- * 派系显示名称映射
- */
-export const FactionLabels: Record<Faction, string> = {
-	[Faction.PLAYER_ALLIANCE]: "玩家联盟",
-	[Faction.FATE_GRIP]: "命运之握",
-};
-
-/**
- * 回合行动顺序
- * 定义每轮（turn）中各派系的行动顺序。
- * 添加新派系时只需在此数组中插入即可。
- * 系统按此顺序循环：每个派系行动完毕后切换到下一个，
- * 最后一个派系行动完毕后 turn++ 并回到第一个。
- */
-export const TURN_ORDER: Faction[] = [
-	Faction.PLAYER_ALLIANCE,
-	Faction.FATE_GRIP,
-];
 
 export const PlayerRoleSchema = z.enum(["HOST", "PLAYER"]);
 export const PlayerRole = PlayerRoleSchema.enum;

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Rectangle } from "pixi.js";
-import { Faction } from "@vt/data";
 import type { InventoryToken, CombatToken } from "@vt/data";
 import type { LayerRegistry } from "@/renderer";
 import { useLayerSystem, useShipRendering } from "@/renderer";
@@ -166,7 +165,7 @@ function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolea
         overloadTime: 1,
         destroyed: false,
         actionSequence: 0,
-        faction: Faction.PLAYER_ALLIANCE,
+        faction: "preset:faction:player-alliance",
     };
 
     return {

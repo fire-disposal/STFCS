@@ -11,7 +11,7 @@
  */
 
 import type { CombatToken, RoomPlayerState } from "@vt/data";
-import { FactionColors } from "@vt/data";
+import { getFactionColor } from "@/utils/factionColor";
 import { Text, TextStyle, Container, Graphics } from "pixi.js";
 import { worldToScreen } from "../core/useLayerSystem";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -295,18 +295,6 @@ export class ShipHUDManager {
 			this.updateHpBarContainer(cached.hpBarContainer, ship.runtime.hull, hullMax, hpPercent, isSelected, hpPerBar);
 		}
 
-		// 辐能条更新
-		const fluxHard = ship.runtime.fluxHard ?? 0;
-		const fluxSoft = ship.runtime.fluxSoft ?? 0;
-		const fluxCapacity = ship.spec.fluxCapacity ?? 100;
-		const fluxStatusChar = getFluxStatusChar(ship);
-		const fluxChanged = fluxHard !== last.fluxHard || fluxSoft !== last.fluxSoft ||
-			fluxCapacity !== last.fluxCapacity || fluxStatusChar !== last.fluxStatusChar;
-
-		if (fluxChanged || selectedChanged) {
-			// flux bar 已隐藏
-		}
-
 		const newName = ship.metadata?.name || ship.$id;
 		const newDisplayName = this.getDisplayName(ship);
 		const nameChanged = newName !== last.name;
@@ -346,6 +334,11 @@ export class ShipHUDManager {
 				this.ownerLabelLayer.addChild(cached.ownerLabel);
 			}
 		}
+
+		const fluxHard = ship.runtime.fluxHard ?? 0;
+		const fluxSoft = ship.runtime.fluxSoft ?? 0;
+		const fluxCapacity = ship.spec.fluxCapacity ?? 100;
+		const fluxStatusChar = getFluxStatusChar(ship);
 
 		cached.lastUpdate = {
 			worldX: ship.runtime.position.x,
@@ -398,7 +391,7 @@ export class ShipHUDManager {
 		if (ownerId) {
 			const player = this.players[ownerId];
 			if (player?.faction) {
-				return FactionColors[player.faction as keyof typeof FactionColors] ?? 0xcfe8ff;
+				return getFactionColor(player.faction) ?? 0xcfe8ff;
 			}
 		}
 		// 无所有者或无派系时使用舰船名称颜色

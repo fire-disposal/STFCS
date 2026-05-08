@@ -20,7 +20,8 @@
 
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
-import { FactionColors, nauticalToPixiSectorRotation } from "@vt/data";
+import { nauticalToPixiSectorRotation } from "@vt/data";
+import { getFactionColor } from "@/utils/factionColor";
 import { Container, Graphics } from "pixi.js";
 import { GlowFilter } from "pixi-filters";
 import { useEffect, useRef } from "react";
@@ -39,7 +40,7 @@ const GLOW_FILTER_CONFIG = {
 };
 
 function getShieldColor(faction?: string): number {
-	return FactionColors[faction as keyof typeof FactionColors] ?? 0x4fc3ff;
+		return getFactionColor(faction) ?? 0x4fc3ff;
 }
 
 function getShieldAlpha(): number {

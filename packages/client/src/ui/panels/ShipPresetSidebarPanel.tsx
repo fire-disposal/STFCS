@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Rocket, Search, Filter } from "lucide-react";
 import { Badge, Box, Button, Flex, Text, TextField, Select, ScrollArea, Card } from "@radix-ui/themes";
 import type { InventoryToken } from "@vt/data";
-import { Faction as FactionEnum, HullSize } from "@vt/data";
+import { HullSize } from "@vt/data";
 import type { SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
 import { notify } from "@/ui/shared/Notification";
@@ -104,7 +104,7 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 				preset: selectedPreset.token,
 				position: cursorPos,
 				heading: cursorHeading,
-				faction: FactionEnum.PLAYER_ALLIANCE,
+				faction: "preset:faction:player-alliance",
 			});
 			notify.success("舰船部署成功");
 		} catch {

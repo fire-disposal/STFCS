@@ -7,7 +7,7 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
-import { GamePhase, Faction } from "@vt/data";
+import { GamePhase } from "@vt/data";
 
 export interface RoomOptions {
 	roomName: string;
@@ -245,14 +245,6 @@ export class Room {
 		this.callbacks.broadcast({
 			type: "ALL_READY_STATUS",
 			payload: { allReady, playerCount: playerList.length, readyCount: playerList.filter(p => p?.isReady).length },
-		});
-	}
-
-	switchActiveFaction(faction: Faction): void {
-		this.stateManager.changeFaction(faction);
-		this.callbacks.broadcast({
-			type: "ACTIVE_FACTION_CHANGED",
-			payload: { faction, changedAt: Date.now() },
 		});
 	}
 

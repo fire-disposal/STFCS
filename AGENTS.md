@@ -39,7 +39,8 @@
 **phase 和 activeFaction 固定对应关系：**
 修改 phase 时必须同步更新 activeFaction：
 - phase="DEPLOYMENT" → activeFaction=undefined
-- phase="PLAYER_ACTION" → activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+- phase="FACTION_ACTION" → activeFaction 由 initiativeOrder[initiativeIndex] 决定
+- phase="SETTLEMENT" → activeFaction=undefined
 
 ### 其他约定
 
@@ -89,13 +90,15 @@ toPixiRotation(nauticalAngle)  // heading * PI/180
 ## Discoveries
 
 1. **瞄准线坐标反转**：屏幕 Y 轴向下，航海坐标系 Y 轴向上，需要反转 dy
-2. **回合流程简化**：移除 TURN_END 作为独立阶段，DM_ACTION 直接跳转到 PLAYER_ACTION + turn++
-3. **RoomPlayerState 无 avatar 字段**：schema 只有基础字段，现已添加 avatar 字段
-4. **Avatar 组件存在**：`/packages/client/src/ui/shared/Avatar.tsx` 支持 assetId 和 base64 加载
-5. **PixiJS v8 无 beginHole/endHole**：需要用环形扇形绘制实现透明内圈
-6. **贴图加载超时**：GamePage 需要绑定 socket response 监听器
-7. **护盾初始化路径**：createCombatToken、edit:token create、机库部署三处都需要初始化护盾
-8. **setToken 迁移**：MutativeStateManager.setToken 会自动为有护盾规格但无运行时护盾的舰船初始化护盾
+2. **回合流程简化**：移除 TURN_END 作为独立阶段（历史记录，现已升级为三阶段系统）
+3. **派系实体化**：Faction 从硬编码枚举重构为 FactionDef 实体，支持预设 + 自定义，旗标通过 faction_flag Asset 管理
+4. **动态先攻**：TURN_ORDER 被 initiativeOrder 替代，DM 可动态调整各派系行动顺序
+5. **RoomPlayerState 无 avatar 字段**：schema 只有基础字段，现已添加 avatar 字段
+6. **Avatar 组件存在**：`/packages/client/src/ui/shared/Avatar.tsx` 支持 assetId 和 base64 加载
+7. **PixiJS v8 无 beginHole/endHole**：需要用环形扇形绘制实现透明内圈
+8. **贴图加载超时**：GamePage 需要绑定 socket response 监听器
+9. **护盾初始化路径**：createCombatToken、edit:token create、机库部署三处都需要初始化护盾
+10. **setToken 迁移**：MutativeStateManager.setToken 会自动为有护盾规格但无运行时护盾的舰船初始化护盾
 
 ---
 
