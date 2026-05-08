@@ -78,7 +78,7 @@ export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
  * 注意：phase 和 activeFaction 存在固定对应关系，
  * 修改 phase 时应同步更新 activeFaction。
  */
-export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION"]);
+export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION", "FACTION_ACTION", "SETTLEMENT"]);
 export const GamePhase = GamePhaseSchema.enum;
 export type GamePhase = z.infer<typeof GamePhaseSchema>;
 
@@ -424,6 +424,9 @@ export const GameRoomStateSchema = z.object({
 	phase: GamePhaseSchema,
 	turnCount: z.number().default(0),
 	activeFaction: FactionSchema.optional(),
+	factions: z.record(z.string(), FactionDefSchema).optional(),
+	initiativeOrder: z.array(z.string()).optional(),
+	initiativeIndex: z.number().optional(),
 	players: z.record(z.string(), RoomPlayerStateSchema),
 	tokens: z.record(z.string(), CombatTokenSchema),
 	map: GameMapSchema.optional(),

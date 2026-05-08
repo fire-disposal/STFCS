@@ -24,6 +24,8 @@ interface TurnBarProps {
 const PHASE_LABELS: Record<GamePhase, string> = {
 	DEPLOYMENT: "部署",
 	PLAYER_ACTION: "行动",
+	FACTION_ACTION: "派系行动",
+	SETTLEMENT: "结算中",
 };
 
 const FACTION_SHORT: Record<string, string> = {
