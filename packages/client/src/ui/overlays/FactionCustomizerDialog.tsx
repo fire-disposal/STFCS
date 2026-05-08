@@ -66,15 +66,23 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         try {
             const ids = list.filter((f) => f.flagAssetId).map((f) => f.flagAssetId!);
             if (ids.length === 0) return;
+            console.log("[FactionCustomizer] Loading flags:", ids.length, ids.slice(0, 3));
             const results = await assetSocket.batchGet(ids, true);
             const urls: Record<string, string> = {};
+            let loaded = 0;
             for (const item of results) {
                 if (item.data && item.info?.mimeType) {
                     urls[item.assetId] = toDataUrl(item.info.mimeType, item.data);
+                    loaded++;
+                } else {
+                    console.warn("[FactionCustomizer] No data for asset:", item.assetId, "info:", item.info, "hasData:", !!item.data);
                 }
             }
+            console.log("[FactionCustomizer] Loaded", loaded, "of", ids.length, "flags");
             setFlagDataUrls(urls);
-        } catch {}
+        } catch (e) {
+            console.error("[FactionCustomizer] Failed to load flag images:", e);
+        }
     }, [assetSocket]);
 
     const loadFactions = useCallback(async () => {

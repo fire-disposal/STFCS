@@ -52,6 +52,8 @@ export const editFactionHandlers = {
 
         let flagAssetId = p.flagAssetId;
         if (p.flagData && !flagAssetId) {
+            const flagSize = p.flagData.length;
+            logger.info(`Creating faction "${p.name}" with flag data (${flagSize} chars base64)`);
             try {
                 const asset = await assetService.uploadAsset(
                     ctx.playerId,
@@ -61,9 +63,12 @@ export const editFactionHandlers = {
                     Buffer.from(p.flagData, "base64"),
                 );
                 flagAssetId = asset.$id;
+                logger.info(`Flag uploaded for faction "${p.name}": ${flagAssetId}`);
             } catch (e) {
                 logger.error(`Flag upload failed for faction "${p.name}": ${e instanceof Error ? e.message : String(e)}`);
             }
+        } else {
+            logger.info(`Creating faction "${p.name}" without flag (flagData=${!!p.flagData}, flagAssetId=${flagAssetId})`);
         }
 
         await factionService.create({
@@ -73,6 +78,8 @@ export const editFactionHandlers = {
             flagAssetId,
             ownerId: ctx.playerId,
         });
+
+        logger.info(`Faction saved to global store: ${factionId} (flag=${flagAssetId})`);
     },
 
     update: async (payload: unknown, ctx: RpcContext) => {

@@ -41,15 +41,21 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
         try {
             const ids = Object.values(factions).filter((f) => f.flagAssetId).map((f) => f.flagAssetId!);
             if (ids.length === 0) return;
+            console.log("[FactionSelector] Loading flags:", ids.length);
             const results = await assetSocket.batchGet(ids, true);
             const urls: Record<string, string> = {};
+            let loaded = 0;
             for (const item of results) {
                 if (item.data && item.info?.mimeType) {
                     urls[item.assetId] = toDataUrl(item.info.mimeType, item.data);
+                    loaded++;
                 }
             }
+            console.log("[FactionSelector] Loaded", loaded, "of", ids.length, "flags");
             setFlagUrls(urls);
-        } catch {}
+        } catch (e) {
+            console.error("[FactionSelector] Failed to load flags:", e);
+        }
     }, [factions, assetSocket]);
 
     useEffect(() => { if (open) loadFlags(); }, [open, loadFlags]);
