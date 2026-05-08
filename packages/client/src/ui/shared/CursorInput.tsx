@@ -14,6 +14,7 @@
 import { Check, Copy, Move, X } from "lucide-react";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { normalizeAngle } from "@vt/data";
+import "./coordinate-input.css";
 
 export type CursorState = "IDLE" | "EDITING" | "VALID" | "INVALID";
 

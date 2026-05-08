@@ -13,6 +13,7 @@
 
 import { Check, Copy, Move, X } from "lucide-react";
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import "./coordinate-input.css";
 
 export type CoordinateState = "IDLE" | "EDITING" | "VALID" | "INVALID";
 

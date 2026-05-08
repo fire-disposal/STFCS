@@ -1,0 +1,186 @@
+/* ====== 坐标输入 / 游标输入 共用样式 ====== */
+
+/* --- 行布局 --- */
+.coordinate-input__row,
+.cursor-coordinate-input__row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	background: rgba(10, 20, 35, 0.6);
+	border: 1px solid rgba(74, 158, 255, 0.15);
+	border-radius: 4px;
+	padding: 2px;
+	transition: border-color 0.15s ease;
+}
+
+/* 状态边框色 */
+.coordinate-input--idle .coordinate-input__row,
+.cursor-coordinate-input--idle .cursor-coordinate-input__row {
+	border-color: rgba(74, 158, 255, 0.15);
+}
+.coordinate-input--valid .coordinate-input__row,
+.cursor-coordinate-input--valid .cursor-coordinate-input__row {
+	border-color: rgba(46, 204, 113, 0.5);
+	box-shadow: 0 0 4px rgba(46, 204, 113, 0.15);
+}
+.coordinate-input--invalid .coordinate-input__row,
+.cursor-coordinate-input--invalid .cursor-coordinate-input__row {
+	border-color: rgba(231, 76, 60, 0.5);
+	box-shadow: 0 0 4px rgba(231, 76, 60, 0.15);
+}
+.coordinate-input--editing .coordinate-input__row,
+.cursor-coordinate-input--editing .cursor-coordinate-input__row {
+	border-color: rgba(74, 158, 255, 0.4);
+}
+
+/* --- 输入框 --- */
+.coordinate-input__wrapper,
+.cursor-coordinate-input__wrapper {
+	flex: 1;
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.coordinate-input__field,
+.cursor-coordinate-input__field {
+	width: 100%;
+	background: transparent;
+	border: none;
+	outline: none;
+	color: #8ba4c7;
+	font-size: 11px;
+	font-family: "Fira Code", monospace;
+	padding: 5px 6px;
+	letter-spacing: 0.3px;
+}
+.coordinate-input__field::placeholder,
+.cursor-coordinate-input__field::placeholder {
+	color: #4a5a6a;
+}
+.coordinate-input__field:focus,
+.cursor-coordinate-input__field:focus {
+	color: #cfe8ff;
+}
+
+/* 状态文字色 */
+.coordinate-input--valid .coordinate-input__field,
+.cursor-coordinate-input--valid .cursor-coordinate-input__field {
+	color: #2ecc71;
+}
+.coordinate-input--invalid .coordinate-input__field,
+.cursor-coordinate-input--invalid .cursor-coordinate-input__field {
+	color: #e74c3c;
+}
+
+/* --- 清空按钮 --- */
+.coordinate-input__clear,
+.cursor-coordinate-input__clear {
+	position: absolute;
+	right: 2px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: transparent;
+	border: none;
+	color: #6b8aaa;
+	cursor: pointer;
+	padding: 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 2px;
+	transition: color 0.15s;
+}
+.coordinate-input__clear:hover,
+.cursor-coordinate-input__clear:hover {
+	color: #e74c3c;
+}
+.coordinate-input__clear-icon,
+.cursor-coordinate-input__clear-icon {
+	width: 10px;
+	height: 10px;
+}
+
+/* --- 操作按钮（复制/跳转/无效） --- */
+.coordinate-input__btn,
+.cursor-coordinate-input__btn {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	padding: 5px 8px;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+	font-size: 11px;
+	font-weight: 500;
+	transition: background 0.15s ease, color 0.15s ease;
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+.coordinate-input__btn:disabled,
+.cursor-coordinate-input__btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* 复制按钮 */
+.coordinate-input__btn--copy,
+.cursor-coordinate-input__btn--copy {
+	background: rgba(74, 158, 255, 0.15);
+	color: #8ba4c7;
+}
+.coordinate-input__btn--copy:hover:not(:disabled),
+.cursor-coordinate-input__btn--copy:hover:not(:disabled) {
+	background: rgba(74, 158, 255, 0.28);
+	color: #cfe8ff;
+}
+
+/* 跳转按钮 */
+.coordinate-input__btn--jump,
+.cursor-coordinate-input__btn--jump {
+	background: rgba(46, 204, 113, 0.2);
+	color: #2ecc71;
+}
+.coordinate-input__btn--jump:hover:not(:disabled),
+.cursor-coordinate-input__btn--jump:hover:not(:disabled) {
+	background: rgba(46, 204, 113, 0.35);
+}
+
+/* 无效按钮 */
+.coordinate-input__btn--invalid,
+.cursor-coordinate-input__btn--invalid {
+	background: rgba(231, 76, 60, 0.15);
+	color: #e74c3c;
+}
+
+.coordinate-input__btn-icon,
+.cursor-coordinate-input__btn-icon {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+
+/* --- 状态指示文字 --- */
+.coordinate-input__status,
+.cursor-coordinate-input__status {
+	margin-top: 4px;
+}
+.coordinate-input__status-text,
+.cursor-coordinate-input__status-text {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10px;
+	color: #2ecc71;
+}
+.coordinate-input__status-text--error,
+.cursor-coordinate-input__status-text--error {
+	color: #e74c3c;
+}
+.coordinate-input__status-icon,
+.cursor-coordinate-input__status-icon {
+	width: 10px;
+	height: 10px;
+	flex-shrink: 0;
+}
