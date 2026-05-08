@@ -16,10 +16,56 @@ import { calculateDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
 import { validateAttackAllocations } from "../rules/targeting.js";
 import { angleBetween, distanceBetween } from "@vt/data";
+import type { CombatToken, WeaponRuntime } from "@vt/data";
 
 export interface WeaponAllocation {
   mountId: string;
   targets: { targetId: string; shotCount: number; quadrant?: number }[];
+}
+
+/**
+ * 计算过载并生成相应的更新指令
+ * applyCombat 和 applyDeviation 共用
+ */
+function resolveOverload(
+  ship: CombatToken,
+  attackerSpec: CombatToken["spec"],
+  attackerRuntime: CombatToken["runtime"],
+  totalFluxCost: number,
+  updatedWeapons: WeaponRuntime[],
+  events: ReturnType<typeof createEngineEvent>[]
+): Record<string, unknown> {
+  const newAttackerFluxSoft = Math.round((attackerRuntime.fluxSoft ?? 0) + totalFluxCost);
+  const newAttackerTotalFlux = newAttackerFluxSoft + Math.round(attackerRuntime.fluxHard ?? 0);
+  const attackerCapacity = Math.round(attackerSpec.fluxCapacity ?? 0);
+  const attackerOverloaded = newAttackerTotalFlux >= attackerCapacity && !attackerRuntime.overloaded;
+
+  const attackerUpdates: Record<string, unknown> = {
+    fluxSoft: newAttackerFluxSoft,
+    weapons: updatedWeapons,
+  };
+
+  if (attackerOverloaded) {
+    attackerUpdates["overloaded"] = true;
+    attackerUpdates["overloadTime"] = 1;
+    if (attackerRuntime.shield) {
+      attackerUpdates["shield"] = { active: false, direction: attackerRuntime.shield.direction ?? 0 };
+    }
+    attackerUpdates["weapons"] = updatedWeapons.map((w: any) => ({
+      ...w,
+      state: w.state === "READY" || w.state === "COOLDOWN" ? "DISABLED" : w.state,
+    }));
+
+    events.push(createEngineEvent("overload", ship.$id, {
+      tokenId: ship.$id,
+      tokenName: ship.metadata?.name ?? ship.$id,
+      totalFlux: newAttackerTotalFlux,
+      fluxCapacity: attackerCapacity,
+      reason: "weapon_fire",
+    }));
+  }
+
+  return attackerUpdates;
 }
 
 export function applyCombat(context: EngineContext): EngineResult {
@@ -194,35 +240,7 @@ export function applyCombat(context: EngineContext): EngineResult {
     };
   }
 
-  const newAttackerFluxSoft = Math.round((attackerRuntime.fluxSoft ?? 0) + totalFluxCost);
-  const newAttackerTotalFlux = newAttackerFluxSoft + Math.round(attackerRuntime.fluxHard ?? 0);
-  const attackerCapacity = Math.round(attackerSpec.fluxCapacity ?? 0);
-  const attackerOverloaded = newAttackerTotalFlux >= attackerCapacity && !attackerRuntime.overloaded;
-
-  const attackerUpdates: Record<string, unknown> = {
-    fluxSoft: newAttackerFluxSoft,
-    weapons: updatedWeapons,
-  };
-
-  if (attackerOverloaded) {
-    attackerUpdates["overloaded"] = true;
-    attackerUpdates["overloadTime"] = 1;
-    if (attackerRuntime.shield) {
-      attackerUpdates["shield"] = { active: false, direction: attackerRuntime.shield.direction ?? 0 };
-    }
-    attackerUpdates["weapons"] = updatedWeapons.map((w: any) => ({
-      ...w,
-      state: w.state === "READY" || w.state === "COOLDOWN" ? "DISABLED" : w.state,
-    }));
-
-    events.push(createEngineEvent("overload", ship.$id, {
-      tokenId: ship.$id,
-      tokenName: ship.metadata?.name ?? ship.$id,
-      totalFlux: newAttackerTotalFlux,
-      fluxCapacity: attackerCapacity,
-      reason: "weapon_fire",
-    }));
-  }
+  const attackerUpdates = resolveOverload(ship, attackerSpec, attackerRuntime, totalFluxCost, updatedWeapons, events);
 
   runtimeUpdates.push({ tokenId: ship.$id, updates: attackerUpdates });
 
@@ -300,35 +318,7 @@ export function applyDeviation(context: EngineContext): EngineResult {
     };
   }
 
-  const newAttackerFluxSoft = Math.round((attackerRuntime.fluxSoft ?? 0) + totalFluxCost);
-  const newAttackerTotalFlux = newAttackerFluxSoft + Math.round(attackerRuntime.fluxHard ?? 0);
-  const attackerCapacity = Math.round(attackerSpec.fluxCapacity ?? 0);
-  const attackerOverloaded = newAttackerTotalFlux >= attackerCapacity && !attackerRuntime.overloaded;
-
-  const attackerUpdates: Record<string, unknown> = {
-    fluxSoft: newAttackerFluxSoft,
-    weapons: updatedWeapons,
-  };
-
-  if (attackerOverloaded) {
-    attackerUpdates["overloaded"] = true;
-    attackerUpdates["overloadTime"] = 1;
-    if (attackerRuntime.shield) {
-      attackerUpdates["shield"] = { active: false, direction: attackerRuntime.shield.direction ?? 0 };
-    }
-    attackerUpdates["weapons"] = updatedWeapons.map((w: any) => ({
-      ...w,
-      state: w.state === "READY" || w.state === "COOLDOWN" ? "DISABLED" : w.state,
-    }));
-
-    events.push(createEngineEvent("overload", ship.$id, {
-      tokenId: ship.$id,
-      tokenName: ship.metadata?.name ?? ship.$id,
-      totalFlux: newAttackerTotalFlux,
-      fluxCapacity: attackerCapacity,
-      reason: "weapon_fire",
-    }));
-  }
+  const attackerUpdates = resolveOverload(ship, attackerSpec, attackerRuntime, totalFluxCost, updatedWeapons, events);
 
   runtimeUpdates.push({ tokenId: ship.$id, updates: attackerUpdates });
 
