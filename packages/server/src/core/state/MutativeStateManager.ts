@@ -28,6 +28,7 @@ import type {
 	EditLogContext,
 } from "@vt/data"
 import { GamePhase } from "@vt/data"
+import { presetFactions } from "@vt/data"
 import type { TurnAdvanceResult } from "../engine/flow/TurnFlowController.js"
 
 export interface MutateResult {
@@ -638,8 +639,21 @@ export class MutativeStateManager {
 	startGame(): void {
 		this.mutateAndBroadcast((draft) => {
 			draft.turnCount = 1;
-			const order = draft.initiativeOrder;
 			draft.phase = GamePhase.FACTION_ACTION;
+
+			// 自动初始化派系：如果未设置，从内置预设加载
+			if (!draft.factions || Object.keys(draft.factions).length === 0) {
+				const map: Record<string, any> = {};
+				for (const p of presetFactions) {
+					map[p.$id] = { ...p };
+				}
+				draft.factions = map;
+			}
+			if (!draft.initiativeOrder || draft.initiativeOrder.length === 0) {
+				draft.initiativeOrder = Object.keys(draft.factions!);
+			}
+
+			const order = draft.initiativeOrder;
 			draft.activeFaction = order?.[0];
 			draft.initiativeIndex = 0;
 		})
