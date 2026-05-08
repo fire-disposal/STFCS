@@ -48,8 +48,11 @@ export const ErrorCodes = {
     // ==================== 业务操作 ====================
     UNKNOWN_ACTION: "UNKNOWN_ACTION",
     INVALID_PHASE: "INVALID_PHASE",
+    NOT_YOUR_TURN: "NOT_YOUR_TURN",
+    ATTACK_INVALID: "ATTACK_INVALID",
     UNKNOWN_QUERY_TYPE: "UNKNOWN_QUERY_TYPE",
     DEPLOY_COLLISION: "DEPLOY_COLLISION",
+    NO_TOKEN_CONTROL: "NO_TOKEN_CONTROL",
 
     // ==================== CRUD 操作 ====================
     UPSERT_FAILED: "UPSERT_FAILED",

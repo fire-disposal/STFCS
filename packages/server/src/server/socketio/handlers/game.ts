@@ -23,6 +23,13 @@ export const gameHandlers = {
         // 权限检查：非房主需要 token 控制权
         if (room.creatorId !== ctx.playerId) {
             ctx.requireTokenControl(p.tokenId);
+
+            // 活跃派系检查：仅当前行动派系的玩家可操作
+            const activeFaction = room.getStateManager().getState().activeFaction;
+            const token = room.getCombatToken(p.tokenId);
+            if (token?.runtime?.faction && token.runtime.faction !== activeFaction) {
+                throw err("不是你的派系回合", ErrorCodes.NOT_YOUR_TURN);
+            }
         }
 
         const actionType = CLIENT_ACTION_MAP[p.action];
