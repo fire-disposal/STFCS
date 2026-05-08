@@ -50,25 +50,25 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 						const isActive = isActionPhase && i === currentIndex;
 						const done = isActionPhase && i < currentIndex;
 						return (
+						<div
+							key={fid}
+							className={`turn-bar__card ${isActive ? "turn-bar__card--active" : done ? "turn-bar__card--done" : ""}`}
+							style={{ borderColor: isActive ? def?.color ?? "#4a9eff" : "transparent" }}
+							title={def?.name ?? fid}
+						>
 							<div
-								key={fid}
-								className={`turn-bar__card ${isActive ? "turn-bar__card--active" : done ? "turn-bar__card--done" : ""}`}
-								style={{ borderColor: isActive ? def?.color ?? "#4a9eff" : "transparent" }}
+								className="turn-bar__flag"
+								style={def ? { background: def.color } : { background: "#888" }}
 							>
-								<div
-									className="turn-bar__flag"
-									style={def ? { background: def.color } : { background: "#888" }}
-								>
-									<span className="turn-bar__flag-initial">
-										{def?.name?.charAt(0) ?? "?"}
-									</span>
+								<span className="turn-bar__flag-initial">
+									{def?.name?.charAt(0) ?? "?"}
+								</span>
+							</div>
+							{isActive && (
+								<div className="turn-bar__pointer">
+									<div className="turn-bar__pointer-triangle" />
 								</div>
-								<span className="turn-bar__card-name">{def?.name ?? fid}</span>
-								{isActive && (
-									<div className="turn-bar__pointer">
-										<div className="turn-bar__pointer-triangle" />
-									</div>
-								)}
+							)}
 							</div>
 						);
 					})}
