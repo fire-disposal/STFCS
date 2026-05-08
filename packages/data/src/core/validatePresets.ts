@@ -8,11 +8,13 @@
 import {
     InventoryTokenSchema,
     WeaponJSONSchema,
+    FactionDefSchema,
     HullSizeSchema,
     HullSize,
 } from "./GameSchemas.js";
 import { presetShips } from "../presets/ships/index.js";
 import { presetWeapons } from "../presets/weapons/index.js";
+import { presetFactions } from "../presets/factions/index.js";
 
 // ============================================================
 // 类型定义
@@ -33,8 +35,10 @@ export interface PresetValidationItem {
 export interface PresetValidationResult {
     ships: PresetValidationItem[];
     weapons: PresetValidationItem[];
+    factions: PresetValidationItem[];
     totalShips: number;
     totalWeapons: number;
+    totalFactions: number;
     totalIssues: number;
     passed: boolean;
 }
@@ -168,11 +172,41 @@ export function validatePresets(): PresetValidationResult {
         weapons.push({ id, name, issues, passed: issues.length === 0 });
     }
 
+    // ---- 派系验证 ----
+    const factions: PresetValidationItem[] = [];
+    for (const faction of presetFactions) {
+        const id = faction.$id;
+        const name = faction.name ?? "(unnamed)";
+        const issues: PresetValidationIssue[] = [];
+
+        const result = FactionDefSchema.safeParse(faction);
+        if (!result.success) {
+            for (const issue of result.error.issues) {
+                const received = (issue as any).received;
+                issues.push({
+                    path: issue.path.join("."),
+                    message: `${issue.message}${received !== undefined ? ` (received: ${JSON.stringify(received)})` : ""}`,
+                });
+                totalIssues++;
+            }
+        }
+
+        // color hex 格式验证
+        if (!/^#[0-9a-fA-F]{6}$/.test(faction.color)) {
+            issues.push({ path: "color", message: `"${faction.color}" 不是合法的 hex 颜色` });
+            totalIssues++;
+        }
+
+        factions.push({ id, name, issues, passed: issues.length === 0 });
+    }
+
     return {
         ships,
         weapons,
+        factions,
         totalShips: presetShips.length,
         totalWeapons: presetWeapons.length,
+        totalFactions: presetFactions.length,
         totalIssues,
         passed: totalIssues === 0,
     };
