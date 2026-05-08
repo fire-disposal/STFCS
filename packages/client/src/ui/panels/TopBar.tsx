@@ -206,9 +206,8 @@ const PlayerAvatars: React.FC<{
 	activeFaction: string | undefined;
 	initiativeOrder: string[];
 }> = ({ players, phase, activeFaction, initiativeOrder }) => {
-	const playerList = Object.values(players).filter((p) => p.connected);
-
 	const grouped = useMemo(() => {
+		const playerList = Object.values(players).filter((p) => p.connected);
 		const result: { faction: string | undefined; players: RoomPlayerState[] }[] = [];
 
 		for (const faction of initiativeOrder) {
@@ -228,7 +227,7 @@ const PlayerAvatars: React.FC<{
 		}
 
 		return result;
-	}, [playerList]);
+	}, [players, initiativeOrder]);
 
 	return (
 		<div className="top-bar__avatars">

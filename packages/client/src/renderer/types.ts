@@ -31,6 +31,7 @@ export interface ShieldArcOptions {
 export type MoveMode = "forward" | "strafe";
 
 export interface MovementPreviewState {
+	shipId: string;
 	phase: MovementPhase | undefined;
 	mode: MoveMode;
 	value: number;

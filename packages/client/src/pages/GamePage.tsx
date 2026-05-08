@@ -22,6 +22,7 @@ import {
 import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import type { SocketNetworkManager } from "@/network";
+import { ErrorBoundary } from "@/ui/shared/ErrorBoundary";
 import BattlePanel from "@/ui/panels/BattlePanel";
 import ShipInfoPanel from "@/ui/panels/ShipInfoPanel";
 import MovementPanel from "@/ui/panels/MovementPanel";
@@ -128,6 +129,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const connectedPlayers = Object.values(players).filter((p) => p.connected);
 
 	return (
+		<ErrorBoundary>
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
 			<TopBar
 				onReadyToggle={() => networkManager.setReady()}
@@ -244,6 +246,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				</Dialog.Content>
 			</Dialog.Root>
 		</Box>
+		</ErrorBoundary>
 	);
 };
 

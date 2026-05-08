@@ -1,17 +1,6 @@
 import type { PlayerRole, MovementPhase } from "@vt/data";
 import { create } from "zustand";
-
-export type MoveMode = "forward" | "strafe";
-
-export interface MovementPreviewState {
-	shipId: string;
-	phase: MovementPhase | undefined;
-	mode: MoveMode;
-	value: number;
-	turn: number;
-	remaining: { forward: number; strafe: number; turn: number };
-	directionLocked: boolean;
-}
+import type { MoveMode, MovementPreviewState } from "@/renderer/types";
 
 export type InteractionMode = "IDLE" | "DRAWING_MOVE" | "SELECTING_TARGET" | "DM_OVERRIDING";
 export type CoordinatePrecision = "exact" | "rounded10" | "rounded100";
