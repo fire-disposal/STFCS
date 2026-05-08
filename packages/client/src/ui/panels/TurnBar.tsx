@@ -6,7 +6,7 @@
 
 import React, { useMemo } from "react";
 import { CheckCircle } from "lucide-react";
-import { GamePhase, Faction, FactionLabels, TURN_ORDER } from "@vt/data";
+import { GamePhase } from "@vt/data";
 import type { RoomPlayerState, CombatToken } from "@vt/data";
 import "./turn-bar.css";
 
@@ -30,11 +30,6 @@ const PHASE_LABELS: Record<GamePhase, string> = {
 	SETTLEMENT: "结算中",
 };
 
-const FACTION_SHORT: Record<string, string> = {
-	PLAYER_ALLIANCE: "联",
-	FATE_GRIP: "命",
-};
-
 export const TurnBar: React.FC<TurnBarProps> = ({
 	phase,
 	turnCount,
@@ -48,8 +43,8 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	factions,
 }) => {
 	const factionTrackItems = useMemo(() => {
-		if (!activeFaction) return [];
-		const order = initiativeOrder ?? Object.values(TURN_ORDER);
+		if (!activeFaction || !initiativeOrder) return [];
+		const order = initiativeOrder;
 		const currentIndex = order.indexOf(activeFaction);
 		return order.map((factionId, index) => {
 			const def = factions?.[factionId];
@@ -59,7 +54,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				label: def?.name ?? factionId.slice(factionId.lastIndexOf(":") + 1),
 				color: def?.color ?? "#888",
 			};
-		}) as Array<{ faction: string; status: string; label: string; color: string }>;
+		});
 	}, [activeFaction, initiativeOrder, factions]);
 
 	const readyCount = useMemo(() => 
@@ -91,7 +86,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				{PHASE_LABELS[phase]}
 			</div>
 
-			{phase === GamePhase.PLAYER_ACTION && (
+			{phase !== GamePhase.DEPLOYMENT && (
 				<div className="turn-bar__turn">轮{turnCount}</div>
 			)}
 

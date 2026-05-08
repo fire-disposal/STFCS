@@ -10,7 +10,6 @@
 
 import { z } from "zod"
 import {
-  FactionSchema,
   FactionDefSchema,
   CombatTokenSchema,
   InventoryTokenSchema,
@@ -369,7 +368,7 @@ export const EditTokenDef = {
     path: z.string().optional(),
     value: z.any().optional(),
     amount: z.number().optional(),
-    faction: FactionSchema.optional(),
+    faction: z.string().optional(),
     position: PointSchema.optional(),
     heading: z.number().optional(),
     reason: z.string().optional(),
@@ -388,7 +387,7 @@ export const EditRoomDef = {
     key: z.string().optional(),
     value: z.number().optional(),
     duration: z.number().optional(),
-    faction: FactionSchema.optional(),
+    faction: z.string().optional(),
     factions: z.array(z.string()).optional(),
     initiativeOrder: z.array(z.string()).optional(),
     phase: z.string().optional(),
@@ -408,7 +407,7 @@ export const DeployTokenDef = {
     preset: InventoryTokenSchema,
     position: PointSchema,
     heading: z.number().optional(),
-    faction: FactionSchema.optional(),
+    faction: z.string().optional(),
   }),
   response: z.object({ tokenId: z.string(), displayName: z.string() }),
 } as const satisfies WsEventDef<any, any>

@@ -320,7 +320,7 @@ export const TokenRuntimeSchema = z.object({
 	weapons: z.array(WeaponRuntimeSchema).optional(),
 	modifiers: z.array(TokenModifierSchema).optional(),
 	actionSequence: z.number().default(0),
-	faction: FactionSchema.optional(),
+	faction: z.string().optional(),
 	ownerId: z.string().optional(),
 	venting: z.boolean().optional(),
 	displayName: z.string().optional(),
@@ -389,7 +389,7 @@ export const RoomPlayerStateSchema = z.object({
 	shortId: z.number().optional(),
 	nickname: z.string(),
 	role: PlayerRoleSchema,
-	faction: FactionSchema.optional(),
+	faction: z.string().optional(),
 	isReady: z.boolean().default(false),
 	connected: z.boolean().default(true),
 	tokenIds: z.array(z.string()).optional(),
@@ -532,7 +532,7 @@ export const RoomArchiveMetadataSchema = z.object({
 	maxPlayers: z.number(),
 	playerCount: z.number(),
 	totalTurns: z.number(),
-	winnerFaction: FactionSchema.optional(),
+	winnerFaction: z.string().optional(),
 	gameDuration: z.number(),
 });
 export type RoomArchiveMetadata = z.infer<typeof RoomArchiveMetadataSchema>;

@@ -8,14 +8,14 @@
 
 import type { Socket } from "socket.io";
 import type { Room } from "../rooms/Room.js";
-import type { CombatToken, TokenRuntime, Faction } from "@vt/data";
+import type { CombatToken, TokenRuntime } from "@vt/data";
 
 export type UserRole = "HOST" | "PLAYER";
 
 export interface PermissionContext {
 	playerId: string;
 	role: UserRole;
-	faction?: Faction;
+	faction?: string;
 }
 
 export function getUserRole(socket: Socket, room: Room): UserRole | null {
@@ -99,7 +99,7 @@ export function checkPermission(socket: Socket, room: Room, action: string): boo
 	return true;
 }
 
-export function getTokenFaction(token: CombatToken): Faction | undefined {
+export function getTokenFaction(token: CombatToken): string | undefined {
 	return token.runtime?.faction;
 }
 
@@ -107,7 +107,7 @@ export function isTokenOwnedByPlayer(token: CombatToken, playerId: string): bool
 	return token.runtime?.ownerId === playerId;
 }
 
-export function canPlayerControlFaction(socket: Socket, room: Room, faction: Faction): boolean {
+export function canPlayerControlFaction(socket: Socket, room: Room, faction: string): boolean {
 	if (isHost(socket, room)) return true;
 
 	const playerId = socket.data.playerId;

@@ -24,7 +24,8 @@
 import { screenToWorld } from "@/utils/coordinateSystem";
 import type { ShipRenderOptions } from "../types";
 import type { CombatToken, WeaponRuntime, MountSpec, WeaponSlotSize } from "@vt/data";
-import { Faction, FactionColors, toPixiRotation, nauticalToPixiSectorRotation, mountOffsetToScreen } from "@vt/data";
+import { toPixiRotation, nauticalToPixiSectorRotation, mountOffsetToScreen } from "@vt/data";
+import { getFactionColor } from "@/utils/factionColor";
 import { Circle, Container, type FederatedPointerEvent, Graphics } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
@@ -193,7 +194,7 @@ function updateShipToken(
 ): void {
 	if (!ship.runtime?.position) return;
 
-	const color = FactionColors[ship.runtime.faction ?? Faction.PLAYER_ALLIANCE] ?? 0xcfd8e3;
+	const color = getFactionColor(ship.runtime.faction);
 	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
 	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 
@@ -237,7 +238,7 @@ function createShipToken(
 ): void {
 	if (!ship.runtime?.position) return;
 
-	const color = FactionColors[ship.runtime.faction ?? Faction.PLAYER_ALLIANCE] ?? 0xcfd8e3;
+	const color = getFactionColor(ship.runtime.faction);
 	const halfWidth = (ship.spec.width ?? DEFAULT_WIDTH) / 2;
 	const halfLength = (ship.spec.length ?? DEFAULT_LENGTH) / 2;
 	const hitRadius = Math.max(halfWidth, halfLength) + 10;

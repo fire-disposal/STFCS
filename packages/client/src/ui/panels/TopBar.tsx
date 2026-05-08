@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Settings, LogOut, Flag } from "lucide-react";
 import TurnBar from "./TurnBar";
-import { GamePhase, Faction, FactionColors, FactionLabels, TURN_ORDER } from "@vt/data";
+import { GamePhase } from "@vt/data";
 import type { RoomPlayerState, CombatToken } from "@vt/data";
 import { Avatar } from "@/ui/shared/Avatar";
 import { SaveMenu } from "./SaveMenu";
@@ -31,7 +31,7 @@ interface TopBarProps {
 	onReadyToggle: () => void;
 	onSettings: () => void;
 	onLeave: () => void;
-	onFactionChange?: (playerId: string, faction: Faction) => void;
+	onFactionChange?: (playerId: string, faction: string) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -76,7 +76,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 			</div>
 
 			<div className="top-bar__center">
-				<PlayerAvatars players={players} phase={phase} activeFaction={activeFaction} />
+				<PlayerAvatars players={players} phase={phase} activeFaction={activeFaction} initiativeOrder={gameState?.initiativeOrder ?? []} />
 			</div>
 
 			{/* 舰船状态条 */}
@@ -91,6 +91,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 				<FactionSelector
 					currentFaction={currentFaction}
 					currentPlayerId={playerId}
+					factions={gameState?.factions as Record<string, { name: string; color: string }> ?? {}}
 					onFactionChange={onFactionChange}
 				/>
 				<SaveMenu isHost={isHost} inRoom={inRoom} />
@@ -112,37 +113,39 @@ export const TopBar: React.FC<TopBarProps> = ({
  * 允许玩家为自己选择所属派系
  */
 const FactionSelector: React.FC<{
-	currentFaction: Faction | undefined;
+	currentFaction: string | undefined;
 	currentPlayerId: string | null;
-	onFactionChange?: (playerId: string, faction: Faction) => void;
-}> = ({ currentFaction, currentPlayerId, onFactionChange }) => {
+	factions: Record<string, { name: string; color: string }>;
+	onFactionChange?: (playerId: string, faction: string) => void;
+}> = ({ currentFaction, currentPlayerId, factions, onFactionChange }) => {
 	const [open, setOpen] = useState(false);
 
-	const handleSelect = useCallback((faction: Faction) => {
+	const handleSelect = useCallback((factionId: string) => {
 		if (currentPlayerId && onFactionChange) {
-			onFactionChange(currentPlayerId, faction);
+			onFactionChange(currentPlayerId, factionId);
 		}
 		setOpen(false);
 	}, [currentPlayerId, onFactionChange]);
 
 	if (!currentPlayerId || !onFactionChange) return null;
 
-	const factionOptions = Object.values(Faction) as Faction[];
+	const factionOptions = Object.entries(factions);
+	const currentDef = currentFaction ? factions[currentFaction] : undefined;
 
 	return (
 		<div className="top-bar__faction-selector" style={{ position: "relative" }}>
 			<button
 				className="top-bar__action-btn"
 				onClick={() => setOpen(!open)}
-				title={currentFaction ? `${FactionLabels[currentFaction]}` : "选择派系"}
+				title={currentDef?.name ?? currentFaction ?? "选择派系"}
 				style={{
-					borderColor: currentFaction ? `#${FactionColors[currentFaction].toString(16).padStart(6, "0")}` : undefined,
+					borderColor: currentDef?.color ?? undefined,
 					borderWidth: 1,
 					borderStyle: "solid",
 				}}
 			>
 				<Flag size={16} />
-				{currentFaction ? FactionLabels[currentFaction] : "派系"}
+				{currentDef?.name ?? currentFaction ?? "派系"}
 			</button>
 			{open && (
 				<div
@@ -159,18 +162,18 @@ const FactionSelector: React.FC<{
 						minWidth: 140,
 					}}
 				>
-					{factionOptions.map((faction) => (
+					{factionOptions.map(([factionId, def]) => (
 						<button
-							key={faction}
+							key={factionId}
 							className="top-bar__faction-option"
-							onClick={() => handleSelect(faction)}
+							onClick={() => handleSelect(factionId)}
 							style={{
 								display: "flex",
 								alignItems: "center",
 								gap: 8,
 								width: "100%",
 								padding: "6px 10px",
-								background: currentFaction === faction ? "rgba(74, 158, 255, 0.15)" : "transparent",
+								background: currentFaction === factionId ? "rgba(74, 158, 255, 0.15)" : "transparent",
 								border: "none",
 								borderRadius: 4,
 								color: "#cfe8ff",
@@ -178,18 +181,17 @@ const FactionSelector: React.FC<{
 								fontSize: 12,
 							}}
 							onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74, 158, 255, 0.1)")}
-							onMouseLeave={(e) => (e.currentTarget.style.background = currentFaction === faction ? "rgba(74, 158, 255, 0.15)" : "transparent")}
+							onMouseLeave={(e) => (e.currentTarget.style.background = currentFaction === factionId ? "rgba(74, 158, 255, 0.15)" : "transparent")}
 						>
 							<span
 								style={{
 									width: 10,
 									height: 10,
 									borderRadius: "50%",
-									background: `#${FactionColors[faction].toString(16).padStart(6, "0")}`,
-									display: "inline-block",
+									background: def.color,
 								}}
 							/>
-							{FactionLabels[faction]}
+							{def.name}
 						</button>
 					))}
 				</div>
@@ -202,15 +204,14 @@ const PlayerAvatars: React.FC<{
 	players: Record<string, RoomPlayerState>;
 	phase: GamePhase;
 	activeFaction: string | undefined;
-}> = ({ players, phase, activeFaction }) => {
+	initiativeOrder: string[];
+}> = ({ players, phase, activeFaction, initiativeOrder }) => {
 	const playerList = Object.values(players).filter((p) => p.connected);
 
-	// 按 TURN_ORDER 排序阵营，同阵营内按昵称排序
 	const grouped = useMemo(() => {
 		const result: { faction: string | undefined; players: RoomPlayerState[] }[] = [];
 
-		// 按 TURN_ORDER 顺序处理有派系的玩家
-		for (const faction of TURN_ORDER) {
+		for (const faction of initiativeOrder) {
 			const factionPlayers = playerList
 				.filter((p) => p.faction === faction)
 				.sort((a, b) => a.nickname.localeCompare(b.nickname));
@@ -219,7 +220,6 @@ const PlayerAvatars: React.FC<{
 			}
 		}
 
-		// 无派系玩家放在最后
 		const unaffiliated = playerList
 			.filter((p) => !p.faction)
 			.sort((a, b) => a.nickname.localeCompare(b.nickname));
@@ -258,17 +258,9 @@ const PlayerAvatar: React.FC<{
 	faction?: string;
 	activeFaction: string | undefined;
 }> = ({ player, phase, faction, activeFaction }) => {
-	/**
-	 * 指示灯颜色逻辑：
-	 * - 默认（非 PLAYER_ACTION 阶段）：灰色
-	 * - 当前玩家回合（activeFaction === player.faction）且未准备：蓝色
-	 * - 当前玩家回合（activeFaction === player.faction）且已准备：绿色
-	 * - 不在当前玩家回合（activeFaction !== player.faction）：红色
-	 */
-	const getDotState = (): "default" | "current-not-ready" | "current-ready" | "other-turn" => {
-		if (phase !== "PLAYER_ACTION") return "default";
-		if (!faction) return "default";
-		if (activeFaction === faction) {
+	const getDotState = () => {
+		if (phase !== "PLAYER_ACTION" && phase !== "FACTION_ACTION") return "default";
+		if (activeFaction === player.faction) {
 			return player.isReady ? "current-ready" : "current-not-ready";
 		}
 		return "other-turn";
@@ -324,7 +316,7 @@ const ShipStatusBar: React.FC<{ ship: CombatToken }> = ({ ship }) => {
 
 	const displayName = runtime.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
 	const faction = runtime.faction;
-	const factionColor = faction ? FactionColors[faction] : undefined;
+	const factionColor = faction ? (faction.includes("fate-grip") ? 0xff4a4a : faction.includes("player-alliance") ? 0x4a9eff : undefined) : undefined;
 
 	return (
 		<div className="ship-status-bar">

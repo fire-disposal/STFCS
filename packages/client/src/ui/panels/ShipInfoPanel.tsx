@@ -8,7 +8,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Anchor, Zap, AlertTriangle, Edit2, Check, X, Copy } from "lucide-react";
-import { FactionColors } from "@vt/data";
+import { getFactionColor } from "@/utils/factionColor";
 import { Badge, Box, Flex, Progress, Text, TextField, IconButton } from "@radix-ui/themes";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -91,7 +91,7 @@ export const ShipInfoPanel: React.FC = () => {
 			{/* 列1：舰船名称 + 状态 */}
 			<Box className="battle-col battle-col--fixed">
 				<Box className="battle-col__header">
-					<Box style={{ width: 10, height: 10, borderRadius: "50%", background: faction ? `#${FactionColors[faction]?.toString(16).padStart(6, "0")}` : "#6b8aaa", boxShadow: faction ? `0 0 8px #${FactionColors[faction]?.toString(16).padStart(6, "0")}` : "none", flexShrink: 0 }} />
+					<Box style={{ width: 10, height: 10, borderRadius: "50%", background: `#${getFactionColor(faction ?? undefined).toString(16).padStart(6, "0")}`, boxShadow: faction ? `0 0 8px #${getFactionColor(faction ?? undefined).toString(16).padStart(6, "0")}` : "none", flexShrink: 0 }} />
 					<Text size="1" weight="bold">{displayName}</Text>
 					{isEditingName ? (
 						<Flex align="center" gap="1">
