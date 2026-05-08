@@ -257,7 +257,7 @@ export type SaveActionPayload = z.infer<typeof SaveActionDef.payload>
 
 export const AssetUploadDef = {
   payload: z.object({
-    type: z.enum(["ship_texture", "weapon_texture"]),
+    type: z.enum(["ship_texture", "weapon_texture", "faction_flag"]),
     filename: z.string().min(1).max(255),
     mimeType: z.string(),
     data: z.string(),
