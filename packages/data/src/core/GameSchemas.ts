@@ -152,6 +152,18 @@ export const MetadataSchema = z.object({
 export type Metadata = z.infer<typeof MetadataSchema>;
 
 // ============================================================
+// 派系定义（实体化，替代硬编码枚举）
+// ============================================================
+
+export const FactionDefSchema = z.object({
+	$id: z.string(),
+	name: z.string(),
+	color: z.string(),
+	flagAssetId: z.string().optional(),
+});
+export type FactionDef = z.infer<typeof FactionDefSchema>;
+
+// ============================================================
 // 武器类型
 // ============================================================
 
@@ -472,7 +484,7 @@ export type GameSave = z.infer<typeof GameSaveSchema>;
 // 资产类型（简化：所有资产公开）
 // ============================================================
 
-export const AssetTypeSchema = z.enum(["ship_texture", "weapon_texture"]);
+export const AssetTypeSchema = z.enum(["ship_texture", "weapon_texture", "faction_flag"]);
 export const AssetType = AssetTypeSchema.enum;
 export type AssetType = z.infer<typeof AssetTypeSchema>;
 

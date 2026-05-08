@@ -24,6 +24,7 @@ const logger = createLogger("asset-service");
 const ASSET_TYPE_DIR: Record<AssetType, string> = {
 	ship_texture: "ships",
 	weapon_texture: "weapons",
+	faction_flag: "factions",
 };
 
 // 资产基础目录

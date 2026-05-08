@@ -23,6 +23,7 @@ export type {
 export {
   presetShips,
   presetWeapons,
+  presetFactions,
 } from "./presets/index.js"
 export type { PresetShip, PresetWeapon } from "./presets/index.js"
 

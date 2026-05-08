@@ -92,6 +92,7 @@ export interface AssetLimitsConfig {
 export interface AssetConfig {
 	ship_texture: AssetLimitsConfig;
 	weapon_texture: AssetLimitsConfig;
+	faction_flag: AssetLimitsConfig;
 }
 
 export const DEFAULT_ASSET_CONFIG: AssetConfig = {
@@ -110,6 +111,14 @@ export const DEFAULT_ASSET_CONFIG: AssetConfig = {
 		maxWidth: 256,
 		minHeight: 3,
 		maxHeight: 256,
+	},
+	faction_flag: {
+		allowedMimeTypes: ["image/png"],
+		maxFileSize: 256 * 1024,
+		minWidth: 64,
+		maxWidth: 512,
+		minHeight: 64,
+		maxHeight: 512,
 	},
 };
 
