@@ -11,6 +11,7 @@
 import { z } from "zod"
 import {
   FactionSchema,
+  FactionDefSchema,
   CombatTokenSchema,
   InventoryTokenSchema,
   WeaponJSONSchema,
@@ -381,11 +382,13 @@ export type EditTokenPayload = z.infer<typeof EditTokenDef.payload>
 
 export const EditRoomDef = {
   payload: z.object({
-    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction"]),
+    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction", "set_factions"]),
     key: z.string().optional(),
     value: z.number().optional(),
     duration: z.number().optional(),
     faction: FactionSchema.optional(),
+    factions: z.array(z.string()).optional(),
+    initiativeOrder: z.array(z.string()).optional(),
     phase: z.string().optional(),
     turn: z.number().optional(),
     playerId: z.string().optional(),
@@ -408,6 +411,32 @@ export const DeployTokenDef = {
   response: z.object({ tokenId: z.string(), displayName: z.string() }),
 } as const satisfies WsEventDef<any, any>
 export type DeployTokenPayload = z.infer<typeof DeployTokenDef.payload>
+
+// ============================================================
+// faction 命名空间（派系浏览/CRUD）
+// ============================================================
+
+export const FactionListDef = {
+  payload: z.object({}),
+  response: z.object({ factions: z.array(FactionDefSchema) }),
+} as const satisfies WsEventDef<any, any>
+
+export const FactionGetDef = {
+  payload: z.object({ factionId: z.string() }),
+  response: z.object({ faction: FactionDefSchema.nullable() }),
+} as const satisfies WsEventDef<any, any>
+
+export const EditFactionDef = {
+  payload: z.object({
+    action: z.enum(["create", "update", "delete", "reorder"]),
+    factionId: z.string().optional(),
+    name: z.string().optional(),
+    color: z.string().optional(),
+    flagAssetId: z.string().optional(),
+    initiativeOrder: z.array(z.string()).optional(),
+  }),
+  response: VoidSchema,
+} as const satisfies WsEventDef<any, any>
 
 // ============================================================
 // sync 命名空间（Patch 格式）
@@ -475,6 +504,9 @@ export const WsEventDefinitions = {
   "edit:token": EditTokenDef,
   "edit:room": EditRoomDef,
   "deploy:token": DeployTokenDef,
+  "faction:list": FactionListDef,
+  "faction:get": FactionGetDef,
+  "edit:faction": EditFactionDef,
   "sync:request_full": SyncRequestFullDef,
 } as const satisfies Record<string, WsEventDef<any, any>>
 
