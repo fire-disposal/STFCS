@@ -34,13 +34,6 @@ export interface TurnEndResult {
 	fluxChange: number;
 }
 
-export interface ProcessAllTokensResult {
-	tokensUpdated: string[];
-	fluxChanges: Map<string, { soft: number; hard: number; total: number }>;
-	overloadRecoveries: string[];
-	weaponStateChanges: string[];
-}
-
 export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	const runtime = token.runtime;
 	const initialSoft = Math.round(runtime?.fluxSoft ?? 0);
@@ -176,45 +169,6 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 	// 6. 重置移动状态
 	if (runtime.movement) {
 		result.movementReset = true;
-	}
-
-	return result;
-}
-
-export function processAllTokensTurnEnd(tokens: CombatToken[]): ProcessAllTokensResult {
-	const result: ProcessAllTokensResult = {
-		tokensUpdated: [],
-		fluxChanges: new Map(),
-		overloadRecoveries: [],
-		weaponStateChanges: [],
-	};
-
-	for (const token of tokens) {
-		if (token.runtime?.destroyed) continue;
-
-		const tokenResult = processTokenTurnEnd(token);
-
-		if (tokenResult.fluxDissipated || tokenResult.overloadEnded ||
-			tokenResult.weaponsUpdated || tokenResult.movementReset ||
-			tokenResult.ventingCleared) {
-			result.tokensUpdated.push(token.$id);
-		}
-
-		if (tokenResult.fluxDissipated || tokenResult.ventingCleared) {
-			result.fluxChanges.set(token.$id, {
-				soft: tokenResult.newFluxSoft,
-				hard: tokenResult.newFluxHard,
-				total: tokenResult.newFluxSoft + tokenResult.newFluxHard,
-			});
-		}
-
-		if (tokenResult.overloadEnded) {
-			result.overloadRecoveries.push(token.$id);
-		}
-
-		if (tokenResult.weaponsUpdated) {
-			result.weaponStateChanges.push(token.$id);
-		}
 	}
 
 	return result;

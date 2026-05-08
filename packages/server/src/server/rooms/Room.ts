@@ -372,42 +372,6 @@ advancePhase(): void {
 		this.callbacks.broadcast(message);
 	}
 
-	handlePlayerMessage(playerId: string, message: any): void {
-		if (!this.isActive) return;
-
-		const { type, requestId } = message;
-
-		try {
-			switch (type) {
-				case "TOGGLE_READY":
-					const success = this.togglePlayerReady(playerId);
-					this.callbacks.sendToPlayer(playerId, {
-						type: success ? "TOGGLE_READY_SUCCESS" : "TOGGLE_READY_FAILED",
-						payload: { ready: this.stateManager.getState().players[playerId]?.isReady },
-						requestId,
-					});
-					break;
-				case "START_GAME":
-					if (this.stateManager.getState().phase !== GamePhase.DEPLOYMENT) {
-						this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "GAME_ALREADY_STARTED", message: "游戏已开始" }, requestId });
-						return;
-					}
-					this.startGame();
-					this.callbacks.sendToPlayer(playerId, { type: "START_GAME_SUCCESS", payload: { startedAt: Date.now() }, requestId });
-					break;
-				case "NEXT_TURN":
-					this.advancePhase();
-					this.callbacks.sendToPlayer(playerId, { type: "NEXT_TURN_SUCCESS", payload: { turn: this.stateManager.getState().turnCount }, requestId });
-					break;
-				default:
-					this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "UNKNOWN_COMMAND", message: "未知命令" }, requestId });
-			}
-		} catch (error) {
-			this.logger.error("Error handling player message", error, { playerId, messageType: type });
-			this.callbacks.sendToPlayer(playerId, { type: "ERROR", payload: { code: "COMMAND_ERROR", message: "命令处理失败" }, requestId });
-		}
-	}
-
 	cleanup(): void {
 		if (!this.isActive) return;
 		this.isActive = false;

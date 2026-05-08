@@ -24,4 +24,3 @@ export {
 export { AssetService } from "./AssetService.js";
 export { PlayerInfoService } from "./PlayerInfoService.js";
 export { PlayerProfileService } from "./PlayerProfileService.js";
-export { SimpleObjectCreationService } from "./SimpleObjectCreationService.js";

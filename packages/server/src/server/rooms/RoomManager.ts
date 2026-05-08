@@ -106,12 +106,6 @@ export class RoomManager {
 		return room.disconnectPlayer(playerId);
 	}
 
-	handlePlayerMessage(roomId: string, playerId: string, message: any): void {
-		const room = this.getRoom(roomId);
-		if (!room) return;
-		room.handlePlayerMessage(playerId, message);
-	}
-
 	getAllRooms(): Array<{
 		id: string;
 		name: string;

@@ -265,7 +265,6 @@ export {
 	AssetService,
 	PlayerInfoService,
 	PlayerProfileService,
-	SimpleObjectCreationService,
 } from "./services/index.js";
 
 export { setupSocketIO, createRpcRegistry, type RpcContext } from "./server/socketio/index.js";
