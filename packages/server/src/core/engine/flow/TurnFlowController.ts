@@ -14,7 +14,7 @@
  */
 
 import type { GameRoomState, TokenRuntime, BattleLogEvent } from "@vt/data";
-import { TURN_ORDER, GamePhase, createBattleLogEvent } from "@vt/data";
+import { GamePhase, createBattleLogEvent } from "@vt/data";
 import { processTokenTurnEnd, type TurnEndResult } from "../rules/turnEnd.js";
 
 export interface TurnAdvanceResult {
@@ -42,12 +42,10 @@ export interface PhaseChangeResult {
 /**
  * 计算回合推进结果（纯函数）
  *
- * 新流程：
+ * 流程：
  *   DEPLOYMENT → FACTION_ACTION (initiativeOrder[0])
  *   FACTION_ACTION → FACTION_ACTION (next) 或 SETTLEMENT (last)
  *   SETTLEMENT → FACTION_ACTION (initiativeOrder[0], turn++)
- *
- * 向后兼容：无 initiativeOrder 时回退到旧 TURN_ORDER 逻辑
  */
 export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	const currentPhase = state.phase;
@@ -55,20 +53,12 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	const order = state.initiativeOrder;
 
 	if (currentPhase === GamePhase.DEPLOYMENT) {
-		if (order && order.length > 0) {
-			return {
-				newPhase: GamePhase.FACTION_ACTION,
-				newFaction: order[0],
-				turnIncremented: true,
-				newTurnCount: 1,
-				settlementNeeded: false,
-				valid: true,
-			};
+		if (!order || order.length === 0) {
+			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
 		}
-		// 向后兼容：无 initiativeOrder 时用旧逻辑
 		return {
-			newPhase: GamePhase.PLAYER_ACTION,
-			newFaction: TURN_ORDER[0],
+			newPhase: GamePhase.FACTION_ACTION,
+			newFaction: order[0],
 			turnIncremented: true,
 			newTurnCount: 1,
 			settlementNeeded: false,
@@ -85,7 +75,6 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 		const nextIdx = currentIdx + 1;
 
 		if (nextIdx >= order.length) {
-			// 最后一个派系 → 进入结算
 			return {
 				newPhase: GamePhase.SETTLEMENT,
 				newFaction: undefined,
@@ -96,7 +85,6 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 			};
 		}
 
-		// 下一个派系
 		return {
 			newPhase: GamePhase.FACTION_ACTION,
 			newFaction: order[nextIdx],
@@ -108,32 +96,15 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	}
 
 	if (currentPhase === GamePhase.SETTLEMENT) {
-		if (order && order.length > 0) {
-			return {
-				newPhase: GamePhase.FACTION_ACTION,
-				newFaction: order[0],
-				turnIncremented: true,
-				newTurnCount: currentTurn + 1,
-				settlementNeeded: false,
-				valid: true,
-			};
+		if (!order || order.length === 0) {
+			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
 		}
-		return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
-	}
-
-	// 向后兼容：PLAYER_ACTION 旧逻辑
-	if (currentPhase === GamePhase.PLAYER_ACTION) {
-		const currentFaction = state.activeFaction;
-		const currentIndex = currentFaction ? TURN_ORDER.indexOf(currentFaction as any) : -1;
-		const nextIndex = currentIndex + 1;
-		const incrementTurn = nextIndex >= TURN_ORDER.length;
-
 		return {
-			newPhase: GamePhase.PLAYER_ACTION,
-			newFaction: incrementTurn ? TURN_ORDER[0] : TURN_ORDER[nextIndex],
-			turnIncremented: incrementTurn,
-			newTurnCount: incrementTurn ? currentTurn + 1 : currentTurn,
-			settlementNeeded: incrementTurn,
+			newPhase: GamePhase.FACTION_ACTION,
+			newFaction: order[0],
+			turnIncremented: true,
+			newTurnCount: currentTurn + 1,
+			settlementNeeded: false,
 			valid: true,
 		};
 	}

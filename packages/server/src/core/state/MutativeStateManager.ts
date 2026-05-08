@@ -27,7 +27,7 @@ import type {
 	Faction,
 	EditLogContext,
 } from "@vt/data"
-import { TURN_ORDER, GamePhase } from "@vt/data"
+import { GamePhase } from "@vt/data"
 import type { TurnAdvanceResult } from "../engine/flow/TurnFlowController.js"
 
 export interface MutateResult {
@@ -558,14 +558,9 @@ export class MutativeStateManager {
 	/**
 	 * 根据阶段获取当前活跃派系
 	 * FACTION_ACTION: 从 initiativeOrder 读取
-	 * PLAYER_ACTION (旧): 使用 TURN_ORDER 循环
 	 * 其他阶段无派系
 	 */
 	private getFactionForPhase(phase: GamePhase): string | undefined {
-		if (phase === GamePhase.PLAYER_ACTION) {
-			const factionIndex = (this.state.turnCount - 1) % TURN_ORDER.length;
-			return TURN_ORDER[factionIndex] as string;
-		}
 		if (phase === GamePhase.FACTION_ACTION) {
 			return this.state.initiativeOrder?.[this.state.initiativeIndex ?? 0];
 		}
@@ -644,14 +639,9 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			draft.turnCount = 1;
 			const order = draft.initiativeOrder;
-			if (order && order.length > 0) {
-				draft.phase = GamePhase.FACTION_ACTION;
-				draft.activeFaction = order[0];
-				draft.initiativeIndex = 0;
-			} else {
-				draft.phase = GamePhase.PLAYER_ACTION;
-				draft.activeFaction = TURN_ORDER[0] as any;
-			}
+			draft.phase = GamePhase.FACTION_ACTION;
+			draft.activeFaction = order?.[0];
+			draft.initiativeIndex = 0;
 		})
 	}
 

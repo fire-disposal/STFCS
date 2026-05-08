@@ -2,7 +2,7 @@
  * room namespace handlers — 房间创建/列表/加入/离开/操作/删除
  */
 import { err } from "./err.js";
-import { ErrorCodes, PlayerRole, TURN_ORDER, createBattleLogEvent } from "@vt/data";
+import { ErrorCodes, PlayerRole, createBattleLogEvent } from "@vt/data";
 import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
@@ -189,7 +189,7 @@ export const roomHandlers = {
                 ctx.state.startGame();
                 ctx.state.resetAllPlayersReady();
                 ctx.state.appendLog(createBattleLogEvent("game_started", {
-                    firstFaction: TURN_ORDER[0],
+                    firstFaction: ctx.state.getState().initiativeOrder?.[0] ?? "unknown",
                 }));
                 return;
             case "kick":

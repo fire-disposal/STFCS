@@ -8,7 +8,6 @@ import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
 import { GamePhase, Faction } from "@vt/data";
-import { executeTurnAdvance } from "../../core/engine/flow/TurnFlowController.js";
 
 export interface RoomOptions {
 	roomName: string;
@@ -246,32 +245,6 @@ export class Room {
 		this.callbacks.broadcast({
 			type: "ALL_READY_STATUS",
 			payload: { allReady, playerCount: playerList.length, readyCount: playerList.filter(p => p?.isReady).length },
-		});
-	}
-
-	startGame(): void {
-		this.stateManager.changeTurn(1);
-		this.stateManager.changePhase(GamePhase.PLAYER_ACTION);
-		this.stateManager.resetAllPlayersReady();
-		this.logger.info("Game started");
-
-		this.callbacks.broadcast({
-			type: "GAME_STARTED",
-			payload: { startedAt: Date.now(), turn: 1, activeFaction: Faction.PLAYER_ALLIANCE },
-		});
-	}
-
-advancePhase(): void {
-		const state = this.stateManager.getState();
-		const result = executeTurnAdvance(state);
-
-		this.stateManager.applyTurnAdvanceResult(result);
-
-		// 广播回合变更
-		const newState = this.stateManager.getState();
-		this.callbacks.broadcast({
-			type: "TURN_CHANGED",
-			payload: { turn: newState.turnCount, activeFaction: newState.activeFaction, phase: newState.phase, changedAt: Date.now() },
 		});
 	}
 

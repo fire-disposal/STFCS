@@ -2,7 +2,7 @@
  * deploy namespace handlers — 舰船部署（从预设创建实例）
  */
 import { err } from "./err.js";
-import { Faction, ErrorCodes, findCollidingShips, createBattleLogEvent } from "@vt/data";
+import { ErrorCodes, findCollidingShips, createBattleLogEvent } from "@vt/data";
 import type { WsPayload, WsResponseData, CombatToken } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { generateShortId } from "../../utils/shortId.js";
@@ -39,7 +39,8 @@ export const deployHandlers = {
             throw err("部署位置与现有舰船碰撞", ErrorCodes.DEPLOY_COLLISION);
         }
 
-        const deployFaction = p.faction ?? Faction.PLAYER_ALLIANCE;
+        const defaultFaction = room.getStateManager().getState().initiativeOrder?.[0] ?? "preset:faction:player-alliance";
+        const deployFaction = p.faction ?? defaultFaction;
 
         const createToken: CombatToken = {
             $id: tokenId,
