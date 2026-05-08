@@ -24,6 +24,7 @@ import {
     type InventoryToken,
     type WeaponJSON,
     type Texture,
+    type WeaponTag,
 } from "@vt/data";
 import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
@@ -1454,8 +1455,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             <Badge key={tag} size="1">{tag}</Badge>
                                                         ))}
                                                         <Select.Root onValueChange={(v) => {
-                                                            if (v && !weaponDraft.spec.tags?.includes(v)) {
-                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v]; });
+                                                            const tag = v as WeaponTag;
+                                                            if (tag && !weaponDraft.spec.tags?.includes(tag)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), tag]; });
                                                             }
                                                         }}>
                                                             <Select.Trigger placeholder="添加标签" />
@@ -1703,8 +1705,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             <Badge key={tag} size="1">{tag}</Badge>
                                                         ))}
                                                         <Select.Root onValueChange={(v) => {
-                                                            if (v && !weaponDraft.spec.tags?.includes(v)) {
-                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), v]; });
+                                                            const tag = v as WeaponTag;
+                                                            if (tag && !weaponDraft.spec.tags?.includes(tag)) {
+                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), tag]; });
                                                             }
                                                         }}>
                                                             <Select.Trigger placeholder="添加标签" />
