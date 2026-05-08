@@ -65,7 +65,7 @@ export function useGameAction() {
 		sendGameAction("vent", tokenId), [sendGameAction]);
 
 	const sendEditToken = useCallback(async (
-		action: "create" | "modify" | "remove" | "heal" | "damage" | "restore" | "reset" | "rename",
+		action: "modify" | "remove" | "heal" | "damage" | "restore" | "reset" | "rename",
 		tokenId?: string,
 		extra: Record<string, unknown> = {},
 	): Promise<boolean> => {

@@ -31,7 +31,7 @@ export const editHandlers = {
             }
             case "heal": {
                 if (!p.tokenId) throw err("需要 tokenId", ErrorCodes.TOKEN_ID_REQUIRED);
-                if (!p.amount) throw err("需要 amount", ErrorCodes.AMOUNT_REQUIRED);
+                if (p.amount == null) throw err("需要 amount", ErrorCodes.AMOUNT_REQUIRED);
                 const token = room.getCombatToken(p.tokenId);
                 if (!token) throw err("舰船不存在", ErrorCodes.TOKEN_NOT_FOUND);
                 const newHull = Math.min(token.spec.maxHitPoints, (token.runtime?.hull ?? 0) + p.amount);
@@ -40,7 +40,7 @@ export const editHandlers = {
             }
             case "damage": {
                 if (!p.tokenId) throw err("需要 tokenId", ErrorCodes.TOKEN_ID_REQUIRED);
-                if (!p.amount) throw err("需要 amount", ErrorCodes.AMOUNT_REQUIRED);
+                if (p.amount == null) throw err("需要 amount", ErrorCodes.AMOUNT_REQUIRED);
                 const token = room.getCombatToken(p.tokenId);
                 if (!token) throw err("舰船不存在", ErrorCodes.TOKEN_NOT_FOUND);
                 const newHull = Math.max(0, (token.runtime?.hull ?? 0) - p.amount);
@@ -109,7 +109,7 @@ export const editHandlers = {
         switch (p.action) {
             case "set_modifier": {
                 if (!p.key) throw err("需要 key", ErrorCodes.KEY_REQUIRED);
-                if (!p.value) throw err("需要 value", ErrorCodes.VALUE_REQUIRED);
+                if (p.value == null) throw err("需要 value", ErrorCodes.VALUE_REQUIRED);
                 ctx.state.setGlobalModifier(p.key, p.value);
                 return;
             }
@@ -140,7 +140,7 @@ export const editHandlers = {
                 return;
             }
             case "set_turn": {
-                if (!p.turn) throw err("需要 turn", ErrorCodes.TURN_REQUIRED);
+                if (p.turn == null) throw err("需要 turn", ErrorCodes.TURN_REQUIRED);
                 ctx.state.changeTurn(p.turn);
                 return;
             }

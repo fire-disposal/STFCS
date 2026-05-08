@@ -64,7 +64,7 @@ rpc.namespace("profile", {
     const result = await playerInfoService.findByPlayerId(ctx.playerId);
     if (!result) throw err("玩家信息不存在", ErrorCodes.PROFILE_NOT_FOUND);
     const info = result.file.info;
-    return { profile: { playerId: info.playerId, nickname: info.displayName, avatar: info.avatar } };
+    return { profile: { playerId: info.playerId, nickname: info.displayName, avatar: info.avatar ?? null } };
   },
   update: async (payload: unknown, ctx) => {
     ctx.requireAuth();
@@ -86,7 +86,7 @@ rpc.namespace("profile", {
       }
     }
 
-    return { profile: { playerId: updated.playerId, nickname: updated.displayName, avatar: updated.avatar } };
+    return { profile: { playerId: updated.playerId, nickname: updated.displayName, avatar: updated.avatar ?? null } };
   },
 });
 

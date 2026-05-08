@@ -2,6 +2,8 @@
  * faction handlers — 派系查询 + CRUD
  */
 import type { WsPayload } from "@vt/data";
+import { ErrorCodes } from "@vt/data";
+import { err } from "./err.js";
 import type { RpcContext } from "../RpcServer.js";
 
 export const factionHandlers = {
@@ -43,7 +45,7 @@ export const editFactionHandlers = {
         const p = payload as WsPayload<"edit:faction:update">;
         const state = ctx.state.getState();
         const faction = state.factions?.[p.factionId];
-        if (!faction) throw new Error("派系不存在");
+        if (!faction) throw err("派系不存在", ErrorCodes.TOKEN_NOT_FOUND);
 
         ctx.state.mutateAndBroadcast((draft: any) => {
             if (draft.factions?.[p.factionId]) {
@@ -57,7 +59,7 @@ export const editFactionHandlers = {
     delete: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
         const p = payload as WsPayload<"edit:faction:delete">;
-        if (p.factionId.startsWith("preset:")) throw new Error("预设派系不可删除");
+        if (p.factionId.startsWith("preset:")) throw err("预设派系不可删除", ErrorCodes.PRESET_NOT_FOUND);
 
         ctx.state.mutateAndBroadcast((draft: any) => {
             if (draft.factions) delete draft.factions[p.factionId];

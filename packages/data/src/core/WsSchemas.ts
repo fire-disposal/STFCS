@@ -383,13 +383,10 @@ export type EditTokenPayload = z.infer<typeof EditTokenDef.payload>
 
 export const EditRoomDef = {
   payload: z.object({
-    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction", "set_factions"]),
+    action: z.enum(["set_modifier", "remove_modifier", "force_end_turn", "set_phase", "set_turn", "set_faction"]),
     key: z.string().optional(),
     value: z.number().optional(),
-    duration: z.number().optional(),
     faction: z.string().optional(),
-    factions: z.array(z.string()).optional(),
-    initiativeOrder: z.array(z.string()).optional(),
     phase: z.string().optional(),
     turn: z.number().optional(),
     playerId: z.string().optional(),
