@@ -190,6 +190,14 @@ export class MutativeStateManager {
 		})
 	}
 
+	appendLogs(entries: BattleLogEvent[]): void {
+		if (entries.length === 0) return;
+		this.mutateAndBroadcast((draft) => {
+			if (!draft.logs) draft.logs = []
+			draft.logs.push(...entries)
+		})
+	}
+
 	/**
 	 * 广播编辑日志变更。
 	 * 只记录 tokens/** 下的变更，生成 BattleLogEdit 事件。
