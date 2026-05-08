@@ -31,8 +31,8 @@ import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
 import { getGameActionSender } from "@/state/stores/gameStore";
-import MiniShipPreview from "./MiniShipPreview";
-import MiniWeaponPreview from "./MiniWeaponPreview";
+import MiniShipPreview from "../shared/MiniShipPreview";
+import MiniWeaponPreview from "../shared/MiniWeaponPreview";
 import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
 import "./ship-customization-modal.css";
 

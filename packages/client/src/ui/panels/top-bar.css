@@ -85,16 +85,6 @@
 	margin: 0 4px;
 }
 
-/* ===== 舰船状态条 ===== */
-
-.top-bar__ship-status {
-	display: flex;
-	align-items: center;
-	gap: 16px;
-	margin-left: 20px;
-	margin-right: 20px;
-	flex-shrink: 0;
-}
 
 .ship-status-bar {
 	display: flex;
