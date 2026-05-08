@@ -14,6 +14,7 @@ import { createEngineEvent } from "../context.js";
 import { calculateWeaponAttack } from "../rules/weapon.js";
 import { calculateDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
+import { validateAttackAllocations } from "../rules/targeting.js";
 import { angleBetween, distanceBetween } from "@vt/data";
 
 export interface WeaponAllocation {
@@ -48,6 +49,15 @@ export function applyCombat(context: EngineContext): EngineResult {
       }),
     };
   });
+
+  const validation = validateAttackAllocations(ship, allocations);
+  if (!validation.valid) {
+    return {
+      runtimeUpdates: [],
+      events: [],
+      error: { code: "ATTACK_INVALID", message: validation.errors.join("; ") },
+    };
+  }
 
   const attackerSpec = ship.spec;
   const attackerRuntime = ship.runtime;
