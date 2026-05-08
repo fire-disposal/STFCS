@@ -166,16 +166,108 @@ Room 加入时 DM 选择：
 
 ---
 
-## 五、实现阶段
+## 六、Faction 上传 API
+
+### 6.1 Asset 上传扩展
+
+现有 `asset:upload` 接口扩展支持 `faction_flag`：
+
+```typescript
+// asset:upload payload
+{
+    type: "faction_flag",
+    filename: string,
+    mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+    buffer: Uint8Array,
+}
+
+// response
+{
+    assetId: string,
+    info: Asset,
+}
+```
+
+**服务端处理：**
+- 接收上传后标准化为统一方形尺寸（如 128x128）
+- 存储到 `storage/assets/faction_flag/{assetId}.png`
+- 更新 `index.json`
+
+### 6.2 Asset 查询扩展
+
+- `asset:list` 支持 `type: "faction_flag"` 过滤
+- faction_flag 为全局资产，所有玩家可见可用
+
+---
+
+## 七、局内 Faction CRUD
+
+### 7.1 预设浏览
+
+```
+faction:list → 返回全局 preset + 本局自定义 faction
+faction:get { factionId } → 返回单个 faction 定义
+```
+
+### 7.2 DM 创建/编辑/删除
+
+命名空间：`edit:faction`
+
+| Action | Payload | 说明 |
+|--------|---------|------|
+| `create` | `{ name, color, flagAssetId? }` | 创建自定义 faction，写入 `state.factions` |
+| `update` | `{ factionId, name?, color?, flagAssetId? }` | 更新已有 faction |
+| `delete` | `{ factionId }` | 删除自定义 faction（预设不可删） |
+| `reorder` | `{ initiativeOrder: string[] }` | 调整先攻顺序（仅 SETTLEMENT 期间有效） |
+
+### 7.3 Room 设置
+
+```typescript
+// room:action
+{
+    action: "set_factions",
+    factions: string[],          // 本局参与的 faction $id 列表
+    initiativeOrder: string[],   // 先攻排序
+}
+```
+
+初始化时从预设加载，DM 后续可调整。
+
+### 7.4 权限控制
+
+| 操作 | 权限 |
+|------|------|
+| `faction:list` / `faction:get` | 所有玩家 |
+| `edit:faction:create/update/delete` | 仅 DM |
+| `room:action set_factions` | 仅 DM |
+
+---
+
+## 八、Flag 渲染
+
+### client 端
+
+- `useTextureLoader` 扩展支持 `faction_flag` 类型加载
+- Flag 作为 PixiJS Sprite 渲染，方形，无旋转偏移
+- 渲染位置：TopBar 派系标签旁 / DM 面板 faction 卡片中 / token HUD 旁
+
+### 回退
+
+- 无 flagAssetId 时：以 faction.color 纯色方块替代
+
+---
+
+## 九、更新后的实现阶段
 
 | 序号 | 提交 | 范围 |
 |------|------|------|
-| 1 | 新增 FactionDefSchema + 内置预设 + AssetType 扩展 | data |
-| 2 | Phase 枚举改为三阶段 + GameRoomState 新增字段 | data |
-| 3 | TurnFlowController + MutativeStateManager 适配新 phase | server |
-| 4 | game/edit/room handler 适配 | server |
-| 5 | 删除旧 dead code + 清理 | server |
-| 6 | preset 验证扩展 | data |
-| 7 | DM 控制面板 + TurnBar/TopBar 适配 | client |
-| 8 | 存档迁移逻辑 | server |
-| 9 | faction flag 上传/加载 | server + client |
+| 1 | 新增 FactionDefSchema + 内置预设 JSON + AssetType 扩展 | data |
+| 2 | Phase 枚举改为三阶段 + GameRoomState 新增 factions/initiativeOrder/initiativeIndex | data |
+| 3 | WsSchemas: 新增 faction:list/get + edit:faction:* + room:action set_factions | data |
+| 4 | preset 验证扩展 + presetShips token.faction 字段适配 | data |
+| 5 | TurnFlowController + MutativeStateManager 适配新 phase | server |
+| 6 | game/edit/room handler 适配 + faction CRUD handler | server |
+| 7 | asset:upload 支持 faction_flag（含方形标准化） | server |
+| 8 | 删除旧 dead code + 存档迁移 | server |
+| 9 | faction flag 加载/渲染 + useTextureLoader 扩展 | client |
+| 10 | DM 控制面板 + TurnBar/TopBar 适配 | client |
