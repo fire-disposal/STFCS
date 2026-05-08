@@ -119,9 +119,21 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	if (!gameState || !roomId) {
 		return (
-			<Box style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
-				<Text color="gray">连接中...</Text>
-				<Text size="1" color="gray">{networkManager.getCurrentRoomId() ? "同步状态..." : "等待房间..."}</Text>
+			<Box style={{
+				height: "100vh", display: "flex", flexDirection: "column",
+				alignItems: "center", justifyContent: "center", gap: 16,
+				background: "#0a0e14",
+			}}>
+				<div style={{
+					width: 48, height: 48,
+					border: "2px solid rgba(74, 158, 255, 0.2)",
+					borderTopColor: "rgba(74, 158, 255, 0.7)",
+					borderRadius: "50%",
+					animation: "spin 1s linear infinite",
+				}} />
+				<Text size="2" style={{ color: "#6b8aaa" }}>
+					{networkManager.getCurrentRoomId() ? "同步状态..." : "等待房间..."}
+				</Text>
 			</Box>
 		);
 	}
