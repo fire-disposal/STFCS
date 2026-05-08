@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from "react";
-import { ChevronDown, Users, UserX, Plus, Minus, FastForward, Play } from "lucide-react";
+import { ChevronDown, Users, UserX, Plus, Minus, FastForward, Play, ChevronUp } from "lucide-react";
 import { Button, Flex, Text, Badge, DropdownMenu, Card, Separator } from "@radix-ui/themes";
 import type { SocketNetworkManager } from "@/network";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -63,6 +63,14 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
         }
     };
 
+    const handleMoveFaction = async (index: number, direction: 1 | -1) => {
+        const order = [...initiativeOrder];
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= order.length) return;
+        [order[index], order[targetIndex]] = [order[targetIndex], order[index]];
+        await send("edit:faction", { action: "reorder", initiativeOrder: order });
+    };
+
     const factions = gameState?.factions ?? {};
     const initiativeOrder = gameState?.initiativeOrder ?? [];
     const currentIdx = activeFaction ? initiativeOrder.indexOf(activeFaction) : -1;
@@ -117,11 +125,35 @@ export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
                                     background: isActive ? "rgba(74,158,255,0.12)" : "transparent",
                                     opacity: done ? 0.45 : 1,
                                 }}>
-                                    <Text size="1" color="gray" style={{ width: 16, textAlign: "center" }}>{idx + 1}</Text>
+                                    <Text size="1" color="gray" style={{ width: 14, textAlign: "center" }}>{idx + 1}</Text>
                                     <span style={{ width: 10, height: 10, borderRadius: 2, background: def?.color ?? "#888", flexShrink: 0 }} />
                                     <Text size="1" style={{ flex: 1, fontWeight: isActive ? 700 : 400 }}>
                                         {def?.name ?? fid}
                                     </Text>
+                                    <Flex direction="column" gap="0">
+                                        <button
+                                            onClick={() => handleMoveFaction(idx, -1)}
+                                            disabled={idx === 0}
+                                            style={{
+                                                border: "none", background: "transparent", color: idx === 0 ? "#333" : "#6b8aaa",
+                                                cursor: idx === 0 ? "default" : "pointer", padding: 0, lineHeight: 1,
+                                                display: "flex",
+                                            }}
+                                        >
+                                            <ChevronUp size={10} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleMoveFaction(idx, 1)}
+                                            disabled={idx === initiativeOrder.length - 1}
+                                            style={{
+                                                border: "none", background: "transparent", color: idx === initiativeOrder.length - 1 ? "#333" : "#6b8aaa",
+                                                cursor: idx === initiativeOrder.length - 1 ? "default" : "pointer", padding: 0, lineHeight: 1,
+                                                display: "flex",
+                                            }}
+                                        >
+                                            <ChevronDown size={10} />
+                                        </button>
+                                    </Flex>
                                     {isActive && <Badge size="1" color="blue">◀</Badge>}
                                 </Flex>
                             );
