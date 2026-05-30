@@ -305,6 +305,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		<div ref={hostRef} id="game-canvas-host" className="game-map-container" style={{ width: "100%", height: "100%" }}>
 			<Application
 				resizeTo={hostRef}
+				resolution={window.devicePixelRatio || 1}
 				autoDensity
 				antialias
 				background={0x06101a}
