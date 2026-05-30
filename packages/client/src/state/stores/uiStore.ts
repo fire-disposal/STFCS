@@ -1,6 +1,6 @@
-import type { PlayerRole, MovementPhase } from "@vt/data";
+import type { PlayerRole } from "@vt/data";
 import { create } from "zustand";
-import type { MoveMode, MovementPreviewState } from "@/renderer/types";
+import type { MovementPreviewState } from "@/renderer/types";
 
 export type InteractionMode = "IDLE" | "DRAWING_MOVE" | "SELECTING_TARGET" | "DM_OVERRIDING";
 export type CoordinatePrecision = "exact" | "rounded10" | "rounded100";
@@ -67,6 +67,8 @@ interface UIState {
 
 	movementPreview: MovementPreviewState | null;
 	shieldDirectionPreview: Record<string, number | undefined>;
+	overlayMode: "none" | "pen" | "arrow" | "ping" | "note";
+	overlayColor: string;
 }
 
 interface UIActions {
@@ -112,6 +114,8 @@ interface UIActions {
 
 	setMovementPreview: (preview: MovementPreviewState | null) => void;
 	setShieldDirectionPreview: (shipId: string, direction: number | undefined) => void;
+	setOverlayMode: (mode: "none" | "pen" | "arrow" | "ping" | "note") => void;
+	setOverlayColor: (color: string) => void;
 }
 
 const DEFAULT_TOGGLES = {
@@ -172,6 +176,8 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	movementPreview: null,
 	shieldDirectionPreview: {},
+	overlayMode: "none",
+	overlayColor: "#FF6B6B",
 
 	setConnected: (connected) => set({ isConnected: connected }),
 	setConnectionError: (error) => set({ connectionError: error }),
@@ -220,4 +226,6 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 
 	setShieldDirectionPreview: (shipId, direction) =>
 		set((s) => ({ shieldDirectionPreview: { ...s.shieldDirectionPreview, [shipId]: direction } })),
+	setOverlayMode: (mode) => set({ overlayMode: mode }),
+	setOverlayColor: (color) => set({ overlayColor: color }),
 }));

@@ -13,6 +13,7 @@ import { playerInfoService, playerProfileService, presetService, assetService } 
 import { PlayerRole, ErrorCodes } from "@vt/data";
 import type { WsPayload, PlayerInfo } from "@vt/data";
 import { generateShortId } from "../utils/shortId.js";
+import { overlayRelay } from "./overlay.js";
 
 export const rpc = createRpcRegistry();
 
@@ -253,11 +254,19 @@ export function setupSocketIO(io: any, roomManager: any): void {
       console.log(`[RoomManager] Auto-saved room ${roomId} (tokens: ${tokenCount}, turns: ${gameState.turnCount}) to creator ${creatorId}`);
     }
 
+    overlayRelay.removeRoom(roomId);
     io.emit("room:list_updated", { action: "removed", roomId });
   });
 
   io.on("connection", (socket: any) => {
     middleware(socket, io, roomManager);
+
+    socket.on("overlay_send", (data: { roomId: string; type: string; payload: unknown }) => {
+      if (!data.roomId) return;
+      const senderId = socket.data.playerId;
+      if (!senderId) return;
+      overlayRelay.handle(io, socket, data.roomId, senderId, data.type, data.payload);
+    });
 
     socket.on("disconnect", () => {
       const sd = socket.data as { playerId?: string; roomId?: string; role?: string };

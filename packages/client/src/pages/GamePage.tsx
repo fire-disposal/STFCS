@@ -20,7 +20,7 @@ import {
 	Separator,
 } from "@radix-ui/themes";
 import { Crown, Settings, Users, CheckCircle, XCircle, Info, Move, Crosshair, Shield } from "lucide-react";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import type { SocketNetworkManager } from "@/network";
 import { ErrorBoundary } from "@/ui/shared/ErrorBoundary";
 import BattlePanel from "@/ui/panels/BattlePanel";
@@ -33,6 +33,11 @@ import RightSidebar from "@/ui/panels/RightSidebar";
 import { useGameAction } from "@/hooks/useGameAction";
 import { Avatar } from "@/ui/shared/Avatar";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
+import { OverlayClient } from "@/network/OverlayClient";
+import type { OverlayHandlers } from "@/renderer/core/PixiCanvas";
+import { OverlayToolbar } from "@/ui/panels/OverlayToolbar";
+import { PLAYER_OVERLAY_COLORS } from "@vt/data";
+import { screenToWorld } from "@/utils/coordinateSystem";
 import "@/ui/panels/room-player-list.css";
 
 interface GamePageProps {
@@ -46,6 +51,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
 	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
+	const overlayClientRef = useRef<OverlayClient | null>(null);
+	const [overlayHandlers, setOverlayHandlers] = useState<OverlayHandlers | null>(null);
+	const overlayHandlersRef = useRef<OverlayHandlers | null>(null);
+	overlayHandlersRef.current = overlayHandlers;
 
 	const socket = networkManager.getSocket();
 	const assetSocket = useAssetSocket(socket);
@@ -57,6 +66,45 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			socket.off("response", assetSocket.handleResponse);
 		};
 	}, [socket, assetSocket.handleResponse]);
+
+	const gameState = useGameState();
+	const players = useGamePlayers();
+	const roomId = useGameRoomId();
+	const playerId = useGamePlayerId();
+
+	React.useEffect(() => {
+		if (!socket || !roomId || !playerId) return;
+		const client = new OverlayClient();
+		client.init(socket, roomId, playerId);
+		overlayClientRef.current = client;
+
+		const onPush = (type: string, payload: any) => {
+			const h = overlayHandlersRef.current;
+			if (!h) return;
+			switch (type) {
+				case "cursor": h.onCursor(payload); break;
+				case "ping": h.onPing(payload); break;
+				case "ping_remove": h.onPingRemove(payload); break;
+				case "draw_stream": h.onDrawStream(payload); break;
+				case "draw_commit": h.onDrawCommit(payload); break;
+				case "note": h.onNote(payload); break;
+				case "viewport": h.onViewport(payload); break;
+				case "clear": h.onClearDrawings(payload); h.onClearNotes(payload); break;
+			}
+		};
+		const onSync = (sync: any) => {
+			const h = overlayHandlersRef.current;
+			if (!h) return;
+			for (const d of sync.drawings ?? []) h.onDrawCommit(d);
+			for (const n of sync.notes ?? []) h.onNote(n);
+			for (const v of sync.viewports ?? []) h.onViewport(v);
+			for (const p of sync.pings ?? []) h.onPing(p);
+		};
+		client.subscribePush(onPush);
+		client.subscribeSync(onSync);
+
+		return () => { client.destroy(); overlayClientRef.current = null; };
+	}, [socket, roomId, playerId]);
 
 	const hpPerBar = useUIStore((state) => state.hpPerBar);
 	const setHpPerBar = useUIStore((state) => state.setHpPerBar);
@@ -74,11 +122,55 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		return () => document.removeEventListener("contextmenu", handleContextMenu);
 	}, [suppressContextMenu]);
 
-	// 仅保留 GamePage 自身需要的数据，不再为子组件抽取 props
-	const gameState = useGameState();
-	const players = useGamePlayers();
-	const roomId = useGameRoomId();
-	const playerId = useGamePlayerId();
+	React.useEffect(() => {
+		if (!overlayClientRef.current || !playerId) return;
+		const interval = setInterval(() => {
+			const cam = useUIStore.getState();
+			const idx = Object.keys(players ?? {}).indexOf(playerId);
+			const color = PLAYER_OVERLAY_COLORS[idx >= 0 ? (idx % PLAYER_OVERLAY_COLORS.length) : 0];
+			overlayClientRef.current?.sendViewport(
+				cam.cameraPosition.x, cam.cameraPosition.y,
+				cam.zoom, cam.viewRotation,
+				window.innerWidth, window.innerHeight, color
+			);
+		}, 200);
+		return () => clearInterval(interval);
+	}, [players, playerId]);
+
+	React.useEffect(() => {
+		const host = document.getElementById("game-canvas-host");
+		if (!host || !playerId) return;
+		const idx = Object.keys(players ?? {}).indexOf(playerId);
+		const color = PLAYER_OVERLAY_COLORS[idx >= 0 ? (idx % PLAYER_OVERLAY_COLORS.length) : 0];
+
+		const onMove = (e: MouseEvent) => {
+			if (!overlayClientRef.current) return;
+			const rect = host.getBoundingClientRect();
+			const sx = e.clientX - rect.left - rect.width / 2;
+			const sy = e.clientY - rect.top - rect.height / 2;
+			const cam = useUIStore.getState();
+			const wp = screenToWorld(sx, sy, cam.zoom, cam.cameraPosition.x, cam.cameraPosition.y, cam.viewRotation);
+			overlayClientRef.current.sendCursor(wp.x, wp.y, color);
+		};
+		host.addEventListener("mousemove", onMove);
+		return () => host.removeEventListener("mousemove", onMove);
+	}, [players, playerId]);
+
+	React.useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+			const store = useUIStore.getState();
+			switch (e.key.toLowerCase()) {
+				case "d": store.setOverlayMode(store.overlayMode === "pen" ? "none" : "pen"); break;
+				case "a": store.setOverlayMode(store.overlayMode === "arrow" ? "none" : "arrow"); break;
+				case "p": store.setOverlayMode(store.overlayMode === "ping" ? "none" : "ping"); break;
+				case "t": store.setOverlayMode(store.overlayMode === "note" ? "none" : "note"); break;
+				case "escape": store.setOverlayMode("none"); break;
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
 
 	const { send } = useGameAction();
 
@@ -144,7 +236,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		<ErrorBoundary>
 		<Box style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e14", color: "#cfe8ff" }}>
 			<TopBar
-				onReadyToggle={() => networkManager.setReady()}
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
 				socket={socket}
@@ -155,7 +246,14 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-					<PixiCanvas fetchAssets={assetSocket.batchGet} />
+					<PixiCanvas
+						fetchAssets={assetSocket.batchGet}
+						onOverlaySetup={setOverlayHandlers}
+						overlayClientRef={overlayClientRef}
+					/>
+					<OverlayToolbar
+						onClearMyAnnotations={() => overlayClientRef.current?.sendClear("player", playerId ?? undefined)}
+					/>
 				</Box>
 
 				<RightSidebar networkManager={networkManager} />

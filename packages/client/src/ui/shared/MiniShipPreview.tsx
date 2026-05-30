@@ -51,6 +51,10 @@ function createLayers(app: any): LayerRegistry {
     cursor.zIndex = 5;
     cursor.eventMode = "none";
 
+    const overlay = new Container();
+    overlay.zIndex = 6;
+    overlay.eventMode = "none";
+
     const tacticalTokens = new Container();
     tacticalTokens.zIndex = 7;
     tacticalTokens.eventMode = "none";
@@ -87,6 +91,7 @@ function createLayers(app: any): LayerRegistry {
         starfieldNear,
         grid,
         cursor,
+        overlay,
         tacticalTokens,
         weaponArcs,
         movementVisuals,
@@ -130,6 +135,7 @@ function createLayers(app: any): LayerRegistry {
         starfieldNear,
         grid,
         cursor,
+        overlay,
         shipSprites,
         weaponSprites,
         tacticalTokens,

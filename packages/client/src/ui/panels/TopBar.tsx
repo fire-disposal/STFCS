@@ -28,7 +28,6 @@ import {
 import "./top-bar.css";
 
 interface TopBarProps {
-	onReadyToggle: () => void;
 	onSettings: () => void;
 	onLeave: () => void;
 	socket?: any;
@@ -36,7 +35,6 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-	onReadyToggle,
 	onSettings,
 	onLeave,
 	socket,
@@ -53,7 +51,6 @@ export const TopBar: React.FC<TopBarProps> = ({
 	const currentPlayer = playerId ? players[playerId] : undefined;
 	const currentFaction = currentPlayer?.faction;
 	const isHost = currentPlayer?.role === "HOST";
-	const isReady = currentPlayer?.isReady ?? false;
 	const inRoom = true;
 
 	// 直接从 uiStore 获取选中的舰船

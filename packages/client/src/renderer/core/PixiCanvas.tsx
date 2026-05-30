@@ -29,7 +29,7 @@
 
 import { StarfieldGenerator } from "../systems/StarfieldBackground";
 import { useUIStore } from "@/state/stores/uiStore";
-import { useAllTokens, useGamePlayers } from "@/state/stores/gameStore";
+import { useAllTokens, useGamePlayers, useGamePlayerId } from "@/state/stores/gameStore";
 import { Application } from "@pixi/react";
 
 import type { CombatToken } from "@vt/data";
@@ -54,6 +54,13 @@ import { useTextureLoader } from "../systems/useTextureLoader";
 import { useShipTextureRendering } from "../entities/ShipTextureRenderer";
 import { useWeaponTextureRendering } from "../entities/WeaponTextureRenderer";
 import type { AssetListItem } from "@vt/data";
+import {
+	useDrawingRendering,
+	useRemoteCursorRendering,
+	usePingRendering,
+	useNoteRendering,
+	useViewportRendering,
+} from "../overlays";
 
 interface AssetBatchGetResult {
 	assetId: string;
@@ -61,9 +68,23 @@ interface AssetBatchGetResult {
 	data?: string;
 }
 
+export interface OverlayHandlers {
+	onDrawStream: (p: any) => void;
+	onDrawCommit: (p: any) => void;
+	onCursor: (p: any) => void;
+	onPing: (p: any) => void;
+	onPingRemove: (p: any) => void;
+	onNote: (p: any) => void;
+	onViewport: (p: any) => void;
+	onClearDrawings: (p: any) => void;
+	onClearNotes: (p: any) => void;
+}
+
 interface GameCanvasProps {
 	onClick?: (x: number, y: number) => void;
 	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
+	onOverlaySetup?: (handlers: OverlayHandlers) => void;
+	overlayClientRef?: React.MutableRefObject<any>;
 }
 
 const useStarfield = () => {
@@ -106,9 +127,12 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	onClick,
 	fetchAssets = noopFetchAssets,
+	onOverlaySetup,
+	overlayClientRef,
 }) => {
 	const ships = useAllTokens();
 	const players = useGamePlayers();
+	const playerId = useGamePlayerId();
 	const hostRef = useRef<HTMLDivElement>(null);
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
@@ -126,6 +150,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		mapCursor,
 		selectShip,
 		movementPreview,
+		overlayMode,
+		overlayColor,
 	} = useUIStore();
 
 	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, textures: showTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
@@ -159,6 +185,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		onClick,
 		setLayers: layerSystem.setLayers,
 		setMapCursor,
+		overlayMode,
+		overlayColor,
+		overlayClientRef: overlayClientRef,
+		playerId: playerId ?? undefined,
 	});
 
 	const assetIds = useMemo(() => collectAssetIds(ships), [ships]);
@@ -203,6 +233,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	});
 	useWeaponArcRendering(layerSystem.layers, ships, selectedShipId ?? null);
 	useGridRendering(layerSystem.layers, showGrid);
+
+	const drawingRenderer = useDrawingRendering(layerSystem.layers);
+	const remoteCursor = useRemoteCursorRendering(layerSystem.layers);
+	const pingRenderer = usePingRendering(layerSystem.layers);
+	const noteRenderer = useNoteRendering(layerSystem.layers);
+	const viewportRenderer = useViewportRendering(layerSystem.layers);
+
+	const overlaySetupRef = useRef(onOverlaySetup);
+	overlaySetupRef.current = onOverlaySetup;
+
+	useEffect(() => {
+		overlaySetupRef.current?.({
+			onDrawStream: drawingRenderer.onDrawStream,
+			onDrawCommit: drawingRenderer.onDrawCommit,
+			onCursor: remoteCursor.onCursor,
+			onPing: pingRenderer.onPing,
+			onPingRemove: pingRenderer.onPingRemove,
+			onNote: noteRenderer.onNote,
+			onViewport: viewportRenderer.onViewport,
+			onClearDrawings: drawingRenderer.onClear,
+			onClearNotes: noteRenderer.onClear,
+		});
+	}, []);
 
 	useEffect(() => {
 		if (!layerSystem.layers) return;
@@ -249,7 +302,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	}, []);
 
 	return (
-		<div ref={hostRef} id="game-canvas-host" className="game-map-container">
+		<div ref={hostRef} id="game-canvas-host" className="game-map-container" style={{ width: "100%", height: "100%" }}>
 			<Application
 				resizeTo={hostRef}
 				autoDensity

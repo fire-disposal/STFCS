@@ -8,6 +8,7 @@ import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
 import { assetService } from "./services.js";
 import { factionService } from "./services.js";
+import { overlayRelay } from "../overlay.js";
 
 export const roomHandlers = {
     create: async (payload: unknown, ctx: RpcContext) => {
@@ -79,6 +80,8 @@ export const roomHandlers = {
         const isHost = room.creatorId === ctx.playerId;
         const role = isHost ? PlayerRole.HOST : PlayerRole.PLAYER;
         ctx.socket.data.role = role;
+
+        overlayRelay.sendSync(ctx.socket, p.roomId);
 
         ctx.io.emit("room:list_updated", {
             action: "updated",

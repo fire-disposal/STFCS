@@ -69,9 +69,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 			label: "DM控制",
 			icon: <Crown size={14} />,
 			component: (
-				<DMControlSidebarPanel
-					networkManager={networkManager}
-				/>
+				<DMControlSidebarPanel />
 			),
 			enabled: Boolean(isHost),
 		},

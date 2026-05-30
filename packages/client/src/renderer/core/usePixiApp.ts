@@ -27,7 +27,7 @@
  */
 
 import { screenToWorld } from "@/utils/coordinateSystem";
-import { Container, Point, Rectangle } from "pixi.js";
+import { Container, Graphics, Point, Rectangle } from "pixi.js";
 import { useCallback, useEffect, useRef } from "react";
 import type { CanvasSize } from "./useCanvasResize";
 import type { DragState } from "../interactions/InteractionHandler";
@@ -66,6 +66,10 @@ export interface UsePixiAppOptions {
 	onClick?: (x: number, y: number) => void;
 	setLayers?: (layers: LayerRegistry) => void;
 	setMapCursor?: (x: number, y: number, r: number) => void;
+	overlayMode?: "none" | "pen" | "arrow" | "ping" | "note";
+	overlayColor?: string;
+	overlayClientRef?: React.MutableRefObject<any>;
+	playerId?: string;
 }
 
 export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
@@ -89,6 +93,20 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 
 	onClickRef.current = onClick;
 	setMapCursorRef.current = setMapCursor;
+
+	const overlayClientRef = options.overlayClientRef;
+
+	const isDrawingRef = useRef(false);
+	const strokeIdRef = useRef("");
+	const strokePointsRef = useRef<{ x: number; y: number }[]>([]);
+	const arrowStartRef = useRef<{ x: number; y: number } | null>(null);
+	const previewGfxRef = useRef<any>(null);
+	const overlayModeRef = useRef(options.overlayMode ?? "none");
+	overlayModeRef.current = options.overlayMode ?? "none";
+	const overlayColorRef = useRef(options.overlayColor ?? "#FF6B6B");
+	overlayColorRef.current = options.overlayColor ?? "#FF6B6B";
+	const playerIdRef = useRef(options.playerId);
+	playerIdRef.current = options.playerId;
 
 	const getWorldPoint = useCallback(
 		(event: any) => {
@@ -190,6 +208,11 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			cursorLayer.eventMode = "none";
 			cursorLayer.sortableChildren = true;
 
+			const overlayLayer = new Container();
+			overlayLayer.zIndex = 6;
+			overlayLayer.eventMode = "none";
+			overlayLayer.sortableChildren = true;
+
 			const tacticalTokensLayer = new Container();
 			tacticalTokensLayer.zIndex = 7;
 			tacticalTokensLayer.eventMode = "static";
@@ -227,6 +250,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				starfieldNear,
 				grid,
 				cursorLayer,
+				overlayLayer,
 				tacticalTokensLayer,
 				weaponArcsLayer,
 				movementVisualsLayer,
@@ -276,6 +300,7 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 				starfieldNear,
 				grid,
 				cursor: cursorLayer,
+				overlay: overlayLayer,
 				shipSprites: shipSpritesLayer,
 				weaponSprites: weaponSpritesLayer,
 				tacticalTokens: tacticalTokensLayer,
@@ -353,6 +378,58 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 					return;
 				}
 
+				if (button === 0 && overlayModeRef.current !== "none") {
+					const wp = getWorldPoint(event);
+					const mode = overlayModeRef.current;
+					const color = overlayColorRef.current;
+
+					if (mode === "pen") {
+						isDrawingRef.current = true;
+						strokeIdRef.current = `${playerIdRef.current}_${Date.now()}`;
+						strokePointsRef.current = [{ x: wp.x, y: wp.y }];
+						overlayClientRef?.current?.sendDrawStream(strokeIdRef.current, wp.x, wp.y, color, 3);
+						event.stopPropagation();
+						return;
+					}
+
+					if (mode === "arrow") {
+						if (!arrowStartRef.current) {
+							arrowStartRef.current = { x: wp.x, y: wp.y };
+							if (!previewGfxRef.current && layersRef.current) {
+								const g = new Graphics();
+								layersRef.current.overlay.addChild(g);
+								previewGfxRef.current = g;
+							}
+						} else {
+							const start = arrowStartRef.current;
+							const points = [start, { x: wp.x, y: wp.y }];
+							overlayClientRef?.current?.sendDrawCommit(`${playerIdRef.current}_${Date.now()}`, "arrow", color, 3, points);
+							arrowStartRef.current = null;
+							if (previewGfxRef.current) { previewGfxRef.current.clear(); }
+						}
+						event.stopPropagation();
+						return;
+					}
+
+					if (mode === "ping") {
+						overlayClientRef?.current?.sendPing(wp.x, wp.y, color);
+						event.stopPropagation();
+						return;
+					}
+
+					if (mode === "note") {
+						const text = window.prompt("输入标注文字");
+						if (text) {
+							overlayClientRef?.current?.sendNote("create", `${playerIdRef.current}_${Date.now()}`, wp.x, wp.y, text, color);
+						}
+						event.stopPropagation();
+						return;
+					}
+
+					event.stopPropagation();
+					return;
+				}
+
 				if (button === 0) {
 					// 左键 -> 点击（选择/设置游标）
 					if (!isShipObject(event.target)) {
@@ -368,6 +445,20 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			});
 
 			stage.on("pointermove", (event: any) => {
+				const wp2 = getWorldPoint(event);
+				if (overlayModeRef.current === "pen" && isDrawingRef.current) {
+					strokePointsRef.current.push({ x: wp2.x, y: wp2.y });
+					overlayClientRef?.current?.sendDrawStream(strokeIdRef.current, wp2.x, wp2.y, overlayColorRef.current, 3);
+				} else if (overlayModeRef.current === "arrow" && arrowStartRef.current && previewGfxRef.current) {
+					const g = previewGfxRef.current;
+					g.clear();
+					const s = arrowStartRef.current;
+					const c = parseInt(overlayColorRef.current.replace("#", ""), 16);
+					g.moveTo(s.x, s.y);
+					g.lineTo(wp2.x, wp2.y);
+					g.stroke({ color: c, width: 3, alpha: 0.6 });
+				}
+
 				const dragState = dragStateRef.current;
 				if (!dragState.active) return;
 				const screen = getScreenCoords(event);
@@ -397,6 +488,13 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			});
 
 			const finishDrag = (event: any) => {
+				if (overlayModeRef.current === "pen" && isDrawingRef.current && (event.button ?? 0) === 0) {
+					isDrawingRef.current = false;
+					overlayClientRef?.current?.sendDrawCommit(strokeIdRef.current, "pen", overlayColorRef.current, 3, strokePointsRef.current);
+					strokePointsRef.current = [];
+					return;
+				}
+
 				const dragState = dragStateRef.current;
 
 				if (
@@ -469,6 +567,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 					tickerCallbackRef.current = null;
 				}
 			}
+			previewGfxRef.current?.destroy();
+			previewGfxRef.current = null;
 		};
 	}, []);
 

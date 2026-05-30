@@ -12,6 +12,7 @@
  * │   ├── [zIndex 3] starfieldNear (近层星空，视差)
  * │   ├── [zIndex 4] grid (网格)
  * │   ├── [zIndex 5] cursor (世界坐标系光标)
+ * │   ├── [zIndex 6] overlay (VTT覆盖层: 绘图/标注/远程光标/Ping/视口)
  * │   ├── [zIndex 7] tacticalTokens (舰船战术标记+挂载点+武器标记)
  * │   ├── [zIndex 8] weaponArcs (武器射界)
  * │   ├── [zIndex 9] movementVisuals (移动预览)
@@ -58,6 +59,8 @@ export interface LayerRegistry {
 	grid: Container;
 	/** [zIndex 5] 世界坐标系光标 */
 	cursor: Container;
+	/** [zIndex 6] VTT overlay layer (drawings, remote cursors, pings, notes, viewports) */
+	overlay: Container;
 	/** [zIndex 7] 舰船战术标记（箭头 token + 挂载点 + 武器标记） */
 	tacticalTokens: Container;
 	/** [zIndex 8] 武器射界可视化 */

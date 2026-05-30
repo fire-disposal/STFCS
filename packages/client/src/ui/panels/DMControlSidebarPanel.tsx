@@ -3,10 +3,10 @@
  * 房主专用：回合推进、派系管理、阶段切换
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { ChevronDown, ChevronUp, FastForward, Play, ArrowRight } from "lucide-react";
 import { Button, Flex, Text, Badge, Card, Separator } from "@radix-ui/themes";
-import type { SocketNetworkManager } from "@/network";
+
 import { useGameAction } from "@/hooks/useGameAction";
 import {
     useGamePlayers,
@@ -18,13 +18,7 @@ import {
 } from "@/state/stores/gameStore";
 import { GamePhase } from "@vt/data";
 
-interface DMControlSidebarPanelProps {
-    networkManager: SocketNetworkManager;
-}
-
-export const DMControlSidebarPanel: React.FC<DMControlSidebarPanelProps> = ({
-    networkManager,
-}) => {
+export const DMControlSidebarPanel: React.FC = () => {
     const { send } = useGameAction();
 
     const players = useGamePlayers();
