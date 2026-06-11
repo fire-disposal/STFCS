@@ -17,7 +17,7 @@ class TextureManager {
 	private version = 0;
 
 	getTextureUrl(assetId: string): string {
-		return `/api/assets/${encodeURIComponent(assetId)}`;
+		return `/api/assets/${encodeURIComponent(assetId)}.png`;
 	}
 
 	async load(assetIds: string[]): Promise<void> {

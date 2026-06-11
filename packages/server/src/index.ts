@@ -85,7 +85,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
 	}
 
 	if (reqUrl.startsWith("/api/assets/")) {
-		const assetId = decodeURIComponent(reqUrl.slice("/api/assets/".length).split("?")[0] ?? "");
+		const assetId = decodeURIComponent(reqUrl.slice("/api/assets/".length).split("?")[0] ?? "").replace(/\.\w+$/, "");
 		if (!assetId) {
 			res.statusCode = 400;
 			res.end("Missing assetId");

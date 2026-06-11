@@ -14,7 +14,7 @@ export function useTextureLoader(assetIds: string[]): Map<string, Texture | null
 		}
 	}, [stableIds]);
 
-	useSyncExternalStore(
+	const version = useSyncExternalStore(
 		textureManager.subscribe.bind(textureManager),
 		textureManager.getSnapshot.bind(textureManager),
 	);
@@ -25,7 +25,7 @@ export function useTextureLoader(assetIds: string[]): Map<string, Texture | null
 			map.set(id, textureManager.getTexture(id));
 		}
 		return map;
-	}, [stableIds, textureManager.getSnapshot()]);
+	}, [stableIds, version]);
 }
 
 export type TextureCache = Map<string, Texture | null>;

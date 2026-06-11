@@ -183,11 +183,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const assetIds = useMemo(() => collectAssetIds(ships), [ships]);
 	const textureCache = useTextureLoader(assetIds);
 
-	useSyncExternalStore(
+	const textureVersion = useSyncExternalStore(
 		textureManager.subscribe.bind(textureManager),
 		textureManager.getSnapshot.bind(textureManager),
 	);
-	const loadingProgress = textureManager.getLoadingProgress();
+	const loadingProgress = useMemo(() => textureManager.getLoadingProgress(), [textureVersion]);
 	const isLoadingTextures = loadingProgress.total > 0 && loadingProgress.loaded < loadingProgress.total;
 
 	useCursorRendering(layerSystem.layers, mapCursor);
