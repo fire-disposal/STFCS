@@ -196,14 +196,7 @@ export class AssetService {
 		await writeFile(join(dir, `${assetId}${ext}`), finalData);
 		await this.updateIndex(type, assetId, this.toListItem(asset));
 
-		logger.info("Asset uploaded", {
-			assetId,
-			type,
-			size: finalData.length,
-			originalMimeType: mimeType,
-			dimensions: validation.dimensions,
-			ownerId,
-		});
+		logger.info(`Asset uploaded: ${assetId} (${type}, ${finalData.length} bytes, ${validation.dimensions?.width}x${validation.dimensions?.height}, owner=${ownerId}) → /api/assets/${encodeURIComponent(assetId)}.png`);
 
 		return asset;
 	}
