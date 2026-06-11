@@ -26,7 +26,7 @@ import {
     type Texture,
     type WeaponTag,
 } from "@vt/data";
-import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X } from "lucide-react";
+import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X, Search } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
@@ -160,6 +160,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [pendingShipTextureFile, setPendingShipTextureFile] = useState<File | null>(null);
     const [pendingWeaponTextureFile, setPendingWeaponTextureFile] = useState<File | null>(null);
 
+    const [shipSearch, setShipSearch] = useState("");
+    const [weaponSearch, setWeaponSearch] = useState("");
+
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
     const shipBuildsRef = useRef<InventoryToken[]>([]);
@@ -275,12 +278,50 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         return shipDraft.spec.mounts.find((item) => item.id === mountSelection) ?? null;
     }, [shipDraft, mountSelection]);
 
+    const isShipDirty = useMemo(() => {
+        if (!shipDraft || !selectedShipBuildId) return false;
+        const original = shipBuilds.find((item) => item.$id === selectedShipBuildId);
+        if (!original) return false;
+        return JSON.stringify(shipDraft) !== JSON.stringify(ensureShipDefaults(original));
+    }, [shipDraft, selectedShipBuildId, shipBuilds]);
+
+    const isWeaponDirty = useMemo(() => {
+        if (!weaponDraft || !selectedWeaponBuildId) return false;
+        const original = weaponBuilds.find((item) => item.$id === selectedWeaponBuildId);
+        if (!original) return false;
+        return JSON.stringify(weaponDraft) !== JSON.stringify(ensureWeaponDefaults(original));
+    }, [weaponDraft, selectedWeaponBuildId, weaponBuilds]);
+
+    const handleSelectShip = useCallback((id: string) => {
+        if (id === selectedShipBuildId) return;
+        if (isShipDirty && !window.confirm("当前修改未保存，是否放弃？")) return;
+        setSelectedShipBuildId(id);
+    }, [selectedShipBuildId, isShipDirty]);
+
+    const handleSelectWeapon = useCallback((id: string) => {
+        if (id === selectedWeaponBuildId) return;
+        if (isWeaponDirty && !window.confirm("当前修改未保存，是否放弃？")) return;
+        setSelectedWeaponBuildId(id);
+    }, [selectedWeaponBuildId, isWeaponDirty]);
+
     const compatibleWeapons = useMemo(() => {
         if (!selectedMount) return [];
         return weaponBuilds.filter((item) => {
             return isWeaponSizeCompatible(selectedMount.size, item.spec.size);
         });
     }, [selectedMount, weaponBuilds]);
+
+    const filteredShipBuilds = useMemo(() => {
+        if (!shipSearch.trim()) return shipBuilds;
+        const q = shipSearch.trim().toLowerCase();
+        return shipBuilds.filter((item) => (item.metadata?.name ?? item.$id).toLowerCase().includes(q));
+    }, [shipBuilds, shipSearch]);
+
+    const filteredWeaponBuilds = useMemo(() => {
+        if (!weaponSearch.trim()) return weaponBuilds;
+        const q = weaponSearch.trim().toLowerCase();
+        return weaponBuilds.filter((item) => (item.metadata?.name ?? item.$id).toLowerCase().includes(q));
+    }, [weaponBuilds, weaponSearch]);
 
     const updateShipDraft = useCallback((updater: (draft: InventoryToken) => void) => {
         setShipDraft((prev) => {
@@ -590,6 +631,22 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         return () => { disposed = true; };
     }, [weaponTexturePreviewUrl, weaponKeyColor, weaponKeyTolerance]);
 
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+                e.preventDefault();
+                if (activeTopTab === "ship") {
+                    void saveShip();
+                } else {
+                    void saveWeapon();
+                }
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [open, activeTopTab, saveShip, saveWeapon]);
+
     if (loadError) {
         return (
             <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -634,27 +691,29 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Plus size={12} /> 新增
                                     </Button>
                                 </Flex>
-                                <Box style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
+                                <TextField.Root
+                                    className="customizer-search"
+                                    size="1"
+                                    placeholder="搜索舰船..."
+                                    value={shipSearch}
+                                    onChange={(e) => setShipSearch(e.target.value)}
+                                >
+                                    <TextField.Slot>
+                                        <Search size={12} />
+                                    </TextField.Slot>
+                                </TextField.Root>
+                                <Box className="customizer-sidebar">
                                     <Flex direction="column" gap="2">
-                                        {shipBuilds.map((item) => {
+                                        {filteredShipBuilds.map((item) => {
                                             const selected = selectedShipBuildId === item.$id;
                                             return (
                                                 <Flex
                                                     key={item.$id}
-                                                    align="center"
-                                                    justify="between"
-                                                    gap="2"
-                                                    onClick={() => setSelectedShipBuildId(item.$id)}
-                                                    style={{
-                                                        padding: "8px 10px",
-                                                        borderRadius: 6,
-                                                        border: selected ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
-                                                        background: selected ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
-                                                        cursor: "pointer",
-                                                    }}
+                                                    className={`customizer-list-item${selected ? " customizer-list-item--selected" : ""}`}
+                                                    onClick={() => handleSelectShip(item.$id)}
                                                 >
-                                                    <Box style={{ minWidth: 0, flex: 1 }}>
-                                                        <Text size="2" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    <Box className="customizer-list-item__info">
+                                                        <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
                                                         </Text>
                                                         <Text size="1" color="gray">{item.spec.size}/{item.spec.class}</Text>
@@ -665,7 +724,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         color="red"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            void deleteShip(item.$id);
+                                                            if (window.confirm(`确定删除舰船 "${item.metadata?.name ?? shortId(item.$id)}"？`)) {
+                                                                void deleteShip(item.$id);
+                                                            }
                                                         }}
                                                     >
                                                         <Trash2 size={12} />
@@ -674,6 +735,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             );
                                         })}
                                         {shipBuilds.length === 0 && <Text color="gray" size="1">暂无舰船存档</Text>}
+                                        {shipBuilds.length > 0 && filteredShipBuilds.length === 0 && <Text color="gray" size="1">无匹配结果</Text>}
                                     </Flex>
                                 </Box>
                             </Card>
@@ -709,11 +771,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
                                                     <Upload size={12} /> 选择图片
                                                 </Button>
-                                                {pendingShipTextureFile && (
-                                                    <Button size="1" variant="solid" color="green" onClick={() => void uploadShipTextureFromPreview()} data-magnetic>
-                                                        <Save size={12} /> 确认上传
-                                                    </Button>
-                                                )}
                                             </Flex>
                                         </Flex>
 
@@ -722,6 +779,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Box style={{ width: 120, height: 120, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden" }}>
                                                     <img src={shipColorKeyPreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                                                 </Box>
+                                            )}
+                                            {pendingShipTextureFile && (
+                                                <Button size="2" variant="solid" color="green" onClick={() => void uploadShipTextureFromPreview()} style={{ width: "100%" }} data-magnetic>
+                                                    <Upload size={14} /> 上传并应用
+                                                </Button>
                                             )}
 
                                             <Separator size="2" />
@@ -733,6 +795,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={-100}
                                                                 max={100}
@@ -747,6 +810,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={-100}
                                                                 max={100}
@@ -761,6 +825,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">缩放比例</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={0.1}
                                                                 max={10}
@@ -839,20 +904,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             {shipDraft.spec.mounts.map((mount) => (
                                                                 <Flex
                                                                     key={mount.id}
-                                                                    align="center"
-                                                                    justify="between"
-                                                                    gap="2"
+                                                                    className={`customizer-list-item${mountSelection === mount.id ? " customizer-list-item--selected" : ""}`}
                                                                     onClick={() => setMountSelection(mount.id)}
-                                                                    style={{
-                                                                        padding: "6px 8px",
-                                                                        borderRadius: 4,
-                                                                        border: mountSelection === mount.id ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
-                                                                        background: mountSelection === mount.id ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
-                                                                        cursor: "pointer",
-                                                                    }}
                                                                 >
-                                                                    <Box style={{ minWidth: 0, flex: 1 }}>
-                                                                        <Text size="1" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                    <Box className="customizer-list-item__info">
+                                                                        <Text size="1" className="customizer-list-item__name">
                                                                             {mount.displayName ?? mount.id}
                                                                         </Text>
                                                                         <Badge size="1">{mount.size}</Badge>
@@ -929,6 +985,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
+                                                                        className="customizer-range"
                                                                         type="range"
                                                                         min={-500}
                                                                         max={500}
@@ -961,6 +1018,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
+                                                                        className="customizer-range"
                                                                         type="range"
                                                                         min={-500}
                                                                         max={500}
@@ -995,6 +1053,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 <Text size="1" color="gray">朝向角度</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
+                                                                        className="customizer-range"
                                                                         type="range"
                                                                         min={-180}
                                                                         max={180}
@@ -1027,6 +1086,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 <Text size="1" color="gray">射界角度</Text>
                                                                 <Flex align="center" gap="2">
                                                                     <input
+                                                                        className="customizer-range"
                                                                         type="range"
                                                                         min={0}
                                                                         max={360}
@@ -1271,7 +1331,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         )}
 
                                         <Flex justify="end" mt="2">
-                                            <Button onClick={() => void saveShip()} data-magnetic><Save size={14} /> 保存</Button>
+                                            <Button onClick={() => void saveShip()} color={isShipDirty ? "green" : undefined} data-magnetic><Save size={14} /> 保存</Button>
                                         </Flex>
                                     </Card>
 
@@ -1279,12 +1339,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Text weight="bold" mb="2">预设模板</Text>
                                         <Flex direction="column" gap="1">
                                             {shipPresets.map((preset) => (
-                                                <Flex key={preset.$id} justify="between" align="center">
-                                                    <Box>
-                                                        <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
-                                                        <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.class}</Text>
+                                                <Flex key={preset.$id} justify="between" align="center" gap="2" py="1">
+                                                    <Box style={{ minWidth: 0, flex: 1 }}>
+                                                        <Text size="2" className="customizer-list-item__name">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
+                                                        <Text size="1" color="gray">{preset.spec.size}/{preset.spec.class} · HP {preset.spec.maxHitPoints} · {preset.spec.mounts?.length ?? 0} 挂点</Text>
                                                     </Box>
-                                                    <Button size="1" variant="ghost" onClick={() => void copyShipPreset(preset.$id)}><Plus size={12} /></Button>
+                                                    <Button size="1" variant="ghost" onClick={() => void copyShipPreset(preset.$id)}><Copy size={12} /></Button>
                                                 </Flex>
                                             ))}
                                         </Flex>
@@ -1303,27 +1363,29 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Plus size={12} /> 新增
                                     </Button>
                                 </Flex>
-                                <Box style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
+                                <TextField.Root
+                                    className="customizer-search"
+                                    size="1"
+                                    placeholder="搜索武器..."
+                                    value={weaponSearch}
+                                    onChange={(e) => setWeaponSearch(e.target.value)}
+                                >
+                                    <TextField.Slot>
+                                        <Search size={12} />
+                                    </TextField.Slot>
+                                </TextField.Root>
+                                <Box className="customizer-sidebar">
                                     <Flex direction="column" gap="2">
-                                        {weaponBuilds.map((item) => {
+                                        {filteredWeaponBuilds.map((item) => {
                                             const selected = selectedWeaponBuildId === item.$id;
                                             return (
                                                 <Flex
                                                     key={item.$id}
-                                                    align="center"
-                                                    justify="between"
-                                                    gap="2"
-                                                    onClick={() => setSelectedWeaponBuildId(item.$id)}
-                                                    style={{
-                                                        padding: "8px 10px",
-                                                        borderRadius: 6,
-                                                        border: selected ? "1px solid rgba(74, 158, 255, 0.9)" : "1px solid rgba(255,255,255,0.08)",
-                                                        background: selected ? "rgba(74, 158, 255, 0.18)" : "rgba(255,255,255,0.03)",
-                                                        cursor: "pointer",
-                                                    }}
+                                                    className={`customizer-list-item${selected ? " customizer-list-item--selected" : ""}`}
+                                                    onClick={() => handleSelectWeapon(item.$id)}
                                                 >
-                                                    <Box style={{ minWidth: 0, flex: 1 }}>
-                                                        <Text size="2" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    <Box className="customizer-list-item__info">
+                                                        <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
                                                         </Text>
                                                         <Text size="1" color="gray">{item.spec.size}/{item.spec.damageType}</Text>
@@ -1334,7 +1396,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         color="red"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            void deleteWeapon(item.$id);
+                                                            if (window.confirm(`确定删除武器 "${item.metadata?.name ?? shortId(item.$id)}"？`)) {
+                                                                void deleteWeapon(item.$id);
+                                                            }
                                                         }}
                                                     >
                                                         <Trash2 size={12} />
@@ -1343,131 +1407,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             );
                                         })}
                                         {weaponBuilds.length === 0 && <Text color="gray" size="1">暂无武器存档</Text>}
+                                        {weaponBuilds.length > 0 && filteredWeaponBuilds.length === 0 && <Text color="gray" size="1">无匹配结果</Text>}
                                     </Flex>
                                 </Box>
                             </Card>
 
                             <Grid columns="2" gap="4">
                                 <Flex direction="column" gap="3">
-                                    <Card style={{ display: "none" }}>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">武器</Text>
-                                        </Flex>
-
-                                        {weaponDraft && (
-                                            <Flex direction="column" gap="3">
-                                                <Box>
-                                                    <Text size="1" weight="bold" mb="1">基本信息</Text>
-                                                    <Grid columns="2" gap="2">
-                                                        <Box>
-                                                            <Text size="1" color="gray">名称</Text>
-                                                            <TextField.Root
-                                                                value={weaponDraft.metadata?.name ?? ""}
-                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), name: e.target.value }; })}
-                                                            />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">描述</Text>
-                                                            <TextField.Root
-                                                                value={weaponDraft.metadata?.description ?? ""}
-                                                                onChange={(e) => updateWeaponDraft((d) => { d.metadata = { ...(d.metadata ?? { name: d.$id }), description: e.target.value }; })}
-                                                            />
-                                                        </Box>
-                                                    </Grid>
-                                                </Box>
-
-                                                <Box>
-                                                    <Text size="1" weight="bold" mb="1">武器规格</Text>
-                                                    <Grid columns="3" gap="2">
-                                                        <Box>
-                                                            <Text size="1" color="gray">槽位尺寸</Text>
-                                                            <Select.Root value={weaponDraft.spec.size} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.size = v as WeaponSlotSize; })}>
-                                                                <Select.Trigger />
-                                                                <Select.Content>{Object.values(WeaponSlotSize).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                            </Select.Root>
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">伤害类型</Text>
-                                                            <Select.Root value={weaponDraft.spec.damageType} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.damageType = v as DamageType; })}>
-                                                                <Select.Trigger />
-                                                                <Select.Content>{Object.values(DamageType).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                            </Select.Root>
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">基础伤害</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.damage)} onChange={(e) => updateWeaponDraft((d) => { d.spec.damage = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                    </Grid>
-                                                </Box>
-
-                                                <Box>
-                                                    <Text size="1" weight="bold" mb="1">射击参数</Text>
-                                                    <Grid columns="4" gap="2">
-                                                        <Box>
-                                                            <Text size="1" color="gray">最大射程</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.range)} onChange={(e) => updateWeaponDraft((d) => { d.spec.range = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">最小射程</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.minRange ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.minRange = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">冷却时间</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.cooldown ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.cooldown = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">辐能/发</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.fluxCostPerShot)} onChange={(e) => updateWeaponDraft((d) => { d.spec.fluxCostPerShot = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                    </Grid>
-
-                                                    <Grid columns="4" gap="2" mt="2">
-                                                        <Box>
-                                                            <Text size="1" color="gray">弹丸/发</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.projectilesPerShot ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.projectilesPerShot = Number(e.target.value) || 1; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">连发次数</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.burstCount ?? 1)} onChange={(e) => updateWeaponDraft((d) => { d.spec.burstCount = Number(e.target.value) || 1; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">OP 成本</Text>
-                                                            <TextField.Root type="number" value={String(weaponDraft.spec.opCost ?? 0)} onChange={(e) => updateWeaponDraft((d) => { d.spec.opCost = Number(e.target.value) || 0; })} />
-                                                        </Box>
-                                                        <Box>
-                                                            <Text size="1" color="gray">多目标射击</Text>
-                                                            <Select.Root value={weaponDraft.spec.allowsMultipleTargets ? "YES" : "NO"} onValueChange={(v) => updateWeaponDraft((d) => { d.spec.allowsMultipleTargets = v === "YES"; })}>
-                                                                <Select.Trigger />
-                                                                <Select.Content>
-                                                                    <Select.Item value="NO">否</Select.Item>
-                                                                    <Select.Item value="YES">是</Select.Item>
-                                                                </Select.Content>
-                                                            </Select.Root>
-                                                        </Box>
-                                                    </Grid>
-                                                </Box>
-
-                                                <Box>
-                                                    <Text size="1" weight="bold" mb="1">标签</Text>
-                                                    <Flex gap="1" align="center" wrap="wrap">
-                                                        {(weaponDraft.spec.tags ?? []).map((tag) => (
-                                                            <Badge key={tag} size="1">{tag}</Badge>
-                                                        ))}
-                                                        <Select.Root onValueChange={(v) => {
-                                                            const tag = v as WeaponTag;
-                                                            if (tag && !weaponDraft.spec.tags?.includes(tag)) {
-                                                                updateWeaponDraft((d) => { d.spec.tags = [...(d.spec.tags ?? []), tag]; });
-                                                            }
-                                                        }}>
-                                                            <Select.Trigger placeholder="添加标签" />
-                                                            <Select.Content>{WeaponTagValues.map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
-                                                        </Select.Root>
-                                                    </Flex>
-                                                </Box>
-                                            </Flex>
-                                        )}
-                                    </Card>
-
                                     <Card>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">武器预览</Text>
@@ -1485,11 +1431,6 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
                                                     <Upload size={12} /> 选择图片
                                                 </Button>
-                                                {pendingWeaponTextureFile && (
-                                                    <Button size="1" variant="solid" color="green" onClick={() => void uploadWeaponTextureFromPreview()} data-magnetic>
-                                                        <Save size={12} /> 确认上传
-                                                    </Button>
-                                                )}
                                             </Flex>
                                         </Flex>
 
@@ -1512,6 +1453,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             <Text size="1">{weaponPreviewZoom.toFixed(2)}x</Text>
                                             <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.min(4, weaponPreviewZoom + 0.25))}>+</Button>
                                         </Flex>
+                                        {pendingWeaponTextureFile && (
+                                            <Button size="2" variant="solid" color="green" onClick={() => void uploadWeaponTextureFromPreview()} style={{ width: "100%" }} data-magnetic>
+                                                <Upload size={14} /> 上传并应用
+                                            </Button>
+                                        )}
 
                                         {weaponDraft && (
                                             <Flex direction="column" gap="2" mt="2">
@@ -1523,6 +1469,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">X 偏移（左舷为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={-100}
                                                                 max={100}
@@ -1537,6 +1484,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">Y 偏移（船头为正）</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={-100}
                                                                 max={100}
@@ -1551,6 +1499,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                         <Text size="1" color="gray">缩放比例</Text>
                                                         <Flex align="center" gap="1">
                                                             <input
+                                                                className="customizer-range"
                                                                 type="range"
                                                                 min={0.1}
                                                                 max={10}
@@ -1701,7 +1650,14 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Text size="1" weight="bold" mb="1">标签</Text>
                                                     <Flex gap="1" align="center" wrap="wrap">
                                                         {(weaponDraft.spec.tags ?? []).map((tag) => (
-                                                            <Badge key={tag} size="1">{tag}</Badge>
+                                                            <Badge key={tag} size="1">
+                                                                {tag}
+                                                                <X
+                                                                    size={10}
+                                                                    style={{ marginLeft: 4, cursor: "pointer" }}
+                                                                    onClick={() => updateWeaponDraft((d) => { d.spec.tags = (d.spec.tags ?? []).filter((t) => t !== tag); })}
+                                                                />
+                                                            </Badge>
                                                         ))}
                                                         <Select.Root onValueChange={(v) => {
                                                             const tag = v as WeaponTag;
@@ -1710,7 +1666,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                             }
                                                         }}>
                                                             <Select.Trigger placeholder="添加标签" />
-                                                            <Select.Content>{WeaponTagValues.map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
+                                                            <Select.Content>{WeaponTagValues.filter((v) => !(weaponDraft.spec.tags ?? []).includes(v)).map((v) => <Select.Item key={v} value={v}>{v}</Select.Item>)}</Select.Content>
                                                         </Select.Root>
                                                     </Flex>
                                                 </Box>
@@ -1728,7 +1684,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         )}
 
                                         <Flex justify="end" mt="2">
-                                            <Button onClick={() => void saveWeapon()} data-magnetic><Save size={14} /> 保存</Button>
+                                            <Button onClick={() => void saveWeapon()} color={isWeaponDirty ? "green" : undefined} data-magnetic><Save size={14} /> 保存</Button>
                                         </Flex>
                                     </Card>
 
@@ -1736,12 +1692,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Text weight="bold" mb="2">预设模板</Text>
                                         <Flex direction="column" gap="1">
                                             {weaponPresets.map((preset) => (
-                                                <Flex key={preset.$id} justify="between" align="center">
-                                                    <Box>
-                                                        <Text size="2">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
-                                                        <Text size="1" color="gray"> {preset.spec.size}/{preset.spec.damageType}</Text>
+                                                <Flex key={preset.$id} justify="between" align="center" gap="2" py="1">
+                                                    <Box style={{ minWidth: 0, flex: 1 }}>
+                                                        <Text size="2" className="customizer-list-item__name">{preset.metadata?.name ?? shortId(preset.$id)}</Text>
+                                                        <Text size="1" color="gray">{preset.spec.size}/{preset.spec.damageType} · {preset.spec.damage}伤害 · {preset.spec.range}射程</Text>
                                                     </Box>
-                                                    <Button size="1" variant="ghost" onClick={() => void copyWeaponPreset(preset.$id)}><Plus size={12} /></Button>
+                                                    <Button size="1" variant="ghost" onClick={() => void copyWeaponPreset(preset.$id)}><Copy size={12} /></Button>
                                                 </Flex>
                                             ))}
                                         </Flex>

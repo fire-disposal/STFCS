@@ -205,3 +205,102 @@
 	z-index: 4;
 	pointer-events: none;
 }
+
+/* === Layout stabilization === */
+
+.customizer-dialog-body {
+	display: flex;
+	flex-direction: column;
+	max-height: 80vh;
+	overflow: hidden;
+}
+
+.customizer-sidebar {
+	max-height: 70vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.customizer-list-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.03);
+	cursor: pointer;
+	transition: border-color 0.15s, background 0.15s;
+}
+
+.customizer-list-item:hover {
+	border-color: rgba(74, 158, 255, 0.4);
+	background: rgba(74, 158, 255, 0.08);
+}
+
+.customizer-list-item--selected {
+	border-color: rgba(74, 158, 255, 0.9);
+	background: rgba(74, 158, 255, 0.18);
+}
+
+.customizer-list-item__info {
+	min-width: 0;
+	flex: 1;
+}
+
+.customizer-list-item__name {
+	display: block;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* === Range slider dark theme === */
+
+.customizer-range {
+	-webkit-appearance: none;
+	appearance: none;
+	height: 4px;
+	background: rgba(255, 255, 255, 0.12);
+	border-radius: 2px;
+	outline: none;
+	cursor: pointer;
+}
+
+.customizer-range::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #4a9eff;
+	border: 2px solid rgba(10, 20, 35, 0.9);
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.customizer-range::-webkit-slider-thumb:hover {
+	background: #6db3ff;
+}
+
+.customizer-range::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #4a9eff;
+	border: 2px solid rgba(10, 20, 35, 0.9);
+	cursor: pointer;
+}
+
+.customizer-range::-moz-range-track {
+	height: 4px;
+	background: rgba(255, 255, 255, 0.12);
+	border-radius: 2px;
+}
+
+/* === Search box === */
+
+.customizer-search {
+	margin-bottom: 8px;
+}
