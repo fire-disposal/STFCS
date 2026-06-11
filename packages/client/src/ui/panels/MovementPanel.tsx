@@ -1,20 +1,5 @@
-/**
- * MovementPanel - 移动控制面板（ABC 阶段系统）
- *
- * 阶段设计：
- * - A阶段：平移（选择前后或左右之一，选定后锁定方向类型）
- * - B阶段：旋转（消耗总角度资源）
- * - C阶段：平移（选择前后或左右之一，选定后锁定方向类型）
- * - 顺序：A → B → C，不可逆
- *
- * 资源：
- * - A/C 阶段各自有独立资源（phaseARemaining / phaseCRemaining），最大值都是 maxSpeed
- * - 方向锁定：一旦在 A/C 阶段选择前后或左右，就锁定该方向类型
- * - 同阶段可多次移动：锁定后可在该方向类型内多次移动
- */
-
 import React, { useState, useCallback, useEffect } from "react";
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, RotateCw, Check, ChevronRight } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, RotateCw, Check, ChevronRight, Info } from "lucide-react";
 import { Button, Flex, Box, Text, Badge, Progress } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -24,10 +9,10 @@ import "./battle-panel-row.css";
 type PhaseType = "A" | "B" | "C";
 type TranslationLock = "FORWARD_BACKWARD" | "LEFT_RIGHT" | null;
 
-const PHASE_CONFIG: Record<PhaseType, { label: string; color: "green" | "amber" | "blue" }> = {
-	A: { label: "移动A", color: "green" },
-	B: { label: "转向B", color: "amber" },
-	C: { label: "移动C", color: "blue" },
+const PHASE_INFO: Record<PhaseType, { label: string; color: "green" | "amber" | "blue"; desc: string }> = {
+	A: { label: "移动 A", color: "green", desc: "平移（前后或左右）" },
+	B: { label: "转向 B", color: "amber", desc: "原地旋转" },
+	C: { label: "移动 C", color: "blue", desc: "平移（前后或左右）" },
 };
 
 export interface MovementPanelProps {
@@ -57,7 +42,6 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 	const phaseCRemaining = maxSpeed - phaseCUsed;
 	const turnRemaining = maxTurnRate - turnUsed;
 
-	// 当前阶段的锁定状态
 	const currentPhaseLock = currentPhase === "A" ? phaseALock : currentPhase === "C" ? phaseCLock : null;
 	const phaseRemaining = currentPhase === "A" ? phaseARemaining : currentPhase === "C" ? phaseCRemaining : 0;
 
@@ -155,7 +139,6 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 		await sendAdvancePhase(ship.$id);
 	};
 
-	// 方向可用性检查
 	const canForwardBackward = canAct && (currentPhase === "A" || currentPhase === "C") && phaseRemaining > 0 && (!currentPhaseLock || currentPhaseLock === "FORWARD_BACKWARD");
 	const canLeftRight = canAct && (currentPhase === "A" || currentPhase === "C") && phaseRemaining > 0 && (!currentPhaseLock || currentPhaseLock === "LEFT_RIGHT");
 
@@ -168,145 +151,162 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 	}
 
 	const isDone = currentPhase === "DONE";
+	const phases: PhaseType[] = ["A", "B", "C"];
 
 	return (
 		<Box className="battle-row">
-			{/* ====== 左列：三阶段状态 ====== */}
-			<Box className="battle-col" style={{ flex: 1.2, minWidth: 120 }}>
+			<Box className="battle-col" style={{ flex: 1, minWidth: 140 }}>
 				<Box className="battle-col__header">
-					<Text size="1" weight="bold">阶段</Text>
+					<Flex align="center" gap="2">
+						<Text size="1" weight="bold">阶段进度</Text>
+						<Text size="1" color="gray">航速 {maxSpeed}m · 转向 {maxTurnRate}°</Text>
+					</Flex>
 				</Box>
-				<Box className="battle-col__content" style={{ flexDirection: "column", gap: 4, padding: "6px 8px" }}>
-					{/* A 阶段 */}
-					<Box style={{
-						display: "flex", alignItems: "center", gap: 8, padding: "6px 8px",
-						background: currentPhase === "A" ? "rgba(74, 158, 255, 0.15)" : isDone ? "rgba(10, 20, 30, 0.3)" : "rgba(10, 25, 50, 0.5)",
-						border: currentPhase === "A" ? "1px solid rgba(74, 158, 255, 0.5)" : "1px solid rgba(43, 66, 97, 0.3)",
-						borderRadius: 4, opacity: isDone ? 0.5 : 1,
-					}}>
-						<Badge size="1" color={currentPhase === "A" ? "green" : "gray"} style={{ fontWeight: "bold", minWidth: 50 }}>Phase A</Badge>
-						<Box style={{ flex: 1 }}>
-							<Progress value={maxSpeed > 0 ? (phaseARemaining / maxSpeed) * 100 : 0} color={currentPhase === "A" ? "green" : "gray"} style={{ height: 6, borderRadius: 2 }} />
-						</Box>
-						<Text size="1" style={{ color: currentPhase === "A" ? "#cfe8ff" : "#6b8aaa", minWidth: 30 }}>{phaseARemaining}m</Text>
-						{phaseALock && <Badge size="1" color="orange">{phaseALock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
-					</Box>
-
-					{/* B 阶段 */}
-					<Box style={{
-						display: "flex", alignItems: "center", gap: 8, padding: "6px 8px",
-						background: currentPhase === "B" ? "rgba(74, 158, 255, 0.15)" : isDone ? "rgba(10, 20, 30, 0.3)" : "rgba(10, 25, 50, 0.5)",
-						border: currentPhase === "B" ? "1px solid rgba(74, 158, 255, 0.5)" : "1px solid rgba(43, 66, 97, 0.3)",
-						borderRadius: 4, opacity: isDone ? 0.5 : 1,
-					}}>
-						<Badge size="1" color={currentPhase === "B" ? "amber" : "gray"} style={{ fontWeight: "bold", minWidth: 50 }}>Phase B</Badge>
-						<Box style={{ flex: 1 }}>
-							<Progress value={maxTurnRate > 0 ? (turnRemaining / maxTurnRate) * 100 : 0} color={currentPhase === "B" ? "amber" : "gray"} style={{ height: 6, borderRadius: 2 }} />
-						</Box>
-						<Text size="1" style={{ color: currentPhase === "B" ? "#cfe8ff" : "#6b8aaa", minWidth: 30 }}>{turnRemaining}°</Text>
-					</Box>
-
-					{/* C 阶段 */}
-					<Box style={{
-						display: "flex", alignItems: "center", gap: 8, padding: "6px 8px",
-						background: currentPhase === "C" ? "rgba(74, 158, 255, 0.15)" : isDone ? "rgba(10, 20, 30, 0.3)" : "rgba(10, 25, 50, 0.5)",
-						border: currentPhase === "C" ? "1px solid rgba(74, 158, 255, 0.5)" : "1px solid rgba(43, 66, 97, 0.3)",
-						borderRadius: 4, opacity: isDone ? 0.5 : 1,
-					}}>
-						<Badge size="1" color={currentPhase === "C" ? "blue" : "gray"} style={{ fontWeight: "bold", minWidth: 50 }}>Phase C</Badge>
-						<Box style={{ flex: 1 }}>
-							<Progress value={maxSpeed > 0 ? (phaseCRemaining / maxSpeed) * 100 : 0} color={currentPhase === "C" ? "blue" : "gray"} style={{ height: 6, borderRadius: 2 }} />
-						</Box>
-						<Text size="1" style={{ color: currentPhase === "C" ? "#cfe8ff" : "#6b8aaa", minWidth: 30 }}>{phaseCRemaining}m</Text>
-						{phaseCLock && <Badge size="1" color="orange">{phaseCLock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
-					</Box>
+				<Box className="battle-col__content" style={{ flexDirection: "column", gap: 3, padding: "4px 8px" }}>
+					{phases.map((p) => {
+						const info = PHASE_INFO[p];
+						const isActive = currentPhase === p;
+						const isPast = phases.indexOf(p) < phases.indexOf(currentPhase as PhaseType);
+						const remaining = p === "A" ? phaseARemaining : p === "C" ? phaseCRemaining : turnRemaining;
+						const max = p === "B" ? maxTurnRate : maxSpeed;
+						const unit = p === "B" ? "°" : "m";
+						const lock = p === "A" ? phaseALock : p === "C" ? phaseCLock : null;
+						return (
+							<Flex key={p} align="center" gap="2" style={{
+								padding: "4px 8px",
+								background: isActive ? "rgba(74, 158, 255, 0.12)" : "transparent",
+								border: isActive ? "1px solid rgba(74, 158, 255, 0.4)" : "1px solid transparent",
+								borderRadius: 4,
+								opacity: isDone || isPast ? 0.5 : 1,
+							}}>
+								<Badge size="1" color={isActive ? info.color : "gray"} style={{ minWidth: 24, justifyContent: "center" }}>{p}</Badge>
+								<Box style={{ flex: 1, minWidth: 0 }}>
+									<Flex justify="between" align="center">
+										<Text size="1" style={{ color: isActive ? "#cfe8ff" : "#6b8aaa" }}>{info.desc}</Text>
+										<Text size="1" style={{ color: isActive ? "#cfe8ff" : "#6b8aaa" }}>{remaining}{unit}</Text>
+									</Flex>
+									<Progress value={max > 0 ? (remaining / max) * 100 : 0} color={isActive ? info.color : "gray"} style={{ height: 4, borderRadius: 2, marginTop: 2 }} />
+								</Box>
+								{lock && <Badge size="1" color="orange" variant="soft">{lock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
+							</Flex>
+						);
+					})}
+					{isDone && (
+						<Flex align="center" gap="2" style={{ padding: "4px 8px" }}>
+							<Badge size="1" color="gray">✓</Badge>
+							<Text size="1" color="gray">
+								移动 {phaseAUsed + phaseCUsed}m · 转向 {turnUsed}°
+							</Text>
+						</Flex>
+					)}
 				</Box>
 			</Box>
 
 			<Box className="battle-divider" />
 
-			{/* ====== 中列：操作区 ====== */}
-			<Box className="battle-col" style={{ flex: 1, minWidth: 100 }}>
+			<Box className="battle-col" style={{ flex: 1.2, minWidth: 160 }}>
 				<Box className="battle-col__header">
 					<Flex align="center" gap="2">
 						<Text size="1" weight="bold">
-							{isDone ? "完成" : PHASE_CONFIG[currentPhase as PhaseType]?.label ?? ""}
+							{isDone ? "移动完成" : PHASE_INFO[currentPhase as PhaseType]?.label ?? ""}
 						</Text>
-						{currentPhase === "A" && phaseALock && <Badge size="1" color="orange">已锁定{phaseALock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
-						{currentPhase === "C" && phaseCLock && <Badge size="1" color="orange">已锁定{phaseCLock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
+						{currentPhaseLock && <Badge size="1" color="orange" variant="soft">已锁定{currentPhaseLock === "FORWARD_BACKWARD" ? "前后" : "左右"}</Badge>}
 					</Flex>
 				</Box>
-				<Box className="battle-col__content battle-col__content--horizontal" style={{ padding: "8px 6px" }}>
+				<Box className="battle-col__content" style={{ padding: "6px 8px" }}>
 					{isDone ? (
-						<Text size="2" color="gray">本回合移动完成</Text>
-					) : currentPhase === "A" || currentPhase === "C" ? (
-						<>
-							{/* 前后按钮 */}
-							<Button size="2" variant={selectedDirection === "forward" ? "solid" : "soft"} color="green" onClick={() => handleDirectionSelect("forward")} disabled={!canForwardBackward} title="前进">
-								<ArrowUp size={14} />
-							</Button>
-							<Button size="2" variant={selectedDirection === "backward" ? "solid" : "soft"} color="green" onClick={() => handleDirectionSelect("backward")} disabled={!canForwardBackward} title="后退">
-								<ArrowDown size={14} />
-							</Button>
-							{/* 左右按钮 */}
-							<Button size="2" variant={selectedDirection === "left" ? "solid" : "soft"} color="blue" onClick={() => handleDirectionSelect("left")} disabled={!canLeftRight} title="左移">
-								<ArrowLeft size={14} />
-							</Button>
-							<Button size="2" variant={selectedDirection === "right" ? "solid" : "soft"} color="blue" onClick={() => handleDirectionSelect("right")} disabled={!canLeftRight} title="右移">
-								<ArrowRight size={14} />
-							</Button>
-						{selectedDirection && (
-							<Flex align="center" gap="2" style={{ flex: 1 }}>
-								<input type="range" min={0} max={phaseRemaining} step={5} value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
-								<input type="number" value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
-								<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>m</Text>
-							</Flex>
-						)}
-						</>
-					) : currentPhase === "B" ? (
-						<>
-						<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue - 15)} disabled={!canAct}>
-							<RotateCcw size={14} />
-						</Button>
-						<Flex align="center" gap="2" style={{ flex: 1 }}>
-							<input type="range" min={-turnRemaining} max={turnRemaining} step={5} value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
-							<input type="number" value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+						<Flex direction="column" align="center" justify="center" gap="1" style={{ height: "100%" }}>
+							<Text size="1" color="gray">本回合移动已完成</Text>
+							<Text size="1" color="gray">等待其他玩家行动</Text>
 						</Flex>
-						<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue + 15)} disabled={!canAct}>
-							<RotateCw size={14} />
-						</Button>
-						<Text size="1" weight="bold" style={{ color: rotateValue > 0 ? "#4a9eff" : rotateValue < 0 ? "#ff6f8f" : "#6b8aaa" }}>
-							°
-						</Text>
-						</>
+					) : currentPhase === "A" || currentPhase === "C" ? (
+						<Flex direction="column" gap="2" style={{ height: "100%" }}>
+							<Flex align="center" gap="2">
+								<Flex direction="column" align="center" gap="1">
+									<Button size="1" variant={selectedDirection === "forward" ? "solid" : "soft"} color="green" onClick={() => handleDirectionSelect("forward")} disabled={!canForwardBackward} title="前进" style={{ width: 32, height: 28 }}>
+										<ArrowUp size={13} />
+									</Button>
+									<Flex gap="1">
+										<Button size="1" variant={selectedDirection === "left" ? "solid" : "soft"} color="blue" onClick={() => handleDirectionSelect("left")} disabled={!canLeftRight} title="左移" style={{ width: 32, height: 28 }}>
+											<ArrowLeft size={13} />
+										</Button>
+										<Button size="1" variant={selectedDirection === "right" ? "solid" : "soft"} color="blue" onClick={() => handleDirectionSelect("right")} disabled={!canLeftRight} title="右移" style={{ width: 32, height: 28 }}>
+											<ArrowRight size={13} />
+										</Button>
+									</Flex>
+									<Button size="1" variant={selectedDirection === "backward" ? "solid" : "soft"} color="green" onClick={() => handleDirectionSelect("backward")} disabled={!canForwardBackward} title="后退" style={{ width: 32, height: 28 }}>
+										<ArrowDown size={13} />
+									</Button>
+								</Flex>
+
+								{selectedDirection ? (
+									<Flex direction="column" gap="1" style={{ flex: 1 }}>
+										<Flex align="center" gap="2">
+											<input type="range" min={0} max={phaseRemaining} step={5} value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
+											<input type="number" value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 48, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+											<Text size="1" color="gray">m</Text>
+										</Flex>
+										<Text size="1" color="gray">剩余 {phaseRemaining}m · 步进 5m</Text>
+									</Flex>
+								) : (
+									<Flex align="center" style={{ flex: 1 }}>
+										<Flex align="center" gap="1">
+											<Info size={12} style={{ color: "#4a6a8a", flexShrink: 0 }} />
+											<Text size="1" color="gray">选择方向开始移动，锁定后仅限同类方向</Text>
+										</Flex>
+									</Flex>
+								)}
+							</Flex>
+						</Flex>
+					) : currentPhase === "B" ? (
+						<Flex direction="column" gap="2" style={{ height: "100%" }}>
+							<Flex align="center" gap="2">
+								<Button size="1" variant="soft" onClick={() => handleRotateChange(rotateValue - 15)} disabled={!canAct} title="逆时针 15°">
+									<RotateCcw size={13} />
+								</Button>
+								<Flex direction="column" gap="1" style={{ flex: 1 }}>
+									<Flex align="center" gap="2">
+										<input type="range" min={-turnRemaining} max={turnRemaining} step={5} value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
+										<input type="number" value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 48, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+										<Text size="1" style={{ color: rotateValue > 0 ? "#4a9eff" : rotateValue < 0 ? "#ff6f8f" : "#6b8aaa" }}>°</Text>
+									</Flex>
+									<Text size="1" color="gray">剩余 {turnRemaining}° · {rotateValue > 0 ? "顺时针" : rotateValue < 0 ? "逆时针" : "步进 5°"}</Text>
+								</Flex>
+								<Button size="1" variant="soft" onClick={() => handleRotateChange(rotateValue + 15)} disabled={!canAct} title="顺时针 15°">
+									<RotateCw size={13} />
+								</Button>
+							</Flex>
+						</Flex>
 					) : null}
 				</Box>
 			</Box>
 
 			<Box className="battle-divider" />
 
-			{/* ====== 右列：执行 + 推进按钮 ====== */}
-			<Box className="battle-col battle-col--narrow" style={{ maxWidth: 100, padding: 0 }}>
-				<Box style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, padding: "6px 4px" }}>
+			<Box className="battle-col" style={{ maxWidth: 90, minWidth: 80 }}>
+				<Box className="battle-col__header">
+					<Text size="1" weight="bold">操作</Text>
+				</Box>
+				<Box className="battle-col__content" style={{ flexDirection: "column", gap: 4, padding: "6px 4px" }}>
 					<Button
 						size="2"
 						variant="solid"
 						color={currentPhase === "B" ? "amber" : currentPhase === "C" ? "blue" : "green"}
 						onClick={handleExecute}
 						disabled={!canAct || isDone || (currentPhase !== "B" && (!selectedDirection || translateValue === 0)) || (currentPhase === "B" && rotateValue === 0)}
-						style={{ flex: 1, minHeight: 50 }}
+						style={{ flex: 1 }}
 					>
-					<Check size={14} /> 执行
-				</Button>
-				<Button
-					size="2"
-					variant="soft"
-					color="amber"
-					onClick={handleAdvancePhase}
-					disabled={!canAct || isDone}
-					style={{ flex: 1, minHeight: 50 }}
-				>
-					<ChevronRight size={14} /> 下一阶段
+						<Check size={14} /> 执行
+					</Button>
+					<Button
+						size="1"
+						variant="soft"
+						color="gray"
+						onClick={handleAdvancePhase}
+						disabled={!canAct || isDone}
+						style={{ flex: 0.6 }}
+					>
+						<ChevronRight size={12} /> 跳过
 					</Button>
 				</Box>
 			</Box>
