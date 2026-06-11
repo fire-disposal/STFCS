@@ -524,34 +524,42 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const handleShipTextureUpload = useCallback(async (file: File) => {
         setIsUploadingShipTexture(true);
         try {
+            const oldAssetId = shipDraft?.spec.texture?.assetId;
             const limits = ASSET_LIMITS.ship_texture;
             const prepared = await resizeImage(file, limits.maxWidth, limits.maxHeight);
             const assetId = await assetSocket.upload("ship_texture", prepared);
             updateShipTexture({ assetId });
             loadTexturePreview(assetId);
+            if (oldAssetId && oldAssetId !== assetId) {
+                assetSocket.deleteAsset(oldAssetId).catch(() => {});
+            }
         } catch (err) {
             console.error("Ship texture upload failed:", err);
             notify.error(err instanceof Error ? err.message : "上传失败");
         } finally {
             setIsUploadingShipTexture(false);
         }
-    }, [assetSocket, updateShipTexture, loadTexturePreview]);
+    }, [assetSocket, updateShipTexture, loadTexturePreview, shipDraft]);
 
     const handleWeaponTextureUpload = useCallback(async (file: File) => {
         setIsUploadingWeaponTexture(true);
         try {
+            const oldAssetId = weaponDraft?.spec.texture?.assetId;
             const limits = ASSET_LIMITS.weapon_texture;
             const prepared = await resizeImage(file, limits.maxWidth, limits.maxHeight);
             const assetId = await assetSocket.upload("weapon_texture", prepared);
             updateWeaponTexture({ assetId });
             loadWeaponTexturePreview(assetId);
+            if (oldAssetId && oldAssetId !== assetId) {
+                assetSocket.deleteAsset(oldAssetId).catch(() => {});
+            }
         } catch (err) {
             console.error("Weapon texture upload failed:", err);
             notify.error(err instanceof Error ? err.message : "上传失败");
         } finally {
             setIsUploadingWeaponTexture(false);
         }
-    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview]);
+    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview, weaponDraft]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -821,9 +829,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Flex gap="2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                                     {shipDraft?.spec.texture?.assetId && (
                                                         <Button size="1" variant="soft" color="red" onClick={() => {
+                                                            const oldId = shipDraft?.spec.texture?.assetId;
                                                             updateShipTexture({ assetId: undefined });
                                                             setTexturePreviewUrl(null);
                                                             setShipColorKeyPreviewUrl(null);
+                                                            if (oldId) assetSocket.deleteAsset(oldId).catch(() => {});
                                                         }} data-magnetic>
                                                             <Trash2 size={12} /> 删除
                                                         </Button>
@@ -1572,9 +1582,11 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 <Flex gap="2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                                     {weaponDraft?.spec.texture?.assetId && (
                                                         <Button size="1" variant="soft" color="red" onClick={() => {
+                                                            const oldId = weaponDraft?.spec.texture?.assetId;
                                                             updateWeaponTexture({ assetId: undefined });
                                                             setWeaponTexturePreviewUrl(null);
                                                             setWeaponColorKeyPreviewUrl(null);
+                                                            if (oldId) assetSocket.deleteAsset(oldId).catch(() => {});
                                                         }} data-magnetic>
                                                             <Trash2 size={12} /> 删除
                                                         </Button>
