@@ -84,6 +84,39 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
 		return;
 	}
 
+	if (reqUrl.startsWith("/api/assets/")) {
+		const assetId = decodeURIComponent(reqUrl.slice("/api/assets/".length).split("?")[0] ?? "");
+		if (!assetId) {
+			res.statusCode = 400;
+			res.end("Missing assetId");
+			return;
+		}
+
+		const ifNoneMatch = req.headers["if-none-match"];
+		if (ifNoneMatch === `"${assetId}"`) {
+			res.statusCode = 304;
+			res.end();
+			return;
+		}
+
+		const result = await assetService.getAssetBuffer(assetId);
+		if (!result) {
+			res.statusCode = 404;
+			res.setHeader("Cache-Control", "no-store");
+			res.end("Not Found");
+			return;
+		}
+
+		res.statusCode = 200;
+		res.setHeader("Content-Type", result.mimeType);
+		res.setHeader("Content-Length", result.buffer.length.toString());
+		res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+		res.setHeader("ETag", `"${assetId}"`);
+		res.setHeader("Access-Control-Allow-Origin", "*");
+		res.end(result.buffer);
+		return;
+	}
+
 	const requestedPath = safePublicPath(reqUrl);
 	if (await sendFile(res, requestedPath)) {
 		return;

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Flag } from "lucide-react";
-import { useAssetSocket } from "@/hooks/useAssetSocket";
+import { textureManager } from "@/renderer/systems/TextureManager";
 
 interface FactionDefBrief {
     name: string;
@@ -13,50 +13,26 @@ interface FactionSelectorProps {
     currentPlayerId: string | null;
     factions: Record<string, FactionDefBrief>;
     onFactionChange?: (playerId: string, faction: string) => void;
-    socket?: any;
-}
-
-function toDataUrl(mimeType: string, base64: string): string {
-    return `data:${mimeType};base64,${base64}`;
 }
 
 export const FactionSelector: React.FC<FactionSelectorProps> = ({
-    currentFaction, currentPlayerId, factions, onFactionChange, socket,
+    currentFaction, currentPlayerId, factions, onFactionChange,
 }) => {
     const [open, setOpen] = useState(false);
     const [flagUrls, setFlagUrls] = useState<Record<string, string>>({});
     const loadedRef = useRef(false);
-    const assetSocket = useAssetSocket(socket ?? null);
 
-    // 接线（GamePage 已接线，此处为组件内独立 channel）
-    useEffect(() => {
-        if (!socket) return;
-        socket.on("response", assetSocket.handleResponse);
-        return () => { socket.off("response", assetSocket.handleResponse); };
-    }, [socket, assetSocket.handleResponse]);
-
-    const loadFlags = useCallback(async () => {
+    const loadFlags = useCallback(() => {
         if (loadedRef.current) return;
         loadedRef.current = true;
-        try {
-            const ids = Object.values(factions).filter((f) => f.flagAssetId).map((f) => f.flagAssetId!);
-            if (ids.length === 0) return;
-            console.log("[FactionSelector] Loading flags:", ids.length);
-            const results = await assetSocket.batchGet(ids, true);
-            const urls: Record<string, string> = {};
-            let loaded = 0;
-            for (const item of results) {
-                if (item.data && item.info?.mimeType) {
-                    urls[item.assetId] = toDataUrl(item.info.mimeType, item.data);
-                    loaded++;
-                }
+        const urls: Record<string, string> = {};
+        for (const f of Object.values(factions)) {
+            if (f.flagAssetId) {
+                urls[f.flagAssetId] = textureManager.getTextureUrl(f.flagAssetId);
             }
-            console.log("[FactionSelector] Loaded", loaded, "of", ids.length, "flags");
-            setFlagUrls(urls);
-        } catch (e) {
-            console.error("[FactionSelector] Failed to load flags:", e);
         }
-    }, [factions, assetSocket]);
+        setFlagUrls(urls);
+    }, [factions]);
 
     useEffect(() => { if (open) loadFlags(); }, [open, loadFlags]);
 

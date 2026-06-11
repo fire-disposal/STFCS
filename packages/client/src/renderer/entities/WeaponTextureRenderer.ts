@@ -68,8 +68,10 @@ export function useWeaponTextureRendering(
 					mountScreenOffset
 				);
 
-				const worldX = mountWorldPos.x - weaponOffsetX;
-				const worldY = mountWorldPos.y - weaponOffsetY;
+				const totalHeading = ship.runtime.heading + mountFacing;
+				const totalRad = toPixiRotation(totalHeading);
+				const worldX = mountWorldPos.x - weaponOffsetX * Math.cos(totalRad) + weaponOffsetY * Math.sin(totalRad);
+				const worldY = mountWorldPos.y - weaponOffsetX * Math.sin(totalRad) - weaponOffsetY * Math.cos(totalRad);
 
 				const totalRotation = toPixiRotation(ship.runtime.heading + mountFacing);
 

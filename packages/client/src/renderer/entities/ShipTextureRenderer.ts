@@ -19,6 +19,7 @@ import { Sprite } from "pixi.js";
 import { useEffect, useRef } from "react";
 import type { LayerRegistry } from "../core/useLayerSystem";
 import type { CombatToken } from "@vt/data";
+import { toPixiRotation } from "@vt/data";
 import type { TextureCache } from "../systems/useTextureLoader";
 
 interface ShipTextureCacheItem {
@@ -67,7 +68,7 @@ export function useShipTextureRendering(
 			const scale = ship.spec.texture?.scale ?? 1;
 
 			// 与 ShipRenderer 保持一致：rotation = heading * π/180
-			const headingRad = (ship.runtime.heading * Math.PI) / 180;
+			const headingRad = toPixiRotation(ship.runtime.heading);
 			
 			// 贴图偏移坐标系：
 			// offsetX：左舷为正（heading=0时指向屏幕左侧）

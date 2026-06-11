@@ -23,7 +23,6 @@
  * - ships: 舰船数据列表
  * - onClick: 可选点击回调
  * - movementPreview: 移动预览状态
- * - fetchAssets: 贴图数据获取函数
  * - 所有其他状态从 uiStore 内部订阅
  */
 
@@ -33,7 +32,7 @@ import { useAllTokens, useGamePlayers, useGamePlayerId } from "@/state/stores/ga
 import { Application } from "@pixi/react";
 
 import type { CombatToken } from "@vt/data";
-import React, { useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { useCamera } from "../systems/useCamera";
 import { useCanvasResize } from "./useCanvasResize";
 import { useCursorRendering } from "../systems/CursorRenderer";
@@ -53,7 +52,7 @@ import { normalizeRotation, screenDeltaToWorldDelta } from "@/utils/coordinateSy
 import { useTextureLoader } from "../systems/useTextureLoader";
 import { useShipTextureRendering } from "../entities/ShipTextureRenderer";
 import { useWeaponTextureRendering } from "../entities/WeaponTextureRenderer";
-import type { AssetListItem } from "@vt/data";
+import { textureManager } from "../systems/TextureManager";
 import {
 	useDrawingRendering,
 	useRemoteCursorRendering,
@@ -61,12 +60,6 @@ import {
 	useNoteRendering,
 	useViewportRendering,
 } from "../overlays";
-
-interface AssetBatchGetResult {
-	assetId: string;
-	info: AssetListItem | null;
-	data?: string;
-}
 
 export interface OverlayHandlers {
 	onDrawStream: (p: any) => void;
@@ -82,7 +75,6 @@ export interface OverlayHandlers {
 
 interface GameCanvasProps {
 	onClick?: (x: number, y: number) => void;
-	fetchAssets?: (assetIds: string[], includeData: boolean) => Promise<AssetBatchGetResult[]>;
 	onOverlaySetup?: (handlers: OverlayHandlers) => void;
 	overlayClientRef?: React.MutableRefObject<any>;
 }
@@ -99,8 +91,6 @@ const useStarfield = () => {
 		nebulaOpacity: 0.12,
 	}), []);
 };
-
-const noopFetchAssets = async (_assetIds: string[], _includeData: boolean): Promise<AssetBatchGetResult[]> => [];
 
 function collectAssetIds(ships: CombatToken[]): string[] {
 	const assetIds = new Set<string>();
@@ -126,7 +116,6 @@ function collectAssetIds(ships: CombatToken[]): string[] {
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
 	onClick,
-	fetchAssets = noopFetchAssets,
 	onOverlaySetup,
 	overlayClientRef,
 }) => {
@@ -192,7 +181,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	});
 
 	const assetIds = useMemo(() => collectAssetIds(ships), [ships]);
-	const textureCache = useTextureLoader({ assetIds, fetchAssets });
+	const textureCache = useTextureLoader(assetIds);
+
+	useSyncExternalStore(
+		textureManager.subscribe.bind(textureManager),
+		textureManager.getSnapshot.bind(textureManager),
+	);
+	const loadingProgress = textureManager.getLoadingProgress();
+	const isLoadingTextures = loadingProgress.total > 0 && loadingProgress.loaded < loadingProgress.total;
 
 	useCursorRendering(layerSystem.layers, mapCursor);
 	useStarfieldRendering(layerSystem.layers, starfield);
@@ -312,6 +308,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 				eventMode="static"
 				onInit={pixiApp.handleInit}
 			/>
+			{isLoadingTextures && (
+				<div style={{
+					position: "absolute",
+					bottom: 8,
+					left: 8,
+					padding: "4px 8px",
+					background: "rgba(0, 0, 0, 0.6)",
+					color: "#6b8aaa",
+					fontSize: 11,
+					borderRadius: 4,
+					pointerEvents: "none",
+					zIndex: 100,
+				}}>
+					加载贴图 ({loadingProgress.loaded}/{loadingProgress.total})...
+				</div>
+			)}
 		</div>
 	);
 };

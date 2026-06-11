@@ -12,6 +12,7 @@ interface MiniWeaponPreviewProps {
     texturePreviewUrl?: string | null;
     zoom: number;
     onZoomChange: (value: number) => void;
+    onTextureOffsetChange?: (deltaX: number, deltaY: number) => void;
 }
 
 function clampZoom(value: number): number {
@@ -53,14 +54,29 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
     weapon,
     texturePreviewUrl,
     zoom,
-    onZoomChange
+    onZoomChange,
+    onTextureOffsetChange
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const graphicsRef = useRef<Graphics | null>(null);
     const [mounted, setMounted] = useState(false);
+    const [containerSize, setContainerSize] = useState({ width: 280, height: 360 });
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (entry) {
+                setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+            }
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
     }, []);
 
     const sizeScale: Record<string, number> = {
@@ -69,8 +85,6 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
         LARGE: 100,
     };
     const baseSize = sizeScale[weapon?.spec.size ?? "SMALL"] ?? 60;
-    const previewWidth = 280;
-    const previewHeight = 240;
 
     const drawGuide = useCallback((g: Graphics) => {
         g.clear();
@@ -82,25 +96,48 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
     const handleInit = useCallback((app: any) => {
         const g = new Graphics();
         graphicsRef.current = g;
-        g.position.set(previewWidth / 2, previewHeight / 2);
+        g.position.set(containerSize.width / 2, containerSize.height / 2);
         app.stage.addChild(g);
         drawGuide(g);
-    }, [drawGuide]);
+    }, [drawGuide, containerSize]);
 
     useEffect(() => {
         if (graphicsRef.current) {
+            graphicsRef.current.position.set(containerSize.width / 2, containerSize.height / 2);
             drawGuide(graphicsRef.current);
         }
-    }, [drawGuide]);
+    }, [drawGuide, containerSize]);
+
+    const dragRef = useRef<{ startX: number; startY: number } | null>(null);
+
+    const handleTextureMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragRef.current = { startX: e.clientX, startY: e.clientY };
+
+        const handleMouseMove = (ev: MouseEvent) => {
+            if (!dragRef.current || !onTextureOffsetChange) return;
+            const dx = ev.clientX - dragRef.current.startX;
+            const dy = ev.clientY - dragRef.current.startY;
+            dragRef.current = { startX: ev.clientX, startY: ev.clientY };
+            onTextureOffsetChange(-dx / zoom, -dy / zoom);
+        };
+
+        const handleMouseUp = () => {
+            dragRef.current = null;
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+    }, [zoom, onTextureOffsetChange]);
 
     const texture = weapon?.spec.texture;
     const textureScale = (texture?.scale ?? 1) * zoom;
-    // 航海坐标系：Y向上，屏幕坐标系：Y向下
-    // offsetY > 0（枪口方向）在屏幕上是向上（负方向）
     const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
-    const textureOffsetY = -(texture?.offsetY ?? 0) * zoom; // 反转 Y
-    
-    // wrap 负责偏移，img 负责缩放和居中
+    const textureOffsetY = -(texture?.offsetY ?? 0) * zoom;
+
     const wrapStyle = useMemo(() => ({
         transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)`,
     }), [textureOffsetX, textureOffsetY]);
@@ -114,14 +151,6 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
             <div
                 ref={containerRef}
                 className="customizer-preview-canvas"
-                style={{
-                    width: previewWidth,
-                    height: previewHeight,
-                    minWidth: previewWidth,
-                    minHeight: previewHeight,
-                    maxWidth: previewWidth,
-                    maxHeight: previewHeight,
-                }}
                 onWheel={(event) => {
                     event.preventDefault();
                     const direction = event.deltaY > 0 ? -1 : 1;
@@ -130,8 +159,8 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
             >
                 {mounted && (
                     <Application
-                        width={previewWidth}
-                        height={previewHeight}
+                        width={containerSize.width}
+                        height={containerSize.height}
                         autoDensity
                         antialias
                         background={0x0a1218}
@@ -140,7 +169,11 @@ export const MiniWeaponPreview: React.FC<MiniWeaponPreviewProps> = ({
                 )}
 
                 {texturePreviewUrl && (
-                    <div className="customizer-preview-texture-wrap" style={wrapStyle}>
+                    <div
+                        className="customizer-preview-texture-wrap"
+                        style={{ ...wrapStyle, cursor: onTextureOffsetChange ? "grab" : undefined }}
+                        onMouseDown={onTextureOffsetChange ? handleTextureMouseDown : undefined}
+                    >
                         <img
                             src={texturePreviewUrl}
                             className="customizer-preview-texture"

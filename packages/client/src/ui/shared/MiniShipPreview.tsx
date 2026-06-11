@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Application } from "@pixi/react";
 import { Container, Rectangle } from "pixi.js";
 import type { InventoryToken, CombatToken } from "@vt/data";
@@ -11,6 +11,7 @@ interface MiniShipPreviewProps {
     zoom: number;
     onZoomChange: (value: number) => void;
     texturePreviewUrl?: string | null;
+    onTextureOffsetChange?: (deltaX: number, deltaY: number) => void;
 }
 
 function clampZoom(value: number): number {
@@ -183,7 +184,7 @@ function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolea
     };
 }
 
-export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, onZoomChange, texturePreviewUrl }) => {
+export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, onZoomChange, texturePreviewUrl, onTextureOffsetChange }) => {
     const hostRef = useRef<HTMLDivElement>(null);
     const canvasSize = useCanvasResize(hostRef);
     const layerSystem = useLayerSystem();
@@ -205,7 +206,31 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
     const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
     const textureOffsetY = -(texture?.offsetY ?? 0) * zoom; // 反转 Y
 
-    // wrap 负责偏移，img 负责缩放和居中
+    const dragRef = useRef<{ startX: number; startY: number } | null>(null);
+
+    const handleTextureMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragRef.current = { startX: e.clientX, startY: e.clientY };
+
+        const handleMouseMove = (ev: MouseEvent) => {
+            if (!dragRef.current || !onTextureOffsetChange) return;
+            const dx = ev.clientX - dragRef.current.startX;
+            const dy = ev.clientY - dragRef.current.startY;
+            dragRef.current = { startX: ev.clientX, startY: ev.clientY };
+            onTextureOffsetChange(-dx / zoom, -dy / zoom);
+        };
+
+        const handleMouseUp = () => {
+            dragRef.current = null;
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+    }, [zoom, onTextureOffsetChange]);
+
     const wrapStyle = useMemo(() => ({
         transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)`,
     }), [textureOffsetX, textureOffsetY]);
@@ -261,7 +286,11 @@ export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, o
                 )}
 
                 {texturePreviewUrl && (
-                    <div className="customizer-preview-texture-wrap" style={wrapStyle}>
+                    <div
+                        className="customizer-preview-texture-wrap"
+                        style={{ ...wrapStyle, cursor: onTextureOffsetChange ? "grab" : undefined }}
+                        onMouseDown={onTextureOffsetChange ? handleTextureMouseDown : undefined}
+                    >
                         <img src={texturePreviewUrl} className="customizer-preview-texture" style={imgStyle} alt="texture-preview" draggable={false} />
                     </div>
                 )}

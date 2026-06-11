@@ -9,7 +9,7 @@ import { Plus, Trash2, Upload, Pipette, Undo2 } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import type { FactionDef } from "@vt/data";
 import { notify } from "@/ui/shared/Notification";
-import { useAssetSocket } from "@/hooks/useAssetSocket";
+import { textureManager } from "@/renderer/systems/TextureManager";
 
 interface Props {
     open: boolean;
@@ -35,10 +35,6 @@ function cropSquareFromImage(img: HTMLImageElement, size: number): string | null
     return canvas.toDataURL("image/png");
 }
 
-function toDataUrl(mimeType: string, base64: string): string {
-    return `data:${mimeType};base64,${base64}`;
-}
-
 export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, networkManager, playerId }) => {
     const [factions, setFactions] = useState<FactionDef[]>([]);
     const [flagDataUrls, setFlagDataUrls] = useState<Record<string, string>>({});
@@ -51,39 +47,15 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
     const fileRef = useRef<HTMLInputElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
-    const socket = networkManager.getSocket();
-    const assetSocket = useAssetSocket(socket);
-
-    // 接线 asset socket 的 response handler
-    useEffect(() => {
-        if (!socket) return;
-        socket.on("response", assetSocket.handleResponse);
-        return () => { socket.off("response", assetSocket.handleResponse); };
-    }, [socket, assetSocket.handleResponse]);
-
-    /** 批量加载旗帜图片 */
-    const loadFlagImages = useCallback(async (list: FactionDef[]) => {
-        try {
-            const ids = list.filter((f) => f.flagAssetId).map((f) => f.flagAssetId!);
-            if (ids.length === 0) return;
-            console.log("[FactionCustomizer] Loading flags:", ids.length, ids.slice(0, 3));
-            const results = await assetSocket.batchGet(ids, true);
-            const urls: Record<string, string> = {};
-            let loaded = 0;
-            for (const item of results) {
-                if (item.data && item.info?.mimeType) {
-                    urls[item.assetId] = toDataUrl(item.info.mimeType, item.data);
-                    loaded++;
-                } else {
-                    console.warn("[FactionCustomizer] No data for asset:", item.assetId, "info:", item.info, "hasData:", !!item.data);
-                }
+    const loadFlagImages = useCallback((list: FactionDef[]) => {
+        const urls: Record<string, string> = {};
+        for (const f of list) {
+            if (f.flagAssetId) {
+                urls[f.flagAssetId] = textureManager.getTextureUrl(f.flagAssetId);
             }
-            console.log("[FactionCustomizer] Loaded", loaded, "of", ids.length, "flags");
-            setFlagDataUrls(urls);
-        } catch (e) {
-            console.error("[FactionCustomizer] Failed to load flag images:", e);
         }
-    }, [assetSocket]);
+        setFlagDataUrls(urls);
+    }, []);
 
     const loadFactions = useCallback(async () => {
         try {

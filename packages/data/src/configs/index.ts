@@ -97,7 +97,7 @@ export interface AssetConfig {
 
 export const DEFAULT_ASSET_CONFIG: AssetConfig = {
 	ship_texture: {
-		allowedMimeTypes: ["image/png"],
+		allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
 		maxFileSize: 2 * 1024 * 1024,
 		minWidth: 9,
 		maxWidth: 1024,
@@ -105,7 +105,7 @@ export const DEFAULT_ASSET_CONFIG: AssetConfig = {
 		maxHeight: 1024,
 	},
 	weapon_texture: {
-		allowedMimeTypes: ["image/png"],
+		allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
 		maxFileSize: 1 * 1024 * 1024,
 		minWidth: 3,
 		maxWidth: 256,

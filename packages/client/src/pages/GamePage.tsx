@@ -32,7 +32,6 @@ import TopBar from "@/ui/panels/TopBar";
 import RightSidebar from "@/ui/panels/RightSidebar";
 import { useGameAction } from "@/hooks/useGameAction";
 import { Avatar } from "@/ui/shared/Avatar";
-import { useAssetSocket } from "@/hooks/useAssetSocket";
 import { OverlayClient } from "@/network/OverlayClient";
 import type { OverlayHandlers } from "@/renderer/core/PixiCanvas";
 import { OverlayToolbar } from "@/ui/panels/OverlayToolbar";
@@ -58,15 +57,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	overlayHandlersRef.current = overlayHandlers;
 
 	const socket = networkManager.getSocket();
-	const assetSocket = useAssetSocket(socket);
-
-	React.useEffect(() => {
-		if (!socket) return;
-		socket.on("response", assetSocket.handleResponse);
-		return () => {
-			socket.off("response", assetSocket.handleResponse);
-		};
-	}, [socket, assetSocket.handleResponse]);
 
 	const gameState = useGameState();
 	const players = useGamePlayers();
@@ -239,7 +229,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			<TopBar
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
-				socket={socket}
 				onFactionChange={(playerId, faction) => {
 					send("edit:room", { action: "set_faction", playerId, faction });
 				}}
@@ -248,7 +237,6 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 				<Box style={{ flex: 1, position: "relative", overflow: "hidden" }}>
 					<PixiCanvas
-						fetchAssets={assetSocket.batchGet}
 						onOverlaySetup={setOverlayHandlers}
 						overlayClientRef={overlayClientRef}
 					/>

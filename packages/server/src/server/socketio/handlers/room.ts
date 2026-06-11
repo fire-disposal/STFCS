@@ -6,7 +6,6 @@ import { ErrorCodes, PlayerRole, createBattleLogEvent, BattleLogType } from "@vt
 import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
-import { assetService } from "./services.js";
 import { factionService } from "./services.js";
 import { overlayRelay } from "../overlay.js";
 
@@ -258,24 +257,21 @@ export const roomHandlers = {
         }
     },
 
-    get_assets: async (payload: unknown, ctx: RpcContext) => {
+    get_assets: async (_payload: unknown, ctx: RpcContext) => {
         ctx.requireRoom();
-        const p = payload as WsPayload<"room:get_assets">;
         const room = ctx.roomManager.getRoom(ctx.roomId);
         if (!room) throw err("房间不存在", ErrorCodes.ROOM_NOT_FOUND);
-        const assetIds: string[] = [];
+        const assetIds = new Set<string>();
         const tokens = room.getCombatTokens();
         for (const token of tokens) {
-            const texture = token.spec.texture;
-            if (texture?.assetId) assetIds.push(texture.assetId);
+            if (token.spec.texture?.assetId) assetIds.add(token.spec.texture.assetId);
             for (const mount of token.spec.mounts ?? []) {
                 if (typeof mount.weapon !== "string" && mount.weapon?.spec?.texture?.assetId) {
-                    assetIds.push(mount.weapon.spec.texture.assetId);
+                    assetIds.add(mount.weapon.spec.texture.assetId);
                 }
             }
         }
-        const assets = await assetService.batchGetAssets([...new Set(assetIds)], p.includeData);
-        return { assets };
+        return { assetIds: [...assetIds] };
     },
 
     delete: async (payload: unknown, ctx: RpcContext) => {

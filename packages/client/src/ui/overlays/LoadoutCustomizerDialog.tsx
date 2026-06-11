@@ -26,13 +26,15 @@ import {
     type Texture,
     type WeaponTag,
 } from "@vt/data";
-import { Plus, Save, Upload, Copy, ShieldCheck, Trash2, X, Search } from "lucide-react";
+import { ChevronDown, Plus, Save, Upload, Copy, ShieldCheck, Trash2, X, Search, Loader } from "lucide-react";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { useAssetSocket } from "@/hooks/useAssetSocket";
+import { textureManager } from "@/renderer/systems/TextureManager";
 import MiniShipPreview from "../shared/MiniShipPreview";
 import MiniWeaponPreview from "../shared/MiniWeaponPreview";
 import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
+import { resizeImage, ASSET_LIMITS } from "@/utils/file";
 import "./ship-customization-modal.css";
 
 interface LoadoutCustomizerDialogProps {
@@ -60,9 +62,6 @@ function ensureWeaponDefaults(weapon: WeaponJSON): WeaponJSON {
     return next;
 }
 
-function toDataUrl(mimeType: string, base64: string): string {
-    return `data:${mimeType};base64,${base64}`;
-}
 
 function shortId(id: string): string {
     if (id.startsWith("preset:")) return id.slice(7);
@@ -74,6 +73,7 @@ async function applyColorKeyToDataUrl(sourceDataUrl: string, applyKeyColor?: { c
 
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const el = new Image();
+        el.crossOrigin = "anonymous";
         el.onload = () => resolve(el);
         el.onerror = () => reject(new Error("图片解码失败"));
         el.src = sourceDataUrl;
@@ -157,14 +157,38 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [weaponKeyTolerance, setWeaponKeyTolerance] = useState(0);
     const [shipColorKeyPreviewUrl, setShipColorKeyPreviewUrl] = useState<string | null>(null);
     const [weaponColorKeyPreviewUrl, setWeaponColorKeyPreviewUrl] = useState<string | null>(null);
-    const [pendingShipTextureFile, setPendingShipTextureFile] = useState<File | null>(null);
-    const [pendingWeaponTextureFile, setPendingWeaponTextureFile] = useState<File | null>(null);
+    const [isUploadingShipTexture, setIsUploadingShipTexture] = useState(false);
+    const [isUploadingWeaponTexture, setIsUploadingWeaponTexture] = useState(false);
+    const [shipImageDimensions, setShipImageDimensions] = useState<{ w: number; h: number } | null>(null);
+    const [weaponImageDimensions, setWeaponImageDimensions] = useState<{ w: number; h: number } | null>(null);
+    const [shipDragOver, setShipDragOver] = useState(false);
+    const [weaponDragOver, setWeaponDragOver] = useState(false);
 
     const [shipSearch, setShipSearch] = useState("");
     const [weaponSearch, setWeaponSearch] = useState("");
 
     const [mountSelection, setMountSelection] = useState<string>("");
     const [loadError, setLoadError] = useState<string | null>(null);
+
+    const [openSections, setOpenSections] = useState<Set<string>>(new Set(["texture", "attributes"]));
+    const toggleSection = useCallback((id: string) => {
+        setOpenSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const [openWeaponSections, setOpenWeaponSections] = useState<Set<string>>(new Set(["texture", "attributes"]));
+    const toggleWeaponSection = useCallback((id: string) => {
+        setOpenWeaponSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
     const shipBuildsRef = useRef<InventoryToken[]>([]);
     const weaponBuildsRef = useRef<WeaponJSON[]>([]);
 
@@ -235,29 +259,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [selectedShipBuildId]);
 
-    const loadTexturePreview = useCallback(async (assetId: string) => {
-        try {
-            const results = await assetSocket.batchGet([assetId], true);
-            const first = results[0];
-            if (first?.data && first?.info?.mimeType) {
-                setTexturePreviewUrl(toDataUrl(first.info.mimeType, first.data));
-            }
-        } catch {
-            setTexturePreviewUrl(null);
-        }
-    }, [assetSocket]);
+    const loadTexturePreview = useCallback((assetId: string) => {
+        setTexturePreviewUrl(textureManager.getTextureUrl(assetId));
+    }, []);
 
-    const loadWeaponTexturePreview = useCallback(async (assetId: string) => {
-        try {
-            const results = await assetSocket.batchGet([assetId], true);
-            const first = results[0];
-            if (first?.data && first?.info?.mimeType) {
-                setWeaponTexturePreviewUrl(toDataUrl(first.info.mimeType, first.data));
-            }
-        } catch {
-            setWeaponTexturePreviewUrl(null);
-        }
-    }, [assetSocket]);
+    const loadWeaponTexturePreview = useCallback((assetId: string) => {
+        setWeaponTexturePreviewUrl(textureManager.getTextureUrl(assetId));
+    }, []);
 
     useEffect(() => {
         const builds = weaponBuildsRef.current;
@@ -513,75 +521,62 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
         }
     }, [send, reloadData]);
 
-    const uploadShipTextureFromPreview = useCallback(async () => {
-        if (!shipColorKeyPreviewUrl) return;
+    const handleShipTextureUpload = useCallback(async (file: File) => {
+        setIsUploadingShipTexture(true);
         try {
-            // 直接上传预览版本（已抠图）
-            const base64Data = shipColorKeyPreviewUrl.split(',')[1];
-            const mimeType = shipColorKeyPreviewUrl.split(',')[0].match(/data:(.*?);/)?.[1] ?? 'image/png';
-            const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: mimeType });
-            const file = new File([blob], `ship-texture-${Date.now()}.png`, { type: 'image/png' });
-            
-            const assetId = await assetSocket.upload("ship_texture", file);
-            notify.success("上传成功");
+            const limits = ASSET_LIMITS.ship_texture;
+            const prepared = await resizeImage(file, limits.maxWidth, limits.maxHeight);
+            const assetId = await assetSocket.upload("ship_texture", prepared);
             updateShipTexture({ assetId });
-            setPendingShipTextureFile(null);
-            await loadTexturePreview(assetId);
-        } catch (error) {
-            notify.error(error instanceof Error ? error.message : "上传失败");
+            loadTexturePreview(assetId);
+        } catch (err) {
+            console.error("Ship texture upload failed:", err);
+            notify.error(err instanceof Error ? err.message : "上传失败");
+        } finally {
+            setIsUploadingShipTexture(false);
         }
-    }, [assetSocket, shipColorKeyPreviewUrl, updateShipTexture, loadTexturePreview]);
+    }, [assetSocket, updateShipTexture, loadTexturePreview]);
 
-    const uploadWeaponTextureFromPreview = useCallback(async () => {
-        if (!weaponColorKeyPreviewUrl) return;
+    const handleWeaponTextureUpload = useCallback(async (file: File) => {
+        setIsUploadingWeaponTexture(true);
         try {
-            // 直接上传预览版本（已抠图）
-            const base64Data = weaponColorKeyPreviewUrl.split(',')[1];
-            const mimeType = weaponColorKeyPreviewUrl.split(',')[0].match(/data:(.*?);/)?.[1] ?? 'image/png';
-            const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: mimeType });
-            const file = new File([blob], `weapon-texture-${Date.now()}.png`, { type: 'image/png' });
-            
-            const assetId = await assetSocket.upload("weapon_texture", file);
-            notify.success("上传成功");
+            const limits = ASSET_LIMITS.weapon_texture;
+            const prepared = await resizeImage(file, limits.maxWidth, limits.maxHeight);
+            const assetId = await assetSocket.upload("weapon_texture", prepared);
             updateWeaponTexture({ assetId });
-            setPendingWeaponTextureFile(null);
-            await loadWeaponTexturePreview(assetId);
-        } catch (error) {
-            notify.error(error instanceof Error ? error.message : "上传失败");
+            loadWeaponTexturePreview(assetId);
+        } catch (err) {
+            console.error("Weapon texture upload failed:", err);
+            notify.error(err instanceof Error ? err.message : "上传失败");
+        } finally {
+            setIsUploadingWeaponTexture(false);
         }
-    }, [assetSocket, weaponColorKeyPreviewUrl, updateWeaponTexture, loadWeaponTexturePreview]);
+    }, [assetSocket, updateWeaponTexture, loadWeaponTexturePreview]);
 
-    const loadLocalTexturePreview = useCallback(async (file: File) => {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result ?? ""));
-            reader.onerror = () => reject(new Error("文件读取失败"));
-            reader.readAsDataURL(file);
-        });
-        setTexturePreviewUrl(dataUrl);
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
     }, []);
 
-    const loadLocalWeaponTexturePreview = useCallback(async (file: File) => {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result ?? ""));
-            reader.onerror = () => reject(new Error("文件读取失败"));
-            reader.readAsDataURL(file);
-        });
-        setWeaponTexturePreviewUrl(dataUrl);
-    }, []);
+    const handleShipDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShipDragOver(false);
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+            void handleShipTextureUpload(file);
+        }
+    }, [handleShipTextureUpload]);
+
+    const handleWeaponDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setWeaponDragOver(false);
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+            void handleWeaponTextureUpload(file);
+        }
+    }, [handleWeaponTextureUpload]);
 
     useEffect(() => {
         let disposed = false;
@@ -632,6 +627,48 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     }, [weaponTexturePreviewUrl, weaponKeyColor, weaponKeyTolerance]);
 
     useEffect(() => {
+        if (!texturePreviewUrl) {
+            setShipImageDimensions(null);
+            return;
+        }
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            setShipImageDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+        };
+        img.src = texturePreviewUrl;
+    }, [texturePreviewUrl]);
+
+    useEffect(() => {
+        if (!weaponTexturePreviewUrl) {
+            setWeaponImageDimensions(null);
+            return;
+        }
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            setWeaponImageDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+        };
+        img.src = weaponTexturePreviewUrl;
+    }, [weaponTexturePreviewUrl]);
+
+    const shipPixelSize = Math.max(shipDraft?.spec.width ?? 40, shipDraft?.spec.length ?? 60);
+    const shipFitScale = shipImageDimensions
+        ? shipPixelSize / Math.max(shipImageDimensions.w, shipImageDimensions.h)
+        : 1;
+    const shipScaleMin = Math.max(0.05, shipFitScale * 0.1);
+    const shipScaleMax = Math.max(2, shipFitScale * 3);
+    const shipScaleStep = shipScaleMax > 5 ? 0.5 : shipScaleMax > 2 ? 0.1 : 0.05;
+
+    const weaponPixelSize = 20;
+    const weaponFitScale = weaponImageDimensions
+        ? weaponPixelSize / Math.max(weaponImageDimensions.w, weaponImageDimensions.h)
+        : 1;
+    const weaponScaleMin = Math.max(0.05, weaponFitScale * 0.1);
+    const weaponScaleMax = Math.max(2, weaponFitScale * 3);
+    const weaponScaleStep = weaponScaleMax > 5 ? 0.5 : weaponScaleMax > 2 ? 0.1 : 0.05;
+
+    useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -665,7 +702,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     }
 
     return (
-        <Dialog.Root open={open} onOpenChange={onOpenChange}>
+        <Dialog.Root open={open} onOpenChange={(next) => {
+            if (!next && (isShipDirty || isWeaponDirty)) {
+                if (!window.confirm("有未保存的修改，确定关闭？")) return;
+            }
+            onOpenChange(next);
+        }}>
             <Dialog.Content maxWidth="1200px">
                 <Flex justify="between" align="center" mb="2">
                     <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
@@ -715,6 +757,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Box className="customizer-list-item__info">
                                                         <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
+                                                            {item.$id === selectedShipBuildId && isShipDirty && <span style={{ color: "var(--orange-9)", marginLeft: 4 }}>●</span>}
                                                         </Text>
                                                         <Text size="1" color="gray">{item.spec.size}/{item.spec.class}</Text>
                                                     </Box>
@@ -740,13 +783,23 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Grid columns="2" gap="4">
-                                <Flex direction="column" gap="3">
-                                    <Card>
+                            <Flex direction="column" style={{ maxHeight: "calc(80vh - 100px)" }}>
+                                <Flex direction="column" style={{ overflowY: "auto", flex: 1 }}>
+                                    <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">舰船</Text>
                                         </Flex>
-                                        <MiniShipPreview token={shipDraft} zoom={shipPreviewZoom} onZoomChange={setShipPreviewZoom} texturePreviewUrl={shipColorKeyPreviewUrl} />
+                                        <MiniShipPreview
+                                            token={shipDraft}
+                                            zoom={shipPreviewZoom}
+                                            onZoomChange={setShipPreviewZoom}
+                                            texturePreviewUrl={shipColorKeyPreviewUrl}
+                                            onTextureOffsetChange={(dx, dy) => {
+                                                const currentX = shipDraft?.spec.texture?.offsetX ?? 0;
+                                                const currentY = shipDraft?.spec.texture?.offsetY ?? 0;
+                                                updateShipTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
+                                            }}
+                                        />
                                         <Flex justify="center" gap="2" mt="1">
                                             <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
                                             <Text size="1">{shipPreviewZoom.toFixed(2)}x</Text>
@@ -754,46 +807,51 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         </Flex>
                                     </Card>
 
-                                    <Card>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">贴图</Text>
-                                            <Flex gap="2">
-                                                {shipDraft?.spec.texture?.assetId && (
-                                                    <Button size="1" variant="soft" color="red" onClick={() => {
-                                                        updateShipTexture({ assetId: undefined });
-                                                        setTexturePreviewUrl(null);
-                                                        setShipColorKeyPreviewUrl(null);
-                                                        setPendingShipTextureFile(null);
-                                                    }} data-magnetic>
-                                                        <Trash2 size={12} /> 删除
+                                    <Card
+                                        mt="3"
+                                        onDragOver={handleDragOver}
+                                        onDragEnter={(e: React.DragEvent) => { e.preventDefault(); setShipDragOver(true); }}
+                                        onDragLeave={() => setShipDragOver(false)}
+                                        onDrop={handleShipDrop}
+                                        style={shipDragOver ? { outline: "2px dashed #4a9eff", outlineOffset: -2 } : undefined}
+                                    >
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleSection("texture")}>
+                                            <Flex align="center" gap="2">
+                                                <Text weight="bold">贴图调整</Text>
+                                                <Flex gap="2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                                    {shipDraft?.spec.texture?.assetId && (
+                                                        <Button size="1" variant="soft" color="red" onClick={() => {
+                                                            updateShipTexture({ assetId: undefined });
+                                                            setTexturePreviewUrl(null);
+                                                            setShipColorKeyPreviewUrl(null);
+                                                        }} data-magnetic>
+                                                            <Trash2 size={12} /> 删除
+                                                        </Button>
+                                                    )}
+                                                    <Button size="1" variant="solid" color="blue"
+                                                        onClick={() => shipTextureInputRef.current?.click()}
+                                                        disabled={isUploadingShipTexture}
+                                                        data-magnetic>
+                                                        {isUploadingShipTexture ? (
+                                                            <><Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> 上传中...</>
+                                                        ) : (
+                                                            <><Upload size={12} /> 选择图片</>
+                                                        )}
                                                     </Button>
-                                                )}
-                                                <Button size="1" variant="solid" color="blue" onClick={() => shipTextureInputRef.current?.click()} data-magnetic>
-                                                    <Upload size={12} /> 选择图片
-                                                </Button>
+                                                </Flex>
                                             </Flex>
+                                            <ChevronDown size={14} style={{ transform: openSections.has("texture") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
                                         </Flex>
-
-                                        <Flex direction="column" gap="2">
-                                            {shipColorKeyPreviewUrl && (
-                                                <Box style={{ width: 120, height: 120, border: "1px solid rgba(43, 66, 97, 0.6)", borderRadius: 4, overflow: "hidden" }}>
-                                                    <img src={shipColorKeyPreviewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                                                </Box>
-                                            )}
-                                            {pendingShipTextureFile && (
-                                                <Button size="2" variant="solid" color="green" onClick={() => void uploadShipTextureFromPreview()} style={{ width: "100%" }} data-magnetic>
-                                                    <Upload size={14} /> 上传并应用
-                                                </Button>
-                                            )}
-
+                                        {openSections.has("texture") && (
+                                        <Flex direction="column" gap="2" mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                                             <Separator size="2" />
 
                                             <Flex direction="column" gap="2">
                                                 <Text size="1" weight="bold">贴图位置调整</Text>
-                                                <Grid columns="3" gap="3">
+                                                <Flex direction="column" gap="2">
                                                     <Box>
                                                         <Text size="1" color="gray">X 偏移（左舷为正）</Text>
-                                                        <Flex align="center" gap="1">
+                                                        <Flex align="center" gap="2">
                                                             <input
                                                                 className="customizer-range"
                                                                 type="range"
@@ -801,14 +859,17 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 max={100}
                                                                 value={shipDraft?.spec.texture?.offsetX ?? 0}
                                                                 onChange={(e) => updateShipTexture({ offsetX: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
+                                                                style={{ flex: 1 }}
                                                             />
-                                                            <Text size="1">{shipDraft?.spec.texture?.offsetX ?? 0}</Text>
+                                                            <input type="number"
+                                                                value={shipDraft?.spec.texture?.offsetX ?? 0}
+                                                                onChange={(e) => updateShipTexture({ offsetX: Number(e.target.value) || 0 })}
+                                                                style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
                                                         </Flex>
                                                     </Box>
                                                     <Box>
                                                         <Text size="1" color="gray">Y 偏移（船头为正）</Text>
-                                                        <Flex align="center" gap="1">
+                                                        <Flex align="center" gap="2">
                                                             <input
                                                                 className="customizer-range"
                                                                 type="range"
@@ -816,28 +877,35 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                 max={100}
                                                                 value={shipDraft?.spec.texture?.offsetY ?? 0}
                                                                 onChange={(e) => updateShipTexture({ offsetY: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
+                                                                style={{ flex: 1 }}
                                                             />
-                                                            <Text size="1">{shipDraft?.spec.texture?.offsetY ?? 0}</Text>
+                                                            <input type="number"
+                                                                value={shipDraft?.spec.texture?.offsetY ?? 0}
+                                                                onChange={(e) => updateShipTexture({ offsetY: Number(e.target.value) || 0 })}
+                                                                style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
                                                         </Flex>
                                                     </Box>
                                                     <Box>
                                                         <Text size="1" color="gray">缩放比例</Text>
-                                                        <Flex align="center" gap="1">
+                                                        <Flex align="center" gap="2">
                                                             <input
                                                                 className="customizer-range"
                                                                 type="range"
-                                                                min={0.1}
-                                                                max={10}
-                                                                step={0.1}
+                                                                min={shipScaleMin}
+                                                                max={shipScaleMax}
+                                                                step={shipScaleStep}
                                                                 value={shipDraft?.spec.texture?.scale ?? 1}
                                                                 onChange={(e) => updateShipTexture({ scale: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
+                                                                style={{ flex: 1 }}
                                                             />
-                                                            <Text size="1">{(shipDraft?.spec.texture?.scale ?? 1).toFixed(1)}x</Text>
+                                                            <input type="number"
+                                                                value={shipDraft?.spec.texture?.scale ?? 1}
+                                                                onChange={(e) => updateShipTexture({ scale: Number(e.target.value) || 0 })}
+                                                                step={shipScaleStep}
+                                                                style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
                                                         </Flex>
                                                     </Box>
-                                                </Grid>
+                                                </Flex>
                                             </Flex>
 
                                             <Separator size="2" />
@@ -850,24 +918,29 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 previewImageUrl={texturePreviewUrl}
                                             />
                                         </Flex>
+                                        )}
 
                                         <input
                                             ref={shipTextureInputRef}
                                             type="file"
-                                            accept="image/png,image/jpeg,image/webp,image/gif"
+                                            accept="image/png,image/jpeg,image/webp"
                                             style={{ display: "none" }}
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                setPendingShipTextureFile(file);
-                                                void loadLocalTexturePreview(file);
+                                                void handleShipTextureUpload(file);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
                                     </Card>
 
-                                    <Card style={{ marginTop: 16 }}>
-                                        <Text weight="bold" mb="2">挂点管理</Text>
+                                    <Card mt="3">
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleSection("mounts")}>
+                                            <Text weight="bold">挂点管理</Text>
+                                            <ChevronDown size={14} style={{ transform: openSections.has("mounts") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
+                                        </Flex>
+                                        {openSections.has("mounts") && (
+                                        <Box mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                                         <Grid columns="30% 70%" gap="4">
                                             <Box style={{ borderRight: "1px solid rgba(255,255,255,0.1)", paddingRight: 16 }}>
                                                 <Button
@@ -997,7 +1070,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                                 if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), x: value };
                                                                             });
                                                                         }}
-                                                                        style={{ width: 100 }}
+                                                                        style={{ flex: 1 }}
                                                                     />
                                                                     <TextField.Root
                                                                         type="number"
@@ -1030,7 +1103,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                                 if (mount) mount.position = { ...(mount.position ?? { x: 0, y: 0 }), y: value };
                                                                             });
                                                                         }}
-                                                                        style={{ width: 100 }}
+                                                                        style={{ flex: 1 }}
                                                                     />
                                                                     <TextField.Root
                                                                         type="number"
@@ -1065,7 +1138,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                                 if (mount) mount.facing = value;
                                                                             });
                                                                         }}
-                                                                        style={{ width: 100 }}
+                                                                        style={{ flex: 1 }}
                                                                     />
                                                                     <TextField.Root
                                                                         type="number"
@@ -1098,7 +1171,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                                                 if (mount) mount.arc = value;
                                                                             });
                                                                         }}
-                                                                        style={{ width: 100 }}
+                                                                        style={{ flex: 1 }}
                                                                     />
                                                                     <TextField.Root
                                                                         type="number"
@@ -1177,20 +1250,25 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 )}
                                             </Box>
                                         </Grid>
+                                        </Box>
+                                        )}
                                     </Card>
-                                </Flex>
 
-                                <Flex direction="column" gap="3">
-                                    <Card>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">属性编辑</Text>
-                                            <Tabs.Root value={editorTab} onValueChange={(v) => setEditorTab(v as "form" | "json")}>
-                                                <Tabs.List>
-                                                    <Tabs.Trigger value="form">表单</Tabs.Trigger>
-                                                    <Tabs.Trigger value="json">JSON</Tabs.Trigger>
-                                                </Tabs.List>
-                                            </Tabs.Root>
+                                    <Card mt="3">
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleSection("attributes")}>
+                                            <Flex align="center" gap="2">
+                                                <Text weight="bold">属性编辑</Text>
+                                                <Tabs.Root value={editorTab} onValueChange={(v) => { v && setEditorTab(v as "form" | "json"); }}>
+                                                    <Tabs.List onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                                        <Tabs.Trigger value="form">表单</Tabs.Trigger>
+                                                        <Tabs.Trigger value="json">JSON</Tabs.Trigger>
+                                                    </Tabs.List>
+                                                </Tabs.Root>
+                                            </Flex>
+                                            <ChevronDown size={14} style={{ transform: openSections.has("attributes") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
                                         </Flex>
+                                        {openSections.has("attributes") && (
+                                        <Box mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
 
                                         {editorTab === "form" && shipDraft && (
                                             <Flex direction="column" gap="3">
@@ -1330,13 +1408,17 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             </Flex>
                                         )}
 
-                                        <Flex justify="end" mt="2">
-                                            <Button onClick={() => void saveShip()} color={isShipDirty ? "green" : undefined} data-magnetic><Save size={14} /> 保存</Button>
-                                        </Flex>
+                                        </Box>
+                                        )}
                                     </Card>
 
-                                    <Card>
-                                        <Text weight="bold" mb="2">预设模板</Text>
+                                    <Card mt="3">
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleSection("presets")}>
+                                            <Text weight="bold">预设模板</Text>
+                                            <ChevronDown size={14} style={{ transform: openSections.has("presets") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
+                                        </Flex>
+                                        {openSections.has("presets") && (
+                                        <Box mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                                         <Flex direction="column" gap="1">
                                             {shipPresets.map((preset) => (
                                                 <Flex key={preset.$id} justify="between" align="center" gap="2" py="1">
@@ -1348,9 +1430,34 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 </Flex>
                                             ))}
                                         </Flex>
+                                        </Box>
+                                        )}
                                     </Card>
+
+                                    <Box style={{ height: 48 }} />
                                 </Flex>
-                            </Grid>
+
+                                <Flex
+                                    justify="between"
+                                    align="center"
+                                    px="3"
+                                    py="2"
+                                    style={{
+                                        borderTop: "1px solid rgba(43, 66, 97, 0.6)",
+                                        background: "var(--color-panel)",
+                                    }}
+                                >
+                                    <Flex align="center" gap="2">
+                                        {isShipDirty && (
+                                            <Badge color="orange" size="1">未保存</Badge>
+                                        )}
+                                        <Text size="1" color="gray">Ctrl+S 快速保存</Text>
+                                    </Flex>
+                                    <Button onClick={() => void saveShip()} color={isShipDirty ? "green" : undefined} disabled={!isShipDirty} data-magnetic>
+                                        <Save size={14} /> 保存
+                                    </Button>
+                                </Flex>
+                            </Flex>
                         </Grid>
                     )}
 
@@ -1387,6 +1494,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     <Box className="customizer-list-item__info">
                                                         <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
+                                                            {item.$id === selectedWeaponBuildId && isWeaponDirty && <span style={{ color: "var(--orange-9)", marginLeft: 4 }}>●</span>}
                                                         </Text>
                                                         <Text size="1" color="gray">{item.spec.size}/{item.spec.damageType}</Text>
                                                     </Box>
@@ -1412,146 +1520,177 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Grid columns="2" gap="4">
-                                <Flex direction="column" gap="3">
-                                    <Card>
+                            <Flex direction="column" style={{ maxHeight: "calc(80vh - 100px)" }}>
+                                <Flex direction="column" style={{ overflowY: "auto", flex: 1 }}>
+                                    <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
                                         <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">武器预览</Text>
-                                            <Flex gap="2">
-                                                {weaponDraft?.spec.texture?.assetId && (
-                                                    <Button size="1" variant="soft" color="red" onClick={() => {
-                                                        updateWeaponTexture({ assetId: undefined });
-                                                        setWeaponTexturePreviewUrl(null);
-                                                        setWeaponColorKeyPreviewUrl(null);
-                                                        setPendingWeaponTextureFile(null);
-                                                    }} data-magnetic>
-                                                        <Trash2 size={12} /> 删除
-                                                    </Button>
-                                                )}
-                                                <Button size="1" variant="solid" color="blue" onClick={() => weaponTextureInputRef.current?.click()} data-magnetic>
-                                                    <Upload size={12} /> 选择图片
-                                                </Button>
-                                            </Flex>
+                                            <Text weight="bold">武器</Text>
                                         </Flex>
-
-                                        <Flex direction="column" gap="2" align="center">
+                                        <Flex direction="column" gap="2">
                                             {weaponDraft && (
                                                 <MiniWeaponPreview
                                                     weapon={weaponDraft}
                                                     texturePreviewUrl={weaponColorKeyPreviewUrl}
                                                     zoom={weaponPreviewZoom}
                                                     onZoomChange={setWeaponPreviewZoom}
+                                                    onTextureOffsetChange={(dx, dy) => {
+                                                        const currentX = weaponDraft?.spec.texture?.offsetX ?? 0;
+                                                        const currentY = weaponDraft?.spec.texture?.offsetY ?? 0;
+                                                        updateWeaponTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
+                                                    }}
                                                 />
                                             )}
                                             {!weaponDraft && (
                                                 <Text size="1" color="gray">请先选择武器</Text>
                                             )}
                                         </Flex>
-
                                         <Flex justify="center" gap="2" mt="1">
                                             <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.max(0.2, weaponPreviewZoom - 0.25))}>-</Button>
                                             <Text size="1">{weaponPreviewZoom.toFixed(2)}x</Text>
                                             <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.min(4, weaponPreviewZoom + 0.25))}>+</Button>
                                         </Flex>
-                                        {pendingWeaponTextureFile && (
-                                            <Button size="2" variant="solid" color="green" onClick={() => void uploadWeaponTextureFromPreview()} style={{ width: "100%" }} data-magnetic>
-                                                <Upload size={14} /> 上传并应用
-                                            </Button>
-                                        )}
+                                    </Card>
 
-                                        {weaponDraft && (
-                                            <Flex direction="column" gap="2" mt="2">
-                                                <Separator size="2" />
-
-                                                <Text size="1" weight="bold">贴图位置调整</Text>
-                                                <Grid columns="3" gap="3">
-                                                    <Box>
-                                                        <Text size="1" color="gray">X 偏移（左舷为正）</Text>
-                                                        <Flex align="center" gap="1">
-                                                            <input
-                                                                className="customizer-range"
-                                                                type="range"
-                                                                min={-100}
-                                                                max={100}
-                                                                value={weaponDraft.spec.texture?.offsetX ?? 0}
-                                                                onChange={(e) => updateWeaponTexture({ offsetX: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
-                                                            />
-                                                            <Text size="1">{weaponDraft.spec.texture?.offsetX ?? 0}</Text>
-                                                        </Flex>
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">Y 偏移（船头为正）</Text>
-                                                        <Flex align="center" gap="1">
-                                                            <input
-                                                                className="customizer-range"
-                                                                type="range"
-                                                                min={-100}
-                                                                max={100}
-                                                                value={weaponDraft.spec.texture?.offsetY ?? 0}
-                                                                onChange={(e) => updateWeaponTexture({ offsetY: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
-                                                            />
-                                                            <Text size="1">{weaponDraft.spec.texture?.offsetY ?? 0}</Text>
-                                                        </Flex>
-                                                    </Box>
-                                                    <Box>
-                                                        <Text size="1" color="gray">缩放比例</Text>
-                                                        <Flex align="center" gap="1">
-                                                            <input
-                                                                className="customizer-range"
-                                                                type="range"
-                                                                min={0.1}
-                                                                max={10}
-                                                                step={0.1}
-                                                                value={weaponDraft.spec.texture?.scale ?? 1}
-                                                                onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) })}
-                                                                style={{ width: 80 }}
-                                                            />
-                                                            <Text size="1">{(weaponDraft.spec.texture?.scale ?? 1).toFixed(1)}x</Text>
-                                                        </Flex>
-                                                    </Box>
-                                                </Grid>
-
-                                                <Separator size="2" />
-
-                                                <ColorKeyPickerPanel
-                                                    color={weaponKeyColor}
-                                                    tolerance={weaponKeyTolerance}
-                                                    onColorChange={setWeaponKeyColor}
-                                                    onToleranceChange={setWeaponKeyTolerance}
-                                                    previewImageUrl={weaponTexturePreviewUrl}
-                                                />
+                                    <Card
+                                        mt="3"
+                                        onDragOver={handleDragOver}
+                                        onDragEnter={(e: React.DragEvent) => { e.preventDefault(); setWeaponDragOver(true); }}
+                                        onDragLeave={() => setWeaponDragOver(false)}
+                                        onDrop={handleWeaponDrop}
+                                        style={weaponDragOver ? { outline: "2px dashed #4a9eff", outlineOffset: -2 } : undefined}
+                                    >
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleWeaponSection("texture")}>
+                                            <Flex align="center" gap="2">
+                                                <Text weight="bold">贴图调整</Text>
+                                                <Flex gap="2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                                    {weaponDraft?.spec.texture?.assetId && (
+                                                        <Button size="1" variant="soft" color="red" onClick={() => {
+                                                            updateWeaponTexture({ assetId: undefined });
+                                                            setWeaponTexturePreviewUrl(null);
+                                                            setWeaponColorKeyPreviewUrl(null);
+                                                        }} data-magnetic>
+                                                            <Trash2 size={12} /> 删除
+                                                        </Button>
+                                                    )}
+                                                    <Button size="1" variant="solid" color="blue"
+                                                        onClick={() => weaponTextureInputRef.current?.click()}
+                                                        disabled={isUploadingWeaponTexture}
+                                                        data-magnetic>
+                                                        {isUploadingWeaponTexture ? (
+                                                            <><Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> 上传中...</>
+                                                        ) : (
+                                                            <><Upload size={12} /> 选择图片</>
+                                                        )}
+                                                    </Button>
+                                                </Flex>
                                             </Flex>
+                                            <ChevronDown size={14} style={{ transform: openWeaponSections.has("texture") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
+                                        </Flex>
+                                        {openWeaponSections.has("texture") && weaponDraft && (
+                                        <Flex direction="column" gap="2" mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
+                                            <Separator size="2" />
+
+                                            <Text size="1" weight="bold">贴图位置调整</Text>
+                                            <Flex direction="column" gap="2">
+                                                <Box>
+                                                    <Text size="1" color="gray">X 偏移（左舷为正）</Text>
+                                                    <Flex align="center" gap="2">
+                                                        <input
+                                                            className="customizer-range"
+                                                            type="range"
+                                                            min={-100}
+                                                            max={100}
+                                                            value={weaponDraft.spec.texture?.offsetX ?? 0}
+                                                            onChange={(e) => updateWeaponTexture({ offsetX: Number(e.target.value) })}
+                                                            style={{ flex: 1 }}
+                                                        />
+                                                        <input type="number"
+                                                            value={weaponDraft.spec.texture?.offsetX ?? 0}
+                                                            onChange={(e) => updateWeaponTexture({ offsetX: Number(e.target.value) || 0 })}
+                                                            style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+                                                    </Flex>
+                                                </Box>
+                                                <Box>
+                                                    <Text size="1" color="gray">Y 偏移（船头为正）</Text>
+                                                    <Flex align="center" gap="2">
+                                                        <input
+                                                            className="customizer-range"
+                                                            type="range"
+                                                            min={-100}
+                                                            max={100}
+                                                            value={weaponDraft.spec.texture?.offsetY ?? 0}
+                                                            onChange={(e) => updateWeaponTexture({ offsetY: Number(e.target.value) })}
+                                                            style={{ flex: 1 }}
+                                                        />
+                                                        <input type="number"
+                                                            value={weaponDraft.spec.texture?.offsetY ?? 0}
+                                                            onChange={(e) => updateWeaponTexture({ offsetY: Number(e.target.value) || 0 })}
+                                                            style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+                                                    </Flex>
+                                                </Box>
+                                                <Box>
+                                                    <Text size="1" color="gray">缩放比例</Text>
+                                                    <Flex align="center" gap="2">
+                                                        <input
+                                                            className="customizer-range"
+                                                            type="range"
+                                                            min={weaponScaleMin}
+                                                            max={weaponScaleMax}
+                                                            step={weaponScaleStep}
+                                                            value={weaponDraft.spec.texture?.scale ?? 1}
+                                                            onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) })}
+                                                            style={{ flex: 1 }}
+                                                        />
+                                                        <input type="number"
+                                                            value={weaponDraft.spec.texture?.scale ?? 1}
+                                                            onChange={(e) => updateWeaponTexture({ scale: Number(e.target.value) || 0 })}
+                                                            step={weaponScaleStep}
+                                                            style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+                                                    </Flex>
+                                                </Box>
+                                            </Flex>
+
+                                            <Separator size="2" />
+
+                                            <ColorKeyPickerPanel
+                                                color={weaponKeyColor}
+                                                tolerance={weaponKeyTolerance}
+                                                onColorChange={setWeaponKeyColor}
+                                                onToleranceChange={setWeaponKeyTolerance}
+                                                previewImageUrl={weaponTexturePreviewUrl}
+                                            />
+                                        </Flex>
                                         )}
 
                                         <input
                                             ref={weaponTextureInputRef}
                                             type="file"
-                                            accept="image/png,image/jpeg,image/webp,image/gif"
+                                            accept="image/png,image/jpeg,image/webp"
                                             style={{ display: "none" }}
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                setPendingWeaponTextureFile(file);
-                                                void loadLocalWeaponTexturePreview(file);
+                                                void handleWeaponTextureUpload(file);
                                                 e.currentTarget.value = "";
                                             }}
                                         />
                                     </Card>
-                                </Flex>
 
-                                <Flex direction="column" gap="3">
-                                    <Card>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">属性编辑</Text>
-                                            <Tabs.Root value={weaponEditorTab} onValueChange={(v) => setWeaponEditorTab(v as "form" | "json")}>
-                                                <Tabs.List>
-                                                    <Tabs.Trigger value="form">表单</Tabs.Trigger>
-                                                    <Tabs.Trigger value="json">JSON</Tabs.Trigger>
-                                                </Tabs.List>
-                                            </Tabs.Root>
+                                    <Card mt="3">
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleWeaponSection("attributes")}>
+                                            <Flex align="center" gap="2">
+                                                <Text weight="bold">属性编辑</Text>
+                                                <Tabs.Root value={weaponEditorTab} onValueChange={(v) => { v && setWeaponEditorTab(v as "form" | "json"); }}>
+                                                    <Tabs.List onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                                        <Tabs.Trigger value="form">表单</Tabs.Trigger>
+                                                        <Tabs.Trigger value="json">JSON</Tabs.Trigger>
+                                                    </Tabs.List>
+                                                </Tabs.Root>
+                                            </Flex>
+                                            <ChevronDown size={14} style={{ transform: openWeaponSections.has("attributes") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
                                         </Flex>
+                                        {openWeaponSections.has("attributes") && (
+                                        <Box mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
 
                                         {weaponEditorTab === "form" && weaponDraft && (
                                             <Flex direction="column" gap="3">
@@ -1683,13 +1822,17 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                             </Flex>
                                         )}
 
-                                        <Flex justify="end" mt="2">
-                                            <Button onClick={() => void saveWeapon()} color={isWeaponDirty ? "green" : undefined} data-magnetic><Save size={14} /> 保存</Button>
-                                        </Flex>
+                                        </Box>
+                                        )}
                                     </Card>
 
-                                    <Card>
-                                        <Text weight="bold" mb="2">预设模板</Text>
+                                    <Card mt="3">
+                                        <Flex justify="between" align="center" style={{ cursor: "pointer" }} onClick={() => toggleWeaponSection("presets")}>
+                                            <Text weight="bold">预设模板</Text>
+                                            <ChevronDown size={14} style={{ transform: openWeaponSections.has("presets") ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
+                                        </Flex>
+                                        {openWeaponSections.has("presets") && (
+                                        <Box mt="2" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                                         <Flex direction="column" gap="1">
                                             {weaponPresets.map((preset) => (
                                                 <Flex key={preset.$id} justify="between" align="center" gap="2" py="1">
@@ -1701,9 +1844,34 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 </Flex>
                                             ))}
                                         </Flex>
+                                        </Box>
+                                        )}
                                     </Card>
+
+                                    <Box style={{ height: 48 }} />
                                 </Flex>
-                            </Grid>
+
+                                <Flex
+                                    justify="between"
+                                    align="center"
+                                    px="3"
+                                    py="2"
+                                    style={{
+                                        borderTop: "1px solid rgba(43, 66, 97, 0.6)",
+                                        background: "var(--color-panel)",
+                                    }}
+                                >
+                                    <Flex align="center" gap="2">
+                                        {isWeaponDirty && (
+                                            <Badge color="orange" size="1">未保存</Badge>
+                                        )}
+                                        <Text size="1" color="gray">Ctrl+S 快速保存</Text>
+                                    </Flex>
+                                    <Button onClick={() => void saveWeapon()} color={isWeaponDirty ? "green" : undefined} disabled={!isWeaponDirty} data-magnetic>
+                                        <Save size={14} /> 保存
+                                    </Button>
+                                </Flex>
+                            </Flex>
                         </Grid>
                     )}
                 </Tabs.Root>

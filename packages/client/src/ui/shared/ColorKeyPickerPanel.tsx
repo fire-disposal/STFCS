@@ -96,7 +96,7 @@ export const ColorKeyPickerPanel: React.FC<ColorKeyPickerPanelProps> = ({
                     max={50}
                     value={tolerance}
                     onChange={(e) => onToleranceChange(Number(e.target.value))}
-                    style={{ width: 80 }}
+                    style={{ flex: 1, minWidth: 60 }}
                 />
                 <Text size="1">{tolerance}</Text>
             </Flex>

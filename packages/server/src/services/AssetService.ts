@@ -14,7 +14,9 @@
 import { mkdir, writeFile, readFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
+import sharp from "sharp";
 import { createLogger } from "../infra/simple-logger.js";
+import { AssetCache } from "./AssetCache.js";
 import { DEFAULT_ASSET_CONFIG } from "@vt/data";
 import type { Asset, AssetListItem, AssetType, AssetLimitsConfig } from "@vt/data";
 
@@ -69,82 +71,9 @@ function getLimits(type: AssetType): AssetLimitsConfig {
 	return DEFAULT_ASSET_CONFIG[type];
 }
 
-/**
- * 解析PNG图像尺寸（简单解析，不依赖外部库）
- */
-function parsePngDimensions(buffer: Buffer): ImageDimensions | null {
-	// PNG文件头: 8字节签名 + 4字节长度 + 4字节类型(IHDR) + 数据
-	// IHDR块包含宽度(4字节)和高度(4字节)
-	if (buffer.length < 24) return null;
-
-	// PNG签名: 89 50 4E 47 0D 0A 1A 0A
-	const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-	for (let i = 0; i < 8; i++) {
-		if (buffer[i] !== signature[i]) return null;
-	}
-
-	// IHDR块在签名后，偏移8字节
-	// 格式: 长度(4) + "IHDR"(4) + 宽度(4) + 高度(4) + ...
-	const width = buffer.readUInt32BE(16);
-	const height = buffer.readUInt32BE(20);
-
-	return { width, height };
-}
-
-/**
- * 解析JPEG图像尺寸（简单解析）
- */
-function parseJpegDimensions(buffer: Buffer): ImageDimensions | null {
-	if (buffer.length < 10) return null;
-
-	// JPEG签名: FF D8
-	if (buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
-
-	let offset = 2;
-	while (offset < buffer.length - 8) {
-		// 查找 SOF0 (FF C0) 或 SOF2 (FF C2) 标记
-		if (buffer[offset] === 0xff) {
-			const marker = buffer[offset + 1];
-			if (marker === undefined) break;
-
-			if (marker === 0xc0 || marker === 0xc2) {
-				// SOF标记后: 长度(2) + 精度(1) + 高度(2) + 宽度(2)
-				const height = buffer.readUInt16BE(offset + 5);
-				const width = buffer.readUInt16BE(offset + 7);
-				return { width, height };
-			}
-			// 跳过其他标记
-			if (marker >= 0xd0 && marker <= 0xd9) {
-				offset += 2;
-			} else if (marker === 0x01) {
-				offset += 4;
-			} else {
-				offset += 2 + buffer.readUInt16BE(offset + 2);
-			}
-		} else {
-			offset++;
-		}
-	}
-
-	return null;
-}
-
-/**
- * 解析图像尺寸
- */
-function parseImageDimensions(buffer: Buffer, mimeType: string): ImageDimensions | null {
-	switch (mimeType) {
-		case "image/png":
-			return parsePngDimensions(buffer);
-		case "image/jpeg":
-			return parseJpegDimensions(buffer);
-		default:
-			return null;
-	}
-}
-
 export class AssetService {
 	private initialized = false;
+	private assetCache = new AssetCache(50 * 1024 * 1024);
 
 	/**
 	 * 初始化资产目录结构
@@ -178,48 +107,45 @@ export class AssetService {
 		}
 	}
 
-	/**
-	 * 验证资产上传
-	 */
-	validateAsset(
+	async validateAsset(
 		type: AssetType,
 		mimeType: string,
 		data: Buffer
-	): { valid: boolean; error?: string; dimensions?: ImageDimensions } {
+	): Promise<{ valid: boolean; error?: string; dimensions?: ImageDimensions }> {
 		const limits = getLimits(type);
 
-		// 1. 验证 MIME 类型
 		if (!limits.allowedMimeTypes.includes(mimeType)) {
 			const allowedStr = limits.allowedMimeTypes.join(", ");
 			return { valid: false, error: `Invalid MIME type for ${type}. Allowed: ${allowedStr}` };
 		}
 
-		// 2. 验证文件大小
 		if (data.length > limits.maxFileSize) {
 			const maxKB = limits.maxFileSize / 1024;
 			return { valid: false, error: `File too large. Max size: ${maxKB}KB` };
 		}
 
-		// 3. 解析并验证图像尺寸
-		const dimensions = parseImageDimensions(data, mimeType);
-		if (!dimensions) {
-			return { valid: false, error: "Unable to parse image dimensions" };
-		}
+		try {
+			const metadata = await sharp(data).metadata();
+			if (!metadata.width || !metadata.height) {
+				return { valid: false, error: "Unable to parse image dimensions" };
+			}
 
-		if (dimensions.width < limits.minWidth || dimensions.height < limits.minHeight) {
-			return { valid: false, error: `Image too small. Min: ${limits.minWidth}x${limits.minHeight}` };
-		}
+			const dimensions = { width: metadata.width, height: metadata.height };
 
-		if (dimensions.width > limits.maxWidth || dimensions.height > limits.maxHeight) {
-			return { valid: false, error: `Image too large. Max: ${limits.maxWidth}x${limits.maxHeight}` };
-		}
+			if (dimensions.width < limits.minWidth || dimensions.height < limits.minHeight) {
+				return { valid: false, error: `Image too small. Min: ${limits.minWidth}x${limits.minHeight}` };
+			}
 
-		return { valid: true, dimensions };
+			if (dimensions.width > limits.maxWidth || dimensions.height > limits.maxHeight) {
+				return { valid: false, error: `Image too large. Max: ${limits.maxWidth}x${limits.maxHeight}` };
+			}
+
+			return { valid: true, dimensions };
+		} catch {
+			return { valid: false, error: "Unable to parse image. File may be corrupted or unsupported format." };
+		}
 	}
 
-	/**
-	 * 上传资产
-	 */
 	async uploadAsset(
 		userId: string,
 		type: AssetType,
@@ -230,15 +156,21 @@ export class AssetService {
 	): Promise<Asset> {
 		await this.initialize();
 
-		// 验证
-		const validation = this.validateAsset(type, mimeType, data);
+		const validation = await this.validateAsset(type, mimeType, data);
 		if (!validation.valid) {
 			throw new Error(validation.error);
 		}
 
+		let finalData = data;
+		let finalMimeType = mimeType;
+		if (mimeType !== "image/png") {
+			finalData = await sharp(data).png().toBuffer();
+			finalMimeType = "image/png";
+		}
+
 		const assetId = generateAssetId(type);
 		const dir = getAssetDir(type);
-		const ext = getExtension(mimeType);
+		const ext = getExtension(finalMimeType);
 		const now = Date.now();
 
 		const ownerId = userId.startsWith("player:") ? userId : `player:${userId}`;
@@ -247,8 +179,8 @@ export class AssetService {
 			$id: assetId,
 			type,
 			filename,
-			mimeType,
-			size: data.length,
+			mimeType: finalMimeType,
+			size: finalData.length,
 			metadata: {
 				name: metadata?.name ?? filename,
 				description: metadata?.description,
@@ -260,19 +192,15 @@ export class AssetService {
 			uploadedAt: now,
 		};
 
-		// 保存元数据
 		await writeFile(join(dir, `${assetId}.json`), JSON.stringify(asset, null, 2));
-
-		// 保存数据文件
-		await writeFile(join(dir, `${assetId}${ext}`), data);
-
-		// 更新索引
+		await writeFile(join(dir, `${assetId}${ext}`), finalData);
 		await this.updateIndex(type, assetId, this.toListItem(asset));
 
 		logger.info("Asset uploaded", {
 			assetId,
 			type,
-			size: data.length,
+			size: finalData.length,
+			originalMimeType: mimeType,
 			dimensions: validation.dimensions,
 			ownerId,
 		});
@@ -357,6 +285,20 @@ export class AssetService {
 		return null;
 	}
 
+	async getAssetBuffer(assetId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+		const cached = this.assetCache.get(assetId);
+		if (cached) return cached;
+
+		const asset = await this.getAsset(assetId);
+		if (!asset) return null;
+
+		const data = await this.getAssetData(assetId);
+		if (!data) return null;
+
+		this.assetCache.set(assetId, data, asset.mimeType);
+		return { buffer: data, mimeType: asset.mimeType };
+	}
+
 	/**
 	 * 获取资产信息（列表项）
 	 */
@@ -439,6 +381,8 @@ export class AssetService {
 
 		const asset = await this.getAsset(assetId);
 		if (!asset) return false;
+
+		this.assetCache.evict(assetId);
 
 		const type = this.parseType(assetId);
 		if (!type) return false;

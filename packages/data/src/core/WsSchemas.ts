@@ -174,13 +174,9 @@ export const RoomActionDef = {
 export type RoomActionPayload = z.infer<typeof RoomActionDef.payload>
 
 export const RoomGetAssetsDef = {
-  payload: z.object({ includeData: z.boolean().optional() }),
+  payload: z.object({}),
   response: z.object({
-    assets: z.array(z.object({
-      assetId: z.string(),
-      info: AssetListItemSchema.nullable(),
-      data: z.string().optional(),
-    })),
+    assetIds: z.array(z.string()),
   }),
 } as const satisfies WsEventDef<any, any>
 
