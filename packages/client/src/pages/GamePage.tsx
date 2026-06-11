@@ -249,7 +249,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				<RightSidebar networkManager={networkManager} />
 			</Box>
 
-			<BattlePanel tabs={tabs} defaultActiveTab="ship-info" />
+			<BattlePanel tabs={tabs} />
 
 			<Dialog.Root open={showPlayerRoster} onOpenChange={setShowPlayerRoster}>
 				<Dialog.Content style={{ maxWidth: 400 }}>

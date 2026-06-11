@@ -162,7 +162,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 	if (!hasShip) {
 		return (
 			<Box className="battle-row battle-row--empty">
-				<Text size="2" color="gray">选择舰船后可移动</Text>
+				<Text size="2" color="gray">点击选择舰船</Text>
 			</Box>
 		);
 	}
@@ -255,25 +255,29 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 							<Button size="2" variant={selectedDirection === "right" ? "solid" : "soft"} color="blue" onClick={() => handleDirectionSelect("right")} disabled={!canLeftRight} title="右移">
 								<ArrowRight size={14} />
 							</Button>
-							{selectedDirection && (
-								<>
-									<input type="range" min={0} max={phaseRemaining} step={5} value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 80 }} />
-									<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>{translateValue}m</Text>
-								</>
-							)}
+						{selectedDirection && (
+							<Flex align="center" gap="2" style={{ flex: 1 }}>
+								<input type="range" min={0} max={phaseRemaining} step={5} value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
+								<input type="number" value={translateValue} onChange={(e) => handleTranslateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+								<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>m</Text>
+							</Flex>
+						)}
 						</>
 					) : currentPhase === "B" ? (
 						<>
-							<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue - 15)} disabled={!canAct}>
-								<RotateCcw size={14} />
-							</Button>
-							<input type="range" min={-turnRemaining} max={turnRemaining} step={5} value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 80 }} />
-							<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue + 15)} disabled={!canAct}>
-								<RotateCw size={14} />
-							</Button>
-							<Text size="1" weight="bold" style={{ color: rotateValue > 0 ? "#4a9eff" : rotateValue < 0 ? "#ff6f8f" : "#6b8aaa" }}>
-								{rotateValue}°
-							</Text>
+						<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue - 15)} disabled={!canAct}>
+							<RotateCcw size={14} />
+						</Button>
+						<Flex align="center" gap="2" style={{ flex: 1 }}>
+							<input type="range" min={-turnRemaining} max={turnRemaining} step={5} value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ flex: 1 }} />
+							<input type="number" value={rotateValue} onChange={(e) => handleRotateChange(Number(e.target.value))} disabled={!canAct} style={{ width: 52, textAlign: "center", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)", borderRadius: 4, color: "#cfe8ff", fontSize: 11, padding: "2px 4px" }} />
+						</Flex>
+						<Button size="2" variant="soft" onClick={() => handleRotateChange(rotateValue + 15)} disabled={!canAct}>
+							<RotateCw size={14} />
+						</Button>
+						<Text size="1" weight="bold" style={{ color: rotateValue > 0 ? "#4a9eff" : rotateValue < 0 ? "#ff6f8f" : "#6b8aaa" }}>
+							°
+						</Text>
 						</>
 					) : null}
 				</Box>
@@ -282,7 +286,7 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 			<Box className="battle-divider" />
 
 			{/* ====== 右列：执行 + 推进按钮 ====== */}
-			<Box className="battle-col battle-col--narrow" style={{ maxWidth: 70, padding: 0 }}>
+			<Box className="battle-col battle-col--narrow" style={{ maxWidth: 100, padding: 0 }}>
 				<Box style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, padding: "6px 4px" }}>
 					<Button
 						size="2"
@@ -292,17 +296,17 @@ export const MovementPanel: React.FC<MovementPanelProps> = ({ canControl = true 
 						disabled={!canAct || isDone || (currentPhase !== "B" && (!selectedDirection || translateValue === 0)) || (currentPhase === "B" && rotateValue === 0)}
 						style={{ flex: 1, minHeight: 50 }}
 					>
-						<Check size={16} />
-					</Button>
-					<Button
-						size="2"
-						variant="soft"
-						color="amber"
-						onClick={handleAdvancePhase}
-						disabled={!canAct || isDone}
-						style={{ flex: 1, minHeight: 50 }}
-					>
-						<ChevronRight size={16} />
+					<Check size={14} /> 执行
+				</Button>
+				<Button
+					size="2"
+					variant="soft"
+					color="amber"
+					onClick={handleAdvancePhase}
+					disabled={!canAct || isDone}
+					style={{ flex: 1, minHeight: 50 }}
+				>
+					<ChevronRight size={14} /> 下一阶段
 					</Button>
 				</Box>
 			</Box>

@@ -18,7 +18,6 @@ export interface TabConfig {
 
 export interface BattlePanelProps {
 	tabs: TabConfig[];
-	defaultActiveTab?: string;
 }
 
 export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs }) => {
@@ -55,11 +54,17 @@ export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs }) => {
 					)}
 				</Flex>
 
-				{!collapsed && (
-					<Box className="battle-bar__content">
-						{enabledTabs.find((tab) => tab.id === safeActiveTab)?.component}
-					</Box>
-				)}
+			{!collapsed && (
+				<Box className="battle-bar__content">
+					{enabledTabs.map((tab) => (
+						<Tabs.Content key={tab.id} value={tab.id} forceMount>
+							<div style={{ display: safeActiveTab === tab.id ? undefined : "none" }}>
+								{tab.component}
+							</div>
+						</Tabs.Content>
+					))}
+				</Box>
+			)}
 			</Tabs.Root>
 		</Box>
 	);

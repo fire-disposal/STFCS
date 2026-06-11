@@ -81,7 +81,7 @@ export const ShipInfoPanel: React.FC = () => {
 	if (!hasShip) {
 		return (
 			<Box className="battle-row battle-row--empty">
-				<Text size="2" color="gray">选择舰船后显示信息</Text>
+				<Text size="2" color="gray">点击地图上的舰船以查看详情</Text>
 			</Box>
 		);
 	}
@@ -92,7 +92,10 @@ export const ShipInfoPanel: React.FC = () => {
 			<Box className="battle-col battle-col--fixed">
 				<Box className="battle-col__header">
 					<Box style={{ width: 10, height: 10, borderRadius: "50%", background: `#${getFactionColor(faction ?? undefined).toString(16).padStart(6, "0")}`, boxShadow: faction ? `0 0 8px #${getFactionColor(faction ?? undefined).toString(16).padStart(6, "0")}` : "none", flexShrink: 0 }} />
-					<Text size="1" weight="bold">{displayName}</Text>
+					<Flex direction="column" gap="0">
+						<Text size="1" weight="bold">{displayName}</Text>
+						<Text size="1" color="gray">{ship.spec.size} · {ship.spec.class}</Text>
+					</Flex>
 					{isEditingName ? (
 						<Flex align="center" gap="1">
 							<TextField.Root size="1" value={editingName} onChange={(e) => setEditingName(e.target.value)} style={{ width: 100 }} />
@@ -124,7 +127,7 @@ export const ShipInfoPanel: React.FC = () => {
 				<Box className="battle-col__content battle-col__content--horizontal">
 					<Text size="1" color="gray">HP</Text>
 					<Text size="2" weight="bold" style={{ color: "#cfe8ff" }}>{hull}/{hullMax}</Text>
-					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 80, height: 8 }} />
+					<Progress value={hullPct} color={hullPct > 50 ? "green" : hullPct > 25 ? "yellow" : "red"} style={{ width: 120, height: 10 }} />
 				</Box>
 			</Box>
 
@@ -194,12 +197,16 @@ export const ShipInfoPanel: React.FC = () => {
 				<Box className="battle-col__header">
 					<Text size="1">坐标</Text>
 				</Box>
-				<Box className="battle-col__content battle-col__content--horizontal">
-					<Text size="1" weight="bold" style={{ color: "#cfe8ff" }}>{headingDeg}°, {posX}, {posY}</Text>
-					<IconButton size="1" variant="ghost" onClick={() => navigator.clipboard.writeText(`${headingDeg},${posX},${posY}`)}>
-						<Copy size={12} />
-					</IconButton>
-				</Box>
+			<Box className="battle-col__content battle-col__content--horizontal">
+				<Flex gap="3">
+					<Text size="1">朝向 {headingDeg}°</Text>
+					<Text size="1">X {posX}</Text>
+					<Text size="1">Y {posY}</Text>
+				</Flex>
+				<IconButton size="1" variant="ghost" onClick={() => navigator.clipboard.writeText(`${headingDeg},${posX},${posY}`)}>
+					<Copy size={12} />
+				</IconButton>
+			</Box>
 			</Box>
 		</Box>
 	);

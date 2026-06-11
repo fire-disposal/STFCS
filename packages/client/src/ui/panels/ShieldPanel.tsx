@@ -144,7 +144,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 
 	// 承伤预估（基于输入伤害）
 	const damageCapacity = useMemo(() => {
-		if (!hasShieldSpec || !shieldActive || inputDamage <= 0) return null;
+		if (!hasShieldSpec || inputDamage <= 0) return null;
 
 		const result: Record<DamageType, { maxDamage: number; maxHits: number }> = {} as any;
 
@@ -159,7 +159,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 		}
 
 		return result;
-	}, [hasShieldSpec, shieldActive, fluxRemaining, shieldEfficiency, inputDamage]);
+	}, [hasShieldSpec, fluxRemaining, shieldEfficiency, inputDamage]);
 
 	const handleOpenShield = async () => {
 		if (!canToggleShield || shieldActive) return;
@@ -196,11 +196,11 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 	};
 
 	if (!hasShip) {
-		return <Box className="battle-row battle-row--empty"><Text size="2" color="gray">选择舰船后可管理护盾</Text></Box>;
+		return <Box className="battle-row battle-row--empty"><Text size="2" color="gray">点击选择舰船</Text></Box>;
 	}
 
 	if (!hasShieldSpec) {
-		return <Box className="battle-row battle-row--empty"><Shield size={14} style={{ color: "#6b8aaa" }} /><Text size="2" color="gray">无护盾装备</Text></Box>;
+		return <Box className="battle-row battle-row--empty"><Shield size={14} style={{ color: "#6b8aaa" }} /><Text size="2" color="gray">该舰船未装备护盾</Text></Box>;
 	}
 
 	return (
@@ -208,14 +208,14 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 			{/* 左列：操作按钮（三行） */}
 			<Box className="battle-col battle-col--narrow" style={{ maxWidth: 70, padding: 0 }}>
 				<Box style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, padding: "6px 4px" }}>
-					<Button size="2" variant={shieldActive ? "soft" : "solid"} color="blue" onClick={handleOpenShield} disabled={!canToggleShield || shieldActive} style={{ flex: 1, minHeight: 36 }}>
+					<Button size="2" variant={shieldActive ? "solid" : "soft"} color="blue" onClick={handleOpenShield} disabled={!canToggleShield || shieldActive} style={{ flex: 1, minHeight: 36, borderLeft: shieldActive ? "3px solid #4a9eff" : undefined }}>
 						<Shield size={14} /> 开启
 					</Button>
-					<Button size="2" variant={!shieldActive ? "soft" : "solid"} color="gray" onClick={handleCloseShield} disabled={!canToggleShield || !shieldActive} style={{ flex: 1, minHeight: 36 }}>
+					<Button size="2" variant={!shieldActive && !venting ? "solid" : "soft"} color="gray" onClick={handleCloseShield} disabled={!canToggleShield || !shieldActive} style={{ flex: 1, minHeight: 36, borderLeft: !shieldActive && !venting ? "3px solid #6b8aaa" : undefined }}>
 						<X size={14} /> 关闭
 					</Button>
-					<Button size="2" variant="soft" color="purple" onClick={handleVent} disabled={!canVent} style={{ flex: 1, minHeight: 36 }}>
-						<Zap size={14} /> 散辐
+					<Button size="2" variant={venting ? "solid" : "soft"} color="purple" onClick={handleVent} disabled={!canVent} style={{ flex: 1, minHeight: 36, borderLeft: venting ? "3px solid #9b59b6" : undefined }}>
+						<Zap size={14} /> 散热
 					</Button>
 				</Box>
 			</Box>
@@ -288,18 +288,12 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 			<Box className="battle-col" style={{ flex: 1, minWidth: 90, opacity: shieldFixed ? 0.4 : 1 }}>
 				<Flex className="battle-col__header" align="center" gap="1">
 					<RotateCw size={12} />
-					<Text size="1" weight="bold">转向</Text>
+					<Text size="1" weight="bold">护盾朝向</Text>
 					{shieldFixed && <Badge size="1" color="gray">固定</Badge>}
 					{isOmniShield && <Badge size="1" color="blue">全向</Badge>}
 				</Flex>
-				<Box className="battle-col__content" style={{ flexDirection: "column", alignItems: "center", gap: 4, padding: "4px 6px" }}>
-					{/* 角度显示器 */}
-					<Text size="2" weight="bold" style={{ color: shieldFixed ? "#6b8aaa" : "#cfe8ff" }}>
-						{previewDirection}°
-					</Text>
-					
-					{/* 竖直滑动条 */}
-					<Box style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center" }}>
+				<Box className="battle-col__content" style={{ flexDirection: "column", gap: 6, padding: "6px 6px" }}>
+					<Flex align="center" gap="2">
 						<input
 							type="range"
 							min={0}
@@ -309,17 +303,25 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 							onChange={(e) => handleDirectionPreview(Number(e.target.value))}
 							disabled={shieldFixed || isOmniShield || !canRotateShield}
 							style={{
-								width: 80,
-								transform: "rotate(-90deg)",
+								flex: 1,
 								opacity: shieldFixed || isOmniShield ? 0.3 : 1,
 							}}
 						/>
-					</Box>
-					
-					{/* 执行按钮 */}
+						<TextField.Root
+							size="1"
+							value={String(previewDirection)}
+							onChange={(e) => {
+								const v = Number(e.target.value);
+								if (!isNaN(v) && v >= 0 && v <= 360) handleDirectionPreview(v);
+							}}
+							disabled={shieldFixed || isOmniShield || !canRotateShield}
+							style={{ width: 48 }}
+						/>
+						<Text size="1" color="gray">°</Text>
+					</Flex>
 					{!shieldFixed && !isOmniShield && (
 						pendingDirection !== null && pendingDirection !== shieldDirection ? (
-							<Flex gap="1">
+							<Flex gap="1" justify="center">
 								<Button size="1" variant="solid" color="green" onClick={handleConfirmDirection} disabled={!canRotateShield}>
 									<Check size={12} />
 								</Button>
@@ -328,7 +330,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 								</Button>
 							</Flex>
 						) : (
-							<Text size="1" color="gray">{!shieldActive ? "需开启" : "调整滑块"}</Text>
+							<Text size="1" color="gray" style={{ textAlign: "center" }}>{!shieldActive ? "需开启" : "调整滑块"}</Text>
 						)
 					)}
 				</Box>
@@ -342,10 +344,12 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 					<Text size="1" weight="bold">承伤</Text>
 					{!shieldActive && <Badge size="1" color="gray">关闭</Badge>}
 				</Flex>
-				<Box className="battle-col__content" style={{ padding: "4px 6px" }}>
+				<Box className="battle-col__content" style={{ padding: "4px 6px", opacity: shieldActive ? 1 : 0.5 }}>
 					{damageCapacity ? (
 						<>
-							{/* 伤害输入 */}
+							{!shieldActive && (
+								<Text size="1" color="gray" style={{ textAlign: "center", marginBottom: 4 }}>激活后可承受</Text>
+							)}
 							<Flex align="center" gap="2" style={{ marginBottom: 4, padding: "2px 4px", background: "rgba(10, 25, 50, 0.3)", borderRadius: 2 }}>
 								<Text size="1" color="gray">武器伤害</Text>
 								<TextField.Root
@@ -356,8 +360,6 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 									style={{ width: 60 }}
 								/>
 							</Flex>
-							
-							{/* 各类型：一行显示伤害和击数 */}
 							<Flex direction="column" gap="1">
 								{(Object.keys(DAMAGE_TYPE_INFO) as DamageType[]).map((type) => {
 									const info = DAMAGE_TYPE_INFO[type];
@@ -378,7 +380,7 @@ export const ShieldPanel: React.FC<ShieldPanelProps> = ({ canControl = true }) =
 							</Flex>
 						</>
 					) : (
-						<Text size="1" color="gray" style={{ textAlign: "center", padding: 8 }}>护盾关闭</Text>
+						<Text size="1" color="gray" style={{ textAlign: "center", padding: 8 }}>无护盾数据</Text>
 					)}
 				</Box>
 			</Box>

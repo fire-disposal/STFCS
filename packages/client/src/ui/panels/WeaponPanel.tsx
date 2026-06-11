@@ -11,6 +11,7 @@ import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useUIStore } from "@/state/stores/uiStore";
 import { UI_CONFIG } from "@/config/constants";
+import { notify } from "@/ui/shared/Notification";
 import "./weapon-panel.css";
 
 const DAMAGE_TYPE_COLORS = UI_CONFIG.COLORS.DAMAGE_TYPE;
@@ -32,6 +33,8 @@ interface WeaponStatus {
 	tags: string[];
 	reason?: string;
 	mountName?: string;
+	mountDisplayName?: string;
+	mountSize?: string;
 	weaponDisplayName?: string;
 }
 
@@ -116,6 +119,8 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 					tags: weaponSpec.tags ?? [],
 					reason,
 					mountName: m.id,
+					mountDisplayName: m.displayName,
+					mountSize: m.size,
 					weaponDisplayName: (m.weapon as any)?.metadata?.name ?? (m.weapon as any)?.$id ?? m.id,
 				};
 			});
@@ -213,6 +218,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 			mountId: localSelectedWeaponId,
 			targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
 		}]);
+		notify.success("开火指令已发送");
 		setSelectedTargetIds([]);
 	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack]);
 
@@ -227,12 +233,20 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 		setSelectedTargetIds([]);
 	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendDeviation]);
 
-	// 空状态
-	if (!hasShip || weapons.length === 0) {
+	if (!hasShip) {
 		return (
 			<Flex className="weapon-panel weapon-panel--empty" gap="2" align="center">
 				<Crosshair size={14} />
-				<Text size="1" color="gray">无武器</Text>
+				<Text size="1" color="gray">点击选择舰船</Text>
+			</Flex>
+		);
+	}
+
+	if (weapons.length === 0) {
+		return (
+			<Flex className="weapon-panel weapon-panel--empty" gap="2" align="center">
+				<Crosshair size={14} />
+				<Text size="1" color="gray">该舰船无武器挂载</Text>
 			</Flex>
 		);
 	}
@@ -274,7 +288,11 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 								title={w.reason ?? w.name}
 							>
 								<Box className={`weapon-indicator weapon-indicator--${indicatorColor}`} />
-								<Text size="1" className="weapon-item__name">{w.mountName} / {w.weaponDisplayName}</Text>
+								<Text size="1" className="weapon-item__name">{
+									w.name !== w.mountId
+										? w.name
+										: `${w.mountDisplayName ?? (() => { const m = w.mountId.match(/(\d+)$/); return m ? `挂点 ${Number(m[1]) + 1}` : w.mountId; })()} · ${w.mountSize ?? ""}`
+								}</Text>
 							</Flex>
 						);
 					})}
@@ -421,15 +439,6 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 						data-magnetic
 					>
 						<Text size="1" weight="bold">开火</Text>
-					</Button>
-					<Button
-						className="fire-col-btn"
-						size="2"
-						variant="soft"
-						color="gray"
-						disabled
-					>
-						<Text size="1">命中</Text>
 					</Button>
 					<Button
 						className="fire-col-btn"
