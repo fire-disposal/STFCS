@@ -917,6 +917,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 onToleranceChange={setKeyTolerance}
                                                 previewImageUrl={texturePreviewUrl}
                                             />
+
+                                            <Separator size="2" />
+                                            <Flex justify="end">
+                                                <Button size="1" onClick={() => void saveShip()} color={isShipDirty ? "green" : undefined} disabled={!isShipDirty} data-magnetic>
+                                                    <Save size={14} /> 保存贴图设置
+                                                </Button>
+                                            </Flex>
                                         </Flex>
                                         )}
 
@@ -1659,6 +1666,13 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                 onToleranceChange={setWeaponKeyTolerance}
                                                 previewImageUrl={weaponTexturePreviewUrl}
                                             />
+
+                                            <Separator size="2" />
+                                            <Flex justify="end">
+                                                <Button size="1" onClick={() => void saveWeapon()} color={isWeaponDirty ? "green" : undefined} disabled={!isWeaponDirty} data-magnetic>
+                                                    <Save size={14} /> 保存贴图设置
+                                                </Button>
+                                            </Flex>
                                         </Flex>
                                         )}
 
