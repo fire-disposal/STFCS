@@ -53,7 +53,6 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 		setSaving(true);
 		try {
 			await send("save:action", { action: "create", name: newSaveName.trim() });
-			notify.success("存档已创建");
 			setNewSaveName("");
 			setShowCreate(false);
 			loadSaves();
@@ -72,7 +71,6 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 		setSaving(true);
 		try {
 			await send("save:action", { action: "load", saveId });
-			notify.success("存档已加载");
 			setOpen(false);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "加载失败");
@@ -86,7 +84,6 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 		setSaving(true);
 		try {
 			await send("save:action", { action: "delete", saveId });
-			notify.success("存档已删除");
 			loadSaves();
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "删除失败");

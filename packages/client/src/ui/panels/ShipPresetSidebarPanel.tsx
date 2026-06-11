@@ -106,7 +106,6 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 				heading: cursorHeading,
 				faction: "preset:faction:player-alliance",
 			});
-			notify.success("舰船部署成功");
 		} catch {
 			// 错误已由 useGameAction 中的 notify.error 处理
 		}

@@ -181,7 +181,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				await send("edit:token", { action: "modify", tokenId: ship.$id, path: "metadata/owner", value: newOwner });
 			}
 
-			notify.success("舰船数据已保存");
 			setEditMode(false);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "保存失败");
@@ -209,7 +208,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 				await send("edit:token", { action: "modify", tokenId: ship.$id, path: "metadata/owner", value: parsed.metadata.owner });
 			}
 
-			notify.success("JSON 数据已保存");
 			setJsonError(null);
 		} catch (error) {
 			setJsonError(error instanceof Error ? error.message : "JSON 解析失败");
@@ -221,7 +219,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 		if (!window.confirm(`确定删除舰船 "${ship.metadata?.name ?? ship.$id.slice(-6)}"？`)) return;
 		try {
 			await send("edit:token", { action: "remove", tokenId: ship.$id });
-			notify.success("舰船已删除");
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "删除失败");
 		}
@@ -231,7 +228,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 		if (!ship) return;
 		try {
 			await send("edit:token", { action: "restore", tokenId: ship.$id });
-			notify.success("舰船已完全修复");
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "修复失败");
 		}
@@ -241,7 +237,6 @@ export const RealityEditSidebarPanel: React.FC<RealityEditSidebarPanelProps> = (
 		if (!ship) return;
 		try {
 			await send("edit:token", { action: "damage", tokenId: ship.$id, amount });
-			notify.success(`造成 ${amount} 点伤害`);
 		} catch (error) {
 			notify.error(error instanceof Error ? error.message : "伤害失败");
 		}

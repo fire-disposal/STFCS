@@ -137,7 +137,6 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
         setNewColor(hex);
         setIsPicking(false);
-        notify.success(`已取色 ${hex}`);
     }, [isPicking]);
 
     const handleCreate = async () => {
@@ -149,7 +148,6 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                 color: newColor,
                 flagData: flagData ?? undefined,
             } as any);
-            notify.success("派系已创建");
             setNewName("");
             setNewColor("#4a9eff");
             setFlagData(null);
@@ -164,7 +162,6 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
         setLoading(true);
         try {
             await networkManager.request("edit:faction:delete", { factionId: fid });
-            notify.success("派系已删除");
             loadFactions();
         } catch (e: any) { notify.error(e?.message ?? "删除失败"); }
         finally { setLoading(false); }

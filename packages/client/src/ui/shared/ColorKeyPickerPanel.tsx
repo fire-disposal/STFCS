@@ -47,7 +47,6 @@ export const ColorKeyPickerPanel: React.FC<ColorKeyPickerPanelProps> = ({
             const eyeDropper = new EyeDropperCtor();
             const result = await eyeDropper.open();
             onColorChange(result.sRGBHex);
-            notify.success(`已取色 ${result.sRGBHex}`);
         } catch {
             // 用户取消时不提示错误
         }
@@ -75,7 +74,6 @@ export const ColorKeyPickerPanel: React.FC<ColorKeyPickerPanelProps> = ({
         const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
         onColorChange(hex);
         setIsPickingFromPreview(false);
-        notify.success(`已取色 ${hex}`);
     }, [isPickingFromPreview, onColorChange]);
 
     return (

@@ -125,6 +125,9 @@ rpc.namespace("save", {
           ownerId: currentState.ownerId,
           createdAt: currentState.createdAt,
         });
+        ctx.state.appendLog(createBattleLogEvent(BattleLogType.SYSTEM, {
+          message: `DM ${ctx.playerName} 加载了存档 "${save.metadata?.name ?? p.saveId}"`,
+        }));
         return;
       }
       case "delete": {

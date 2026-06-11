@@ -152,7 +152,6 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
 				console.log("[LobbyPage] Avatar data URL generated, length:", dataUrl.length);
 				setPreviewAvatar(dataUrl);
-				notify.success("头像解析成功，请点击保存完成更换");
 			};
 			img.onerror = () => {
 				notify.error("图片加载失败");

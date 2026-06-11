@@ -76,7 +76,6 @@ const App: React.FC = () => {
 			setUserProfile(result.profile ?? { nickname: username, avatar: null });
 			userService.setUsername(username);
 			setAppState("lobby");
-			notify.success(`欢迎，${username}！`);
 			setRefreshKey(Date.now());
 		} else {
 			notify.error(result.error || "认证失败");
@@ -89,7 +88,6 @@ const App: React.FC = () => {
 		setPlayerId(null);
 		setAppState("auth");
 		networkManagerRef.current?.logout();
-		notify.info("已退出登录");
 	}, []);
 
 	const handleCreateRoom = useCallback(async () => {
@@ -102,7 +100,6 @@ const App: React.FC = () => {
 		});
 
 		if (result.success && result.roomId) {
-			notify.success("房间创建成功，点击「进入我的房间」开始游戏");
 			setAppState("lobby");
 			setRefreshKey(Date.now());
 		} else {
@@ -118,7 +115,6 @@ const App: React.FC = () => {
 		const result = await networkManagerRef.current.joinRoom(myRoom.roomId);
 
 		if (result.success) {
-			notify.success("进入房间成功");
 			setAppState("game");
 		} else {
 			notify.error(result.error || "进入房间失败");
@@ -133,7 +129,6 @@ const App: React.FC = () => {
 		const result = await networkManagerRef.current.joinRoom(roomId);
 
 		if (result.success) {
-			notify.success("加入房间成功");
 			setAppState("game");
 		} else {
 			notify.error(result.error || "加入房间失败");
@@ -145,7 +140,6 @@ const App: React.FC = () => {
 		setAppState("lobby");
 		networkManagerRef.current?.leaveRoom();
 		setRefreshKey(Date.now());
-		notify.info("已返回大厅");
 	}, []);
 
 	const handleRefresh = useCallback(() => {
@@ -162,7 +156,6 @@ const App: React.FC = () => {
 			}
 
 			setUserProfile(result.profile);
-			notify.success("玩家档案已保存");
 		},
 		[]
 	);
@@ -172,7 +165,6 @@ const App: React.FC = () => {
 
 		const result = await networkManagerRef.current.deleteRoom(roomId);
 		if (result.success) {
-			notify.success("房间已删除");
 			setRefreshKey(Date.now());
 		} else {
 			notify.error(result.error || "删除房间失败");
