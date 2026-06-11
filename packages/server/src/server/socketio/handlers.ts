@@ -10,8 +10,8 @@ import { customizeHandlers } from "./handlers/customize.js";
 import { gameHandlers } from "./handlers/game.js";
 import { factionHandlers, editFactionHandlers } from "./handlers/faction.js";
 import { playerInfoService, playerProfileService, presetService, assetService } from "./handlers/services.js";
-import { PlayerRole, ErrorCodes } from "@vt/data";
-import type { WsPayload, PlayerInfo } from "@vt/data";
+import { PlayerRole, ErrorCodes, createBattleLogEvent, BattleLogType } from "@vt/data";
+import type { WsPayload, PlayerInfo, PingPayload } from "@vt/data";
 import { generateShortId } from "../utils/shortId.js";
 import { overlayRelay } from "./overlay.js";
 
@@ -266,11 +266,31 @@ export function setupSocketIO(io: any, roomManager: any): void {
       const senderId = socket.data.playerId;
       if (!senderId) return;
       overlayRelay.handle(io, socket, data.roomId, senderId, data.type, data.payload);
+      if (data.type === "ping") {
+        const p = data.payload as PingPayload;
+        const room = roomManager.getRoom(data.roomId);
+        if (room) {
+          room.getStateManager().appendLog(createBattleLogEvent(BattleLogType.PING, {
+            playerId: p.playerId,
+            playerName: socket.data.playerName ?? "",
+            x: Math.round(p.x),
+            y: Math.round(p.y),
+          }));
+        }
+      }
     });
 
     socket.on("disconnect", () => {
-      const sd = socket.data as { playerId?: string; roomId?: string; role?: string };
+      const sd = socket.data as { playerId?: string; roomId?: string; role?: string; playerName?: string };
       if (sd.roomId && sd.playerId) {
+        const room = roomManager.getRoom(sd.roomId);
+        if (room) {
+          room.getStateManager().appendLog(createBattleLogEvent(BattleLogType.PLAYER_LEAVE, {
+            playerId: sd.playerId,
+            playerName: sd.playerName ?? "",
+            reason: "disconnect",
+          }));
+        }
         roomManager.disconnectPlayer(sd.roomId, sd.playerId);
       }
       socket.data.roomId = undefined;

@@ -471,6 +471,11 @@ export const SyncRequestFullDef = {
   response: GameRoomStateSchema,
 } as const satisfies WsEventDef<any, any>
 
+export const GameRollDiceDef = {
+  payload: z.object({ diceType: z.string(), count: z.number().int().min(1).max(20) }),
+  response: z.object({ diceType: z.string(), count: z.number(), results: z.array(z.number()), sum: z.number() }),
+} as const satisfies WsEventDef<any, any>
+
 // ============================================================
 // BattleLog（战斗日志）
 // ============================================================
@@ -508,6 +513,7 @@ export const WsEventDefinitions = {
   "preset:get_weapon": PresetGetWeaponDef,
   "game:action": GameActionDef,
   "game:query": GameQueryDef,
+  "game:roll_dice": GameRollDiceDef,
   "edit:token": EditTokenDef,
   "edit:room": EditRoomDef,
   "deploy:token": DeployTokenDef,
@@ -574,25 +580,9 @@ export function createPatchPayload(patches: StatePatch[]): StatePatchPayload {
 
 // BattleLog 工具函数
 export function createBattleLogEvent(
-  type: string,
-  data: Record<string, unknown> = {},
-  timestamp?: number
+	type: string,
+	data: Record<string, unknown> = {},
+	timestamp?: number
 ): BattleLogEvent {
-  return { type, data, timestamp: timestamp ?? Date.now() }
-}
-
-/** @deprecated 使用 createBattleLogEvent */
-export function createBattleLogEdit(
-  playerId: string,
-  playerName: string,
-  tokenId: string,
-  tokenName: string,
-  path: string,
-  oldValue: unknown,
-  newValue: unknown,
-  reason?: string
-): BattleLogEvent {
-  return createBattleLogEvent("edit", {
-    playerId, playerName, tokenId, tokenName, path, oldValue, newValue, reason,
-  })
+	return { type, data, timestamp: timestamp ?? Date.now() }
 }

@@ -56,7 +56,6 @@ export {
   createPatch,
   createPatchPayload,
   createBattleLogEvent,
-  createBattleLogEdit,
 } from "./core/index.js"
 
 export type {

@@ -385,6 +385,75 @@ export type RoomPlayerState = z.infer<typeof RoomPlayerStateSchema>;
 // 战斗日志
 // ============================================================
 
+/** 战斗日志事件类型常量 */
+export const BattleLogType = {
+	ATTACK: "attack",
+	DEVIATION: "deviation",
+	DESTROYED: "destroyed",
+	MOVE: "move",
+	ROTATE: "rotate",
+	SHIELD_TOGGLE: "shield_toggle",
+	SHIELD_ROTATE: "shield_rotate",
+	VENT: "vent",
+	OVERLOADED: "overloaded",
+	OVERLOAD_END: "overload_end",
+	END_TURN: "end_turn",
+	ADVANCE_PHASE: "advance_phase",
+	EDIT: "edit",
+	GAME_STARTED: "game_started",
+	FACTION_CHANGE: "faction_change",
+	FLUX_SETTLEMENT: "flux_settlement",
+	ROUND_END: "round_end",
+	DEPLOY: "deploy",
+	PLAYER_JOIN: "player_join",
+	PLAYER_LEAVE: "player_leave",
+	ROLL: "roll",
+	PING: "ping",
+	SYSTEM: "system",
+} as const;
+export type BattleLogType = (typeof BattleLogType)[keyof typeof BattleLogType];
+
+/** 日志分类（用于 UI 过滤和配色） */
+export const BattleLogCategory = {
+	COMBAT: "combat",
+	MOVEMENT: "movement",
+	DEFENSE: "defense",
+	SETTLEMENT: "settlement",
+	PHASE: "phase",
+	SYSTEM: "system",
+} as const;
+export type BattleLogCategory = (typeof BattleLogCategory)[keyof typeof BattleLogCategory];
+
+/** 日志类型 → 分类映射 */
+export const BATTLE_LOG_CATEGORY_MAP: Record<string, BattleLogCategory> = {
+	[BattleLogType.ATTACK]: BattleLogCategory.COMBAT,
+	[BattleLogType.DEVIATION]: BattleLogCategory.COMBAT,
+	[BattleLogType.DESTROYED]: BattleLogCategory.COMBAT,
+	[BattleLogType.MOVE]: BattleLogCategory.MOVEMENT,
+	[BattleLogType.ROTATE]: BattleLogCategory.MOVEMENT,
+	[BattleLogType.SHIELD_TOGGLE]: BattleLogCategory.DEFENSE,
+	[BattleLogType.SHIELD_ROTATE]: BattleLogCategory.DEFENSE,
+	[BattleLogType.VENT]: BattleLogCategory.DEFENSE,
+	[BattleLogType.OVERLOADED]: BattleLogCategory.DEFENSE,
+	[BattleLogType.OVERLOAD_END]: BattleLogCategory.DEFENSE,
+	[BattleLogType.FLUX_SETTLEMENT]: BattleLogCategory.SETTLEMENT,
+	[BattleLogType.ROUND_END]: BattleLogCategory.SETTLEMENT,
+	[BattleLogType.END_TURN]: BattleLogCategory.PHASE,
+	[BattleLogType.ADVANCE_PHASE]: BattleLogCategory.PHASE,
+	[BattleLogType.FACTION_CHANGE]: BattleLogCategory.PHASE,
+	[BattleLogType.EDIT]: BattleLogCategory.SYSTEM,
+	[BattleLogType.GAME_STARTED]: BattleLogCategory.SYSTEM,
+	[BattleLogType.DEPLOY]: BattleLogCategory.SYSTEM,
+	[BattleLogType.PLAYER_JOIN]: BattleLogCategory.SYSTEM,
+	[BattleLogType.PLAYER_LEAVE]: BattleLogCategory.SYSTEM,
+	[BattleLogType.ROLL]: BattleLogCategory.SYSTEM,
+	[BattleLogType.PING]: BattleLogCategory.SYSTEM,
+	[BattleLogType.SYSTEM]: BattleLogCategory.SYSTEM,
+};
+
+/** 客户端最大保留日志条数 */
+export const MAX_LOG_ENTRIES = 500;
+
 export const BattleLogEventSchema = z.object({
 	type: z.string(),
 	timestamp: z.number(),

@@ -2,7 +2,7 @@
  * room namespace handlers — 房间创建/列表/加入/离开/操作/删除
  */
 import { err } from "./err.js";
-import { ErrorCodes, PlayerRole, createBattleLogEvent } from "@vt/data";
+import { ErrorCodes, PlayerRole, createBattleLogEvent, BattleLogType } from "@vt/data";
 import type { WsPayload } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { playerInfoService } from "./services.js";
@@ -83,6 +83,11 @@ export const roomHandlers = {
 
         overlayRelay.sendSync(ctx.socket, p.roomId);
 
+        ctx.state.appendLog(createBattleLogEvent(BattleLogType.PLAYER_JOIN, {
+            playerId: ctx.playerId,
+            playerName: ctx.playerName,
+        }));
+
         ctx.io.emit("room:list_updated", {
             action: "updated",
             room: {
@@ -109,6 +114,11 @@ export const roomHandlers = {
     leave: async (_: unknown, ctx: RpcContext) => {
         ctx.requireRoom();
         const room = ctx.roomManager.getRoom(ctx.roomId);
+
+        ctx.state.appendLog(createBattleLogEvent(BattleLogType.PLAYER_LEAVE, {
+            playerId: ctx.playerId,
+            playerName: ctx.playerName,
+        }));
 
         const leaveSuccess = ctx.roomManager.leaveRoom(ctx.roomId, ctx.playerId);
 
@@ -158,6 +168,12 @@ export const roomHandlers = {
         const isHost = room.creatorId === ctx.playerId;
         const role = isHost ? PlayerRole.HOST : PlayerRole.PLAYER;
         ctx.socket.data.role = role;
+
+        ctx.state.appendLog(createBattleLogEvent(BattleLogType.PLAYER_JOIN, {
+            playerId: ctx.playerId,
+            playerName: ctx.playerName,
+            reconnect: true,
+        }));
 
         ctx.io.emit("room:list_updated", {
             action: "updated",

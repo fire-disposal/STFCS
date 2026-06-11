@@ -2,7 +2,7 @@
  * game namespace handlers — 玩家行动执行 + 游戏状态查询
  */
 import { err } from "./err.js";
-import { GamePhase, ErrorCodes, createBattleLogEvent } from "@vt/data";
+import { GamePhase, ErrorCodes, createBattleLogEvent, BattleLogType } from "@vt/data";
 import type { WsPayload, BattleLogEvent } from "@vt/data";
 import type { RpcContext } from "../RpcServer.js";
 import { calculateShipWeaponTargets } from "../../../core/engine/rules/targeting.js";
@@ -95,5 +95,32 @@ export const gameHandlers = {
             default:
                 throw err(`未知查询类型: ${p.type}`, ErrorCodes.UNKNOWN_QUERY_TYPE);
         }
+    },
+
+    roll_dice: async (payload: unknown, ctx: RpcContext) => {
+        ctx.requireRoom();
+        const p = payload as WsPayload<"game:roll_dice">;
+
+        const diceSides: Record<string, number> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+        const sides = diceSides[p.diceType];
+        if (!sides) throw err(`无效骰子类型: ${p.diceType}`, ErrorCodes.UNKNOWN_ACTION);
+
+        const results: number[] = [];
+        for (let i = 0; i < p.count; i++) {
+            results.push(Math.floor(Math.random() * sides) + 1);
+        }
+        const sum = results.reduce((a, b) => a + b, 0);
+
+        ctx.state.appendLog(createBattleLogEvent(BattleLogType.ROLL, {
+            playerId: ctx.playerId,
+            playerName: ctx.playerName,
+            diceType: p.diceType,
+            sides,
+            count: p.count,
+            results,
+            sum,
+        }));
+
+        return { diceType: p.diceType, count: p.count, results, sum };
     },
 };

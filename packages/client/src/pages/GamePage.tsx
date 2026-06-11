@@ -36,6 +36,7 @@ import { useAssetSocket } from "@/hooks/useAssetSocket";
 import { OverlayClient } from "@/network/OverlayClient";
 import type { OverlayHandlers } from "@/renderer/core/PixiCanvas";
 import { OverlayToolbar } from "@/ui/panels/OverlayToolbar";
+import { DicePanel } from "@/ui/panels/DicePanel";
 import { PLAYER_OVERLAY_COLORS } from "@vt/data";
 import { screenToWorld } from "@/utils/coordinateSystem";
 import "@/ui/panels/room-player-list.css";
@@ -254,6 +255,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 					<OverlayToolbar
 						onClearMyAnnotations={() => overlayClientRef.current?.sendClear("player", playerId ?? undefined)}
 					/>
+					<DicePanel />
 				</Box>
 
 				<RightSidebar networkManager={networkManager} />

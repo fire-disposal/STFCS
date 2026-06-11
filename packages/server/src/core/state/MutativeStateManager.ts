@@ -27,7 +27,7 @@ import type {
 	Faction,
 	EditLogContext,
 } from "@vt/data"
-import { GamePhase } from "@vt/data"
+import { GamePhase, MAX_LOG_ENTRIES } from "@vt/data"
 import { presetFactions } from "@vt/data"
 import type { TurnAdvanceResult } from "../engine/flow/TurnFlowController.js"
 
@@ -188,6 +188,9 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			if (!draft.logs) draft.logs = []
 			draft.logs.push(entry)
+			if (draft.logs.length > MAX_LOG_ENTRIES) {
+				draft.logs.splice(0, draft.logs.length - MAX_LOG_ENTRIES)
+			}
 		})
 	}
 
@@ -196,6 +199,9 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			if (!draft.logs) draft.logs = []
 			draft.logs.push(...entries)
+			if (draft.logs.length > MAX_LOG_ENTRIES) {
+				draft.logs.splice(0, draft.logs.length - MAX_LOG_ENTRIES)
+			}
 		})
 	}
 

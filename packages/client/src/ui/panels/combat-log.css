@@ -1,10 +1,12 @@
 .combat-log-panel {
 	background: rgba(10, 30, 50, 0.3);
+	position: relative;
 }
 
 .combat-log-header {
 	border-bottom: 1px solid rgba(43, 66, 97, 0.4);
 	flex-shrink: 0;
+	min-height: 32px;
 }
 
 .combat-log-list {
@@ -13,14 +15,66 @@
 }
 
 .combat-log-entry {
-	border-bottom: 1px solid rgba(43, 66, 97, 0.15);
+	border-bottom: 1px solid rgba(43, 66, 97, 0.12);
 	transition: background 0.1s;
-	min-height: 24px;
+	min-height: 22px;
 	align-items: center;
+	font-size: 11px;
+	line-height: 1.4;
 }
 
 .combat-log-entry:hover {
-	background: rgba(74, 158, 255, 0.05);
+	background: rgba(74, 158, 255, 0.04);
 }
 
+.combat-log-entry__body .rt-Text {
+	font-size: 11px;
+	line-height: 1.4;
+}
 
+.combat-log-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	margin-top: 2px;
+	align-self: flex-start;
+}
+
+.combat-log-filter-btn {
+	background: transparent;
+	border: 1px solid rgba(43, 66, 97, 0.4);
+	color: rgba(180, 195, 215, 0.7);
+	border-radius: 8px;
+	padding: 1px 7px;
+	font-size: 10px;
+	line-height: 16px;
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s;
+	flex-shrink: 0;
+}
+
+.combat-log-filter-btn:hover {
+	background: rgba(74, 158, 255, 0.08);
+	color: rgba(220, 230, 245, 0.9);
+}
+
+.combat-log-filter-btn--active {
+	border-color: transparent;
+	font-weight: 600;
+}
+
+.combat-log-scroll-hint {
+	position: absolute;
+	bottom: 4px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 1;
+}
+
+.combat-log-scroll-hint .combat-log-filter-btn {
+	background: rgba(30, 60, 90, 0.85);
+	border-color: rgba(74, 158, 255, 0.4);
+	color: rgba(200, 220, 245, 0.9);
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
