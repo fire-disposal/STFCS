@@ -9,13 +9,15 @@
  */
 
 import React from "react";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Check } from "lucide-react";
 import TurnBar from "./TurnBar";
 import { ShipStatusBar } from "./ShipStatusBar";
 import { FactionSelector } from "./FactionSelector";
 import { PlayerAvatars } from "./PlayerAvatars";
 import { SaveMenu } from "./SaveMenu";
 import { useUIStore } from "@/state/stores/uiStore";
+import { useGameAction } from "@/hooks/useGameAction";
+import { GamePhase } from "@vt/data";
 import {
 	useGamePhase,
 	useGameTurnCount,
@@ -52,6 +54,9 @@ export const TopBar: React.FC<TopBarProps> = ({
 	const currentFaction = currentPlayer?.faction;
 	const isHost = currentPlayer?.role === "HOST";
 	const inRoom = true;
+	const { send } = useGameAction();
+	const isMyTurn = phase === GamePhase.FACTION_ACTION && activeFaction && currentFaction === activeFaction;
+	const isReady = currentPlayer?.isReady ?? false;
 
 	// 直接从 uiStore 获取选中的舰船
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
@@ -81,7 +86,15 @@ export const TopBar: React.FC<TopBarProps> = ({
 			)}
 
 			<div className="top-bar__right">
-				{/* 派系选择器 */}
+				{isMyTurn && (
+					<button
+						className={`top-bar__action-btn ${isReady ? "top-bar__action-btn--ready" : ""}`}
+						onClick={() => void send("room:action", { action: "ready" })}
+					>
+						<Check size={14} />
+						{isReady ? "已就绪" : "就绪"}
+					</button>
+				)}
 			<FactionSelector
 				currentFaction={currentFaction}
 				currentPlayerId={playerId}

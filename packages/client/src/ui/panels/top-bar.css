@@ -77,6 +77,17 @@
 	color: #ff6f8f;
 }
 
+.top-bar__action-btn--ready {
+	color: #22c55e;
+	border-color: rgba(34, 197, 94, 0.4);
+	background: rgba(34, 197, 94, 0.1);
+}
+
+.top-bar__action-btn--ready:hover {
+	background: rgba(34, 197, 94, 0.18);
+	border-color: rgba(34, 197, 94, 0.6);
+}
+
 /* 阵营分隔线 */
 .top-bar__avatar-divider {
 	width: 1px;

@@ -121,28 +121,4 @@
 	margin-left: 2px;
 }
 
-.turn-bar__ready {
-	width: 28px;
-	height: 28px;
-	border-radius: 50%;
-	background: rgba(100, 116, 139, 0.15);
-	border: 1.5px solid rgba(100, 116, 139, 0.35);
-	color: #64748b;
-	cursor: pointer;
-	font-size: 12px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	transition: all 0.2s;
-}
 
-.turn-bar__ready:hover {
-	background: rgba(100, 116, 139, 0.3);
-}
-
-.turn-bar__ready--active {
-	background: rgba(34, 197, 94, 0.15);
-	border-color: rgba(34, 197, 94, 0.5);
-	color: #22c55e;
-}

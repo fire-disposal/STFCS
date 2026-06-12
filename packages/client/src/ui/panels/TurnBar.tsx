@@ -1,7 +1,6 @@
 import React from "react";
 import { GamePhase } from "@vt/data";
 import { textureManager } from "@/renderer/systems/TextureManager";
-import { useGameAction } from "@/hooks/useGameAction";
 import {
 	useGamePlayers,
 	useGamePlayerId,
@@ -23,7 +22,6 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	initiativeOrder,
 	factions,
 }) => {
-	const { send } = useGameAction();
 	const playerId = useGamePlayerId();
 	const players = useGamePlayers();
 	const isActionPhase = phase === GamePhase.FACTION_ACTION;
@@ -31,15 +29,6 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 	const currentIndex = isActionPhase && activeFaction && initiativeOrder
 		? initiativeOrder.indexOf(activeFaction)
 		: -1;
-
-	const currentPlayer = playerId ? players[playerId] : undefined;
-	const myFaction = currentPlayer?.faction;
-	const isMyTurn = isActionPhase && activeFaction && myFaction === activeFaction;
-	const isReady = currentPlayer?.isReady ?? false;
-
-	const handleToggleReady = async () => {
-		await send("room:action", { action: "ready" });
-	};
 
 	const playerList = Object.entries(players);
 
@@ -92,11 +81,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				</div>
 			)}
 
-			{isMyTurn && (
-				<button onClick={handleToggleReady} className={`turn-bar__ready${isReady ? " turn-bar__ready--active" : ""}`}>
-					{isReady ? "✓" : "●"}
-				</button>
-			)}
+
 		</div>
 	);
 };
