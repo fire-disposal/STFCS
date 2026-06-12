@@ -570,7 +570,13 @@ export class MutativeStateManager {
 	 */
 	private getFactionForPhase(phase: GamePhase): string | undefined {
 		if (phase === GamePhase.FACTION_ACTION) {
-			return this.state.initiativeOrder?.[this.state.initiativeIndex ?? 0];
+			const order = this.state.initiativeOrder;
+			const factions = this.state.factions;
+			if (!order || order.length === 0) return undefined;
+			const idx = Math.max(0, Math.min(this.state.initiativeIndex ?? 0, order.length - 1));
+			const factionId = order[idx]!;
+			if (factions && !factions[factionId]) return order.find(id => !!factions[id]);
+			return factionId;
 		}
 		return undefined;
 	}
@@ -594,14 +600,17 @@ export class MutativeStateManager {
 		this.mutateAndBroadcast((draft) => {
 			if (result.phaseChanged) {
 				draft.phase = result.newPhase;
-				draft.activeFaction = this.getFactionForPhase(result.newPhase);
-				draft.initiativeIndex = result.newPhase === GamePhase.FACTION_ACTION ? (draft.initiativeIndex ?? 0) : undefined;
+				draft.activeFaction = result.newFaction;
+				if (result.newPhase === GamePhase.FACTION_ACTION) {
+					const order = draft.initiativeOrder ?? [];
+					const idx = result.newFaction ? order.indexOf(result.newFaction) : -1;
+					draft.initiativeIndex = idx >= 0 ? idx : 0;
+				} else {
+					draft.initiativeIndex = undefined;
+				}
 			}
 			if (result.turnIncremented) {
 				draft.turnCount = result.newTurnCount;
-				if (result.newPhase === GamePhase.FACTION_ACTION || result.newPhase === GamePhase.SETTLEMENT) {
-					draft.initiativeIndex = 0;
-				}
 			}
 			if (result.factionChanged && result.newFaction && !result.phaseChanged) {
 				draft.activeFaction = result.newFaction;
@@ -648,7 +657,6 @@ export class MutativeStateManager {
 			draft.turnCount = 1;
 			draft.phase = GamePhase.FACTION_ACTION;
 
-			// 自动初始化派系：预设始终为基线，自定义派系叠加其上
 			if (!draft.factions) draft.factions = {};
 			for (const p of presetFactions) {
 				if (!draft.factions[p.$id]) {
@@ -659,10 +667,24 @@ export class MutativeStateManager {
 				draft.initiativeOrder = Object.keys(draft.factions!);
 			}
 
+			this.cleanInitiativeOrder(draft);
+
 			const order = draft.initiativeOrder;
 			draft.activeFaction = order?.[0];
 			draft.initiativeIndex = 0;
 		})
+	}
+
+	private cleanInitiativeOrder(draft: Draft<GameRoomState>): void {
+		if (!draft.initiativeOrder || !draft.factions) return;
+		const validFactions = new Set(Object.keys(draft.factions));
+		const seen = new Set<string>();
+		draft.initiativeOrder = draft.initiativeOrder.filter(id => {
+			if (seen.has(id)) return false;
+			if (!validFactions.has(id)) return false;
+			seen.add(id);
+			return true;
+		});
 	}
 
 	getHistory(): HistoryEntry[] {

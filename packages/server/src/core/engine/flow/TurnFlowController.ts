@@ -40,6 +40,23 @@ export interface PhaseChangeResult {
 }
 
 /**
+ * 清洗 initiativeOrder：去重 + 过滤不存在的派系
+ */
+function cleanOrder(state: GameRoomState): string[] {
+	const raw = state.initiativeOrder;
+	if (!raw || raw.length === 0) return [];
+	const factions = state.factions;
+	if (!factions) return [];
+	const seen = new Set<string>();
+	return raw.filter(id => {
+		if (seen.has(id)) return false;
+		if (!factions[id]) return false;
+		seen.add(id);
+		return true;
+	});
+}
+
+/**
  * 计算回合推进结果（纯函数）
  *
  * 流程：
@@ -50,10 +67,10 @@ export interface PhaseChangeResult {
 export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	const currentPhase = state.phase;
 	const currentTurn = Math.round(state.turnCount);
-	const order = state.initiativeOrder;
+	const order = cleanOrder(state);
 
 	if (currentPhase === GamePhase.DEPLOYMENT) {
-		if (!order || order.length === 0) {
+		if (order.length === 0) {
 			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
 		}
 		return {
@@ -67,11 +84,12 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	}
 
 	if (currentPhase === GamePhase.FACTION_ACTION) {
-		if (!order || order.length === 0) {
+		if (order.length === 0) {
 			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
 		}
 
-		const currentIdx = state.initiativeIndex ?? order.indexOf(state.activeFaction ?? "");
+		const rawIdx = state.initiativeIndex ?? order.indexOf(state.activeFaction ?? "");
+		const currentIdx = Math.max(0, Math.min(rawIdx, order.length - 1));
 		const nextIdx = currentIdx + 1;
 
 		if (nextIdx >= order.length) {
@@ -96,7 +114,7 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	}
 
 	if (currentPhase === GamePhase.SETTLEMENT) {
-		if (!order || order.length === 0) {
+		if (order.length === 0) {
 			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
 		}
 		return {

@@ -252,7 +252,6 @@ export const roomHandlers = {
                 ctx.requireHost();
                 if (!p.factions || !p.initiativeOrder) throw err("需要 factions 和 initiativeOrder", ErrorCodes.KEY_REQUIRED);
                 const factionIds = p.factions;
-                const order = p.initiativeOrder;
                 ctx.state.mutateAndBroadcast((draft: any) => {
                     const existingMap = draft.factions ?? {};
                     const newMap: Record<string, unknown> = {};
@@ -260,7 +259,16 @@ export const roomHandlers = {
                         newMap[id] = existingMap[id] ?? { $id: id, name: id, color: "#888" };
                     }
                     draft.factions = newMap;
-                    draft.initiativeOrder = order;
+
+                    const validIds = new Set(Object.keys(newMap));
+                    const seen = new Set<string>();
+                    const cleanedOrder = (p.initiativeOrder as string[]).filter((id: string) => {
+                        if (seen.has(id)) return false;
+                        if (!validIds.has(id)) return false;
+                        seen.add(id);
+                        return true;
+                    });
+                    draft.initiativeOrder = cleanedOrder.length > 0 ? cleanedOrder : Object.keys(newMap);
                     draft.initiativeIndex = 0;
                 });
                 return;

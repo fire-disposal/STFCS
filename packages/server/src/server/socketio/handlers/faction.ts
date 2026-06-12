@@ -121,8 +121,24 @@ export const editFactionHandlers = {
     reorder: async (payload: unknown, ctx: RpcContext) => {
         ctx.requireHost();
         const p = payload as WsPayload<"edit:faction:reorder">;
+        const factions = ctx.state.getState().factions;
+        if (!factions) throw err("无可用派系", ErrorCodes.FACTION_NOT_FOUND);
+
+        const validFactions = new Set(Object.keys(factions));
+        const seen = new Set<string>();
+        const cleaned = (p.initiativeOrder ?? []).filter((id: string) => {
+            if (seen.has(id)) return false;
+            if (!validFactions.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+        if (cleaned.length === 0) throw err("先攻序列不能为空", ErrorCodes.KEY_REQUIRED);
+
         ctx.state.mutateAndBroadcast((draft: any) => {
-            draft.initiativeOrder = p.initiativeOrder;
+            draft.initiativeOrder = cleaned;
+            if (draft.initiativeIndex != null && draft.initiativeIndex >= cleaned.length) {
+                draft.initiativeIndex = 0;
+            }
         });
     },
 };

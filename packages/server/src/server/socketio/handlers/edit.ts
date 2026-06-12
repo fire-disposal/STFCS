@@ -152,6 +152,12 @@ export const editHandlers = {
                     throw err("派系不存在", ErrorCodes.FACTION_NOT_FOUND);
                 }
                 ctx.state.updatePlayer(p.playerId, { faction: p.faction });
+                const order = ctx.state.getState().initiativeOrder;
+                if (order && !order.includes(p.faction)) {
+                    ctx.state.mutateAndBroadcast((draft) => {
+                        draft.initiativeOrder = [...(draft.initiativeOrder ?? []), p.faction!];
+                    });
+                }
                 return;
             }
             default:
