@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import type { RoomPlayerState } from "@vt/data";
 import { GamePhase } from "@vt/data";
 import { Avatar } from "@/ui/shared/Avatar";
+import { useGameState } from "@/state/stores/gameStore";
 import "./player-avatars.css";
 
 /**
@@ -13,6 +14,7 @@ const PlayerAvatar: React.FC<{
 	faction?: string;
 	activeFaction: string | undefined;
 }> = ({ player, phase, faction, activeFaction }) => {
+	const factions = useGameState()?.factions;
 	const getDotState = () => {
 		if (phase !== GamePhase.PLAYER_ACTION && phase !== GamePhase.FACTION_ACTION) return "default";
 		if (activeFaction === player.faction) {
@@ -22,7 +24,8 @@ const PlayerAvatar: React.FC<{
 	};
 
 	const dotState = getDotState();
-	const factionColor = faction ? (faction.includes("fate-grip") ? 0xff4a4a : faction.includes("player-alliance") ? 0x4a9eff : undefined) : undefined;
+	const factionDef = faction ? factions?.[faction] : undefined;
+	const factionColor = factionDef?.color ? parseInt(factionDef.color.replace("#", ""), 16) : undefined;
 
 	return (
 		<div

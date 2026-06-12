@@ -147,6 +147,10 @@ export const editHandlers = {
             case "set_faction": {
                 if (!p.playerId) throw err("需要 playerId", ErrorCodes.PLAYER_ID_REQUIRED);
                 if (!p.faction) throw err("需要 faction", ErrorCodes.FACTION_REQUIRED);
+                const factions = ctx.state.getState().factions;
+                if (!factions || !factions[p.faction]) {
+                    throw err("派系不存在", ErrorCodes.FACTION_NOT_FOUND);
+                }
                 ctx.state.updatePlayer(p.playerId, { faction: p.faction });
                 return;
             }

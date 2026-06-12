@@ -109,6 +109,12 @@ export const editFactionHandlers = {
         }
 
         await factionService.delete(p.factionId);
+
+        if (faction.flagAssetId) {
+            assetService.deleteAsset(faction.flagAssetId).catch((e) => {
+                logger.error(`Failed to delete flag asset ${faction.flagAssetId}: ${e instanceof Error ? e.message : String(e)}`);
+            });
+        }
     },
 
     reorder: async (payload: unknown, ctx: RpcContext) => {

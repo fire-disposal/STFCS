@@ -62,6 +62,7 @@ export const ErrorCodes = {
     SAVE_NOT_FOUND: "SAVE_NOT_FOUND",
     ASSET_DELETE_FAILED: "ASSET_DELETE_FAILED",
     PRESET_NOT_FOUND: "PRESET_NOT_FOUND",
+    FACTION_NOT_FOUND: "FACTION_NOT_FOUND",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

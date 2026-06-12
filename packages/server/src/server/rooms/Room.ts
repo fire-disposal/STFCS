@@ -7,7 +7,7 @@ import { createLogger } from "../../infra/simple-logger.js";
 import { MutativeStateManager } from "../../core/state/MutativeStateManager.js";
 import type { Server as IOServer } from "socket.io";
 import type { GameRoomState, CombatToken, TokenRuntime } from "@vt/data";
-import { GamePhase } from "@vt/data";
+import { GamePhase, presetFactions } from "@vt/data";
 
 export interface RoomOptions {
 	roomName: string;
@@ -63,6 +63,8 @@ export class Room {
 			turnCount: 0,
 			players: {},
 			tokens: {},
+			factions: Object.fromEntries(presetFactions.map(f => [f.$id, f])),
+			initiativeOrder: presetFactions.map(f => f.$id),
 			logs: [],
 			globalModifiers: {},
 			createdAt: this.createdAt,

@@ -7,6 +7,7 @@ import React from "react";
 import { ChevronDown, ChevronUp, FastForward, Play, ArrowRight } from "lucide-react";
 import { Button, Flex, Text, Badge, Card, Separator } from "@radix-ui/themes";
 
+import { textureManager } from "@/renderer/systems/TextureManager";
 import { useGameAction } from "@/hooks/useGameAction";
 import {
     useGamePlayers,
@@ -77,7 +78,7 @@ export const DMControlSidebarPanel: React.FC = () => {
                 </Flex>
                 {currentDef && (
                     <Flex align="center" gap="2" mt="1">
-                        <span style={{ width: 12, height: 12, borderRadius: 3, background: currentDef.color, flexShrink: 0 }} />
+					<span style={{ width: 12, height: 12, borderRadius: 3, background: currentDef.flagAssetId ? `url(${textureManager.getTextureUrl(currentDef.flagAssetId)}) center/cover` : currentDef.color, flexShrink: 0 }} />
                         <Text size="1" weight="bold">{currentDef.name}</Text>
                         <Text size="1" color="gray">行动中</Text>
                     </Flex>
@@ -99,7 +100,7 @@ export const DMControlSidebarPanel: React.FC = () => {
                                     opacity: done ? 0.45 : 1,
                                 }}>
                                     <Text size="1" color="gray" style={{ width: 14, textAlign: "center" }}>{idx + 1}</Text>
-                                    <span style={{ width: 10, height: 10, borderRadius: 2, background: def?.color ?? "#888", flexShrink: 0 }} />
+                                    <span style={{ width: 10, height: 10, borderRadius: 2, background: def?.flagAssetId ? `url(${textureManager.getTextureUrl(def.flagAssetId)}) center/cover` : def?.color ?? "#888", flexShrink: 0 }} />
                                     <Text size="1" style={{ flex: 1, fontWeight: isActive ? 700 : 400 }}>{def?.name ?? fid}</Text>
                                     <Flex direction="column" gap="0">
                                         <button onClick={() => handleMoveFaction(idx, -1)} disabled={idx === 0}

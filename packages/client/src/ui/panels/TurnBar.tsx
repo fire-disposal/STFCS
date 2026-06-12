@@ -4,6 +4,7 @@
 
 import React from "react";
 import { GamePhase } from "@vt/data";
+import { textureManager } from "@/renderer/systems/TextureManager";
 import "./turn-bar.css";
 
 interface TurnBarProps {
@@ -58,11 +59,13 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 						>
 							<div
 								className="turn-bar__flag"
-								style={def ? { background: def.color } : { background: "#888" }}
+								style={{ background: def?.flagAssetId
+									? `url(${textureManager.getTextureUrl(def.flagAssetId)}) center/cover`
+									: def?.color ?? "#888" }}
 							>
-								<span className="turn-bar__flag-initial">
+								{!def?.flagAssetId && <span className="turn-bar__flag-initial">
 									{def?.name?.charAt(0) ?? "?"}
-								</span>
+								</span>}
 							</div>
 							{isActive && (
 								<div className="turn-bar__pointer">
