@@ -19,6 +19,7 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
     currentFaction, currentPlayerId, factions, onFactionChange,
 }) => {
     const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
     const [flagUrls, setFlagUrls] = useState<Record<string, string>>({});
     const loadedRef = useRef(false);
 
@@ -41,6 +42,7 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
             onFactionChange(currentPlayerId, factionId);
         }
         setOpen(false);
+        setSearch("");
     }, [currentPlayerId, onFactionChange]);
 
     if (!currentPlayerId || !onFactionChange) return null;
@@ -77,19 +79,33 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
                 <>
                     <div
                         style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                        onClick={() => setOpen(false)}
+                        onClick={() => { setOpen(false); setSearch(""); }}
                     />
                     <div style={{
                         position: "absolute", top: "100%", right: 0, marginTop: 4,
                         background: "#0f1923", border: "1px solid #2a3440",
-                        borderRadius: 8, padding: 6, zIndex: 100, minWidth: 180,
+                        borderRadius: 8, padding: 6, zIndex: 100, minWidth: 200,
                         boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+                        maxHeight: 320, display: "flex", flexDirection: "column",
                     }}>
-                        <div style={{ color: "#6b8aaa", fontSize: 10, fontWeight: 600, padding: "4px 8px 6px", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                        <div style={{ color: "#6b8aaa", fontSize: 10, fontWeight: 600, padding: "4px 8px 2px", letterSpacing: 0.5, textTransform: "uppercase" }}>
                             选择派系
                         </div>
-
-                        {factionEntries.map(([fid, def]) => {
+                        <input
+                            type="text"
+                            placeholder="搜索派系..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            autoFocus
+                            style={{
+                                width: "100%", padding: "5px 8px", margin: "4px 0",
+                                background: "rgba(0,0,0,0.3)", border: "1px solid rgba(43,66,97,0.6)",
+                                borderRadius: 4, color: "#cfe8ff", fontSize: 12, outline: "none",
+                                boxSizing: "border-box",
+                            }}
+                        />
+                        <div style={{ overflowY: "auto", flex: 1 }}>
+                        {factionEntries.filter(([, def]) => !search.trim() || def.name.toLowerCase().includes(search.trim().toLowerCase())).map(([fid, def]) => {
                             const selected = fid === currentFaction;
                             const flagUrl = def.flagAssetId ? flagUrls[def.flagAssetId] : undefined;
                             return (
@@ -136,11 +152,12 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
                             );
                         })}
 
-                        {factionEntries.length === 0 && (
+                        {factionEntries.filter(([, def]) => !search.trim() || def.name.toLowerCase().includes(search.trim().toLowerCase())).length === 0 && (
                             <div style={{ padding: "12px 8px", color: "#5a7085", fontSize: 12, textAlign: "center" }}>
-                                暂无活跃派系
+                                {search.trim() ? "无匹配派系" : "暂无活跃派系"}
                             </div>
                         )}
+                        </div>
                     </div>
                 </>
             )}

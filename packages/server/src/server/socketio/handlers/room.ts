@@ -29,6 +29,16 @@ export const roomHandlers = {
         });
         if (!room) throw err("创建房间失败", ErrorCodes.ROOM_CREATE_FAILED);
 
+        const globalFactions = await factionService.list();
+        if (globalFactions.length > 0) {
+            room.getStateManager().mutate((draft) => {
+                if (!draft.factions) draft.factions = {};
+                for (const f of globalFactions) {
+                    if (!draft.factions[f.$id]) draft.factions[f.$id] = f;
+                }
+            });
+        }
+
         ctx.io.emit("room:list_updated", {
             action: "created",
             room: {
