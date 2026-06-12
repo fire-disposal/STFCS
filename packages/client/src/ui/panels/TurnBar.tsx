@@ -1,6 +1,7 @@
 import React from "react";
 import { GamePhase } from "@vt/data";
 import { textureManager } from "@/renderer/systems/TextureManager";
+import { Avatar } from "@/ui/shared/Avatar";
 import {
 	useGamePlayers,
 	useGamePlayerId,
@@ -63,15 +64,17 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 										{!def?.flagAssetId && <span>{def?.name?.charAt(0) ?? "?"}</span>}
 									</div>
 									<div className="turn-bar__avatars">
-										{factionPlayers.map(([pid, p]) => (
-											<div
-												key={pid}
-												className={`turn-bar__avatar${p?.isReady ? " turn-bar__avatar--ready" : ""}`}
-												title={p?.nickname ?? pid}
-											>
-												{p?.nickname?.charAt(0) ?? "?"}
-											</div>
-										))}
+										{factionPlayers.map(([pid, p]) => {
+											const dotClass = isActive
+												? (p?.isReady ? "turn-bar__dot--ready" : "turn-bar__dot--not-ready")
+												: "turn-bar__dot--other";
+											return (
+												<div key={pid} className="turn-bar__avatar" title={p?.nickname ?? pid}>
+													<Avatar src={p?.avatar} size={24} userName={p?.nickname ?? "?"} />
+													<span className={`turn-bar__dot ${dotClass}`} />
+												</div>
+											);
+										})}
 									</div>
 									{isDone && <span className="turn-bar__done-mark">✓</span>}
 								</div>

@@ -13,7 +13,7 @@ import { Settings, LogOut, Check } from "lucide-react";
 import TurnBar from "./TurnBar";
 import { ShipStatusBar } from "./ShipStatusBar";
 import { FactionSelector } from "./FactionSelector";
-import { PlayerAvatars } from "./PlayerAvatars";
+
 import { SaveMenu } from "./SaveMenu";
 import { useUIStore } from "@/state/stores/uiStore";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -74,9 +74,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 				/>
 			</div>
 
-			<div className="top-bar__center">
-				<PlayerAvatars players={players} phase={phase} activeFaction={activeFaction} initiativeOrder={gameState?.initiativeOrder ?? []} />
-			</div>
+
 
 			{/* 舰船状态条 */}
 			{selectedShip && selectedShip.runtime && (
