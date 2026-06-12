@@ -73,15 +73,17 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 									<div className="turn-bar__flag" style={{ background: flagBg }}>
 										{!def?.flagAssetId && <span>{def?.name?.charAt(0) ?? "?"}</span>}
 									</div>
-									{factionPlayers.map(([pid, p]) => (
-										<div
-											key={pid}
-											className={`turn-bar__avatar${p?.isReady ? " turn-bar__avatar--ready" : ""}`}
-											title={p?.nickname ?? pid}
-										>
-											{p?.nickname?.charAt(0) ?? "?"}
-										</div>
-									))}
+									<div className="turn-bar__avatars">
+										{factionPlayers.map(([pid, p]) => (
+											<div
+												key={pid}
+												className={`turn-bar__avatar${p?.isReady ? " turn-bar__avatar--ready" : ""}`}
+												title={p?.nickname ?? pid}
+											>
+												{p?.nickname?.charAt(0) ?? "?"}
+											</div>
+										))}
+									</div>
 									{isDone && <span className="turn-bar__done-mark">✓</span>}
 								</div>
 							</React.Fragment>
