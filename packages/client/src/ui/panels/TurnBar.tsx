@@ -60,7 +60,7 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 									className={`turn-bar__group${isActive ? " turn-bar__group--active" : ""}${isDone ? " turn-bar__group--done" : ""}`}
 									style={{ "--fc": def?.color ?? "#4a9eff" } as React.CSSProperties}
 								>
-									<div className="turn-bar__flag" style={{ background: flagBg }}>
+									<div className="turn-bar__flag" style={{ background: flagBg }} title={def?.name ?? fid}>
 										{!def?.flagAssetId && <span>{def?.name?.charAt(0) ?? "?"}</span>}
 									</div>
 									<div className="turn-bar__avatars">
