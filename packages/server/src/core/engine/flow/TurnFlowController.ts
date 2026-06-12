@@ -60,7 +60,6 @@ function cleanOrder(state: GameRoomState): string[] {
  * 计算回合推进结果（纯函数）
  *
  * 流程：
- *   DEPLOYMENT → FACTION_ACTION (initiativeOrder[0])
  *   FACTION_ACTION → FACTION_ACTION (next) 或 SETTLEMENT (last)
  *   SETTLEMENT → FACTION_ACTION (initiativeOrder[0], turn++)
  */
@@ -68,20 +67,6 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 	const currentPhase = state.phase;
 	const currentTurn = Math.round(state.turnCount);
 	const order = cleanOrder(state);
-
-	if (currentPhase === GamePhase.DEPLOYMENT) {
-		if (order.length === 0) {
-			return { newPhase: currentPhase, newFaction: undefined, turnIncremented: false, newTurnCount: currentTurn, settlementNeeded: false, valid: false, error: "未配置 initiativeOrder" };
-		}
-		return {
-			newPhase: GamePhase.FACTION_ACTION,
-			newFaction: order[0],
-			turnIncremented: true,
-			newTurnCount: 1,
-			settlementNeeded: false,
-			valid: true,
-		};
-	}
 
 	if (currentPhase === GamePhase.FACTION_ACTION) {
 		if (order.length === 0) {
@@ -96,8 +81,8 @@ export function calculateTurnAdvance(state: GameRoomState): PhaseChangeResult {
 			return {
 				newPhase: GamePhase.SETTLEMENT,
 				newFaction: undefined,
-				turnIncremented: true,
-				newTurnCount: currentTurn + 1,
+				turnIncremented: false,
+				newTurnCount: currentTurn,
 				settlementNeeded: true,
 				valid: true,
 			};
@@ -260,13 +245,21 @@ export function executeTurnAdvance(state: GameRoomState): TurnAdvanceResult {
 
 		// 回合结束播报
 		result.logEvents.push(createBattleLogEvent("round_end", {
-			round: result.newTurnCount - 1,
+			round: Math.round(state.turnCount),
 			phase: state.phase,
 		}));
 	}
 
 	// 添加派系切换日志
 	if (phaseResult.newFaction) {
+		if (state.activeFaction && state.phase === GamePhase.FACTION_ACTION) {
+			const currentFactionName = state.factions?.[state.activeFaction]?.name ?? state.activeFaction;
+			result.logEvents.push(createBattleLogEvent("faction_turn_end", {
+				faction: state.activeFaction,
+				factionName: currentFactionName,
+				turn: state.turnCount,
+			}));
+		}
 		result.logEvents.push(createBattleLogEvent("faction_change", {
 			fromFaction: state.activeFaction,
 			toFaction: phaseResult.newFaction,
@@ -280,16 +273,9 @@ export function executeTurnAdvance(state: GameRoomState): TurnAdvanceResult {
 /**
  * 验证回合推进是否允许
  */
-export function validateTurnAdvance(state: GameRoomState, isHost: boolean): { valid: boolean; error?: string } {
+export function validateTurnAdvance(_state: GameRoomState, isHost: boolean): { valid: boolean; error?: string } {
 	if (!isHost) {
 		return { valid: false, error: "只有房主可以推进回合" };
-	}
-
-	if (state.phase === GamePhase.DEPLOYMENT) {
-		const tokenCount = Object.keys(state.tokens).length;
-		if (tokenCount === 0) {
-			return { valid: false, error: "至少需要部署一艘舰船" };
-		}
 	}
 
 	return { valid: true };

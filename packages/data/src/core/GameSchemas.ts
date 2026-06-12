@@ -71,18 +71,18 @@ export type ArmorQuadrant = z.infer<typeof ArmorQuadrantSchema>;
  * 游戏阶段（GamePhase）- 顶层状态
  *
  * Phase ↔ activeFaction 对应规则：
- * - DEPLOYMENT: activeFaction = undefined（部署阶段不区分派系）
- * - PLAYER_ACTION: activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+ * - FACTION_ACTION: activeFaction 由 initiativeOrder[initiativeIndex] 决定
+ * - SETTLEMENT: activeFaction = undefined
  *
  * Phase 转换流程：
- * 1. DEPLOYMENT → PLAYER_ACTION（所有玩家准备好后，游戏开始）
- * 2. PLAYER_ACTION 内：TURN_ORDER 中的派系依次行动
- * 3. 最后一个派系行动完毕后 turn++，回到第一个派系
+ * 1. FACTION_ACTION 内：initiativeOrder 中的派系依次行动
+ * 2. 最后一个派系行动完毕后进入 SETTLEMENT
+ * 3. SETTLEMENT 结算完毕后 turn++，回到第一个派系
  *
  * 注意：phase 和 activeFaction 存在固定对应关系，
  * 修改 phase 时应同步更新 activeFaction。
  */
-export const GamePhaseSchema = z.enum(["DEPLOYMENT", "PLAYER_ACTION", "FACTION_ACTION", "SETTLEMENT"]);
+export const GamePhaseSchema = z.enum(["FACTION_ACTION", "SETTLEMENT"]);
 export const GamePhase = GamePhaseSchema.enum;
 export type GamePhase = z.infer<typeof GamePhaseSchema>;
 
@@ -467,8 +467,8 @@ export type BattleLogEvent = z.infer<typeof BattleLogEventSchema>;
  *
  * 重要：phase 和 activeFaction 存在固定对应关系
  * 修改 phase 时必须同步更新 activeFaction：
- * - phase="DEPLOYMENT" → activeFaction=undefined
- * - phase="PLAYER_ACTION" → activeFaction 由 TURN_ORDER 决定（派系轮流行动）
+ * - phase="FACTION_ACTION" → activeFaction 由 initiativeOrder[initiativeIndex] 决定
+ * - phase="SETTLEMENT" → activeFaction=undefined
  */
 export const GameRoomStateSchema = z.object({
 	roomId: z.string(),

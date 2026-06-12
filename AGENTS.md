@@ -38,7 +38,6 @@
 
 **phase 和 activeFaction 固定对应关系：**
 修改 phase 时必须同步更新 activeFaction：
-- phase="DEPLOYMENT" → activeFaction=undefined
 - phase="FACTION_ACTION" → activeFaction 由 initiativeOrder[initiativeIndex] 决定
 - phase="SETTLEMENT" → activeFaction=undefined
 

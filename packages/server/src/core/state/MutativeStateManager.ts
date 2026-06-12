@@ -28,7 +28,6 @@ import type {
 	EditLogContext,
 } from "@vt/data"
 import { GamePhase, MAX_LOG_ENTRIES } from "@vt/data"
-import { presetFactions } from "@vt/data"
 import type { TurnAdvanceResult } from "../engine/flow/TurnFlowController.js"
 
 export interface MutateResult {
@@ -55,8 +54,8 @@ export class MutativeStateManager {
 		this.state = initialState ?? {
 			roomId,
 			ownerId: "",
-			phase: GamePhase.DEPLOYMENT,
-			turnCount: 0,
+			phase: GamePhase.FACTION_ACTION,
+			turnCount: 1,
 			players: {},
 			tokens: {},
 			globalModifiers: {},
@@ -543,8 +542,8 @@ export class MutativeStateManager {
 	/**
 	 * 切换阶段，同时自动更新 activeFaction。
 	 * phase ↔ activeFaction 对应关系：
-	 *   DEPLOYMENT   → undefined
-	 *   PLAYER_ACTION → TURN_ORDER 循环决定
+	 *   FACTION_ACTION → initiativeOrder[initiativeIndex] 决定
+	 *   SETTLEMENT     → undefined
 	 */
 	changePhase(phase: GamePhase): void {
 		this.mutateAndBroadcast((draft) => {
@@ -626,6 +625,9 @@ export class MutativeStateManager {
 			}
 			if (!draft.logs) draft.logs = [];
 			draft.logs.push(...result.logEvents);
+			if (draft.logs.length > MAX_LOG_ENTRIES) {
+				draft.logs.splice(0, draft.logs.length - MAX_LOG_ENTRIES);
+			}
 		});
 	}
 
@@ -650,41 +652,6 @@ export class MutativeStateManager {
 				delete draft.globalModifiers[key]
 			}
 		})
-	}
-
-	startGame(): void {
-		this.mutateAndBroadcast((draft) => {
-			draft.turnCount = 1;
-			draft.phase = GamePhase.FACTION_ACTION;
-
-			if (!draft.factions) draft.factions = {};
-			for (const p of presetFactions) {
-				if (!draft.factions[p.$id]) {
-					draft.factions[p.$id] = { ...p };
-				}
-			}
-			if (!draft.initiativeOrder || draft.initiativeOrder.length === 0) {
-				draft.initiativeOrder = Object.keys(draft.factions!);
-			}
-
-			this.cleanInitiativeOrder(draft);
-
-			const order = draft.initiativeOrder;
-			draft.activeFaction = order?.[0];
-			draft.initiativeIndex = 0;
-		})
-	}
-
-	private cleanInitiativeOrder(draft: Draft<GameRoomState>): void {
-		if (!draft.initiativeOrder || !draft.factions) return;
-		const validFactions = new Set(Object.keys(draft.factions));
-		const seen = new Set<string>();
-		draft.initiativeOrder = draft.initiativeOrder.filter(id => {
-			if (seen.has(id)) return false;
-			if (!validFactions.has(id)) return false;
-			seen.add(id);
-			return true;
-		});
 	}
 
 	getHistory(): HistoryEntry[] {

@@ -16,7 +16,7 @@ const PlayerAvatar: React.FC<{
 }> = ({ player, phase, faction, activeFaction }) => {
 	const factions = useGameState()?.factions;
 	const getDotState = () => {
-		if (phase !== GamePhase.PLAYER_ACTION && phase !== GamePhase.FACTION_ACTION) return "default";
+		if (phase !== GamePhase.FACTION_ACTION) return "default";
 		if (activeFaction === player.faction) {
 			return player.isReady ? "current-ready" : "current-not-ready";
 		}

@@ -61,7 +61,7 @@ export const useGamePlayerId = () => useGameStore((s) => s.playerId);
 export const useGameRoomId = () => useGameStore((s) => s.state?.roomId ?? null);
 export const useGameTokens = () => useGameStore((s) => s.state?.tokens ?? EMPTY_TOKENS);
 export const useGamePlayers = () => useGameStore((s) => s.state?.players ?? EMPTY_PLAYERS);
-export const useGamePhase = () => useGameStore((s) => s.state?.phase ?? "DEPLOYMENT");
+export const useGamePhase = () => useGameStore((s) => s.state?.phase ?? "FACTION_ACTION");
 export const useGameTurnCount = () => useGameStore((s) => s.state?.turnCount ?? 0);
 export const useGameActiveFaction = () => useGameStore((s) => s.state?.activeFaction);
 export const useGameLogs = () => useGameStore((s) => s.state?.logs ?? EMPTY_ARRAY);

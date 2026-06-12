@@ -245,12 +245,6 @@ export class SocketNetworkManager {
 		} catch { /* ignore */ }
 	}
 
-	async startGame(): Promise<void> {
-		try {
-			await this.request("room:action", { action: "start" });
-		} catch { /* ignore */ }
-	}
-
 	async kickPlayer(targetId: string): Promise<void> {
 		try {
 			await this.request("room:action", { action: "kick", targetId });

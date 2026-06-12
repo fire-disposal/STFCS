@@ -17,7 +17,7 @@ export const gameHandlers = {
 
         // 阶段检查
         const currentPhase = room.getStateManager().getState().phase;
-        if (currentPhase !== GamePhase.FACTION_ACTION && currentPhase !== GamePhase.PLAYER_ACTION) {
+		if (currentPhase !== GamePhase.FACTION_ACTION) {
             throw err("当前阶段不允许操作", ErrorCodes.INVALID_PHASE);
         }
 

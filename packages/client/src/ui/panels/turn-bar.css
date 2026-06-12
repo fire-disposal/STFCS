@@ -1,108 +1,232 @@
-/* TurnBar - 阶段 + 回合 + 派系卡片 + 三角指针 */
-
 .turn-bar {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 4px 10px;
-	background: rgba(10, 14, 20, 0.85);
-	border: 1px solid rgba(74, 158, 255, 0.18);
-	border-radius: 6px;
+	gap: 12px;
+	padding: 6px 14px;
+	background: rgba(8, 12, 18, 0.92);
+	border: 1px solid rgba(74, 158, 255, 0.15);
+	border-radius: 8px;
 	font-size: 12px;
-	height: 52px;
+	height: 54px;
 	box-sizing: border-box;
+	backdrop-filter: blur(6px);
 }
 
-/* -- 阶段标签 -- */
-.turn-bar__phase {
-	padding: 2px 8px;
-	font-weight: 600;
-	border-radius: 4px;
-	letter-spacing: 0.3px;
-	font-size: 11px;
-	flex-shrink: 0;
-}
-.turn-bar__phase--deployment     { color: #a78bfa; background: rgba(167, 139, 250, 0.12); }
-.turn-bar__phase--player_action  { color: #4a9eff; background: rgba(74, 158, 255, 0.12); }
-.turn-bar__phase--faction_action { color: #4a9eff; background: rgba(74, 158, 255, 0.15); }
-.turn-bar__phase--settlement     { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
-
-.turn-bar__round {
-	font-weight: 700;
-	color: #60a5fa;
-	white-space: nowrap;
-	flex-shrink: 0;
-}
-
-/* ====== 派系卡片线 ====== */
-.turn-bar__faction-line {
-	display: flex;
-	align-items: stretch;
-	gap: 8px;
-	flex: 1;
-	min-width: 0;
-	height: 100%;
-}
-
-/* -- 派系卡片 -- */
-.turn-bar__card {
+.turn-bar__round-badge {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: rgba(74, 158, 255, 0.12);
+	border: 1px solid rgba(74, 158, 255, 0.3);
+	flex-shrink: 0;
+}
+
+.turn-bar__round-num {
+	font-size: 14px;
+	font-weight: 800;
+	color: #60a5fa;
+	line-height: 1;
+}
+
+.turn-bar__round-label {
+	font-size: 9px;
+	color: #4a7aaa;
+	line-height: 1;
+	margin-top: 1px;
+}
+
+.turn-bar__settlement {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 12px;
+	background: rgba(245, 158, 11, 0.1);
+	border: 1px solid rgba(245, 158, 11, 0.3);
+	border-radius: 6px;
+	animation: turn-bar-pulse 2s ease-in-out infinite;
+}
+
+.turn-bar__settlement-icon {
+	font-size: 14px;
+	animation: turn-bar-spin 3s linear infinite;
+}
+
+.turn-bar__settlement-text {
+	color: #f59e0b;
+	font-weight: 600;
+	font-size: 12px;
+}
+
+@keyframes turn-bar-pulse {
+	0%, 100% { opacity: 0.8; }
+	50% { opacity: 1; }
+}
+
+@keyframes turn-bar-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.turn-bar__timeline {
+	display: flex;
+	align-items: center;
+	gap: 0;
 	flex: 1;
 	min-width: 0;
-	max-width: 48px;
-	padding: 4px;
+	padding: 0 4px;
+}
+
+.turn-bar__connector {
+	width: 16px;
+	height: 2px;
+	background: rgba(74, 158, 255, 0.15);
+	flex-shrink: 0;
+}
+
+.turn-bar__connector--done {
+	background: rgba(34, 197, 94, 0.4);
+}
+
+.turn-bar__faction {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
 	border-radius: 6px;
-	border: 2px solid transparent;
-	background: rgba(20, 30, 45, 0.35);
-	transition: opacity 0.25s, transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+	background: rgba(20, 30, 45, 0.4);
+	border: 1.5px solid transparent;
+	transition: all 0.3s ease;
 	position: relative;
-	cursor: default;
+	min-width: 0;
+	flex-shrink: 1;
 }
-.turn-bar__card--done {
-	opacity: 0.35;
+
+.turn-bar__faction--active {
+	background: rgba(74, 158, 255, 0.08);
+	border-color: var(--faction-color, #4a9eff);
+	box-shadow: 0 0 12px color-mix(in srgb, var(--faction-color, #4a9eff) 30%, transparent),
+	            inset 0 0 8px color-mix(in srgb, var(--faction-color, #4a9eff) 8%, transparent);
+	flex-shrink: 0;
 }
-.turn-bar__card--active {
-	opacity: 1;
-	transform: scale(1.08);
-	box-shadow: 0 0 10px rgba(74, 158, 255, 0.25);
+
+.turn-bar__faction--done {
+	opacity: 0.45;
 }
-.turn-bar__card:not(.turn-bar__card--active):not(.turn-bar__card--done) {
+
+.turn-bar__faction--pending {
 	opacity: 0.6;
 }
 
-/* -- 旗帜方块 -- */
-.turn-bar__flag {
-	width: 28px;
-	height: 28px;
+.turn-bar__faction--mine {
+	outline: 1px solid rgba(255, 255, 255, 0.15);
+	outline-offset: 1px;
+}
+
+.turn-bar__faction-flag {
+	width: 24px;
+	height: 24px;
 	border-radius: 4px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
-}
-.turn-bar__flag-initial {
-	font-size: 14px;
-	font-weight: 800;
-	color: rgba(255, 255, 255, 0.7);
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+	position: relative;
+	overflow: hidden;
 }
 
-/* -- 指针（卡片底部） -- */
-.turn-bar__pointer {
-	position: absolute;
-	bottom: -8px;
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 2;
+.turn-bar__faction--active .turn-bar__faction-flag {
+	width: 28px;
+	height: 28px;
 }
-.turn-bar__pointer-triangle {
-	width: 0;
-	height: 0;
-	border-left: 5px solid transparent;
-	border-right: 5px solid transparent;
-	border-bottom: 7px solid #4a9eff;
-	filter: drop-shadow(0 1px 2px rgba(74, 158, 255, 0.4));
+
+.turn-bar__faction-initial {
+	font-size: 12px;
+	font-weight: 800;
+	color: rgba(255, 255, 255, 0.75);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.turn-bar__faction-check {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.55);
+	color: #22c55e;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.turn-bar__faction-name {
+	font-size: 11px;
+	font-weight: 500;
+	color: #8a9db0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 64px;
+}
+
+.turn-bar__faction--active .turn-bar__faction-name {
+	color: #cfe8ff;
+	font-weight: 700;
+	max-width: 80px;
+}
+
+.turn-bar__faction--done .turn-bar__faction-name {
+	text-decoration: line-through;
+	text-decoration-color: rgba(34, 197, 94, 0.5);
+}
+
+.turn-bar__faction-mine-dot {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: #60a5fa;
+	box-shadow: 0 0 4px rgba(96, 165, 250, 0.6);
+}
+
+.turn-bar__active-label {
+	font-size: 11px;
+	font-weight: 700;
+	white-space: nowrap;
+	flex-shrink: 0;
+	letter-spacing: 0.3px;
+}
+
+.turn-bar__ready {
+	padding: 5px 14px;
+	border-radius: 5px;
+	background: rgba(100, 116, 139, 0.15);
+	border: 1px solid rgba(100, 116, 139, 0.35);
+	color: #94a3b8;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	flex-shrink: 0;
+	transition: all 0.2s ease;
+}
+
+.turn-bar__ready:hover {
+	background: rgba(100, 116, 139, 0.3);
+	border-color: rgba(100, 116, 139, 0.5);
+}
+
+.turn-bar__ready--done {
+	background: rgba(34, 197, 94, 0.15);
+	border-color: rgba(34, 197, 94, 0.45);
+	color: #22c55e;
+}
+
+.turn-bar__ready--done:hover {
+	background: rgba(34, 197, 94, 0.25);
 }

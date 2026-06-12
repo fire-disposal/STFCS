@@ -59,8 +59,10 @@ export class Room {
 		this.stateManager = new MutativeStateManager(this.id, {
 			roomId: this.id,
 			ownerId: this.options.creatorSessionId,
-			phase: GamePhase.DEPLOYMENT,
-			turnCount: 0,
+			phase: GamePhase.FACTION_ACTION,
+			turnCount: 1,
+			activeFaction: presetFactions[0]?.$id,
+			initiativeIndex: 0,
 			players: {},
 			tokens: {},
 			factions: Object.fromEntries(presetFactions.map(f => [f.$id, f])),
@@ -249,12 +251,15 @@ export class Room {
 
 	private checkAllPlayersReady(): void {
 		const state = this.stateManager.getState();
-		const playerList = Object.keys(state.players).map(k => state.players[k]);
-		const allReady = playerList.length > 0 && playerList.every(p => p?.isReady);
+		const players = Object.values(state.players);
+		const activeFaction = state.activeFaction;
+
+		const activeFactionPlayers = players.filter(p => p?.connected && p?.faction === activeFaction);
+		const allReady = activeFactionPlayers.length > 0 && activeFactionPlayers.every(p => p?.isReady);
 
 		this.callbacks.broadcast({
 			type: "ALL_READY_STATUS",
-			payload: { allReady, playerCount: playerList.length, readyCount: playerList.filter(p => p?.isReady).length },
+			payload: { allReady, playerCount: activeFactionPlayers.length, readyCount: activeFactionPlayers.filter(p => p?.isReady).length },
 		});
 	}
 

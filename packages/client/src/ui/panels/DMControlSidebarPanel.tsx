@@ -3,8 +3,8 @@
  * 房主专用：回合推进、派系管理、阶段切换
  */
 
-import React from "react";
-import { ChevronDown, ChevronUp, FastForward, Play, ArrowRight } from "lucide-react";
+import React, { useRef, useEffect } from "react";
+import { ChevronDown, ChevronUp, FastForward, ArrowRight } from "lucide-react";
 import { Button, Flex, Text, Badge, Card, Separator } from "@radix-ui/themes";
 
 import { textureManager } from "@/renderer/systems/TextureManager";
@@ -18,6 +18,7 @@ import {
     useGameState,
 } from "@/state/stores/gameStore";
 import { GamePhase } from "@vt/data";
+import { notify } from "@/ui/shared/Notification";
 
 export const DMControlSidebarPanel: React.FC = () => {
     const { send } = useGameAction();
@@ -31,14 +32,25 @@ export const DMControlSidebarPanel: React.FC = () => {
     const currentPlayer = playerId ? players[playerId] : undefined;
     const isHost = currentPlayer?.role === "HOST";
 
+    const activeFactionPlayers = Object.values(players).filter(
+        (p) => p.faction === activeFaction && p.connected
+    );
+    const totalCount = activeFactionPlayers.length;
+    const readyCount = activeFactionPlayers.filter((p) => p.isReady).length;
+    const allReady = totalCount > 0 && readyCount === totalCount;
+
+    const prevAllReady = useRef(allReady);
+    useEffect(() => {
+        if (allReady && !prevAllReady.current) {
+            notify.success("活跃派系全员就绪");
+        }
+        prevAllReady.current = allReady;
+    }, [allReady]);
+
     if (!isHost) return null;
 
     const handleAdvanceTurn = async () => {
-        if (phase === GamePhase.DEPLOYMENT) {
-            await send("room:action", { action: "start" });
-        } else {
-            await send("edit:room", { action: "force_end_turn" });
-        }
+        await send("edit:room", { action: "force_end_turn" });
     };
 
     const handleMoveFaction = async (index: number, direction: 1 | -1) => {
@@ -54,9 +66,9 @@ export const DMControlSidebarPanel: React.FC = () => {
     const currentIdx = activeFaction ? initiativeOrder.indexOf(activeFaction) : -1;
     const isLastFaction = currentIdx === initiativeOrder.length - 1;
     const currentDef = activeFaction ? factions[activeFaction] : undefined;
+    const isActionPhase = phase === GamePhase.FACTION_ACTION;
 
     const getPhaseStyle = (p: GamePhase) => {
-        if (p === GamePhase.DEPLOYMENT) return { bg: "rgba(167,139,250,0.15)", color: "#a78bfa" };
         if (p === GamePhase.SETTLEMENT) return { bg: "rgba(245,158,11,0.15)", color: "#f59e0b" };
         return { bg: "rgba(74,158,255,0.15)", color: "#4a9eff" };
     };
@@ -73,7 +85,7 @@ export const DMControlSidebarPanel: React.FC = () => {
                 <Flex justify="between" align="center" mb="2">
                     <Text size="1" weight="bold" color="gray">回合 {turnCount}</Text>
                     <Badge size="1" style={{ background: ps.bg, color: ps.color }}>
-                        {phase === GamePhase.DEPLOYMENT ? "部署" : phase === GamePhase.FACTION_ACTION ? "派系行动" : phase === GamePhase.SETTLEMENT ? "结算" : phase}
+                        {phase === GamePhase.FACTION_ACTION ? "派系行动" : phase === GamePhase.SETTLEMENT ? "结算" : phase}
                     </Badge>
                 </Flex>
                 {currentDef && (
@@ -81,6 +93,13 @@ export const DMControlSidebarPanel: React.FC = () => {
 					<span style={{ width: 12, height: 12, borderRadius: 3, background: currentDef.flagAssetId ? `url(${textureManager.getTextureUrl(currentDef.flagAssetId)}) center/cover` : currentDef.color, flexShrink: 0 }} />
                         <Text size="1" weight="bold">{currentDef.name}</Text>
                         <Text size="1" color="gray">行动中</Text>
+                    </Flex>
+                )}
+                {isActionPhase && activeFaction && totalCount > 0 && (
+                    <Flex justify="between" align="center" mt="1">
+                        <Text size="1" color={allReady ? "green" : "gray"}>
+                            {allReady ? "✓ 全员就绪" : `就绪 ${readyCount}/${totalCount}`}
+                        </Text>
                     </Flex>
                 )}
             </Card>
@@ -124,8 +143,7 @@ export const DMControlSidebarPanel: React.FC = () => {
                 color={isLastFaction ? "red" : "blue"}
                 onClick={handleAdvanceTurn}
                 style={{ width: "100%", fontWeight: 600 }}>
-                {phase === GamePhase.DEPLOYMENT ? (<><Play size={14} /> 开始游戏</>)
-                : isLastFaction ? (<><FastForward size={14} /> 结算回合</>)
+                {isLastFaction ? (<><FastForward size={14} /> 结算回合</>)
                 : (<><FastForward size={14} /> 下一派系</>)}
             </Button>
 
@@ -134,7 +152,6 @@ export const DMControlSidebarPanel: React.FC = () => {
             <Card style={{ padding: "6px 8px" }}>
                 <Text size="1" color="gray" mb="2">阶段切换</Text>
                 <Flex gap="1" wrap="wrap">
-                    <Button size="1" variant="soft" color="purple" onClick={() => send("edit:room", { action: "set_phase", phase: "DEPLOYMENT" })}>部署</Button>
                     <Button size="1" variant="soft" onClick={() => send("edit:room", { action: "set_phase", phase: "FACTION_ACTION" })}>派系行动</Button>
                     <Button size="1" variant="soft" color="amber" onClick={() => send("edit:room", { action: "set_phase", phase: "SETTLEMENT" })}>结算</Button>
                 </Flex>
@@ -144,4 +161,3 @@ export const DMControlSidebarPanel: React.FC = () => {
 };
 
 export default DMControlSidebarPanel;
-

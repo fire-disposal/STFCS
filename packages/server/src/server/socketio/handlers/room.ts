@@ -213,28 +213,7 @@ export const roomHandlers = {
             case "ready":
                 room.togglePlayerReady(ctx.playerId);
                 return;
-            case "start":
-                ctx.requireHost();
-
-                // 开始前将全局自定义派系注入房间状态
-                const globalFactions = await factionService.list();
-                if (globalFactions.length > 0) {
-                    ctx.state.mutateAndBroadcast((draft: any) => {
-                        if (!draft.factions) draft.factions = {};
-                        for (const f of globalFactions) {
-                            if (!draft.factions[f.$id]) {
-                                draft.factions[f.$id] = { ...f };
-                            }
-                        }
-                    });
-                }
-
-                ctx.state.startGame();
-                ctx.state.resetAllPlayersReady();
-                ctx.state.appendLog(createBattleLogEvent("game_started", {
-                    firstFaction: ctx.state.getState().initiativeOrder?.[0] ?? "unknown",
-                }));
-                return;
+		case "kick":
             case "kick":
                 ctx.requireHost();
                 if (!p.targetId) throw err("需要 targetId", ErrorCodes.TARGET_REQUIRED);
