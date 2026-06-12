@@ -41,54 +41,48 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 		await send("room:action", { action: "ready" });
 	};
 
-	const activeDef = activeFaction ? factions?.[activeFaction] : undefined;
+	const playerList = Object.entries(players);
 
 	return (
 		<div className="turn-bar">
-			<div className="turn-bar__round-badge">
-				<span className="turn-bar__round-num">{turnCount}</span>
-				<span className="turn-bar__round-label">轮</span>
-			</div>
+			<div className="turn-bar__round">{turnCount}</div>
 
-			{isSettlement && (
-				<div className="turn-bar__settlement">
-					<span className="turn-bar__settlement-icon">⚙</span>
-					<span className="turn-bar__settlement-text">结算阶段</span>
-				</div>
-			)}
+			{isSettlement && <div className="turn-bar__settlement">结算</div>}
 
 			{isActionPhase && initiativeOrder && initiativeOrder.length > 0 && (
-				<div className="turn-bar__timeline">
+				<div className="turn-bar__groups">
 					{initiativeOrder.map((fid, i) => {
 						const def = factions?.[fid];
 						const isActive = i === currentIndex;
 						const isDone = i < currentIndex;
-						const isPending = i > currentIndex;
-						const isMine = fid === myFaction;
 						const flagBg = def?.flagAssetId
 							? `url(${textureManager.getTextureUrl(def.flagAssetId)}) center/cover`
 							: def?.color ?? "#555";
 
+						const factionPlayers = playerList.filter(
+							([, p]) => p?.connected && p?.faction === fid
+						);
+
 						return (
 							<React.Fragment key={fid}>
-								{i > 0 && (
-									<div className={`turn-bar__connector ${isDone ? "turn-bar__connector--done" : ""}`} />
-								)}
+								{i > 0 && <div className="turn-bar__sep" />}
 								<div
-									className={`turn-bar__faction ${isActive ? "turn-bar__faction--active" : ""} ${isDone ? "turn-bar__faction--done" : ""} ${isPending ? "turn-bar__faction--pending" : ""} ${isMine ? "turn-bar__faction--mine" : ""}`}
-									title={def?.name ?? fid}
-									style={isActive ? { "--faction-color": def?.color ?? "#4a9eff" } as React.CSSProperties : undefined}
+									className={`turn-bar__group${isActive ? " turn-bar__group--active" : ""}${isDone ? " turn-bar__group--done" : ""}`}
+									style={{ "--fc": def?.color ?? "#4a9eff" } as React.CSSProperties}
 								>
-									<div className="turn-bar__faction-flag" style={{ background: flagBg }} >
-										{!def?.flagAssetId && (
-											<span className="turn-bar__faction-initial">{def?.name?.charAt(0) ?? "?"}</span>
-										)}
-										{isDone && <span className="turn-bar__faction-check">✓</span>}
+									<div className="turn-bar__flag" style={{ background: flagBg }}>
+										{!def?.flagAssetId && <span>{def?.name?.charAt(0) ?? "?"}</span>}
 									</div>
-									<span className="turn-bar__faction-name">
-										{def?.name ?? fid.split(":").pop()}
-									</span>
-									{isMine && <span className="turn-bar__faction-mine-dot" />}
+									{factionPlayers.map(([pid, p]) => (
+										<div
+											key={pid}
+											className={`turn-bar__avatar${p?.isReady ? " turn-bar__avatar--ready" : ""}`}
+											title={p?.nickname ?? pid}
+										>
+											{p?.nickname?.charAt(0) ?? "?"}
+										</div>
+									))}
+									{isDone && <span className="turn-bar__done-mark">✓</span>}
 								</div>
 							</React.Fragment>
 						);
@@ -96,18 +90,9 @@ export const TurnBar: React.FC<TurnBarProps> = ({
 				</div>
 			)}
 
-			{isActionPhase && activeDef && (
-				<div className="turn-bar__active-label" style={{ color: activeDef.color }}>
-					{activeDef.name} 行动中
-				</div>
-			)}
-
 			{isMyTurn && (
-				<button
-					onClick={handleToggleReady}
-					className={`turn-bar__ready ${isReady ? "turn-bar__ready--done" : ""}`}
-				>
-					{isReady ? "✓ 已就绪" : "● 就绪"}
+				<button onClick={handleToggleReady} className={`turn-bar__ready${isReady ? " turn-bar__ready--active" : ""}`}>
+					{isReady ? "✓" : "●"}
 				</button>
 			)}
 		</div>

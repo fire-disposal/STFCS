@@ -1,232 +1,142 @@
 .turn-bar {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 6px 14px;
-	background: rgba(8, 12, 18, 0.92);
-	border: 1px solid rgba(74, 158, 255, 0.15);
+	gap: 10px;
+	padding: 5px 12px;
+	background: rgba(8, 12, 18, 0.9);
+	border: 1px solid rgba(74, 158, 255, 0.12);
 	border-radius: 8px;
-	font-size: 12px;
-	height: 54px;
+	height: 48px;
 	box-sizing: border-box;
-	backdrop-filter: blur(6px);
 }
 
-.turn-bar__round-badge {
+.turn-bar__round {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: rgba(74, 158, 255, 0.1);
+	border: 1px solid rgba(74, 158, 255, 0.25);
 	display: flex;
-	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
-	border-radius: 50%;
-	background: rgba(74, 158, 255, 0.12);
-	border: 1px solid rgba(74, 158, 255, 0.3);
+	font-size: 13px;
+	font-weight: 800;
+	color: #60a5fa;
 	flex-shrink: 0;
 }
 
-.turn-bar__round-num {
-	font-size: 14px;
-	font-weight: 800;
-	color: #60a5fa;
-	line-height: 1;
-}
-
-.turn-bar__round-label {
-	font-size: 9px;
-	color: #4a7aaa;
-	line-height: 1;
-	margin-top: 1px;
-}
-
 .turn-bar__settlement {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 12px;
+	padding: 3px 10px;
+	border-radius: 4px;
 	background: rgba(245, 158, 11, 0.1);
-	border: 1px solid rgba(245, 158, 11, 0.3);
-	border-radius: 6px;
-	animation: turn-bar-pulse 2s ease-in-out infinite;
-}
-
-.turn-bar__settlement-icon {
-	font-size: 14px;
-	animation: turn-bar-spin 3s linear infinite;
-}
-
-.turn-bar__settlement-text {
+	border: 1px solid rgba(245, 158, 11, 0.25);
 	color: #f59e0b;
+	font-size: 11px;
 	font-weight: 600;
-	font-size: 12px;
 }
 
-@keyframes turn-bar-pulse {
-	0%, 100% { opacity: 0.8; }
-	50% { opacity: 1; }
-}
-
-@keyframes turn-bar-spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
-}
-
-.turn-bar__timeline {
+.turn-bar__groups {
 	display: flex;
 	align-items: center;
 	gap: 0;
 	flex: 1;
 	min-width: 0;
-	padding: 0 4px;
 }
 
-.turn-bar__connector {
-	width: 16px;
-	height: 2px;
-	background: rgba(74, 158, 255, 0.15);
+.turn-bar__sep {
+	width: 1px;
+	height: 24px;
+	background: rgba(74, 158, 255, 0.12);
+	margin: 0 6px;
 	flex-shrink: 0;
 }
 
-.turn-bar__connector--done {
-	background: rgba(34, 197, 94, 0.4);
-}
-
-.turn-bar__faction {
+.turn-bar__group {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
 	padding: 4px 8px;
 	border-radius: 6px;
-	background: rgba(20, 30, 45, 0.4);
 	border: 1.5px solid transparent;
-	transition: all 0.3s ease;
+	transition: opacity 0.25s, border-color 0.25s, background 0.25s;
 	position: relative;
-	min-width: 0;
-	flex-shrink: 1;
 }
 
-.turn-bar__faction--active {
-	background: rgba(74, 158, 255, 0.08);
-	border-color: var(--faction-color, #4a9eff);
-	box-shadow: 0 0 12px color-mix(in srgb, var(--faction-color, #4a9eff) 30%, transparent),
-	            inset 0 0 8px color-mix(in srgb, var(--faction-color, #4a9eff) 8%, transparent);
-	flex-shrink: 0;
+.turn-bar__group--active {
+	background: color-mix(in srgb, var(--fc) 8%, transparent);
+	border-color: color-mix(in srgb, var(--fc) 50%, transparent);
 }
 
-.turn-bar__faction--done {
-	opacity: 0.45;
+.turn-bar__group--done {
+	opacity: 0.4;
 }
 
-.turn-bar__faction--pending {
-	opacity: 0.6;
+.turn-bar__group:not(.turn-bar__group--active):not(.turn-bar__group--done) {
+	opacity: 0.65;
 }
 
-.turn-bar__faction--mine {
-	outline: 1px solid rgba(255, 255, 255, 0.15);
-	outline-offset: 1px;
-}
-
-.turn-bar__faction-flag {
-	width: 24px;
-	height: 24px;
+.turn-bar__flag {
+	width: 22px;
+	height: 22px;
 	border-radius: 4px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	flex-shrink: 0;
-	position: relative;
-	overflow: hidden;
-}
-
-.turn-bar__faction--active .turn-bar__faction-flag {
-	width: 28px;
-	height: 28px;
-}
-
-.turn-bar__faction-initial {
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 800;
-	color: rgba(255, 255, 255, 0.75);
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+	color: rgba(255, 255, 255, 0.7);
+	flex-shrink: 0;
 }
 
-.turn-bar__faction-check {
-	position: absolute;
-	inset: 0;
+.turn-bar__avatar {
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: rgba(30, 45, 65, 0.8);
+	border: 2px solid rgba(100, 116, 139, 0.4);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(0, 0, 0, 0.55);
-	color: #22c55e;
-	font-size: 12px;
+	font-size: 10px;
 	font-weight: 700;
-}
-
-.turn-bar__faction-name {
-	font-size: 11px;
-	font-weight: 500;
 	color: #8a9db0;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 64px;
+	transition: border-color 0.2s;
 }
 
-.turn-bar__faction--active .turn-bar__faction-name {
+.turn-bar__avatar--ready {
+	border-color: #22c55e;
 	color: #cfe8ff;
-	font-weight: 700;
-	max-width: 80px;
 }
 
-.turn-bar__faction--done .turn-bar__faction-name {
-	text-decoration: line-through;
-	text-decoration-color: rgba(34, 197, 94, 0.5);
-}
-
-.turn-bar__faction-mine-dot {
-	position: absolute;
-	top: 2px;
-	right: 2px;
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	background: #60a5fa;
-	box-shadow: 0 0 4px rgba(96, 165, 250, 0.6);
-}
-
-.turn-bar__active-label {
+.turn-bar__done-mark {
 	font-size: 11px;
+	color: #22c55e;
 	font-weight: 700;
-	white-space: nowrap;
-	flex-shrink: 0;
-	letter-spacing: 0.3px;
+	margin-left: 2px;
 }
 
 .turn-bar__ready {
-	padding: 5px 14px;
-	border-radius: 5px;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
 	background: rgba(100, 116, 139, 0.15);
-	border: 1px solid rgba(100, 116, 139, 0.35);
-	color: #94a3b8;
+	border: 1.5px solid rgba(100, 116, 139, 0.35);
+	color: #64748b;
 	cursor: pointer;
 	font-size: 12px;
-	font-weight: 600;
-	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
-	transition: all 0.2s ease;
+	transition: all 0.2s;
 }
 
 .turn-bar__ready:hover {
 	background: rgba(100, 116, 139, 0.3);
-	border-color: rgba(100, 116, 139, 0.5);
 }
 
-.turn-bar__ready--done {
+.turn-bar__ready--active {
 	background: rgba(34, 197, 94, 0.15);
-	border-color: rgba(34, 197, 94, 0.45);
+	border-color: rgba(34, 197, 94, 0.5);
 	color: #22c55e;
-}
-
-.turn-bar__ready--done:hover {
-	background: rgba(34, 197, 94, 0.25);
 }
