@@ -1,5 +1,6 @@
 import React from "react";
 import type { CombatToken } from "@vt/data";
+import { getFactionColor } from "@/utils/factionColor";
 import "./ship-status-bar.css";
 
 /**
@@ -25,7 +26,7 @@ export const ShipStatusBar: React.FC<{ ship: CombatToken }> = ({ ship }) => {
 
 	const displayName = runtime.displayName ?? ship.metadata?.name ?? ship.$id.slice(-6);
 	const faction = runtime.faction;
-	const factionColor = faction ? (faction.includes("fate-grip") ? 0xff4a4a : faction.includes("player-alliance") ? 0x4a9eff : undefined) : undefined;
+	const factionColor = faction ? getFactionColor(faction) : undefined;
 
 	return (
 		<div className="ship-status-bar">

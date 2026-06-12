@@ -39,7 +39,8 @@ export const deployHandlers = {
             throw err("部署位置与现有舰船碰撞", ErrorCodes.DEPLOY_COLLISION);
         }
 
-        const defaultFaction = room.getStateManager().getState().initiativeOrder?.[0] ?? "preset:faction:player-alliance";
+        const playerState = room.getStateManager().getState().players?.[ctx.playerId];
+        const defaultFaction = playerState?.faction ?? room.getStateManager().getState().initiativeOrder?.[0] ?? "preset:faction:player-alliance";
         const deployFaction = p.faction ?? defaultFaction;
 
         const createToken: CombatToken = {

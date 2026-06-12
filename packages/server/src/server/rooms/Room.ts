@@ -97,6 +97,11 @@ export class Room {
 
 		this.emptiedAt = null;
 
+		const state = this.stateManager.getState();
+		const order = state.initiativeOrder ?? [];
+		const factionForCreator = order[0] ?? "preset:faction:fate-grip";
+		const factionForOther = (order.length > 1 ? order[1] : order[0]) ?? "preset:faction:player-alliance";
+
 		const playerData: { sessionId: string; nickname: string; role: "HOST" | "PLAYER"; isReady: boolean; connected: boolean; avatar?: string; faction?: string } = {
 			sessionId: connectionId,
 			nickname: playerName,
@@ -104,8 +109,8 @@ export class Room {
 			isReady: false,
 			connected: true,
 			faction: this.options.creatorSessionId === playerId
-				? "preset:faction:fate-grip"
-				: "preset:faction:player-alliance",
+				? factionForCreator
+				: factionForOther,
 		};
 		if (avatar) playerData.avatar = avatar;
 

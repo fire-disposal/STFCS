@@ -11,6 +11,7 @@ import type { SocketNetworkManager } from "@/network";
 import { ShipPreviewCanvas } from "./ShipPreviewCanvas";
 import { notify } from "@/ui/shared/Notification";
 import { useUIStore } from "@/state/stores/uiStore";
+import { getGameState, getGamePlayerId } from "@/state/stores/gameStore";
 import { useGameAction } from "@/hooks/useGameAction";
 
 const HULL_SIZE_NAMES: Record<string, string> = {
@@ -99,12 +100,16 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 		};
 		const cursorHeading = mapCursor?.r ?? 0;
 
+		const playerId = getGamePlayerId();
+		const players = getGameState()?.players;
+		const playerFaction = playerId ? players?.[playerId]?.faction : undefined;
+
 		try {
 			await send("deploy:token", {
 				preset: selectedPreset.token,
 				position: cursorPos,
 				heading: cursorHeading,
-				faction: "preset:faction:player-alliance",
+				faction: playerFaction ?? "preset:faction:player-alliance",
 			});
 		} catch {
 			// 错误已由 useGameAction 中的 notify.error 处理

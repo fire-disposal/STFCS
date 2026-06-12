@@ -10,6 +10,7 @@ import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { useSelectedShip } from "@/hooks/useSelectedShip";
 import { useUIStore } from "@/state/stores/uiStore";
+import { getGameState } from "@/state/stores/gameStore";
 import { UI_CONFIG } from "@/config/constants";
 import { notify } from "@/ui/shared/Notification";
 import "./weapon-panel.css";
@@ -140,15 +141,21 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 				if (result && result.weapons) {
 					const map = new Map<string, WeaponTargetingData>();
 					for (const weaponData of result.weapons) {
-						const validTargets: TargetInfo[] = (weaponData.validTargets ?? []).map((t: any) => ({
+					const tokens = getGameState()?.tokens ?? {};
+					const shipFaction = ship!.runtime?.faction;
+					const validTargets: TargetInfo[] = (weaponData.validTargets ?? []).map((t: any) => {
+						const targetToken = tokens[t.targetId];
+						const targetFaction = targetToken?.runtime?.faction;
+						return {
 							id: t.targetId,
 							name: t.targetName ?? t.targetId.slice(-6),
 							distance: t.distance ?? 0,
 							inRange: t.inRange ?? false,
 							inArc: t.inArc ?? false,
 							canAttack: t.inRange && t.inArc,
-							isFriendly: t.faction === "PLAYER",
-						}));
+							isFriendly: !!(shipFaction && targetFaction === shipFaction),
+						};
+					});
 						map.set(weaponData.mountId, {
 							mountId: weaponData.mountId,
 							validTargets,
