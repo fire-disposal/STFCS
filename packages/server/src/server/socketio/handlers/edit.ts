@@ -147,15 +147,36 @@ export const editHandlers = {
             case "set_faction": {
                 if (!p.playerId) throw err("需要 playerId", ErrorCodes.PLAYER_ID_REQUIRED);
                 if (!p.faction) throw err("需要 faction", ErrorCodes.FACTION_REQUIRED);
-                const factions = ctx.state.getState().factions;
-                if (!factions || !factions[p.faction]) {
+                const state = ctx.state.getState();
+                if (!state.factions || !state.factions[p.faction]) {
                     throw err("派系不存在", ErrorCodes.FACTION_NOT_FOUND);
                 }
+                const oldFaction = state.players[p.playerId]?.faction;
                 ctx.state.updatePlayer(p.playerId, { faction: p.faction });
-                const order = ctx.state.getState().initiativeOrder;
-                if (order && !order.includes(p.faction)) {
+
+                const updatedState = ctx.state.getState();
+                const order = updatedState.initiativeOrder ?? [];
+                let needsUpdate = false;
+                let newOrder = [...order];
+
+                if (!order.includes(p.faction)) {
+                    newOrder.push(p.faction);
+                    needsUpdate = true;
+                }
+
+                if (oldFaction && oldFaction !== p.faction && !oldFaction.startsWith("preset:")) {
+                    const hasPlayers = Object.values(updatedState.players).some(
+                        (pl) => pl?.connected && pl?.faction === oldFaction
+                    );
+                    if (!hasPlayers && oldFaction !== updatedState.activeFaction) {
+                        newOrder = newOrder.filter((id) => id !== oldFaction);
+                        needsUpdate = true;
+                    }
+                }
+
+                if (needsUpdate) {
                     ctx.state.mutateAndBroadcast((draft) => {
-                        draft.initiativeOrder = [...(draft.initiativeOrder ?? []), p.faction!];
+                        draft.initiativeOrder = newOrder;
                     });
                 }
                 return;
