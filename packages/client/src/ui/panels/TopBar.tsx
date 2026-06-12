@@ -31,12 +31,14 @@ interface TopBarProps {
 	onSettings: () => void;
 	onLeave: () => void;
 	onFactionChange?: (playerId: string, faction: string) => void;
+	onFactionDelete?: (factionId: string) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
 	onSettings,
 	onLeave,
 	onFactionChange,
+	onFactionDelete,
 }) => {
 	// 从 Zustand 直接获取所有游戏状态
 	const phase = useGamePhase();
@@ -83,8 +85,9 @@ export const TopBar: React.FC<TopBarProps> = ({
 			<FactionSelector
 				currentFaction={currentFaction}
 				currentPlayerId={playerId}
-				factions={gameState?.factions as Record<string, { name: string; color: string; flagAssetId?: string }> ?? {}}
+				factions={gameState?.factions as Record<string, { name: string; color: string; flagAssetId?: string; ownerId?: string; ownerName?: string }> ?? {}}
 				onFactionChange={onFactionChange}
+				onFactionDelete={onFactionDelete}
 			/>
 				<SaveMenu isHost={isHost} inRoom={inRoom} />
 				<button className="top-bar__action-btn" onClick={onSettings}>

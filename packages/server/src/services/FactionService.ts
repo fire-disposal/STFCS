@@ -18,6 +18,7 @@ interface FactionRecord {
     color: string;
     flagAssetId?: string | undefined;
     ownerId?: string | undefined;
+    ownerName?: string | undefined;
 }
 
 const STORAGE_PATH = join(process.cwd(), "storage", "factions.json");

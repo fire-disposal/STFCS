@@ -243,7 +243,12 @@ export const FactionCustomizerDialog: React.FC<Props> = ({ open, onOpenChange, n
                                     }}>
                                         {flagUrl ? undefined : f.name.charAt(0)}
                                     </span>
-                                    <Text size="1" style={{ flex: 1 }}>{f.name}</Text>
+                                    <Flex direction="column" style={{ flex: 1 }}>
+                                        <Text size="1">{f.name}</Text>
+                                        {f.ownerName && (
+                                            <Text size="1" color="gray">{f.ownerName}</Text>
+                                        )}
+                                    </Flex>
                                     <Text size="1" color="gray">{f.$id.startsWith("preset:") ? "预设" : "自定义"}</Text>
                                     {!f.$id.startsWith("preset:") && f.ownerId === playerId && (
                                         <Button size="1" variant="soft" color="red" onClick={() => handleDelete(f.$id)} disabled={loading}>

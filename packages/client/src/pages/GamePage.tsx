@@ -232,6 +232,9 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 				onFactionChange={(playerId, faction) => {
 					send("edit:room", { action: "set_faction", playerId, faction });
 				}}
+				onFactionDelete={(factionId) => {
+					send("edit:faction:delete", { factionId });
+				}}
 			/>
 
 			<Box style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>

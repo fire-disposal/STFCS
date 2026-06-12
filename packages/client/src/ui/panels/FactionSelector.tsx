@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Flag } from "lucide-react";
+import { Flag, Trash2 } from "lucide-react";
 import { textureManager } from "@/renderer/systems/TextureManager";
 
 interface FactionDefBrief {
     name: string;
     color: string;
     flagAssetId?: string;
+    ownerId?: string;
+    ownerName?: string;
 }
 
 interface FactionSelectorProps {
@@ -13,10 +15,11 @@ interface FactionSelectorProps {
     currentPlayerId: string | null;
     factions: Record<string, FactionDefBrief>;
     onFactionChange?: (playerId: string, faction: string) => void;
+    onFactionDelete?: (factionId: string) => void;
 }
 
 export const FactionSelector: React.FC<FactionSelectorProps> = ({
-    currentFaction, currentPlayerId, factions, onFactionChange,
+    currentFaction, currentPlayerId, factions, onFactionChange, onFactionDelete,
 }) => {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -109,7 +112,7 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
                             const selected = fid === currentFaction;
                             const flagUrl = def.flagAssetId ? flagUrls[def.flagAssetId] : undefined;
                             return (
-                                <button
+                                <div
                                     key={fid}
                                     onClick={() => handleSelect(fid)}
                                     style={{
@@ -142,13 +145,32 @@ export const FactionSelector: React.FC<FactionSelectorProps> = ({
                                     }}>
                                         {flagUrl ? undefined : def.name.charAt(0)}
                                     </span>
-                                    <span style={{ flex: 1, fontWeight: selected ? 600 : 400 }}>
-                                        {def.name}
-                                    </span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ fontWeight: selected ? 600 : 400, display: "block" }}>
+                                            {def.name}
+                                        </span>
+                                        {def.ownerName && !fid.startsWith("preset:") && (
+                                            <span style={{ fontSize: 10, color: "#5a7085", display: "block" }}>
+                                                创建者: {def.ownerName}
+                                            </span>
+                                        )}
+                                    </div>
                                     {selected && (
-                                        <span style={{ color: "#4a9eff", fontSize: 10, fontWeight: 600 }}>当前</span>
+                                        <span style={{ color: "#4a9eff", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>当前</span>
                                     )}
-                                </button>
+                                    {onFactionDelete && def.ownerId === currentPlayerId && !fid.startsWith("preset:") && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onFactionDelete(fid); }}
+                                            style={{
+                                                background: "transparent", border: "none",
+                                                color: "#e5484d", cursor: "pointer", padding: 2,
+                                                display: "flex", alignItems: "center", flexShrink: 0,
+                                            }}
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    )}
+                                </div>
                             );
                         })}
 

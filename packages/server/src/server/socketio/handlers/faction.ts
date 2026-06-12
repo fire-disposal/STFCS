@@ -77,6 +77,7 @@ export const editFactionHandlers = {
             color: p.color,
             flagAssetId,
             ownerId: ctx.playerId,
+            ownerName: ctx.playerName,
         });
 
         logger.info(`Faction saved to global store: ${factionId} (flag=${flagAssetId})`);
