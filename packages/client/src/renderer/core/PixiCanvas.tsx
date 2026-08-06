@@ -152,7 +152,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
 	const handlePanDelta = useCallback((deltaX: number, deltaY: number) => {
 		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
-		setCameraPosition(cameraPositionRef.current.x - worldDelta.x, cameraPositionRef.current.y - worldDelta.y);
+		const nextPosition = {
+			x: cameraPositionRef.current.x - worldDelta.x,
+			y: cameraPositionRef.current.y - worldDelta.y,
+		};
+		cameraPositionRef.current = nextPosition;
+		setCameraPosition(nextPosition.x, nextPosition.y);
 	}, [setCameraPosition, zoom]);
 
 	const handleRotateDelta = useCallback((delta: number) => {

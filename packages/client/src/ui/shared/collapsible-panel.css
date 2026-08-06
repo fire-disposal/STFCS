@@ -207,6 +207,13 @@
 	position: relative;
 }
 
+.collapsible-panel__tabs-root {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
 .collapsible-panel__content--horizontal {
 	padding: 12px 16px;
 	overflow-x: auto;

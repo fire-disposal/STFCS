@@ -12,7 +12,7 @@
 import type { EngineContext, EngineResult, TokenRuntimeUpdate } from "../context.js";
 import { createEngineEvent } from "../context.js";
 import { calculateWeaponAttack } from "../rules/weapon.js";
-import { calculateDamage } from "../rules/damage.js";
+import { calculateDamage, calculateEmpDamage } from "../rules/damage.js";
 import { calculateModifiedValue } from "./modifier.js";
 import { validateAttackAllocations } from "../rules/targeting.js";
 import { angleBetween, distanceBetween } from "@vt/data";
@@ -147,6 +147,7 @@ export function applyCombat(context: EngineContext): EngineResult {
         const attackerDamageDealt = calculateModifiedValue(1.0, attackerRuntime, "damageDealt");
         const targetDamageTaken = calculateModifiedValue(1.0, targetRuntime, "damageTaken");
         const finalDamage = Math.round(attackResult.damage * attackerDamageDealt * targetDamageTaken);
+        const finalEmpDamage = Math.round(attackResult.empDamage * attackerDamageDealt * targetDamageTaken);
 
         const damageResult = calculateDamage(
           targetToken.spec,
@@ -156,13 +157,16 @@ export function applyCombat(context: EngineContext): EngineResult {
           attackerPos,
           targetPos
         );
+        const empResult = calculateEmpDamage(finalEmpDamage, targetToken.spec, targetRuntime);
 
         const newHull = Math.round(Math.max(0, (targetRuntime.hull ?? 0) - damageResult.hullDamage));
         const newArmor = [...(targetRuntime.armor ?? [0, 0, 0, 0, 0, 0])];
         if (damageResult.armorQuadrant >= 0 && damageResult.armorQuadrant < 6) {
           newArmor[damageResult.armorQuadrant] = Math.round(Math.max(0, newArmor[damageResult.armorQuadrant]! - damageResult.armorDamage));
         }
-        const newFluxHard = Math.round((targetRuntime.fluxHard ?? 0) + damageResult.fluxGenerated);
+        const newFluxHard = Math.round(
+          (targetRuntime.fluxHard ?? 0) + damageResult.fluxGenerated + empResult.fluxGenerated
+        );
         const newFluxSoft = Math.round(targetRuntime.fluxSoft ?? 0);
         const newTotalFlux = newFluxHard + newFluxSoft;
         const destroyed = newHull <= 0;
@@ -203,11 +207,12 @@ export function applyCombat(context: EngineContext): EngineResult {
           distance: Math.round(distanceBetween(attackerPos, targetPos)),
           hitDamage: Math.round(attackResult.damage),
           finalDamage,
+          empDamage: finalEmpDamage,
           hullDamage: Math.round(damageResult.hullDamage),
           armorDamage: Math.round(damageResult.armorDamage),
           armorQuadrant: damageResult.armorQuadrant,
           shieldHit: damageResult.shieldHit,
-          fluxGenerated: Math.round(damageResult.fluxGenerated),
+          fluxGenerated: Math.round(damageResult.fluxGenerated + empResult.fluxGenerated),
           destroyed,
           overloaded,
         }));

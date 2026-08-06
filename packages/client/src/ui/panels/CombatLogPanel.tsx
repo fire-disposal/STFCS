@@ -101,7 +101,8 @@ const LogRenderer: React.FC<LogRendererProps> = React.memo(({ log, tokens }) => 
 		case BattleLogType.ATTACK: {
 			const shieldHit = b("shieldHit") && n("fluxGenerated");
 			const armorHit = n("armorDamage") != null && n("armorDamage")! > 0;
-			const hullHit = n("hullDamage") != null;
+			const hullHit = n("hullDamage") != null && n("hullDamage")! > 0;
+			const empDamage = n("empDamage") ?? 0;
 			return (
 				<span>
 					<Text style={{ color: catColor }}>
@@ -115,8 +116,9 @@ const LogRenderer: React.FC<LogRendererProps> = React.memo(({ log, tokens }) => 
 					</Text>
 					<Text style={{ color: NC.DAMAGE }}> {n("hitDamage")}伤害</Text>
 					{armorHit ? <Text style={{ color: NC.ARMOR }}> 护甲-{n("armorDamage")}(象限{n("armorQuadrant")})</Text> : null}
-					{hullHit ? <Text style={{ color: NC.HULL }}> 结构-{n("hullDamage")}</Text> : !hullHit && !shieldHit ? <Text color="gray"> 未穿透</Text> : null}
+					{hullHit ? <Text style={{ color: NC.HULL }}> 结构-{n("hullDamage")}</Text> : !hullHit && !shieldHit && empDamage === 0 ? <Text color="gray"> 未穿透</Text> : null}
 					{shieldHit ? <Text style={{ color: NC.SHIELD }}> 护盾拦截+{n("fluxGenerated")}辐能</Text> : null}
+					{empDamage > 0 ? <Text style={{ color: NC.SHIELD }}> EMP+{empDamage}硬辐能</Text> : null}
 				</span>
 			);
 		}

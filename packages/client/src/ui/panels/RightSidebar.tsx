@@ -15,7 +15,7 @@ import { RealityEditSidebarPanel } from "./RealityEditSidebarPanel";
 import { CombatLogPanel } from "./CombatLogPanel";
 import { DMControlSidebarPanel } from "./DMControlSidebarPanel";
 import type { SocketNetworkManager } from "@/network";
-import { useGameCurrentPlayer } from "@/state/stores/gameStore";
+import { useGameCurrentPlayer, useGamePlayerId, useGameState } from "@/state/stores/gameStore";
 import "./right-sidebar.css";
 
 interface RightSidebarProps {
@@ -26,8 +26,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 	networkManager,
 }) => {
 	const currentPlayer = useGameCurrentPlayer();
-	const isHost = currentPlayer?.role === "HOST";
-
+	const playerId = useGamePlayerId();
+	const gameState = useGameState();
+	const isHost = currentPlayer?.role === "HOST" || gameState?.ownerId === playerId;
 	const upperTabs: TabConfig[] = useMemo(() => [
 		{
 			id: "view-control",

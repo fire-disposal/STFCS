@@ -30,7 +30,7 @@ export const DMControlSidebarPanel: React.FC = () => {
     const gameState = useGameState();
     const playerId = useGamePlayerId();
     const currentPlayer = playerId ? players[playerId] : undefined;
-    const isHost = currentPlayer?.role === "HOST";
+    const isHost = currentPlayer?.role === "HOST" || gameState?.ownerId === playerId;
 
     const activeFactionPlayers = Object.values(players).filter(
         (p) => p.faction === activeFaction && p.connected

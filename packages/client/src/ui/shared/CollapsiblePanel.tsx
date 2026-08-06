@@ -78,7 +78,7 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
 			<Box
 				className={`collapsible-panel collapsible-panel--${direction} ${className}`}
 			>
-				<Tabs.Root value={safeActiveTab} onValueChange={setActiveTab}>
+				<Tabs.Root className="collapsible-panel__tabs-root" value={safeActiveTab} onValueChange={setActiveTab}>
 					<Flex
 						className={`collapsible-panel__header collapsible-panel__header--${direction}`}
 						align="center"

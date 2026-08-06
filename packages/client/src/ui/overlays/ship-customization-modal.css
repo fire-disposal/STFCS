@@ -206,21 +206,45 @@
 	pointer-events: none;
 }
 
-/* === Layout stabilization === */
+/* === Responsive workbench layout === */
 
-.customizer-dialog-body {
+.customizer-dialog-content {
+	width: min(1200px, calc(100vw - 32px));
+	max-width: calc(100vw - 32px);
+	height: min(86vh, 920px);
 	display: flex;
 	flex-direction: column;
-	max-height: 80vh;
 	overflow: hidden;
 }
 
-.customizer-sidebar {
-	max-height: 70vh;
-	overflow-y: auto;
-	padding-right: 4px;
+.customizer-dialog-tabs {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
 }
 
+.customizer-workspace {
+	flex: 1;
+	min-height: 0;
+	grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) !important;
+}
+
+.customizer-library,
+.customizer-editor {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.customizer-sidebar,
+.customizer-editor__scroll {
+	flex: 1;
+	min-height: 0;
+	max-height: none;
+	overflow-y: auto;
+}
 .customizer-list-item {
 	display: flex;
 	align-items: center;

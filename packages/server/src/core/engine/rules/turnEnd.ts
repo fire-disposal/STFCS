@@ -157,7 +157,11 @@ export function processTokenTurnEnd(token: CombatToken): TurnEndResult {
 		});
 
 		const hasChanges = updatedWeapons.some(
-			(w: WeaponRuntime | undefined, i: number) => w && weaponsList[i] && w.state !== weaponsList[i]?.state
+			(w: WeaponRuntime | undefined, i: number) =>
+				w && weaponsList[i] && (
+					w.state !== weaponsList[i]?.state ||
+					w.cooldownRemaining !== weaponsList[i]?.cooldownRemaining
+				)
 		);
 
 		if (hasChanges) {

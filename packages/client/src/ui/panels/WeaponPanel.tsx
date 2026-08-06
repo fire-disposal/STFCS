@@ -97,7 +97,7 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 					reason = "舰船过载";
 				} else if (state !== "READY") {
 					canFire = false;
-					reason = state === "COOLDOWN" ? `冷却中 (${cooldown}s)` : `状态: ${state}`;
+					reason = state === "COOLDOWN" ? `冷却中 (${cooldown}回合)` : `状态: ${state}`;
 				} else if (hasFired) {
 					canFire = false;
 					reason = "本回合已射击";

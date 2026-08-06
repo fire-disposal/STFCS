@@ -113,7 +113,7 @@ export function useCamera(
 		const nextZoom = clampZoom(current.zoom + zoomDiff * speed);
 		const nextX = current.x + xDiff * speed;
 		const nextY = current.y + yDiff * speed;
-
+		cameraRef.current = { ...current, x: nextX, y: nextY, zoom: nextZoom };
 		setZoom(nextZoom);
 		setCameraPosition(nextX, nextY);
 	}, [clampZoom, setCameraPosition, setZoom]);

@@ -716,7 +716,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             }
             onOpenChange(next);
         }}>
-            <Dialog.Content maxWidth="1200px">
+            <Dialog.Content className="customizer-dialog-content" maxWidth="1200px">
                 <Flex justify="between" align="center" mb="2">
                     <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
                     <Dialog.Close>
@@ -726,15 +726,15 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                     </Dialog.Close>
                 </Flex>
 
-                <Tabs.Root value={activeTopTab} onValueChange={(v) => setActiveTopTab(v as "ship" | "weapon")}>
+                <Tabs.Root className="customizer-dialog-tabs" value={activeTopTab} onValueChange={(v) => setActiveTopTab(v as "ship" | "weapon")}>
                     <Tabs.List mb="3">
                         <Tabs.Trigger value="ship">舰船</Tabs.Trigger>
                         <Tabs.Trigger value="weapon">武器</Tabs.Trigger>
                     </Tabs.List>
 
                     {activeTopTab === "ship" && (
-                        <Grid columns="260px 1fr" gap="4">
-                            <Card>
+                        <Grid className="customizer-workspace" columns="260px 1fr" gap="4">
+                            <Card className="customizer-library">
                                 <Flex justify="between" align="center" mb="2">
                                     <Text weight="bold">舰船存档</Text>
                                     <Button size="1" variant="soft" onClick={() => void createShipBuild()} data-magnetic>
@@ -791,8 +791,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Flex direction="column" style={{ maxHeight: "calc(80vh - 100px)" }}>
-                                <Flex direction="column" style={{ overflowY: "auto", flex: 1 }}>
+                            <Flex className="customizer-editor" direction="column">
+                                <Flex className="customizer-editor__scroll" direction="column">
                                     <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">舰船</Text>
@@ -1479,8 +1479,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                     )}
 
                     {activeTopTab === "weapon" && (
-                        <Grid columns="260px 1fr" gap="4">
-                            <Card>
+                        <Grid className="customizer-workspace" columns="260px 1fr" gap="4">
+                            <Card className="customizer-library">
                                 <Flex justify="between" align="center" mb="2">
                                     <Text weight="bold">武器存档</Text>
                                     <Button size="1" variant="soft" onClick={() => void createWeaponBuild()} data-magnetic>
@@ -1537,8 +1537,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Flex direction="column" style={{ maxHeight: "calc(80vh - 100px)" }}>
-                                <Flex direction="column" style={{ overflowY: "auto", flex: 1 }}>
+                            <Flex className="customizer-editor" direction="column">
+                                <Flex className="customizer-editor__scroll" direction="column">
                                     <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
                                         <Flex justify="between" align="center" mb="2">
                                             <Text weight="bold">武器</Text>

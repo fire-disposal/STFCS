@@ -76,9 +76,10 @@ export function calculateWeaponAttack(
 	}
 
 	// 4. 计算基础伤害（射程惩罚）
-	const baseDamage = weaponSpec.damage * (weaponSpec.projectilesPerShot || 1);
+	const projectiles = weaponSpec.projectilesPerShot || 1;
 	const rangeModifier = calculateDamageModifier(dist, effectiveRange);
-	result.damage = baseDamage * rangeModifier;
+	result.damage = weaponSpec.damage * projectiles * rangeModifier;
+	result.empDamage = (weaponSpec.emp || 0) * projectiles * rangeModifier;
 
 	// 5. 辐能产生（攻击者软辐能）
 	result.fluxGenerated = weaponSpec.fluxCostPerShot || 0;
@@ -130,10 +131,10 @@ export function calculateDamageModifier(
  * 计算武器冷却
  */
 export function calculateWeaponCooldown(
-	_weaponSpec: WeaponSpec,
+	_weaponSpec: WeaponSpec | undefined,
 	currentCooldown: number
 ): number {
-	return Math.max(0, currentCooldown - 1);
+	return Math.max(0, Math.ceil(currentCooldown) - 1);
 }
 
 /**
@@ -160,6 +161,13 @@ export function setWeaponFired(
 	};
 }
 
+/**
+ * Advances a weapon by one completed combat round.
+ *
+ * A weapon fired this round enters cooldown during settlement. Each subsequent
+ * settlement removes one whole remaining round, so a cooldown of N prevents
+ * firing for exactly N following rounds.
+ */
 export function updateWeaponStateAtTurnEnd(
 	weaponRuntime: WeaponRuntime | undefined,
 	weaponSpec?: WeaponSpec
@@ -167,23 +175,17 @@ export function updateWeaponStateAtTurnEnd(
 	if (!weaponRuntime) return weaponRuntime;
 
 	if (weaponRuntime.state === "FIRED") {
-		const cooldown = weaponSpec?.cooldown || 0;
-		if (cooldown <= 0) {
-			return {
-				...weaponRuntime,
-				state: "READY",
-			};
-		} else {
-			return {
-				...weaponRuntime,
-				state: "COOLDOWN",
-				cooldownRemaining: cooldown,
-			};
-		}
+		const cooldown = Math.max(0, Math.ceil(weaponSpec?.cooldown ?? 0));
+		return {
+			...weaponRuntime,
+			state: cooldown === 0 ? "READY" : "COOLDOWN",
+			cooldownRemaining: cooldown,
+		};
 	}
 
-	if (weaponRuntime.state === "COOLDOWN" && (weaponRuntime.cooldownRemaining || 0) > 0) {
-		const newCooldown = Math.max(0, (weaponRuntime.cooldownRemaining || 0) - 1);
+	if (weaponRuntime.state === "COOLDOWN") {
+		const cooldownRemaining = weaponRuntime.cooldownRemaining ?? 0;
+		const newCooldown = calculateWeaponCooldown(weaponSpec, cooldownRemaining);
 		return {
 			...weaponRuntime,
 			state: newCooldown === 0 ? "READY" : "COOLDOWN",
