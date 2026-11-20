@@ -192,12 +192,12 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          printf '%s' "${{ secrets.GITHUB_TOKEN }}" |
-            ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "docker login ${{ env.REGISTRY }} -u '${{ github.actor }}' --password-stdin"
           scp -o BatchMode=yes docker-compose.yml "$SERVER_USER@$SERVER_HOST:/srv/stfcs/docker-compose.yml"
+          # 生产机在境内，从 ghcr 直接拉 500MB 实测约 100KB/s；改为 runner 侧取镜像再流式导入
+          docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
+          docker save "$IMAGE" | gzip -1 | ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "gunzip | docker load"
           ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" env APP_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" bash -s <<'REMOTE'
           set -euo pipefail
-          docker pull "$APP_IMAGE:$IMAGE_TAG"
           mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
           docker compose -f /srv/stfcs/docker-compose.yml up -d
           docker compose -f /srv/stfcs/docker-compose.yml ps
