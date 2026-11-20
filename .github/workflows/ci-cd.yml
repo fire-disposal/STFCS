@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: '构建并部署到生产机'
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -71,7 +76,9 @@ jobs:
   build:
     name: Build & Push Image
     needs: [validate, test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -103,9 +110,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 生产机在阿里云，runner 直连其 22/80 全部超时；经中转机隧道部署
   deploy:
+    name: Deploy
     needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -113,47 +121,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 缺 secret 直接停在这里，不进 ssh、不重试
+      - name: Check secrets
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$SERVER_HOST" ] || missing="$missing SERVER_HOST"
+          [ -n "$SERVER_USER" ] || missing="$missing SERVER_USER"
+          [ -n "$SSH_KEY" ] || missing="$missing SSH_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::缺少 secrets:$missing，需要更新 secrets"
+            exit 1
+          fi
+
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Configure ssh tunnel
+      - name: Verify production access
         env:
-          JUMP_HOST: ${{ secrets.DEPLOY_JUMP_HOST }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           touch ~/.ssh/known_hosts
-          ssh-keyscan -T 5 -H "$JUMP_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          if ! ssh-keygen -F "$JUMP_HOST" -f ~/.ssh/known_hosts >/dev/null; then
-            echo "::error::$JUMP_HOST:22 unreachable from runner"
-            exit 1
-          fi
-          cat >> ~/.ssh/config <<EOF
-          Host deploy-jump
-            HostName $JUMP_HOST
-            User root
-            StrictHostKeyChecking yes
-          EOF
-          # 生产机只能从中转机探测
-          ssh -o BatchMode=yes deploy-jump "ssh-keyscan -T 5 -H $SERVER_HOST 2>/dev/null" >> ~/.ssh/known_hosts || true
+          ssh-keyscan -T 5 -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           if ! ssh-keygen -F "$SERVER_HOST" -f ~/.ssh/known_hosts >/dev/null; then
-            echo "::error::$SERVER_HOST:22 unreachable from jump host"
+            echo "::error::$SERVER_HOST:22 不可达，需要更新 secrets（SERVER_HOST 应为生产机公网 IP）"
             exit 1
           fi
-          cat >> ~/.ssh/config <<EOF
-          Host stfcs-prod
-            HostName $SERVER_HOST
-            User $SERVER_USER
-            StrictHostKeyChecking yes
-            ServerAliveInterval 15
-            ProxyCommand ssh -W %h:%p deploy-jump
-          EOF
-          chmod 600 ~/.ssh/config ~/.ssh/known_hosts
-          if ! ssh -o BatchMode=yes -o ConnectTimeout=10 stfcs-prod true; then
-            echo "::error::ssh auth failed; authorized_keys 未包含 SSH_PRIVATE_KEY 对应公钥"
+          if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SERVER_USER@$SERVER_HOST" true; then
+            echo "::error::ssh 登录被拒，需要更新 secrets 或在生产机 authorized_keys 加入 SSH_PRIVATE_KEY 的公钥"
             exit 1
           fi
 
@@ -183,34 +186,39 @@ jobs:
 
       - name: Deploy
         env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
           IMAGE: ${{ env.IMAGE_REPO }}:${{ github.sha }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
           printf '%s' "${{ secrets.GITHUB_TOKEN }}" |
-            ssh -o BatchMode=yes stfcs-prod "docker login ${{ env.REGISTRY }} -u '${{ github.actor }}' --password-stdin"
-          scp -o BatchMode=yes docker-compose.yml stfcs-prod:/srv/stfcs/docker-compose.yml
-          ssh -o BatchMode=yes stfcs-prod env APP_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" bash -s <<'REMOTE'
+            ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "docker login ${{ env.REGISTRY }} -u '${{ github.actor }}' --password-stdin"
+          scp -o BatchMode=yes docker-compose.yml "$SERVER_USER@$SERVER_HOST:/srv/stfcs/docker-compose.yml"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" env APP_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" bash -s <<'REMOTE'
           set -euo pipefail
           docker pull "$APP_IMAGE:$IMAGE_TAG"
           mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
           docker compose -f /srv/stfcs/docker-compose.yml up -d
           docker compose -f /srv/stfcs/docker-compose.yml ps
           REMOTE
-          running=$(ssh -o BatchMode=yes stfcs-prod "docker inspect -f '{{.Config.Image}}' stfcs-app")
+          running=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "docker inspect -f '{{.Config.Image}}' stfcs-app")
           test "$running" = "$IMAGE" || { echo "::error::stfcs-app 运行中的镜像为 $running"; exit 1; }
 
       - name: Health Check
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           set -uo pipefail
-          for i in $(seq 1 30); do
-            health=$(ssh -o BatchMode=yes stfcs-prod 'curl -s -o /dev/null -w "%{http_code}" http://localhost/health' || true)
-            page=$(ssh -o BatchMode=yes stfcs-prod 'curl -s -o /dev/null -w "%{http_code}" http://localhost/stfcs/' || true)
+          for i in $(seq 1 24); do
+            health=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" 'curl -s -o /dev/null -w "%{http_code}" http://localhost/health' || true)
+            page=$(ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" 'curl -s -o /dev/null -w "%{http_code}" http://localhost/stfcs/' || true)
             if [ "$health" = "200" ] && [ "$page" = "200" ]; then
               echo "health=$health stfcs=$page"
               exit 0
             fi
             sleep 5
           done
-          ssh -o BatchMode=yes stfcs-prod "docker logs --tail 50 stfcs-app"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "docker logs --tail 50 stfcs-app"
           exit 1

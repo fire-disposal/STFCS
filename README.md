@@ -68,7 +68,7 @@ pnpm install
 pnpm dev            # 先构建 @vt/data，再起 server(:3001) + client(:5173)
 pnpm build
 pnpm typecheck && pnpm lint && pnpm test
-docker compose up -d   # 生产形态，宿主 http://localhost:2567
+docker compose up -d   # 生产形态，宿主 http://localhost/stfcs/
 ```
 
 client 的 vite 只把 `/api` 代理到 3001，WebSocket 直连 server 地址；`pnpm --filter @vt/server dev` 可只起服务端。
@@ -89,11 +89,11 @@ BASE_PATH=/stfcs docker compose up -d   # compose 固定 80:3001 与 /srv/stfcs/
 
 ### CI 部署
 
-push 到 `main` 后 workflow 依次做：按 `VITE_BASE_PATH=/stfcs/` 构建并推送 `ghcr.io/fire-disposal/stfcs-app:<sha>`、在 runner 上跑一遍镜像确认 `/health` 与 `/stfcs/` 的静态资源前缀、登录生产机拉取该 sha、`docker compose up -d`、校验运行中的镜像并检查 `/health` 与 `/stfcs/`。
+push 到 `main` 只跑 lint、单测、构建并推送 `ghcr.io/fire-disposal/stfcs-app:<sha>`；部署必须手动触发：Actions 里选 `CI/CD Pipeline`，`deploy=true`，同一次运行会重新构建再直连生产机部署。
 
-生产机在阿里云，GitHub 托管 runner 直连其 22 与 80 全部超时；部署固定走 `DEPLOY_JUMP_HOST` 中转机的 SSH 隧道，`ProxyCommand ssh -W %h:%p deploy-jump`。中转机上的公钥被限制为只能转发到生产机 22。相关 secrets：`SERVER_HOST`、`SERVER_USER`、`SSH_PRIVATE_KEY`、`DEPLOY_JUMP_HOST`。
+部署步骤：按 `VITE_BASE_PATH=/stfcs/` 构建、在 runner 上跑一遍镜像确认 `/health` 与 `/stfcs/` 的静态资源前缀、ssh 登录生产机拉取该 sha、`docker compose up -d`、校验运行中的镜像并检查 `/health` 与 `/stfcs/`。
 
-`docker pull` 放在 `compose up` 之前，拉取失败时旧容器继续提供服务。
+secrets 是 `SERVER_HOST`（生产机公网 IP）、`SERVER_USER`、`SSH_PRIVATE_KEY`；缺任一项作业在第一步失败并提示更新 secrets，连不通也不重试。`docker pull` 放在 `compose up` 之前，拉取失败时旧容器继续提供服务。
 
 ## 边界与已知问题
 
