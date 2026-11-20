@@ -11,7 +11,7 @@ env:
   REGISTRY: ghcr.io
   PNPM_VERSION: 10.32.1
   NODE_VERSION: 24
-  HOST_PORT: 2567
+  HOST_PORT: 80
   APP_PORT: 3001
   CORS_ORIGINS: "*"
 
@@ -110,6 +110,8 @@ jobs:
           context: .
           file: ./Dockerfile.unified
           push: true
+          build-args: |
+            VITE_BASE_PATH=/stfcs/
           tags: |
             ${{ env.REGISTRY }}/fire-disposal/stfcs-app:latest
             ${{ env.REGISTRY }}/fire-disposal/stfcs-app:${{ github.sha }}
@@ -120,33 +122,83 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy
+      # 先在 runner 上把"能不能连上"与"能不能登录"分开暴露，避免 heredoc 里静默 5 秒超时
+      - name: SSH preflight
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            docker system prune -af
-            docker pull ghcr.io/fire-disposal/stfcs-app:latest
-            docker rm -f stfcs-app || true
-            docker network create stfcs-network 2>/dev/null || true
-            mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
-            docker run -d --name stfcs-app --restart unless-stopped --network stfcs-network \
-              -p ${{ env.HOST_PORT }}:${{ env.APP_PORT }} -e NODE_ENV=production -e PORT=${{ env.APP_PORT }} -e CORS_ORIGINS='${{ env.CORS_ORIGINS }}' \
-              -v /srv/stfcs/storage:/app/storage \
-              ghcr.io/fire-disposal/stfcs-app:latest
-            sleep 10
-            docker ps --filter name=stfcs-app
+          set -euo pipefail
+          if ! ssh-keyscan -T 5 -H "$SERVER_HOST" > /tmp/known_hosts 2>/dev/null || [ ! -s /tmp/known_hosts ]; then
+            echo "::error::${SERVER_HOST}:22 unreachable from runner (tcp timeout)"
+            exit 1
+          fi
+          cat /tmp/known_hosts >> ~/.ssh/known_hosts
+          if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SERVER_USER@$SERVER_HOST" true; then
+            echo "::error::ssh auth failed for ${SERVER_USER}@${SERVER_HOST}; authorized_keys 缺少 SSH_PRIVATE_KEY 对应公钥"
+            exit 1
+          fi
+
+      - name: Deploy
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          IMAGE_REPO: ${{ env.REGISTRY }}/fire-disposal/stfcs-app
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" |
+            ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" \
+              "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          scp -o BatchMode=yes docker-compose.yml "$SERVER_USER@$SERVER_HOST:/srv/stfcs/docker-compose.yml"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" \
+            env APP_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" bash -s <<'EOF'
+          set -euo pipefail
+          docker pull "$APP_IMAGE:$IMAGE_TAG"
+          mkdir -p /srv/stfcs/storage/players /srv/stfcs/storage/assets/ships /srv/stfcs/storage/assets/weapons
+          docker compose -f /srv/stfcs/docker-compose.yml up -d
+          docker compose -f /srv/stfcs/docker-compose.yml ps
           EOF
 
       - name: Health Check
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          for i in $(seq 1 12); do
-            curl -fsS --max-time 5 http://${{ secrets.SERVER_HOST }}:${{ env.HOST_PORT }}/health && exit 0
+          for i in $(seq 1 24); do
+            health=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${SERVER_HOST}:${{ env.HOST_PORT }}/health" || true)
+            page=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${SERVER_HOST}:${{ env.HOST_PORT }}/stfcs/" || true)
+            if [ "$health" = "200" ] && [ "$page" = "200" ]; then
+              echo "health=$health stfcs=$page"
+              exit 0
+            fi
             sleep 5
           done
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "docker logs --tail 50 stfcs-app"
+          ssh -o BatchMode=yes "$SERVER_USER@$SERVER_HOST" "docker logs --tail 50 stfcs-app"
           exit 1
+
+  # 临时：runner 侧连通性探针，仅 workflow_dispatch 触发
+  probe:
+    name: Deploy probe
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          echo "host_chars=${#SERVER_HOST} user_chars=${#SERVER_USER}"
+          echo "--- resolve"; getent ahosts "$SERVER_HOST" | head -4 || echo "resolve failed"
+          echo "--- tcp"
+          for p in 22 80 443; do
+            if timeout 6 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/$p" 2>/dev/null; then echo "port $p open"; else echo "port $p blocked"; fi
+          done
+          echo "--- keyscan"
+          ssh-keyscan -T 5 "$SERVER_HOST" 2>&1 | head -3 || true
