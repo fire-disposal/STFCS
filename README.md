@@ -87,6 +87,14 @@ BASE_PATH=/stfcs docker compose up -d   # compose 固定 80:3001 与 /srv/stfcs/
 - 数据目录是容器内 `/app/packages/server/storage`，挂宿主机 `/srv/stfcs/storage`。旧的 `/app/storage` 挂载点无效，服务端按 `process.cwd()` 解析 `storage/`。
 - `GET /health` 始终留在根路径，供容器健康检查使用。
 
+### CI 部署
+
+push 到 `main` 后 workflow 依次做：按 `VITE_BASE_PATH=/stfcs/` 构建并推送 `ghcr.io/fire-disposal/stfcs-app:<sha>`、在 runner 上跑一遍镜像确认 `/health` 与 `/stfcs/` 的静态资源前缀、登录生产机拉取该 sha、`docker compose up -d`、校验运行中的镜像并检查 `/health` 与 `/stfcs/`。
+
+生产机在阿里云，GitHub 托管 runner 直连其 22 与 80 全部超时；部署固定走 `DEPLOY_JUMP_HOST` 中转机的 SSH 隧道，`ProxyCommand ssh -W %h:%p deploy-jump`。中转机上的公钥被限制为只能转发到生产机 22。相关 secrets：`SERVER_HOST`、`SERVER_USER`、`SSH_PRIVATE_KEY`、`DEPLOY_JUMP_HOST`。
+
+`docker pull` 放在 `compose up` 之前，拉取失败时旧容器继续提供服务。
+
 ## 边界与已知问题
 
 - 房间和战局全在内存里，进程一停就没了；落盘的只有玩家档案和房间删除时的快照。
