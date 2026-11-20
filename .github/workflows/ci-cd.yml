@@ -125,17 +125,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          for h in "$JUMP_HOST" "$SERVER_HOST"; do
-            if ! ssh-keyscan -T 5 -H "$h" >> ~/.ssh/known_hosts 2>/dev/null; then
-              echo "::error::$h:22 unreachable from runner"
-              exit 1
-            fi
-          done
+          touch ~/.ssh/known_hosts
+          ssh-keyscan -T 5 -H "$JUMP_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          if ! ssh-keygen -F "$JUMP_HOST" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "::error::$JUMP_HOST:22 unreachable from runner"
+            exit 1
+          fi
           cat >> ~/.ssh/config <<EOF
           Host deploy-jump
             HostName $JUMP_HOST
             User root
             StrictHostKeyChecking yes
+          EOF
+          # 生产机只能从中转机探测
+          ssh -o BatchMode=yes deploy-jump "ssh-keyscan -T 5 -H $SERVER_HOST 2>/dev/null" >> ~/.ssh/known_hosts || true
+          if ! ssh-keygen -F "$SERVER_HOST" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "::error::$SERVER_HOST:22 unreachable from jump host"
+            exit 1
+          fi
+          cat >> ~/.ssh/config <<EOF
           Host stfcs-prod
             HostName $SERVER_HOST
             User $SERVER_USER
