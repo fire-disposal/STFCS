@@ -91,9 +91,9 @@ BASE_PATH=/stfcs docker compose up -d   # compose 固定 80:3001 与 /srv/stfcs/
 
 push 到 `main` 只跑 lint、单测、构建并推送 `ghcr.io/fire-disposal/stfcs-app:<sha>`；部署必须手动触发：Actions 里选 `CI/CD Pipeline`，`deploy=true`，同一次运行会重新构建再直连生产机部署。
 
-部署步骤：按 `VITE_BASE_PATH=/stfcs/` 构建、在 runner 上跑一遍镜像确认 `/health` 与 `/stfcs/` 的静态资源前缀、ssh 登录生产机拉取该 sha、`docker compose up -d`、校验运行中的镜像并检查 `/health` 与 `/stfcs/`。
+部署步骤：按 `VITE_BASE_PATH=/stfcs/` 构建、在 runner 上跑一遍镜像确认 `/health` 与 `/stfcs/` 的静态资源前缀、把镜像从 runner 流式导入生产机（境内直拉 ghcr 只有约 100KB/s）、`docker compose up -d`、校验运行中的镜像并检查 `/health` 与 `/stfcs/`。
 
-secrets 是 `SERVER_HOST`（生产机公网 IP）、`SERVER_USER`、`SSH_PRIVATE_KEY`；缺任一项作业在第一步失败并提示更新 secrets，连不通也不重试。`docker pull` 放在 `compose up` 之前，拉取失败时旧容器继续提供服务。
+secrets 是 `SERVER_HOST`（生产机公网 IP）、`SERVER_USER`、`SSH_PRIVATE_KEY`；缺任一项作业在第一步失败并提示更新 secrets，连不通也不重试。镜像导入在 `compose up` 之前完成，传输失败时旧容器继续提供服务。
 
 ## 边界与已知问题
 
