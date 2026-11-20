@@ -202,3 +202,9 @@ jobs:
           done
           echo "--- keyscan"
           ssh-keyscan -T 5 "$SERVER_HOST" 2>&1 | head -3 || true
+          echo "--- relay $( [ -n "${{ secrets.PROBE_HOST }}" ] && echo present || echo absent)"
+          for h in "${{ secrets.PROBE_HOST }}"; do
+            for p in 22 80; do
+              if timeout 6 bash -c "exec 3<>/dev/tcp/$h/$p" 2>/dev/null; then echo "relay port $p open"; else echo "relay port $p blocked"; fi
+            done
+          done
