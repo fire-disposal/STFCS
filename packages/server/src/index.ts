@@ -19,12 +19,23 @@ const logger = createLogger("server");
 interface ServerConfig {
 	port: number;
 	corsOrigin?: string;
+	basePath?: string;
 }
 
 const DEFAULT_CONFIG: ServerConfig = {
 	port: 3001,
 	corsOrigin: "*",
+	basePath: "",
 };
+
+/**
+ * 规范化部署前缀："" 或 "/stfcs"（无尾斜杠）
+ */
+export function normalizeBasePath(raw: string | undefined): string {
+	const trimmed = (raw ?? "").trim().replace(/\/+$/, "");
+	if (!trimmed) return "";
+	return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
 
 const PUBLIC_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)), "public");
 
@@ -70,22 +81,39 @@ async function sendFile(res: ServerResponse, path: string): Promise<boolean> {
 	}
 }
 
-async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleHttpRequest(req: IncomingMessage, res: ServerResponse, basePath = ""): Promise<void> {
 	const reqUrl = req.url ?? "/";
+	const urlPath = reqUrl.split("?")[0] ?? "/";
 
-	if (reqUrl === "/health") {
+	if (urlPath === "/health") {
 		res.statusCode = 200;
 		res.setHeader("Content-Type", "application/json");
 		res.end(JSON.stringify({ ok: true }));
 		return;
 	}
 
-	if (reqUrl.startsWith("/socket.io/")) {
+	if (basePath) {
+		if (urlPath === basePath) {
+			res.statusCode = 308;
+			res.setHeader("Location", `${basePath}/${reqUrl.slice(basePath.length)}`);
+			res.end();
+			return;
+		}
+		if (!urlPath.startsWith(`${basePath}/`)) {
+			res.statusCode = 404;
+			res.end("Not Found");
+			return;
+		}
+	}
+
+	const localPath = basePath ? urlPath.slice(basePath.length) : urlPath;
+
+	if (localPath.startsWith("/socket.io/")) {
 		return;
 	}
 
-	if (reqUrl.startsWith("/api/assets/")) {
-		const assetId = decodeURIComponent(reqUrl.slice("/api/assets/".length).split("?")[0] ?? "").replace(/\.\w+$/, "");
+	if (localPath.startsWith("/api/assets/")) {
+		const assetId = decodeURIComponent(localPath.slice("/api/assets/".length)).replace(/\.\w+$/, "");
 		if (!assetId) {
 			res.statusCode = 400;
 			res.end("Missing assetId");
@@ -117,7 +145,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
 		return;
 	}
 
-	const requestedPath = safePublicPath(reqUrl);
+	const requestedPath = safePublicPath(localPath);
 	if (await sendFile(res, requestedPath)) {
 		return;
 	}
@@ -150,10 +178,11 @@ export class STFCServer {
 			this.validatePresetsOnStartup();
 
 			this.httpServer = createServer((req, res) => {
-				void handleHttpRequest(req, res);
+				void handleHttpRequest(req, res, this.config.basePath);
 			});
 			this.io = new IOServer(this.httpServer, {
 				cors: { origin: this.config.corsOrigin },
+				path: `${this.config.basePath}/socket.io/`,
 				maxHttpBufferSize: 10 * 1024 * 1024,
 				pingTimeout: 10000,
 				pingInterval: 5000,
@@ -269,6 +298,7 @@ const isDirectRun = (() => {
 if (isDirectRun) {
 	const directRunConfig: Partial<ServerConfig> = {
 		port: parsePort(process.env["PORT"], DEFAULT_CONFIG.port),
+		basePath: normalizeBasePath(process.env["BASE_PATH"]),
 	};
 	const corsOrigins = process.env["CORS_ORIGINS"];
 	if (corsOrigins) {

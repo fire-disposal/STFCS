@@ -3,6 +3,27 @@ import type { RoomArchive } from "@vt/data";
 import { PlayerInfoService } from "./PlayerInfoService.js";
 import { generateId } from "../utils/id.js";
 
+/**
+ * 旧存档的 saveJson 直接是房间状态；新存档的 saveJson 是 GameSave。
+ * 统一成 GameSave，让旧档案也能列出来并载入。
+ */
+function normalizeSave(archive: RoomArchive): GameSave {
+	const raw = archive.saveJson as unknown;
+	if (raw && typeof raw === "object" && "$id" in raw && "snapshot" in raw) {
+		return raw as GameSave;
+	}
+	return {
+		$id: archive.$id,
+		metadata: {
+			name: archive.name,
+			createdAt: archive.createdAt,
+			updatedAt: archive.updatedAt,
+		},
+		snapshot: raw as GameSave["snapshot"],
+		createdAt: archive.createdAt,
+	};
+}
+
 export class PlayerProfileService {
 	constructor(private playerInfoService: PlayerInfoService) { }
 
@@ -97,6 +118,6 @@ export class PlayerProfileService {
 
 	async listSaves(userId: string): Promise<GameSave[]> {
 		const archives = await this.playerInfoService.getRoomSaves(userId);
-		return archives.map((a) => a.saveJson);
+		return archives.map((a) => normalizeSave(a));
 	}
 }

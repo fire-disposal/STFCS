@@ -70,6 +70,7 @@ export interface UsePixiAppOptions {
 	overlayColor?: string;
 	overlayClientRef?: React.MutableRefObject<any>;
 	playerId?: string;
+	setZoom?: (zoom: number) => void;
 }
 
 export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
@@ -89,6 +90,9 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 	const layersRef = useRef<LayerRegistry | null>(null);
 	const onClickRef = useRef(onClick);
 	const setMapCursorRef = useRef(setMapCursor);
+	const setZoomRef = useRef(options.setZoom);
+	setZoomRef.current = options.setZoom;
+	const touchCleanupRef = useRef<(() => void) | null>(null);
 	const tickerCallbackRef = useRef<any>(null);
 
 	onClickRef.current = onClick;
@@ -346,11 +350,24 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 
 			stage.on("pointerdown", (event: any) => {
 				const button = event.button ?? event.data?.button ?? 0;
+				const pointerType = event.pointerType ?? event.data?.pointerType ?? "mouse";
 				const dragState = dragStateRef.current;
 				const screen = getScreenCoords(event);
 
 				event.preventDefault();
 				event.stopPropagation();
+
+				if (pointerType === "touch") {
+					// 单指平移；双指缩放由原生 pointer 监听处理
+					dragState.active = true;
+					dragState.mode = "pan";
+					dragState.startX = screen.x;
+					dragState.startY = screen.y;
+					dragState.lastX = dragState.startX;
+					dragState.lastY = dragState.startY;
+					dragState.moved = false;
+					return;
+				}
 
 				if (button === 2) {
 					// 右键 -> 平移
@@ -533,6 +550,46 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 			};
 			app.ticker.add(tickerCallback);
 			tickerCallbackRef.current = tickerCallback;
+
+			// 触屏：单指平移（Pixi 事件）+ 双指缩放（原生 PointerEvent）
+			const view = app.view as HTMLCanvasElement | undefined;
+			const touchPointers = new Map<number, { x: number; y: number }>();
+			let pinchStartDist = 0;
+			let pinchStartZoom = 1;
+			const onPointerDown = (ev: PointerEvent) => {
+				if (ev.pointerType !== "touch") return;
+				touchPointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+				if (touchPointers.size === 2) {
+					dragStateRef.current.active = false;
+					const [a, b] = [...touchPointers.values()];
+					pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+					pinchStartZoom = cameraRef.current.zoom;
+				}
+			};
+			const onPointerMove = (ev: PointerEvent) => {
+				if (ev.pointerType !== "touch" || !touchPointers.has(ev.pointerId)) return;
+				touchPointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+				if (touchPointers.size < 2 || pinchStartDist === 0) return;
+				const [a, b] = [...touchPointers.values()];
+				const dist = Math.hypot(a.x - b.x, a.y - b.y);
+				setZoomRef.current?.(pinchStartZoom * (dist / pinchStartDist));
+			};
+			const onPointerEnd = (ev: PointerEvent) => {
+				touchPointers.delete(ev.pointerId);
+				if (touchPointers.size < 2) pinchStartDist = 0;
+			};
+			if (view) {
+				view.addEventListener("pointerdown", onPointerDown, { passive: true });
+				view.addEventListener("pointermove", onPointerMove, { passive: true });
+				view.addEventListener("pointerup", onPointerEnd, { passive: true });
+				view.addEventListener("pointercancel", onPointerEnd, { passive: true });
+				touchCleanupRef.current = () => {
+					view.removeEventListener("pointerdown", onPointerDown);
+					view.removeEventListener("pointermove", onPointerMove);
+					view.removeEventListener("pointerup", onPointerEnd);
+					view.removeEventListener("pointercancel", onPointerEnd);
+				};
+			}
 		},
 		[
 			canvasSize,
@@ -561,6 +618,8 @@ export function usePixiApp(options: UsePixiAppOptions): UsePixiAppResult {
 	useEffect(() => {
 		return () => {
 			const app = pixiAppRef.current;
+			touchCleanupRef.current?.();
+			touchCleanupRef.current = null;
 			if (app) {
 				if (tickerCallbackRef.current) {
 					app.ticker.remove(tickerCallbackRef.current);

@@ -33,6 +33,7 @@ import { useAssetSocket } from "@/hooks/useAssetSocket";
 import { textureManager } from "@/renderer/systems/TextureManager";
 import MiniShipPreview from "../shared/MiniShipPreview";
 import MiniWeaponPreview from "../shared/MiniWeaponPreview";
+import ShipPreviewCanvas from "@/ui/panels/ShipPreviewCanvas";
 import ColorKeyPickerPanel from "@/ui/shared/ColorKeyPickerPanel";
 import { resizeImage, ASSET_LIMITS } from "@/utils/file";
 import "./ship-customization-modal.css";
@@ -67,6 +68,14 @@ function shortId(id: string): string {
     if (id.startsWith("preset:")) return id.slice(7);
     return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
 }
+
+const DAMAGE_SWATCH: Record<string, string> = {
+    KINETIC: "#ffb347",
+    ENERGY: "#4a9eff",
+    HIGH_EXPLOSIVE: "#ff6f8f",
+    FRAGMENTATION: "#f1c40f",
+    EMP: "#9b59b6",
+};
 
 async function applyColorKeyToDataUrl(sourceDataUrl: string, applyKeyColor?: { color: string; tolerance: number }): Promise<string> {
     if (!applyKeyColor || applyKeyColor.tolerance <= 0) return sourceDataUrl;
@@ -146,8 +155,8 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
     const [editorTab, setEditorTab] = useState<"form" | "json">("form");
     const [weaponEditorTab, setWeaponEditorTab] = useState<"form" | "json">("form");
 
-    const [shipPreviewZoom, setShipPreviewZoom] = useState(1);
-    const [weaponPreviewZoom, setWeaponPreviewZoom] = useState(1);
+    const [shipPreviewZoom, setShipPreviewZoom] = useState(2);
+    const [weaponPreviewZoom, setWeaponPreviewZoom] = useState(2);
     const [texturePreviewUrl, setTexturePreviewUrl] = useState<string | null>(null);
     const [weaponTexturePreviewUrl, setWeaponTexturePreviewUrl] = useState<string | null>(null);
 
@@ -717,10 +726,15 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
             onOpenChange(next);
         }}>
             <Dialog.Content className="customizer-dialog-content" maxWidth="1200px">
-                <Flex justify="between" align="center" mb="2">
-                    <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
+                <Flex justify="between" align="start" mb="3" gap="4">
+                    <Box>
+                        <Dialog.Title>舰船 / 武器工坊</Dialog.Title>
+                        <Dialog.Description size="1" color="gray">
+                            左侧选存档，右侧调参数；预览按滚轮缩放，拖动贴图对齐船体，保存后写回账号。
+                        </Dialog.Description>
+                    </Box>
                     <Dialog.Close>
-                        <Button size="1" variant="ghost" color="gray">
+                        <Button size="1" variant="ghost" color="gray" aria-label="关闭工坊">
                             <X size={14} />
                         </Button>
                     </Dialog.Close>
@@ -762,6 +776,9 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     className={`customizer-list-item${selected ? " customizer-list-item--selected" : ""}`}
                                                     onClick={() => handleSelectShip(item.$id)}
                                                 >
+                                                    <Box className="customizer-list-item__thumb">
+                                                        <ShipPreviewCanvas token={item} size={26} selected={selected} />
+                                                    </Box>
                                                     <Box className="customizer-list-item__info">
                                                         <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
@@ -791,29 +808,37 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Flex className="customizer-editor" direction="column">
+                            <Flex className="customizer-editor">
+                                <Card className="customizer-preview-pane">
+                                    <Flex justify="between" align="center" gap="2">
+                                        <Flex align="center" gap="2">
+                                            <Text weight="bold">舰船预览</Text>
+                                            {isShipDirty && <Badge size="1" color="orange">未保存</Badge>}
+                                        </Flex>
+                                        <Text size="1" color="gray" className="customizer-preview-pane__name">
+                                            {shipDraft?.metadata?.name ?? "未选择"}
+                                        </Text>
+                                    </Flex>
+                                    <MiniShipPreview
+                                        token={shipDraft}
+                                        zoom={shipPreviewZoom}
+                                        onZoomChange={setShipPreviewZoom}
+                                        texturePreviewUrl={shipColorKeyPreviewUrl}
+                                        onTextureOffsetChange={(dx, dy) => {
+                                            const currentX = shipDraft?.spec.texture?.offsetX ?? 0;
+                                            const currentY = shipDraft?.spec.texture?.offsetY ?? 0;
+                                            updateShipTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
+                                        }}
+                                    />
+                                    <Flex justify="between" align="center" gap="2">
+                                        <Button size="1" variant="ghost" aria-label="缩小预览" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
+                                        <Button size="1" variant="ghost" title="重置缩放" onClick={() => setShipPreviewZoom(1)}>{shipPreviewZoom.toFixed(2)}x</Button>
+                                        <Button size="1" variant="ghost" aria-label="放大预览" onClick={() => setShipPreviewZoom(Math.min(4, shipPreviewZoom + 0.25))}>+</Button>
+                                    </Flex>
+                                    <Text size="1" color="gray">滚轮缩放，拖动贴图对齐船体</Text>
+                                </Card>
+                                <Flex className="customizer-editor__main" direction="column">
                                 <Flex className="customizer-editor__scroll" direction="column">
-                                    <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">舰船</Text>
-                                        </Flex>
-                                        <MiniShipPreview
-                                            token={shipDraft}
-                                            zoom={shipPreviewZoom}
-                                            onZoomChange={setShipPreviewZoom}
-                                            texturePreviewUrl={shipColorKeyPreviewUrl}
-                                            onTextureOffsetChange={(dx, dy) => {
-                                                const currentX = shipDraft?.spec.texture?.offsetX ?? 0;
-                                                const currentY = shipDraft?.spec.texture?.offsetY ?? 0;
-                                                updateShipTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
-                                            }}
-                                        />
-                                        <Flex justify="center" gap="2" mt="1">
-                                            <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.max(0.2, shipPreviewZoom - 0.25))}>-</Button>
-                                            <Text size="1">{shipPreviewZoom.toFixed(2)}x</Text>
-                                            <Button size="1" variant="ghost" onClick={() => setShipPreviewZoom(Math.min(4, shipPreviewZoom + 0.25))}>+</Button>
-                                        </Flex>
-                                    </Card>
 
                                     <Card
                                         mt="3"
@@ -1474,6 +1499,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                         <Save size={14} /> 保存
                                     </Button>
                                 </Flex>
+                                </Flex>
                             </Flex>
                         </Grid>
                     )}
@@ -1508,6 +1534,12 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                                     className={`customizer-list-item${selected ? " customizer-list-item--selected" : ""}`}
                                                     onClick={() => handleSelectWeapon(item.$id)}
                                                 >
+                                                    <Box className="customizer-list-item__thumb">
+                                                        <span
+                                                            className="customizer-list-item__swatch"
+                                                            style={{ background: DAMAGE_SWATCH[item.spec.damageType] ?? "#6b8aaa" }}
+                                                        />
+                                                    </Box>
                                                     <Box className="customizer-list-item__info">
                                                         <Text size="2" className="customizer-list-item__name">
                                                             {item.metadata?.name ?? shortId(item.$id)}
@@ -1537,36 +1569,43 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                 </Box>
                             </Card>
 
-                            <Flex className="customizer-editor" direction="column">
+                            <Flex className="customizer-editor">
+                                <Card className="customizer-preview-pane">
+                                    <Flex justify="between" align="center" gap="2">
+                                        <Flex align="center" gap="2">
+                                            <Text weight="bold">武器预览</Text>
+                                            {isWeaponDirty && <Badge size="1" color="orange">未保存</Badge>}
+                                        </Flex>
+                                        <Text size="1" color="gray" className="customizer-preview-pane__name">
+                                            {weaponDraft?.metadata?.name ?? "未选择"}
+                                        </Text>
+                                    </Flex>
+                                    {weaponDraft ? (
+                                        <MiniWeaponPreview
+                                            weapon={weaponDraft}
+                                            texturePreviewUrl={weaponColorKeyPreviewUrl}
+                                            zoom={weaponPreviewZoom}
+                                            onZoomChange={setWeaponPreviewZoom}
+                                            onTextureOffsetChange={(dx, dy) => {
+                                                const currentX = weaponDraft?.spec.texture?.offsetX ?? 0;
+                                                const currentY = weaponDraft?.spec.texture?.offsetY ?? 0;
+                                                updateWeaponTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
+                                            }}
+                                        />
+                                    ) : (
+                                        <Flex align="center" justify="center" className="customizer-preview-empty">
+                                            <Text size="1" color="gray">请先选择武器</Text>
+                                        </Flex>
+                                    )}
+                                    <Flex justify="between" align="center" gap="2">
+                                        <Button size="1" variant="ghost" aria-label="缩小预览" onClick={() => setWeaponPreviewZoom(Math.max(0.2, weaponPreviewZoom - 0.25))}>-</Button>
+                                        <Button size="1" variant="ghost" title="重置缩放" onClick={() => setWeaponPreviewZoom(1)}>{weaponPreviewZoom.toFixed(2)}x</Button>
+                                        <Button size="1" variant="ghost" aria-label="放大预览" onClick={() => setWeaponPreviewZoom(Math.min(4, weaponPreviewZoom + 0.25))}>+</Button>
+                                    </Flex>
+                                    <Text size="1" color="gray">滚轮缩放，拖动贴图对齐准星</Text>
+                                </Card>
+                                <Flex className="customizer-editor__main" direction="column">
                                 <Flex className="customizer-editor__scroll" direction="column">
-                                    <Card style={{ position: "sticky", top: 0, zIndex: 10 }}>
-                                        <Flex justify="between" align="center" mb="2">
-                                            <Text weight="bold">武器</Text>
-                                        </Flex>
-                                        <Flex direction="column" gap="2">
-                                            {weaponDraft && (
-                                                <MiniWeaponPreview
-                                                    weapon={weaponDraft}
-                                                    texturePreviewUrl={weaponColorKeyPreviewUrl}
-                                                    zoom={weaponPreviewZoom}
-                                                    onZoomChange={setWeaponPreviewZoom}
-                                                    onTextureOffsetChange={(dx, dy) => {
-                                                        const currentX = weaponDraft?.spec.texture?.offsetX ?? 0;
-                                                        const currentY = weaponDraft?.spec.texture?.offsetY ?? 0;
-                                                        updateWeaponTexture({ offsetX: Math.round(currentX + dx), offsetY: Math.round(currentY + dy) });
-                                                    }}
-                                                />
-                                            )}
-                                            {!weaponDraft && (
-                                                <Text size="1" color="gray">请先选择武器</Text>
-                                            )}
-                                        </Flex>
-                                        <Flex justify="center" gap="2" mt="1">
-                                            <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.max(0.2, weaponPreviewZoom - 0.25))}>-</Button>
-                                            <Text size="1">{weaponPreviewZoom.toFixed(2)}x</Text>
-                                            <Button size="1" variant="ghost" onClick={() => setWeaponPreviewZoom(Math.min(4, weaponPreviewZoom + 0.25))}>+</Button>
-                                        </Flex>
-                                    </Card>
 
                                     <Card
                                         mt="3"
@@ -1896,6 +1935,7 @@ export const LoadoutCustomizerDialog: React.FC<LoadoutCustomizerDialogProps> = (
                                     <Button onClick={() => void saveWeapon()} color={isWeaponDirty ? "green" : undefined} disabled={!isWeaponDirty} data-magnetic>
                                         <Save size={14} /> 保存
                                     </Button>
+                                </Flex>
                                 </Flex>
                             </Flex>
                         </Grid>

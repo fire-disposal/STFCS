@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Save, Trash2, Download, Loader2, Plus } from "lucide-react";
-import { Dialog, Flex, Box, Text, Button, IconButton, TextField, Badge } from "@radix-ui/themes";
+import { Dialog, AlertDialog, Flex, Box, Text, Button, IconButton, TextField, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
 import { notify } from "@/ui/shared/Notification";
 import type { SaveBuild } from "@vt/data";
@@ -22,20 +22,22 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 	const [saving, setSaving] = useState(false);
 	const [newSaveName, setNewSaveName] = useState("");
 	const [showCreate, setShowCreate] = useState(false);
+	const [pendingDelete, setPendingDelete] = useState<{ saveId: string; name: string } | null>(null);
 
 	const { send } = useGameAction();
 
 	const loadSaves = useCallback(async () => {
 		setLoading(true);
 		try {
-			const result = await send("save:action", { action: "list" }) as { saves?: SaveBuild[] } | null;
-			if (result?.saves) {
-				setSaves(result.saves);
+			const result = await send("save:action", { action: "list" });
+			if (!result) {
+				notify.error("加载存档列表失败");
+				return;
 			}
-		} catch (error) {
-			notify.error("加载存档列表失败");
+			if ("saves" in result) setSaves(result.saves);
+		} finally {
+			setLoading(false);
 		}
-		setLoading(false);
 	}, [send]);
 
 	useEffect(() => {
@@ -52,14 +54,14 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 
 		setSaving(true);
 		try {
-			await send("save:action", { action: "create", name: newSaveName.trim() });
+			const result = await send("save:action", { action: "create", name: newSaveName.trim() });
+			if (!result) return;
 			setNewSaveName("");
 			setShowCreate(false);
-			loadSaves();
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "创建失败");
+			void loadSaves();
+		} finally {
+			setSaving(false);
 		}
-		setSaving(false);
 	}, [newSaveName, send, loadSaves]);
 
 	const handleLoad = useCallback(async (saveId: string) => {
@@ -70,25 +72,25 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 
 		setSaving(true);
 		try {
-			await send("save:action", { action: "load", saveId });
+			const result = await send("save:action", { action: "load", saveId });
+			if (!result) return;
+			notify.success("存档已载入");
 			setOpen(false);
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "加载失败");
+		} finally {
+			setSaving(false);
 		}
-		setSaving(false);
 	}, [inRoom, isHost, send]);
 
-	const handleDelete = useCallback(async (saveId: string, name: string) => {
-		if (!window.confirm(`确定删除存档 "${name}"？`)) return;
-
+	const handleDelete = useCallback(async (saveId: string) => {
 		setSaving(true);
 		try {
-			await send("save:action", { action: "delete", saveId });
-			loadSaves();
-		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "删除失败");
+			const result = await send("save:action", { action: "delete", saveId });
+			if (!result) return;
+			notify.success("存档已删除");
+			void loadSaves();
+		} finally {
+			setSaving(false);
 		}
-		setSaving(false);
 	}, [send, loadSaves]);
 
 	const formatDate = (timestamp: number) => {
@@ -101,6 +103,7 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 	};
 
 	return (
+		<>
 		<Dialog.Root open={open} onOpenChange={setOpen}>
 			<Dialog.Trigger>
 				<button className="top-bar__action-btn" title="存档">
@@ -189,9 +192,10 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 											size="1"
 											variant="soft"
 											color="red"
-											onClick={() => handleDelete(save.$id, save.metadata?.name ?? "未命名")}
+											onClick={() => setPendingDelete({ saveId: save.$id, name: save.metadata?.name ?? "未命名" })}
 											disabled={saving}
 											title="删除"
+											aria-label="删除存档"
 										>
 											<Trash2 size={12} />
 										</IconButton>
@@ -209,6 +213,35 @@ export const SaveMenu: React.FC<SaveMenuProps> = ({ isHost, inRoom }) => {
 				</Dialog.Close>
 			</Dialog.Content>
 		</Dialog.Root>
+
+		<AlertDialog.Root open={pendingDelete !== null} onOpenChange={(next) => { if (!next) setPendingDelete(null); }}>
+			<AlertDialog.Content style={{ maxWidth: 380 }}>
+				<AlertDialog.Title>删除存档</AlertDialog.Title>
+				<AlertDialog.Description size="2">
+					确定删除「{pendingDelete?.name}」？此操作不可撤销。
+				</AlertDialog.Description>
+				<Flex justify="end" gap="2" mt="4">
+					<AlertDialog.Cancel>
+						<Button variant="soft" color="gray" size="1">取消</Button>
+					</AlertDialog.Cancel>
+					<AlertDialog.Action>
+						<Button
+							variant="solid"
+							color="red"
+							size="1"
+							disabled={saving}
+							onClick={() => {
+								if (pendingDelete) void handleDelete(pendingDelete.saveId);
+								setPendingDelete(null);
+							}}
+						>
+							删除
+						</Button>
+					</AlertDialog.Action>
+				</Flex>
+			</AlertDialog.Content>
+		</AlertDialog.Root>
+		</>
 	);
 };
 

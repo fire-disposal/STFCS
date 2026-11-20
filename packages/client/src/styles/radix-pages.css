@@ -44,7 +44,7 @@
 
 .radix-auth-logo {
     display: inline-flex;
-    margin-bottom: 8px;
+    margin-bottom: 0;
     font-size: 28px;
     color: #7fb6ff;
 }
@@ -102,5 +102,29 @@
     .radix-auth-shell,
     .radix-lobby-shell {
         padding: 12px;
+    }
+}
+
+.radix-inline-notice {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(241, 196, 15, 0.35);
+    background: rgba(241, 196, 15, 0.08);
+    color: #f1c40f;
+}
+
+.radix-spin {
+    animation: radix-spin 0.9s linear infinite;
+}
+
+@keyframes radix-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .radix-spin {
+        animation: none;
     }
 }

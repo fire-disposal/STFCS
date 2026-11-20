@@ -31,18 +31,25 @@ export function useRoomList(
 	refreshKey?: number
 ): { rooms: RoomInfo[]; isLoading: boolean; refresh: () => void } {
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
 	const nmRef = useRef(networkManager);
 	nmRef.current = networkManager;
+	const inFlightRef = useRef(false);
 
 	const fetchRooms = useCallback(async () => {
 		const nm = nmRef.current;
-		if (!nm?.isConnected()) return;
+		if (!nm?.isConnected()) {
+			setIsLoading(false);
+			return;
+		}
+		if (inFlightRef.current) return;
+		inFlightRef.current = true;
 		setIsLoading(true);
 		try {
 			const list = await nm.getRoomList();
 			setRooms(list as RoomInfo[]);
 		} finally {
+			inFlightRef.current = false;
 			setIsLoading(false);
 		}
 	}, []);

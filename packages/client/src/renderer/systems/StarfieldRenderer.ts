@@ -27,13 +27,13 @@ import type { LayerRegistry } from "../core/useLayerSystem";
 
 export function useStarfieldRendering(
 	layers: LayerRegistry | null,
-	starfield: StarfieldGenerator
+	starfield: StarfieldGenerator,
+	animate = false
 ): void {
 	const deepGraphicsRef = useRef<Graphics | null>(null);
 	const midGraphicsRef = useRef<Graphics | null>(null);
 	const nearGraphicsRef = useRef<Graphics | null>(null);
 	const nebulaGraphicsRef = useRef<Graphics | null>(null);
-	const lastTimeRef = useRef<number>(0);
 	const frameCountRef = useRef(0);
 
 	useEffect(() => {
@@ -82,20 +82,24 @@ export function useStarfieldRendering(
 	}, [layers, starfield]);
 
 	useEffect(() => {
-		if (!layers || !starfield) return;
+		if (!layers || !starfield || !animate) return;
 
-		const animate = () => {
-			const timestamp = performance.now();
-			const deltaTime = (timestamp - lastTimeRef.current) / 1000;
-			lastTimeRef.current = timestamp;
+		let rafId = 0;
+		let lastDrawAt = 0;
+		const FRAME_MS = 1000 / 15;
+
+		const loop = (now: number) => {
+			rafId = requestAnimationFrame(loop);
+			if (now - lastDrawAt < FRAME_MS) return;
+			const deltaTime = lastDrawAt === 0 ? 0 : Math.min((now - lastDrawAt) / 1000, 0.1);
+			lastDrawAt = now;
 			frameCountRef.current++;
-
-			const safeDelta = Math.min(deltaTime, 0.1);
-			starfield.update(safeDelta);
+			starfield.update(deltaTime);
 
 			const deepGraphics = deepGraphicsRef.current;
 			const midGraphics = midGraphicsRef.current;
 			const nearGraphics = nearGraphicsRef.current;
+			const nebulaGraphics = nebulaGraphicsRef.current;
 
 			if (deepGraphics && frameCountRef.current % 3 === 0) {
 				deepGraphics.clear();
@@ -111,25 +115,16 @@ export function useStarfieldRendering(
 				nearGraphics.clear();
 				starfield.drawNearStars(nearGraphics);
 			}
-		};
 
-		if (layers.starfieldDeep.children[0]) {
-			const ticker = (layers.starfieldDeep as any).__pixiApp?.ticker;
-			if (ticker) {
-				ticker.add(animate);
-				return () => ticker.remove(animate);
+			if (nebulaGraphics) {
+				nebulaGraphics.clear();
+				starfield.drawNebula(nebulaGraphics);
 			}
-		}
-
-		let rafId: number;
-		const loop = () => {
-			animate();
-			rafId = requestAnimationFrame(loop);
 		};
-		rafId = requestAnimationFrame(loop);
 
+		rafId = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(rafId);
-	}, [layers, starfield]);
+	}, [layers, starfield, animate]);
 
 	useEffect(() => {
 		return () => {

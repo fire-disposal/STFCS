@@ -1,0 +1,45 @@
+.loading-screen {
+	display: flex;
+	height: 100%;
+	min-height: 100vh;
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	background: #0a0e14;
+	color: #6b8aaa;
+	font-family: "Fira Code", ui-monospace, monospace;
+	letter-spacing: 0.04em;
+}
+
+.loading-screen__ring {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	border: 2px solid rgba(74, 158, 255, 0.18);
+	border-top-color: rgba(74, 158, 255, 0.8);
+	animation: loading-screen-spin 0.9s linear infinite;
+}
+
+.loading-screen__label {
+	font-size: 13px;
+	text-transform: uppercase;
+}
+
+.loading-screen__hint {
+	font-size: 12px;
+	color: rgba(107, 138, 170, 0.7);
+}
+
+@keyframes loading-screen-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.loading-screen__ring {
+		animation-duration: 3s;
+	}
+}

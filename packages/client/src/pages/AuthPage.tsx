@@ -8,18 +8,21 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Badge, Box, Button, Card, Flex, Heading, Separator, Text, TextField } from '@radix-ui/themes';
 import { LockKeyhole, User } from 'lucide-react';
+import { BASE_PATH } from '@/config';
 
 interface AuthPageProps {
+  connected: boolean;
   onAuthenticated: (username: string) => void;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
+  connected,
   onAuthenticated,
 }) => {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [serverStatus] = useState({ online: true, port: '2567', secure: false });
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   useEffect(() => {
     const saved = localStorage.getItem('stfcs_username');
@@ -32,20 +35,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setError('请输入指挥官代号');
       return;
     }
+    if (!connected) {
+      setError('尚未连接到指挥服务器');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
       localStorage.setItem('stfcs_username', trimmed);
-      onAuthenticated(trimmed);
+      await onAuthenticated(trimmed);
     } catch (e) {
       console.error('[AuthPanel] Error:', e);
       setError(e instanceof Error ? e.message : '连接失败');
     } finally {
       setIsLoading(false);
     }
-  }, [username, onAuthenticated]);
+  }, [username, onAuthenticated, connected]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -62,25 +69,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <Flex gap="6" direction={{ initial: 'column', md: 'row' }}>
           <Flex direction="column" justify="between" className="radix-auth-side">
             <Box>
-              <Text className="radix-auth-logo">◈</Text>
-              <Heading size="8" mb="2">STFCS</Heading>
+              <Flex align="center" gap="2" mb="2">
+                <Text className="radix-auth-logo">◈</Text>
+                <Heading size="8" mb="0">STFCS</Heading>
+              </Flex>
               <Text color="gray" size="3">战术指挥系统</Text>
               <Separator my="4" size="4" />
               <Flex direction="column" gap="2">
                 <Flex justify="between" align="center">
                   <Text size="2" color="gray">系统状态</Text>
-                  <Badge color={serverStatus.online ? 'green' : 'red'} variant="soft">
-                    {serverStatus.online ? '在线' : '离线'}
+                  <Badge color={connected ? 'green' : 'amber'} variant="soft">
+                    {connected ? '在线' : '连接中'}
                   </Badge>
                 </Flex>
                 <Flex justify="between" align="center">
-                  <Text size="2" color="gray">服务端口</Text>
-                  <Badge variant="soft">{serverStatus.port}</Badge>
+                  <Text size="2" color="gray">入口路径</Text>
+                  <Badge variant="soft">{BASE_PATH}</Badge>
                 </Flex>
                 <Flex justify="between" align="center">
-                  <Text size="2" color="gray">连接加密</Text>
-                  <Badge color={serverStatus.secure ? 'green' : 'amber'} variant="soft">
-                    {serverStatus.secure ? '是' : '否'}
+                  <Text size="2" color="gray">传输协议</Text>
+                  <Badge color={secure ? 'green' : 'gray'} variant="soft">
+                    {secure ? 'HTTPS' : 'HTTP'}
                   </Badge>
                 </Flex>
               </Flex>
@@ -111,7 +120,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <Button
               size="3"
               onClick={handleSubmit}
-              disabled={isLoading || !isValid}
+              disabled={isLoading || !isValid || !connected}
               data-magnetic
             >
               <LockKeyhole size={16} />

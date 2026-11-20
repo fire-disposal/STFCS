@@ -9,8 +9,6 @@ import type { RoomInfo } from "@/network";
 import type { SocketNetworkManager } from "@/network";
 import { notify } from "@/ui/shared/Notification";
 import { Avatar } from "@/ui/shared/Avatar";
-import LoadoutCustomizerDialog from "@/ui/overlays/LoadoutCustomizerDialog";
-import FactionCustomizerDialog from "@/ui/overlays/FactionCustomizerDialog";
 import {
 	Badge,
 	Box,
@@ -20,14 +18,18 @@ import {
 	Flex,
 	Heading,
 	ScrollArea,
+	Select,
 	Separator,
 	Tabs,
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info, Flag } from "lucide-react";
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { DoorOpen, LogOut, RefreshCw, Upload, UserCircle, Wrench, Play, Plus, Save, Info, Flag, Link2 } from "lucide-react";
+import React, { useState, useMemo, useCallback, useRef, useEffect, Suspense } from "react";
 import AboutDialog from "@/ui/overlays/AboutDialog";
+
+const LoadoutCustomizerDialog = React.lazy(() => import("@/ui/overlays/LoadoutCustomizerDialog"));
+const FactionCustomizerDialog = React.lazy(() => import("@/ui/overlays/FactionCustomizerDialog"));
 
 interface LobbyPageProps {
 	networkManager: SocketNetworkManager;
@@ -37,7 +39,8 @@ interface LobbyPageProps {
 	isLoading: boolean;
 	myRoom: RoomInfo | null;
 	playerId: string | null;
-	onCreateRoom: () => void;
+	pendingJoinId?: string | null;
+	onCreateRoom: (options?: { name?: string; maxPlayers?: number }) => void;
 	onEnterMyRoom: () => void;
 	onJoinRoom: (roomId: string) => void;
 	onDeleteRoom: (roomId: string) => void;
@@ -45,6 +48,12 @@ interface LobbyPageProps {
 	onLogout: () => void;
 	onUpdateProfile: (profile: { nickname?: string; avatar?: string }) => void;
 }
+
+const PHASE_LABELS: Record<string, string> = {
+	DEPLOYMENT: "部署",
+	FACTION_ACTION: "行动",
+	SETTLEMENT: "结算",
+};
 
 export const LobbyPage: React.FC<LobbyPageProps> = ({
 	networkManager,
@@ -54,6 +63,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	isLoading,
 	myRoom,
 	playerId,
+	pendingJoinId,
 	onCreateRoom,
 	onEnterMyRoom,
 	onJoinRoom,
@@ -66,6 +76,9 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 	const [showFactions, setShowFactions] = useState(false);
 	const [showProfile, setShowProfile] = useState(false);
 	const [showAbout, setShowAbout] = useState(false);
+	const [showCreateRoom, setShowCreateRoom] = useState(false);
+	const [newRoomName, setNewRoomName] = useState("");
+	const [newRoomSize, setNewRoomSize] = useState("4");
 	const [roomTab, setRoomTab] = useState("all");
 	const [nickname, setNickname] = useState(profile.nickname);
 	// 内部预览状态：如果是 Base64，则直接作为预览，如果是 "👤" 或 null，则为 null
@@ -114,13 +127,13 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
 		// 检查文件类型
 		if (!file.type.startsWith("image/")) {
-			alert("请选择图片文件");
+			notify.error("请选择图片文件");
 			return;
 		}
 
 		// 检查大小 (最大 2MB，前端限制)
 		if (file.size > 2 * 1024 * 1024) {
-			alert("图片文件过大，请选择小于 2MB 的图片");
+			notify.error("图片文件过大，请选择小于 2MB 的图片");
 			return;
 		}
 
@@ -173,7 +186,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 						<Flex align="center" gap="3">
 							<Avatar src={profile.avatar} size="medium" />
 							<Box>
-								<Heading size="5">🏠 游戏大厅</Heading>
+								<Heading size="5">游戏大厅</Heading>
 								<Text color="gray" size="2">欢迎，{profile.nickname || playerName}</Text>
 							</Box>
 						</Flex>
@@ -201,10 +214,19 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 					<Card className="radix-surface-card" size="3">
 						<Flex justify="between" align="center" mb="3">
 							<Heading size="4">房间列表</Heading>
-							<Button variant="soft" onClick={onRefresh} data-magnetic>
-								<RefreshCw size={14} /> 刷新
+							<Button variant="soft" onClick={onRefresh} disabled={isLoading} data-magnetic>
+								<RefreshCw size={14} className={isLoading ? "radix-spin" : undefined} /> {isLoading ? "刷新中" : "刷新"}
 							</Button>
 						</Flex>
+						{pendingJoinId && (
+							<Flex align="center" gap="2" mb="3" className="radix-inline-notice">
+								<Link2 size={14} />
+								<Text size="1">邀请房间 {pendingJoinId} 暂未加入</Text>
+								<Button size="1" variant="soft" onClick={() => onJoinRoom(pendingJoinId)}>
+									重试加入
+								</Button>
+							</Flex>
+						)}
 						<Tabs.Root value={roomTab} onValueChange={setRoomTab}>
 							<Tabs.List>
 								<Tabs.Trigger value="all">全部</Tabs.Trigger>
@@ -234,7 +256,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 													</Flex>
 													<Flex gap="2" wrap="wrap">
 														<Badge variant="soft">{room.playerCount}/{room.maxPlayers} 玩家</Badge>
-														<Badge variant="soft">阶段：{room.phase}</Badge>
+														<Badge variant="soft">阶段：{PHASE_LABELS[room.phase] ?? room.phase}</Badge>
 														{room.turnCount !== undefined && room.turnCount > 0 && (
 															<Badge variant="soft">回合：{room.turnCount}</Badge>
 														)}
@@ -244,6 +266,14 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 															<Badge color="amber" variant="soft">等待房主</Badge>
 														)}
 													</Flex>
+													<Box style={{ height: 3, marginTop: 8, borderRadius: 2, background: "rgba(74, 158, 255, 0.12)" }}>
+														<Box style={{
+															height: "100%",
+															borderRadius: 2,
+															width: `${Math.min(100, Math.round((room.playerCount / Math.max(1, room.maxPlayers)) * 100))}%`,
+															background: room.playerCount >= room.maxPlayers ? "#e74c3c" : "#4a9eff",
+														}} />
+													</Box>
 												</Box>
 												<Flex gap="2" wrap="wrap">
 													<Button onClick={() => onJoinRoom(room.roomId)} data-magnetic>
@@ -270,14 +300,18 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 									<Play size={16} /> 进入我的房间
 								</Button>
 							) : (
-								<Button size="3" className="radix-full-btn" onClick={onCreateRoom} data-magnetic>
+								<Button size="3" className="radix-full-btn" onClick={() => {
+									setNewRoomName(`${playerName}的房间`);
+									setNewRoomSize("4");
+									setShowCreateRoom(true);
+								}} data-magnetic>
 									<Plus size={16} /> 创建新房间
 								</Button>
 							)}
 						</Card>
 
 						<Card className="radix-surface-card" size="3">
-							<Heading size="3" mb="3">📊 实时统计</Heading>
+							<Heading size="3" mb="3">实时统计</Heading>
 							<Flex direction="column" gap="2">
 								<Flex justify="between"><Text color="gray">活跃房间</Text><Badge color="blue">{stats.totalRooms}</Badge></Flex>
 								<Flex justify="between"><Text color="gray">在线玩家</Text><Badge color="green">{stats.totalPlayers}</Badge></Flex>
@@ -286,7 +320,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 						</Card>
 
 						<Card className="radix-surface-card" size="3">
-							<Heading size="3" mb="3">📖 快速指南</Heading>
+							<Heading size="3" mb="3">快速指南</Heading>
 							<Flex direction="column" gap="2">
 								<Text size="2" color="gray">1. 创建或加入房间</Text>
 								<Text size="2" color="gray">2. 首个玩家自动成为 DM</Text>
@@ -297,6 +331,54 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 					</Flex>
 				</div>
 			</Flex>
+
+			<Dialog.Root open={showCreateRoom} onOpenChange={setShowCreateRoom}>
+				<Dialog.Content maxWidth="400px">
+					<Dialog.Title>创建房间</Dialog.Title>
+					<Dialog.Description size="2" mb="3">你将成为房主与 DM，开局后由你推进回合。</Dialog.Description>
+					<Flex direction="column" gap="3">
+						<Box>
+							<Text as="label" size="2" color="gray" mb="2" className="radix-label">房间名称</Text>
+							<TextField.Root
+								value={newRoomName}
+								onChange={(e) => setNewRoomName(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && newRoomName.trim()) {
+										onCreateRoom({ name: newRoomName, maxPlayers: Number(newRoomSize) });
+										setShowCreateRoom(false);
+									}
+								}}
+								placeholder="房间名称"
+								maxLength={40}
+								autoFocus
+							/>
+						</Box>
+						<Box>
+							<Text as="label" size="2" color="gray" mb="2" className="radix-label">人数上限</Text>
+							<Select.Root value={newRoomSize} onValueChange={setNewRoomSize}>
+								<Select.Trigger />
+								<Select.Content>
+									{["2", "4", "6", "8"].map((size) => (
+										<Select.Item key={size} value={size}>{size} 人</Select.Item>
+									))}
+								</Select.Content>
+							</Select.Root>
+						</Box>
+					</Flex>
+					<Flex justify="end" gap="2" mt="4">
+						<Button variant="soft" color="gray" onClick={() => setShowCreateRoom(false)}>取消</Button>
+						<Button
+							disabled={!newRoomName.trim()}
+							onClick={() => {
+								onCreateRoom({ name: newRoomName, maxPlayers: Number(newRoomSize) });
+								setShowCreateRoom(false);
+							}}
+						>
+							<Plus size={14} /> 创建房间
+						</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
 
 			<Dialog.Root open={showProfile} onOpenChange={setShowProfile}>
 				<Dialog.Content maxWidth="420px">
@@ -343,18 +425,26 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 				</Dialog.Content>
 			</Dialog.Root>
 
-			<LoadoutCustomizerDialog
-				open={showCustomizer}
-				onOpenChange={setShowCustomizer}
-				networkManager={networkManager}
-			/>
+			{showCustomizer && (
+				<Suspense fallback={null}>
+					<LoadoutCustomizerDialog
+						open={showCustomizer}
+						onOpenChange={setShowCustomizer}
+						networkManager={networkManager}
+					/>
+				</Suspense>
+			)}
 
-			<FactionCustomizerDialog
-				open={showFactions}
-				onOpenChange={setShowFactions}
-				networkManager={networkManager}
-				playerId={playerId}
-			/>
+			{showFactions && (
+				<Suspense fallback={null}>
+					<FactionCustomizerDialog
+						open={showFactions}
+						onOpenChange={setShowFactions}
+						networkManager={networkManager}
+						playerId={playerId}
+					/>
+				</Suspense>
+			)}
 
 			<AboutDialog
 				open={showAbout}

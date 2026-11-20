@@ -89,6 +89,23 @@
 	border-color: rgba(34, 197, 94, 0.6);
 }
 
+.top-bar__badge {
+	min-width: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: rgba(74, 158, 255, 0.18);
+	border: 1px solid rgba(74, 158, 255, 0.35);
+	font-size: 11px;
+	line-height: 16px;
+	text-align: center;
+	color: #cfe8ff;
+}
+
+.top-bar__action-btn:focus-visible {
+	outline: 2px solid rgba(74, 158, 255, 0.7);
+	outline-offset: 2px;
+}
+
 /* 阵营分隔线 */
 .top-bar__avatar-divider {
 	width: 1px;

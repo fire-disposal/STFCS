@@ -41,8 +41,7 @@ export interface UseCameraResult {
 
 export function useCamera(
 	canvasSize: CanvasSize,
-	setZoom: (zoom: number) => void,
-	setCameraPosition: (x: number, y: number) => void
+	setCamera: (x: number, y: number, zoom: number) => void
 ): UseCameraResult {
 	const cameraRef = useRef<CameraState>({ x: 0, y: 0, zoom: 1, viewRotation: 0 });
 	const zoomTargetRef = useRef<{ zoom: number; x: number; y: number } | null>(null);
@@ -102,8 +101,8 @@ export function useCamera(
 			Math.abs(xDiff) < 0.05 &&
 			Math.abs(yDiff) < 0.05
 		) {
-			setZoom(target.zoom);
-			setCameraPosition(target.x, target.y);
+			cameraRef.current = { x: target.x, y: target.y, zoom: target.zoom, viewRotation: current.viewRotation };
+			setCamera(target.x, target.y, target.zoom);
 			zoomTargetRef.current = null;
 			isZoomAnimatingRef.current = false;
 			return;
@@ -114,9 +113,8 @@ export function useCamera(
 		const nextX = current.x + xDiff * speed;
 		const nextY = current.y + yDiff * speed;
 		cameraRef.current = { ...current, x: nextX, y: nextY, zoom: nextZoom };
-		setZoom(nextZoom);
-		setCameraPosition(nextX, nextY);
-	}, [clampZoom, setCameraPosition, setZoom]);
+		setCamera(nextX, nextY, nextZoom);
+	}, [clampZoom, setCamera]);
 
 	return {
 		cameraRef,

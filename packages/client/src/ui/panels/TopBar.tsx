@@ -9,7 +9,7 @@
  */
 
 import React from "react";
-import { Settings, LogOut, Check } from "lucide-react";
+import { Settings, LogOut, Check, Users, CircleHelp } from "lucide-react";
 import TurnBar from "./TurnBar";
 import { ShipStatusBar } from "./ShipStatusBar";
 import { FactionSelector } from "./FactionSelector";
@@ -32,6 +32,8 @@ import "./top-bar.css";
 interface TopBarProps {
 	onSettings: () => void;
 	onLeave: () => void;
+	onPlayers?: () => void;
+	onHelp?: () => void;
 	onFactionChange?: (playerId: string, faction: string) => void;
 	onFactionDelete?: (factionId: string) => void;
 }
@@ -39,6 +41,8 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
 	onSettings,
 	onLeave,
+	onPlayers,
+	onHelp,
 	onFactionChange,
 	onFactionDelete,
 }) => {
@@ -53,10 +57,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 	const currentPlayer = playerId ? players[playerId] : undefined;
 	const currentFaction = currentPlayer?.faction;
 	const isHost = currentPlayer?.role === "HOST";
-	const inRoom = true;
 	const { send } = useGameAction();
 	const isMyTurn = phase === GamePhase.FACTION_ACTION && activeFaction && currentFaction === activeFaction;
 	const isReady = currentPlayer?.isReady ?? false;
+	const connectedCount = Object.values(players).filter((p) => p.connected).length;
 
 	// 直接从 uiStore 获取选中的舰船
 	const selectedShipId = useUIStore((state) => state.selectedShipId);
@@ -100,12 +104,31 @@ export const TopBar: React.FC<TopBarProps> = ({
 				onFactionChange={onFactionChange}
 				onFactionDelete={onFactionDelete}
 			/>
-				<SaveMenu isHost={isHost} inRoom={inRoom} />
-				<button className="top-bar__action-btn" onClick={onSettings}>
+				<SaveMenu isHost={isHost} inRoom />
+				<button
+					className="top-bar__action-btn"
+					onClick={onPlayers}
+					title="玩家与邀请"
+					aria-label="玩家与邀请"
+				>
+					<Users size={16} />
+					玩家
+					<span className="top-bar__badge">{connectedCount}</span>
+				</button>
+				<button
+					className="top-bar__action-btn"
+					onClick={onHelp}
+					title="快捷键"
+					aria-label="快捷键"
+				>
+					<CircleHelp size={16} />
+					帮助
+				</button>
+				<button className="top-bar__action-btn" onClick={onSettings} aria-label="设置">
 					<Settings size={16} />
 					设置
 				</button>
-				<button className="top-bar__action-btn top-bar__action-btn--danger" onClick={onLeave}>
+				<button className="top-bar__action-btn top-bar__action-btn--danger" onClick={onLeave} aria-label="离开房间">
 					<LogOut size={16} />
 					离开
 				</button>

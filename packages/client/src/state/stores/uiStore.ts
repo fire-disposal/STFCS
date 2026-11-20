@@ -87,6 +87,7 @@ interface UIActions {
 	toggleSuppressContextMenu: () => void;
 
 	setCameraPosition: (x: number, y: number) => void;
+	setCamera: (x: number, y: number, zoom: number) => void;
 	setZoom: (zoom: number) => void;
 
 	/** 切换某个布尔开关 */
@@ -158,7 +159,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	toggles: { ...DEFAULT_TOGGLES },
 
 	hideNativeCursor: false,
-	hpPerBar: 200,
+	hpPerBar: 20,
 
 	mapCursor: null,
 	coordinatePrecision: "rounded10",
@@ -197,13 +198,18 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
 	setMousePosition: (x, y) => set({ mousePosition: { x, y } }),
 
 	setCameraPosition: (x, y) => set({ cameraPosition: { x, y } }),
+	/** 平移/缩放动画每帧只写一次，避免两棵树各渲染一次 */
+	setCamera: (x, y, zoom) => set({
+		cameraPosition: { x, y },
+		zoom: Math.max(0.5, Math.min(3, zoom)),
+	}),
 	setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(3, zoom)) }),
 	toggleSuppressContextMenu: () => set((s) => ({ suppressContextMenu: !s.suppressContextMenu })),
 
 	toggle: (key) => set((s) => ({ toggles: { ...s.toggles, [key]: !s.toggles[key] } })),
 
 	setHideNativeCursor: (hide) => set({ hideNativeCursor: hide }),
-	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(100, value)) }),
+	setHpPerBar: (value) => set({ hpPerBar: Math.max(5, Math.min(200, value)) }),
 
 	setMapCursor: (x, y, r) => set({ mapCursor: { x, y, r: Math.round(r * 100) / 100 } }),
 	clearMapCursor: () => set({ mapCursor: null }),

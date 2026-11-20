@@ -53,13 +53,13 @@ export function useShipTextureRendering(
 
 			const assetId = ship.spec.texture?.assetId;
 			if (!assetId) {
-				console.log("[ShipTextureRenderer] No assetId for ship:", ship.$id);
+				if (import.meta.env.DEV) console.log("[ShipTextureRenderer] No assetId for ship:", ship.$id);
 				continue;
 			}
 
 			const texture = textureCache.get(assetId);
 			if (!texture) {
-				console.log("[ShipTextureRenderer] Texture not loaded for:", assetId, "cache keys:", Array.from(textureCache.keys()));
+				if (import.meta.env.DEV) console.log("[ShipTextureRenderer] Texture not loaded for:", assetId);
 				continue;
 			}
 

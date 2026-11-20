@@ -1,26 +1,27 @@
 # =============================================
 # STFCS Docker Compose
 # Production Deployment Configuration
+# 公网暴露：http://<public-ip>/stfcs/
 # =============================================
-
-version: '3.8'
 
 services:
   app:
-    image: ${APP_IMAGE:-ghcr.io/fire-disposal/stfcs-app}:${IMAGE_TAG:-latest}
+    image: ${APP_IMAGE:-stfcs-app}:${IMAGE_TAG:-local}
     container_name: stfcs-app
     restart: unless-stopped
     ports:
-      - "2567:3001"  # Host 2567 -> App 3001
+      - "80:3001"  # Host 80 -> App 3001
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - BASE_PATH=/stfcs
       - CORS_ORIGINS=*
       - LOG_LEVEL=info
     networks:
       - stfcs-network
     volumes:
-      - /srv/stfcs/storage:/app/storage
+      # 必须是 packages/server/storage：服务端以 process.cwd() 为根解析 storage
+      - /srv/stfcs/storage:/app/packages/server/storage
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
       interval: 30s

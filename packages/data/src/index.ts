@@ -98,6 +98,9 @@ export {
   GameMapSchema,
   RoomArchiveSchema,
   RoomArchiveMetadataSchema,
+  WeaponTargetInfoSchema,
+  WeaponTargetingResultSchema,
+  ShipTargetingResultSchema,
 } from "./core/GameSchemas.js"
-export type { PlayerInfo, RoomArchive, RoomArchiveMetadata } from "./core/GameSchemas.js"
+export type { PlayerInfo, RoomArchive, RoomArchiveMetadata, WeaponTargetInfo, ShipTargetingResult } from "./core/GameSchemas.js"
 export { validatePlayerInfo } from "./core/GameSchemas.js"

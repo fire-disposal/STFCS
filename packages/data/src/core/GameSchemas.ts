@@ -603,3 +603,48 @@ export const RoomArchiveSchema = z.object({
 	updatedAt: z.number(),
 });
 export type RoomArchive = z.infer<typeof RoomArchiveSchema>;
+
+// ============================================================
+// 火控查询结果（game:query targets）
+// ============================================================
+
+export const WeaponTargetInfoSchema = z.object({
+	targetId: z.string(),
+	targetName: z.string(),
+	distance: z.number(),
+	inRange: z.boolean(),
+	inArc: z.boolean(),
+	hitAngle: z.number().optional(),
+	targetQuadrant: z.number().optional(),
+});
+export type WeaponTargetInfo = z.infer<typeof WeaponTargetInfoSchema>;
+
+export const WeaponTargetingResultSchema = z.object({
+	mountId: z.string(),
+	weaponName: z.string().optional(),
+	weaponSpec: z.string().optional(),
+	state: z.string().optional(),
+	isReady: z.boolean().optional(),
+	range: z.number().optional(),
+	minRange: z.number().optional(),
+	arc: z.number().optional(),
+	mountFacing: z.number().optional(),
+	damage: z.number().optional(),
+	burstCount: z.number().optional(),
+	projectilesPerShot: z.number().optional(),
+	allowsMultipleTargets: z.boolean().optional(),
+	isAvailable: z.boolean().optional(),
+	unavailableReason: z.string().optional(),
+	uiStatus: z.enum(["FIRED", "UNAVAILABLE", "READY", "READY_WITH_TARGETS"]).optional(),
+	uiStatusLabel: z.string().optional(),
+	validTargets: z.array(WeaponTargetInfoSchema).default([]),
+});
+
+export const ShipTargetingResultSchema = z.object({
+	shipId: z.string().optional(),
+	shipName: z.string().optional(),
+	canAttack: z.boolean().optional(),
+	cannotAttackReason: z.string().optional(),
+	weapons: z.array(WeaponTargetingResultSchema).default([]),
+});
+export type ShipTargetingResult = z.infer<typeof ShipTargetingResultSchema>;

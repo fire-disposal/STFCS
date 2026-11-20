@@ -1,0 +1,67 @@
+.connection-banner {
+	position: fixed;
+	top: 8px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 5000;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	border: 1px solid rgba(241, 196, 15, 0.45);
+	background: rgba(26, 20, 8, 0.92);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+	color: #f1c40f;
+	font-family: "Fira Code", ui-monospace, monospace;
+	font-size: 12px;
+	max-width: min(92vw, 640px);
+}
+
+.connection-banner__icon {
+	flex: 0 0 auto;
+	animation: connection-banner-pulse 1.6s ease-in-out infinite;
+}
+
+.connection-banner__title {
+	font-weight: 600;
+	letter-spacing: 0.04em;
+}
+
+.connection-banner__detail {
+	color: #d9c9a3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.connection-banner__action {
+	margin-left: 4px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	border: 1px solid rgba(241, 196, 15, 0.5);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.connection-banner__action:hover {
+	background: rgba(241, 196, 15, 0.12);
+}
+
+@keyframes connection-banner-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.connection-banner__icon {
+		animation: none;
+	}
+}

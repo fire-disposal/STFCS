@@ -4,7 +4,8 @@
  * 使用 useSelectedShip hook 统一获取选中舰船
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { ShipTargetingResultSchema } from "@vt/data";
 import { Crosshair, Swords, Loader2 } from "lucide-react";
 import { Button, Flex, Box, Text, Badge } from "@radix-ui/themes";
 import { useGameAction } from "@/hooks/useGameAction";
@@ -127,51 +128,56 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 			});
 	}, [hasShip, ship]);
 
-	// 查询火控数据（整个舰船所有武器）
-	useEffect(() => {
-		if (!canAct) {
+	// 查询火控数据（按舰船 id 触发，避免每次 state:patch 都打一次 RPC）
+	const shipId = ship?.$id ?? null;
+	const fetchTargeting = useCallback(async () => {
+		if (!canAct || !shipId) {
 			setAllWeaponsTargeting(new Map());
 			return;
 		}
 
-		const fetchTargeting = async () => {
-			setIsLoading(true);
-			try {
-				const result = await sendQuery("targets", ship!.$id);
-				if (result && result.weapons) {
-					const map = new Map<string, WeaponTargetingData>();
-					for (const weaponData of result.weapons) {
-					const tokens = getGameState()?.tokens ?? {};
-					const shipFaction = ship!.runtime?.faction;
-					const validTargets: TargetInfo[] = (weaponData.validTargets ?? []).map((t: any) => {
-						const targetToken = tokens[t.targetId];
-						const targetFaction = targetToken?.runtime?.faction;
-						return {
-							id: t.targetId,
-							name: t.targetName ?? t.targetId.slice(-6),
-							distance: t.distance ?? 0,
-							inRange: t.inRange ?? false,
-							inArc: t.inArc ?? false,
-							canAttack: t.inRange && t.inArc,
-							isFriendly: !!(shipFaction && targetFaction === shipFaction),
-						};
-					});
-						map.set(weaponData.mountId, {
-							mountId: weaponData.mountId,
-							validTargets,
-							uiStatus: weaponData.uiStatus ?? "READY",
-						});
-					}
-					setAllWeaponsTargeting(map);
-				}
-			} catch (error) {
-				console.warn("Failed to query targeting data:", error);
+		setIsLoading(true);
+		try {
+			const result = await sendQuery("targets", shipId);
+			const parsed = ShipTargetingResultSchema.safeParse(result);
+			if (!parsed.success) {
+				console.warn("Unexpected targeting payload:", parsed.error.message);
+				return;
 			}
+			const tokens = getGameState()?.tokens ?? {};
+			const shipFaction = tokens[shipId]?.runtime?.faction;
+			const map = new Map<string, WeaponTargetingData>();
+			for (const weaponData of parsed.data.weapons) {
+				const validTargets: TargetInfo[] = weaponData.validTargets.map((t) => {
+					const targetToken = tokens[t.targetId];
+					const targetFaction = targetToken?.runtime?.faction;
+					return {
+						id: t.targetId,
+						name: t.targetName || t.targetId.slice(-6),
+						distance: t.distance,
+						inRange: t.inRange,
+						inArc: t.inArc,
+						canAttack: t.inRange && t.inArc,
+						isFriendly: !!(shipFaction && targetFaction === shipFaction),
+					};
+				});
+				map.set(weaponData.mountId, {
+					mountId: weaponData.mountId,
+					validTargets,
+					uiStatus: weaponData.uiStatus ?? "READY",
+				});
+			}
+			setAllWeaponsTargeting(map);
+		} catch (error) {
+			console.warn("Failed to query targeting data:", error);
+		} finally {
 			setIsLoading(false);
-		};
+		}
+	}, [canAct, shipId, sendQuery]);
 
-		fetchTargeting();
-	}, [canAct, ship, sendQuery]);
+	useEffect(() => {
+		void fetchTargeting();
+	}, [fetchTargeting]);
 
 	// 同步本地选中到全局 store
 	useEffect(() => {
@@ -218,16 +224,25 @@ export const WeaponPanel: React.FC<WeaponPanelProps> = ({ canControl = true }) =
 	}, [selectedTargetIds]);
 
 	// 开火
+	const firePendingRef = useRef(false);
 	const handleFire = useCallback(async () => {
-		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0) return;
+		if (!canAct || !localSelectedWeaponId || selectedTargetIds.length === 0 || firePendingRef.current) return;
 
-		await sendAttack(ship!.$id, [{
-			mountId: localSelectedWeaponId,
-			targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
-		}]);
-		notify.success("开火指令已发送");
-		setSelectedTargetIds([]);
-	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack]);
+		firePendingRef.current = true;
+		try {
+			const ok = await sendAttack(ship!.$id, [{
+				mountId: localSelectedWeaponId,
+				targets: selectedTargetIds.map((t) => ({ targetId: t, shots: 1 })),
+			}]);
+			if (ok) {
+				notify.success("开火指令已发送");
+				setSelectedTargetIds([]);
+				void fetchTargeting();
+			}
+		} finally {
+			firePendingRef.current = false;
+		}
+	}, [canAct, localSelectedWeaponId, selectedTargetIds, ship, sendAttack, fetchTargeting]);
 
 	// 偏差（模拟未命中）
 	const handleDeviation = useCallback(async () => {

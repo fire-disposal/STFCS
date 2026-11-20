@@ -57,8 +57,9 @@
 - 回合：`TurnFlowController` 按派系轮转，推进由房主用 `force_end_turn` 触发（就绪人数只是 UI 信号）；最后派系后进 `SETTLEMENT`，再 `turnCount+1` 回到首位
 - 房间：内存 Map 管房（上限 100，空房 30 秒清、闲置 300 秒删），每房最多 8 人，房主断线自动转移；房间删除时若已有布局，快照写进房主存档
 - 主持面：DM 侧栏改阶段/回合/派系、强制推进、直接编辑任意 token；overlay 支持画笔、便签、ping、视口同步
-- 界面：Auth / Lobby / Game 三页，中英双语；玩家档案落在 `storage/players/*.json`
-- 未完成：战报只覆盖 `game:action`，加入/退出仍是 notify（`todo.md` 就一行：把职责逐步迁到 battlelog）；测试只有 2 个文件、11 个用例，移动、护盾、装甲、目标选择、回合推进都没测
+- 界面：Auth / Lobby / Game 三页，中文文案硬编码（`locales/` 的 en-US 资源未接入）；玩家档案落在 `storage/players/*.json`
+- 交互：邀请链接 `/stfcs/join/<roomId>` 登录后自动进房；顶栏玩家名单支持房主移人；`?` 打开快捷键表；断线顶部横幅提示并可重载
+- 未完成：战报只覆盖 `game:action`，加入/退出仍是 notify（`todo.md` 就一行：把职责逐步迁到 battlelog）；测试只有 3 个文件、12 个用例，移动、护盾、装甲、目标选择、回合推进都没测
 
 ## 启动流程
 
@@ -71,6 +72,20 @@ docker compose up -d   # 生产形态，宿主 http://localhost:2567
 ```
 
 client 的 vite 只把 `/api` 代理到 3001，WebSocket 直连 server 地址；`pnpm --filter @vt/server dev` 可只起服务端。
+
+## 部署
+
+单容器自带前端静态文件与 Socket.IO。默认挂在根路径，需要前缀时前端与服务端用同一个前缀编译与启动。
+
+```bash
+docker build -f Dockerfile.unified --build-arg VITE_BASE_PATH=/stfcs/ -t stfcs-app:local .
+BASE_PATH=/stfcs docker compose up -d   # compose 固定 80:3001 与 /srv/stfcs/storage
+```
+
+- `VITE_BASE_PATH` 是编译期前缀：静态资源、路由 basename、图片接口、邀请链接都按它生成。
+- `BASE_PATH` 是运行期前缀：静态文件、`/api/assets/*`、Socket.IO 路径 `${BASE_PATH}/socket.io/` 都挂在其下，路径外返回 404。
+- 数据目录是容器内 `/app/packages/server/storage`，挂宿主机 `/srv/stfcs/storage`。旧的 `/app/storage` 挂载点无效，服务端按 `process.cwd()` 解析 `storage/`。
+- `GET /health` 始终留在根路径，供容器健康检查使用。
 
 ## 边界与已知问题
 

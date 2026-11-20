@@ -39,6 +39,8 @@ export const OverlayToolbar: React.FC<OverlayToolbarProps> = ({ onClearMyAnnotat
                 size="1" variant={active ? "solid" : "ghost"}
                 color={active ? "blue" : "gray"}
                 onClick={() => setOverlayMode(active ? "none" : tool.id)}
+                aria-label={tool.label}
+                aria-pressed={active}
               >
                 <tool.icon size={14} />
               </IconButton>
@@ -47,10 +49,14 @@ export const OverlayToolbar: React.FC<OverlayToolbarProps> = ({ onClearMyAnnotat
         })}
         <Box style={{ width: 1, height: 20, background: "rgba(74,158,255,0.15)", margin: "0 4px" }} />
         {COLORS.map((c) => (
-          <Box
-            key={c} onClick={() => setOverlayColor(c)}
+          <button
+            key={c}
+            type="button"
+            aria-label={`标注颜色 ${c}`}
+            aria-pressed={overlayColor === c}
+            onClick={() => setOverlayColor(c)}
             style={{
-              width: 16, height: 16, borderRadius: 4, background: c,
+              width: 16, height: 16, padding: 0, borderRadius: 4, background: c,
               border: overlayColor === c ? "2px solid white" : "2px solid transparent",
               cursor: "pointer",
             }}
@@ -61,6 +67,7 @@ export const OverlayToolbar: React.FC<OverlayToolbarProps> = ({ onClearMyAnnotat
           <IconButton
             size="1" variant="ghost" color="gray"
             onClick={onClearMyAnnotations}
+            aria-label="清除我的标注"
           >
             <Trash2 size={14} />
           </IconButton>

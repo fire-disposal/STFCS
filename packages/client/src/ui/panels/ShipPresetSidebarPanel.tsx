@@ -183,7 +183,7 @@ export const ShipPresetSidebarPanel: React.FC<ShipPresetSidebarPanelProps> = ({
 												size={32}
 												selected={isSelected}
 											/>
-											<Box style={{ flex: 1, minWidth: 0 }}>
+											<Box style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
 												<Text size="1" weight="bold" style={{
 													color: isSelected ? "#4a9eff" : "#cfe8ff",
 													overflow: "hidden",

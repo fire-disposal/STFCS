@@ -11,6 +11,7 @@ import "@radix-ui/themes/styles.css";
 import "./styles.css";
 import { NotificationContainer } from "@/ui/shared/Notification";
 import { ensureFontsReady } from "@/utils/fontLoader";
+import { ROUTER_BASENAME } from "@/config";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -36,6 +37,7 @@ async function main() {
 				<QueryClientProvider client={queryClient}>
 					<Theme appearance="dark" accentColor="blue" grayColor="slate" radius="none">
 						<BrowserRouter
+							basename={ROUTER_BASENAME}
 							future={{
 								v7_startTransition: true,
 								v7_relativeSplatPath: true,

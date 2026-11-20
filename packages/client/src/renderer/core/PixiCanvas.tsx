@@ -126,45 +126,62 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const canvasSize = useCanvasResize(hostRef);
 	const starfield = useStarfield();
 
-	const {
-		zoom,
-		cameraPosition,
-		setCameraPosition,
-		viewRotation,
-		setViewRotation,
-		toggles,
-		selectedShipId,
-		setZoom,
-		setMapCursor,
-		mapCursor,
-		selectShip,
-		movementPreview,
-		overlayMode,
-		overlayColor,
-	} = useUIStore();
+	const zoom = useUIStore((state) => state.zoom);
+	const cameraPosition = useUIStore((state) => state.cameraPosition);
+	const setCamera = useUIStore((state) => state.setCamera);
+	const setZoom = useUIStore((state) => state.setZoom);
+	const viewRotation = useUIStore((state) => state.viewRotation);
+	const setViewRotation = useUIStore((state) => state.setViewRotation);
+	const toggles = useUIStore((state) => state.toggles);
+	const selectedShipId = useUIStore((state) => state.selectedShipId);
+	const setMapCursor = useUIStore((state) => state.setMapCursor);
+	const mapCursor = useUIStore((state) => state.mapCursor);
+	const selectShip = useUIStore((state) => state.selectShip);
+	const movementPreview = useUIStore((state) => state.movementPreview);
+	const overlayMode = useUIStore((state) => state.overlayMode);
+	const overlayColor = useUIStore((state) => state.overlayColor);
 
-	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, textures: showTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer } = toggles;
+	const { grid: showGrid, background: showBackground, movementRange: showMovementRange, textures: showTextures, hpBars: showHpBars, fluxBars: showFluxBars, shipNames: showShipNames, ownerLabels: showOwnerLabels, weaponLayer: showWeaponLayer, starfieldParallax: animateStarfield } = toggles;
 
 	const cameraPositionRef = useRef(cameraPosition);
 	cameraPositionRef.current = cameraPosition;
 	const viewRotationRef = useRef(viewRotation);
 	viewRotationRef.current = viewRotation;
+	const pendingCameraRef = useRef<{ x: number; y: number } | null>(null);
+	const panFrameRef = useRef<number | null>(null);
+
+	const flushPan = useCallback(() => {
+		panFrameRef.current = null;
+		const pending = pendingCameraRef.current;
+		if (!pending) return;
+		pendingCameraRef.current = null;
+		setCamera(pending.x, pending.y, camera.cameraRef.current.zoom);
+	}, [setCamera]);
 
 	const handlePanDelta = useCallback((deltaX: number, deltaY: number) => {
-		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, zoom, -viewRotationRef.current);
+		const worldDelta = screenDeltaToWorldDelta(deltaX, deltaY, camera.cameraRef.current.zoom, -viewRotationRef.current);
 		const nextPosition = {
 			x: cameraPositionRef.current.x - worldDelta.x,
 			y: cameraPositionRef.current.y - worldDelta.y,
 		};
 		cameraPositionRef.current = nextPosition;
-		setCameraPosition(nextPosition.x, nextPosition.y);
-	}, [setCameraPosition, zoom]);
+		pendingCameraRef.current = nextPosition;
+		if (panFrameRef.current === null) {
+			panFrameRef.current = requestAnimationFrame(flushPan);
+		}
+	}, [flushPan]);
 
 	const handleRotateDelta = useCallback((delta: number) => {
 		setViewRotation(normalizeRotation(viewRotationRef.current + delta));
 	}, [setViewRotation]);
 
-	const camera = useCamera(canvasSize, setZoom, setCameraPosition);
+	useEffect(() => () => {
+		if (panFrameRef.current !== null) cancelAnimationFrame(panFrameRef.current);
+		panFrameRef.current = null;
+		pendingCameraRef.current = null;
+	}, []);
+
+	const camera = useCamera(canvasSize, setCamera);
 	const interaction = useInteraction(handlePanDelta, handleRotateDelta);
 	const layerSystem = useLayerSystem();
 	const zoomInteraction = useZoomInteraction(camera, canvasSize);
@@ -183,6 +200,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 		overlayColor,
 		overlayClientRef: overlayClientRef,
 		playerId: playerId ?? undefined,
+		setZoom,
 	});
 
 	const assetIds = useMemo(() => collectAssetIds(ships), [ships]);
@@ -196,7 +214,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 	const isLoadingTextures = loadingProgress.total > 0 && loadingProgress.loaded < loadingProgress.total;
 
 	useCursorRendering(layerSystem.layers, mapCursor);
-	useStarfieldRendering(layerSystem.layers, starfield);
+	useStarfieldRendering(layerSystem.layers, starfield, animateStarfield);
 
 	useShipTextureRendering(layerSystem.layers, ships, textureCache);
 	useWeaponTextureRendering(layerSystem.layers, ships, textureCache);

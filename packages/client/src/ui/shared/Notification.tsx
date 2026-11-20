@@ -71,7 +71,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onClo
 					{getIcon()}
 					<span className="notification-tactical-title">{titles[notification.type]}</span>
 				</div>
-				<button className="notification-tactical-close" onClick={handleClose}>
+				<button className="notification-tactical-close" onClick={handleClose} aria-label="关闭通知">
 					<X size={16} strokeWidth={2} />
 				</button>
 			</div>
@@ -89,7 +89,13 @@ export const NotificationContainer: React.FC = () => {
 	// 监听全局通知事件
 	useEffect(() => {
 		const handleNotification = (event: CustomEvent<Notification>) => {
-			setNotifications((prev) => [...prev, event.detail]);
+			setNotifications((prev) => {
+				// 同文案合并，最多保留 4 条，避免错误连发把界面盖住
+				if (prev.some((n) => n.type === event.detail.type && n.message === event.detail.message)) {
+					return prev;
+				}
+				return [...prev, event.detail].slice(-4);
+			});
 		};
 
 		window.addEventListener("stfcs-notification" as any, handleNotification as any);
@@ -104,7 +110,7 @@ export const NotificationContainer: React.FC = () => {
 	}, []);
 
 	return (
-		<div className="notification-tactical-container">
+		<div className="notification-tactical-container" role="status" aria-live="polite">
 			{notifications.map((notification) => (
 				<NotificationItem key={notification.id} notification={notification} onClose={handleClose} />
 			))}

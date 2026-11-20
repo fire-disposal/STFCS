@@ -23,6 +23,8 @@ COPY packages/client ./packages/client
 # 利用 Turbo 进行全量构建
 # 设置 CI 环境变量以禁用 daemon 并防止 254 退出码
 ENV CI=1
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 RUN pnpm run build
 
 # Final runtime stage

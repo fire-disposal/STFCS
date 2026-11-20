@@ -5,6 +5,7 @@ import type {
 	AssetListItem,
 } from "@vt/data";
 import { ASSET_LIMITS, fileToBase64 } from "@/utils/file";
+import { randomId } from "@/utils/randomId";
 
 interface AssetUploadResult {
 	assetId: string;
@@ -25,7 +26,7 @@ export function useAssetSocket(socket: Socket | null) {
 				return Promise.reject(new Error("Socket not connected"));
 			}
 
-			const requestId = crypto.randomUUID();
+			const requestId = randomId();
 
 			return new Promise<T>((resolve, reject) => {
 				pendingRequests.current.set(requestId, { resolve: resolve as (value: unknown) => void, reject });

@@ -1,4 +1,5 @@
 import { Assets, Texture } from "pixi.js";
+import { BASE_PATH } from "@/config";
 
 interface TextureEntry {
 	texture: Texture | null;
@@ -17,7 +18,7 @@ class TextureManager {
 	private version = 0;
 
 	getTextureUrl(assetId: string): string {
-		return `/api/assets/${encodeURIComponent(assetId)}.png`;
+		return `${BASE_PATH}api/assets/${encodeURIComponent(assetId)}.png`;
 	}
 
 	async load(assetIds: string[]): Promise<void> {
@@ -100,11 +101,21 @@ class TextureManager {
 		return this.version;
 	}
 
+	private notifyScheduled = false;
+
 	private notify(): void {
-		this.version++;
-		for (const listener of this.listeners) {
-			listener();
-		}
+		if (this.notifyScheduled) return;
+		this.notifyScheduled = true;
+		const flush = () => {
+			this.notifyScheduled = false;
+			this.version++;
+			for (const listener of this.listeners) {
+				listener();
+			}
+		};
+		// 一批贴图加载只触发一次 React 更新
+		if (typeof requestAnimationFrame === "function") requestAnimationFrame(flush);
+		else queueMicrotask(flush);
 	}
 }
 

@@ -329,6 +329,8 @@ const LogRenderer: React.FC<LogRendererProps> = React.memo(({ log, tokens }) => 
 
 LogRenderer.displayName = "LogRenderer";
 
+const RENDER_LIMIT = 250;
+
 export const CombatLogPanel: React.FC = () => {
 	const logs = useGameLogs();
 	const tokens = useGameTokens();
@@ -342,23 +344,23 @@ export const CombatLogPanel: React.FC = () => {
 		const filtered = filter
 			? logs.filter((log) => BATTLE_LOG_CATEGORY_MAP[log.type] === filter)
 			: logs;
-		const reversed = [...filtered].reverse();
-		return reversed;
+		// 最新在上：取尾部 N 条再倒序，避免整段日志 DOM
+		return filtered.slice(-RENDER_LIMIT).reverse();
 	}, [logs, filter]);
 
 	useEffect(() => {
 		if (autoScroll && listRef.current) {
-			listRef.current.scrollTop = listRef.current.scrollHeight;
+			listRef.current.scrollTop = 0;
 		}
 	}, [filteredLogs, autoScroll]);
 
 	const handleScroll = useCallback(() => {
 		const el = listRef.current;
 		if (!el) return;
-		const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-		if (atBottom && !autoScroll) {
+		const atTop = el.scrollTop < 24;
+		if (atTop && !autoScroll) {
 			setAutoScroll(true);
-		} else if (!atBottom && autoScroll) {
+		} else if (!atTop && autoScroll) {
 			setAutoScroll(false);
 		}
 	}, [autoScroll]);
@@ -367,7 +369,7 @@ export const CombatLogPanel: React.FC = () => {
 		<Flex direction="column" className="combat-log-panel" style={{ height: "100%" }}>
 			<Flex align="center" gap="1" px="2" py="1" className="combat-log-header" wrap="wrap">
 				<Text size="1" weight="bold">日志</Text>
-				<Text size="1" color="gray">({logs.length})</Text>
+				<Text size="1" color="gray">({logs.length}{logs.length > RENDER_LIMIT ? ` · 显示最近 ${RENDER_LIMIT}` : ""})</Text>
 				<Box style={{ flex: 1 }} />
 				{FILTER_CATEGORIES.map((cat) => {
 					const isActive = filter === cat;

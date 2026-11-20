@@ -1,313 +1,232 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Application } from "@pixi/react";
-import { Container, Rectangle } from "pixi.js";
-import type { InventoryToken, CombatToken } from "@vt/data";
-import type { LayerRegistry } from "@/renderer";
-import { useLayerSystem, useShipRendering } from "@/renderer";
-import { useCanvasResize } from "@/renderer/core/useCanvasResize";
+import type { InventoryToken, WeaponSlotSize } from "@vt/data";
+import { UI_CONFIG } from "@/config/constants";
 
 interface MiniShipPreviewProps {
-    token: InventoryToken | null;
-    zoom: number;
-    onZoomChange: (value: number) => void;
-    texturePreviewUrl?: string | null;
-    onTextureOffsetChange?: (deltaX: number, deltaY: number) => void;
+	token: InventoryToken | null;
+	zoom: number;
+	onZoomChange: (value: number) => void;
+	texturePreviewUrl?: string | null;
+	onTextureOffsetChange?: (deltaX: number, deltaY: number) => void;
 }
+
+const MOUNT_SLOT_SIZE: Record<WeaponSlotSize, number> = {
+	SMALL: 6,
+	MEDIUM: 9,
+	LARGE: 12,
+};
+
+const DAMAGE_COLORS: Record<string, string> = {
+	KINETIC: "#ffb347",
+	ENERGY: "#4a9eff",
+	HIGH_EXPLOSIVE: "#ff6f8f",
+	FRAGMENTATION: "#f1c40f",
+	EMP: "#9b59b6",
+};
 
 function clampZoom(value: number): number {
-    return Math.min(4, Math.max(0.2, value));
+	return Math.min(4, Math.max(0.2, value));
 }
 
-function createLayers(app: any): LayerRegistry {
-    const world = new Container();
-    world.sortableChildren = true;
-    world.eventMode = "none";
-    world.hitArea = new Rectangle(-10000, -10000, 20000, 20000);
+export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({
+	token,
+	zoom,
+	onZoomChange,
+	texturePreviewUrl,
+	onTextureOffsetChange,
+}) => {
+	const hostRef = useRef<HTMLDivElement>(null);
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const [size, setSize] = useState({ width: 320, height: 240 });
+	const [isDraggingTexture, setDraggingTexture] = useState(false);
 
-    const background = new Container();
-    background.zIndex = 0;
-    background.eventMode = "none";
+	useEffect(() => {
+		const el = hostRef.current;
+		if (!el) return;
+		const observer = new ResizeObserver((entries) => {
+			const entry = entries[0];
+			if (!entry) return;
+			setSize({
+				width: Math.max(1, Math.floor(entry.contentRect.width)),
+				height: Math.max(1, Math.floor(entry.contentRect.height)),
+			});
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
 
-    const starfieldNebula = new Container();
-    starfieldNebula.zIndex = 0;
-    starfieldNebula.eventMode = "none";
+	const texture = token?.spec.texture;
+	const textureScale = (texture?.scale ?? 1) * zoom;
+	const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
+	const textureOffsetY = -(texture?.offsetY ?? 0) * zoom;
 
-    const starfieldDeep = new Container();
-    starfieldDeep.zIndex = 1;
-    starfieldDeep.eventMode = "none";
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		const dpr = window.devicePixelRatio || 1;
+		const width = size.width;
+		const height = size.height;
+		canvas.width = Math.floor(width * dpr);
+		canvas.height = Math.floor(height * dpr);
+		canvas.style.width = `${width}px`;
+		canvas.style.height = `${height}px`;
 
-    const starfieldMid = new Container();
-    starfieldMid.zIndex = 2;
-    starfieldMid.eventMode = "none";
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		ctx.clearRect(0, 0, width, height);
 
-    const starfieldNear = new Container();
-    starfieldNear.zIndex = 3;
-    starfieldNear.eventMode = "none";
+		const cx = width / 2;
+		const cy = height / 2;
 
-    const grid = new Container();
-    grid.zIndex = 4;
-    grid.eventMode = "none";
+		// 中心十字
+		ctx.strokeStyle = "rgba(120, 170, 220, 0.28)";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(cx - 18, cy);
+		ctx.lineTo(cx + 18, cy);
+		ctx.moveTo(cx, cy - 18);
+		ctx.lineTo(cx, cy + 18);
+		ctx.stroke();
 
-    const cursor = new Container();
-    cursor.zIndex = 5;
-    cursor.eventMode = "none";
+		if (!token) return;
 
-    const overlay = new Container();
-    overlay.zIndex = 6;
-    overlay.eventMode = "none";
+		const spec = token.spec;
+		const halfW = ((spec.width ?? 30) / 2) * zoom;
+		const halfL = ((spec.length ?? 50) / 2) * zoom;
 
-    const tacticalTokens = new Container();
-    tacticalTokens.zIndex = 7;
-    tacticalTokens.eventMode = "none";
+		// 舰体轮廓：船头向上（heading 0），舷宽 X 只影响横向
+		ctx.beginPath();
+		ctx.moveTo(cx, cy - halfL);
+		ctx.lineTo(cx + halfW * 0.72, cy - halfL * 0.62);
+		ctx.lineTo(cx + halfW, cy - halfL * 0.08);
+		ctx.lineTo(cx + halfW * 0.86, cy + halfL * 0.44);
+		ctx.lineTo(cx + halfW * 0.34, cy + halfL * 0.82);
+		ctx.lineTo(cx - halfW * 0.34, cy + halfL * 0.82);
+		ctx.lineTo(cx - halfW * 0.86, cy + halfL * 0.44);
+		ctx.lineTo(cx - halfW, cy - halfL * 0.08);
+		ctx.lineTo(cx - halfW * 0.72, cy - halfL * 0.62);
+		ctx.closePath();
+		ctx.fillStyle = "rgba(74, 158, 255, 0.14)";
+		ctx.fill();
+		ctx.strokeStyle = "rgba(120, 190, 255, 0.9)";
+		ctx.lineWidth = 1.5;
+		ctx.stroke();
 
-    const weaponArcs = new Container();
-    weaponArcs.zIndex = 8;
-    weaponArcs.eventMode = "none";
+		// 挂载点：position.x 左舷为正，position.y 船头为正
+		for (const mount of spec.mounts ?? []) {
+			const mx = cx - (mount.position?.x ?? 0) * zoom;
+			const my = cy - (mount.position?.y ?? 0) * zoom;
+			const radius = MOUNT_SLOT_SIZE[mount.size] ?? 6;
+			const damageType = mount.weapon?.spec?.damageType ?? "";
+			const color = DAMAGE_COLORS[damageType] ?? "#8ba4c7";
 
-    const movementVisuals = new Container();
-    movementVisuals.zIndex = 9;
-    movementVisuals.eventMode = "none";
+			ctx.beginPath();
+			ctx.arc(mx, my, radius, 0, Math.PI * 2);
+			ctx.fillStyle = "rgba(10, 20, 32, 0.85)";
+			ctx.fill();
+			ctx.strokeStyle = color;
+			ctx.lineWidth = 1.2;
+			ctx.stroke();
 
-    const shieldArcs = new Container();
-    shieldArcs.zIndex = 10;
-    shieldArcs.eventMode = "none";
+			// 朝向箭头：航海角 0 度朝上
+			const facing = ((mount.facing ?? 0) - 90) * (Math.PI / 180);
+			ctx.beginPath();
+			ctx.moveTo(mx, my);
+			ctx.lineTo(mx + Math.cos(facing) * (radius + 5), my + Math.sin(facing) * (radius + 5));
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+			ctx.lineWidth = 1.2;
+			ctx.stroke();
+		}
 
-    const hexagonArmor = new Container();
-    hexagonArmor.zIndex = 11;
-    hexagonArmor.eventMode = "none";
+		// 舰种标签
+		ctx.fillStyle = "rgba(160, 200, 240, 0.75)";
+		ctx.font = "11px 'Fira Code', ui-monospace, monospace";
+		ctx.textAlign = "left";
+		ctx.fillText(`${spec.size} / ${spec.class}`, 8, 16);
+	}, [token, zoom, size]);
 
-    const shipSprites = new Container();
-    shipSprites.zIndex = 13;
-    shipSprites.eventMode = "none";
+	const dragRef = useRef<{ startX: number; startY: number } | null>(null);
 
-    const weaponSprites = new Container();
-    weaponSprites.zIndex = 14;
-    weaponSprites.eventMode = "none";
+	const handleTextureMouseDown = useCallback((e: React.MouseEvent) => {
+		if (!onTextureOffsetChange) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDraggingTexture(true);
+		dragRef.current = { startX: e.clientX, startY: e.clientY };
 
-    world.addChild(
-        background,
-        starfieldNebula,
-        starfieldDeep,
-        starfieldMid,
-        starfieldNear,
-        grid,
-        cursor,
-        overlay,
-        tacticalTokens,
-        weaponArcs,
-        movementVisuals,
-        shieldArcs,
-        hexagonArmor,
-        shipSprites,
-        weaponSprites
-    );
+		const handleMouseMove = (ev: MouseEvent) => {
+			if (!dragRef.current) return;
+			const dx = ev.clientX - dragRef.current.startX;
+			const dy = ev.clientY - dragRef.current.startY;
+			dragRef.current = { startX: ev.clientX, startY: ev.clientY };
+			onTextureOffsetChange(-dx / zoom, -dy / zoom);
+		};
 
-    const hud = new Container();
-    hud.sortableChildren = true;
-    hud.eventMode = "none";
+		const handleMouseUp = () => {
+			dragRef.current = null;
+			setDraggingTexture(false);
+			window.removeEventListener("mousemove", handleMouseMove);
+			window.removeEventListener("mouseup", handleMouseUp);
+		};
 
-    const shipBars = new Container();
-    shipBars.zIndex = 0;
-    shipBars.eventMode = "none";
+		window.addEventListener("mousemove", handleMouseMove);
+		window.addEventListener("mouseup", handleMouseUp);
+	}, [zoom, onTextureOffsetChange]);
 
-    const fluxBars = new Container();
-    fluxBars.zIndex = 1;
-    fluxBars.eventMode = "none";
+	const textureWrapStyle = useMemo(
+		() => ({ transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)` }),
+		[textureOffsetX, textureOffsetY],
+	);
+	const textureStyle = useMemo(
+		() => ({ transform: `translate(-50%, -50%) scale(${textureScale})` }),
+		[textureScale],
+	);
 
-    const shipNames = new Container();
-    shipNames.zIndex = 2;
-    shipNames.eventMode = "none";
+	return (
+		<div className="customizer-preview-shell">
+			<div
+				ref={hostRef}
+				className="customizer-preview-canvas"
+				onWheel={(event) => {
+					event.preventDefault();
+					const direction = event.deltaY > 0 ? -1 : 1;
+					onZoomChange(clampZoom(zoom + direction * 0.08));
+				}}
+			>
+				<canvas ref={canvasRef} className="customizer-preview-draw" />
 
-    const ownerLabels = new Container();
-    ownerLabels.zIndex = 3;
-    ownerLabels.eventMode = "none";
+				{texturePreviewUrl && (
+					<div
+						className="customizer-preview-texture-wrap"
+						style={{ ...textureWrapStyle, cursor: onTextureOffsetChange ? (isDraggingTexture ? "grabbing" : "grab") : undefined }}
+						onMouseDown={handleTextureMouseDown}
+					>
+						<img
+							src={texturePreviewUrl}
+							className="customizer-preview-texture"
+							style={textureStyle}
+							alt="texture-preview"
+							draggable={false}
+						/>
+					</div>
+				)}
 
-    hud.addChild(shipBars, fluxBars, shipNames, ownerLabels);
+				<div className="customizer-preview-crosshair" />
+			</div>
 
-    app.stage.addChild(world);
-    app.stage.addChild(hud);
-
-    return {
-        world,
-        background,
-        starfieldNebula,
-        starfieldDeep,
-        starfieldMid,
-        starfieldNear,
-        grid,
-        cursor,
-        overlay,
-        shipSprites,
-        weaponSprites,
-        tacticalTokens,
-        weaponArcs,
-        movementVisuals,
-        shieldArcs,
-        hexagonArmor,
-        hud,
-        shipBars,
-        fluxBars,
-        shipNames,
-        ownerLabels,
-    };
-}
-
-function toPreviewShip(token: InventoryToken): CombatToken & { selected?: boolean } {
-    const spec = token.spec;
-    const runtime = {
-        position: { x: 0, y: 0 },
-        heading: 0,
-        hull: spec.maxHitPoints,
-        armor: [
-            spec.armorMaxPerQuadrant,
-            spec.armorMaxPerQuadrant,
-            spec.armorMaxPerQuadrant,
-            spec.armorMaxPerQuadrant,
-            spec.armorMaxPerQuadrant,
-            spec.armorMaxPerQuadrant,
-        ],
-        fluxSoft: 0,
-        fluxHard: 0,
-        overloaded: false,
-        overloadTime: 1,
-        destroyed: false,
-        actionSequence: 0,
-        faction: "preset:faction:player-alliance",
-    };
-
-    return {
-        $id: token.$id,
-        $presetRef: token.$presetRef,
-        spec,
-        runtime,
-        metadata: token.metadata,
-    };
-}
-
-export const MiniShipPreview: React.FC<MiniShipPreviewProps> = ({ token, zoom, onZoomChange, texturePreviewUrl, onTextureOffsetChange }) => {
-    const hostRef = useRef<HTMLDivElement>(null);
-    const canvasSize = useCanvasResize(hostRef);
-    const layerSystem = useLayerSystem();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    const ships = useMemo(() => {
-        if (!token) return [];
-        return [toPreviewShip(token)];
-    }, [token]);
-
-    const texture = token?.spec.texture;
-    const textureScale = (texture?.scale ?? 1) * zoom;
-    // 航海坐标系：Y向上，屏幕坐标系：Y向下
-    // offsetY > 0（船头方向）在屏幕上是向上（负方向）
-    const textureOffsetX = (texture?.offsetX ?? 0) * zoom;
-    const textureOffsetY = -(texture?.offsetY ?? 0) * zoom; // 反转 Y
-
-    const dragRef = useRef<{ startX: number; startY: number } | null>(null);
-
-    const handleTextureMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragRef.current = { startX: e.clientX, startY: e.clientY };
-
-        const handleMouseMove = (ev: MouseEvent) => {
-            if (!dragRef.current || !onTextureOffsetChange) return;
-            const dx = ev.clientX - dragRef.current.startX;
-            const dy = ev.clientY - dragRef.current.startY;
-            dragRef.current = { startX: ev.clientX, startY: ev.clientY };
-            onTextureOffsetChange(-dx / zoom, -dy / zoom);
-        };
-
-        const handleMouseUp = () => {
-            dragRef.current = null;
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("mouseup", handleMouseUp);
-        };
-
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
-    }, [zoom, onTextureOffsetChange]);
-
-    const wrapStyle = useMemo(() => ({
-        transform: `translate(${textureOffsetX}px, ${textureOffsetY}px)`,
-    }), [textureOffsetX, textureOffsetY]);
-
-    const imgStyle = useMemo(() => ({
-        transform: `translate(-50%, -50%) scale(${textureScale})`,
-    }), [textureScale]);
-
-    useShipRendering(
-        layerSystem.layers,
-        ships,
-        null,
-        {
-            zoom,
-            x: 0,
-            y: 0,
-            canvasWidth: canvasSize.width,
-            canvasHeight: canvasSize.height,
-            viewRotation: 0,
-        },
-        {}
-    );
-
-    useEffect(() => {
-        if (!layerSystem.layers) return;
-        layerSystem.updateWorldTransforms(zoom, 0, 0, canvasSize, 0, false);
-        layerSystem.updateHitAreas(canvasSize);
-    }, [layerSystem, canvasSize, zoom]);
-
-    return (
-        <div className="customizer-preview-shell">
-            <div
-                ref={hostRef}
-                className="customizer-preview-canvas"
-                onWheel={(event) => {
-                    event.preventDefault();
-                    const direction = event.deltaY > 0 ? -1 : 1;
-                    onZoomChange(clampZoom(zoom + direction * 0.08));
-                }}
-            >
-                {mounted && (
-                    <Application
-                        resizeTo={hostRef}
-                        autoDensity
-                        antialias
-                        background={0x050d18}
-                        eventMode="none"
-                        onInit={(app) => {
-                            const layers = createLayers(app);
-                            layerSystem.setLayers(layers);
-                        }}
-                    />
-                )}
-
-                {texturePreviewUrl && (
-                    <div
-                        className="customizer-preview-texture-wrap"
-                        style={{ ...wrapStyle, cursor: onTextureOffsetChange ? "grab" : undefined }}
-                        onMouseDown={onTextureOffsetChange ? handleTextureMouseDown : undefined}
-                    >
-                        <img src={texturePreviewUrl} className="customizer-preview-texture" style={imgStyle} alt="texture-preview" draggable={false} />
-                    </div>
-                )}
-
-                <div className="customizer-preview-crosshair" />
-            </div>
-
-            <input
-                type="range"
-                min={0.2}
-                max={4}
-                step={0.01}
-                value={zoom}
-                onChange={(e) => onZoomChange(clampZoom(Number(e.target.value)))}
-            />
-        </div>
-    );
+			<input
+				className="customizer-range"
+				type="range"
+				min={0.2}
+				max={4}
+				step={0.01}
+				value={zoom}
+				onChange={(e) => onZoomChange(clampZoom(Number(e.target.value)))}
+				aria-label="预览缩放"
+			/>
+		</div>
+	);
 };
 
 export default MiniShipPreview;

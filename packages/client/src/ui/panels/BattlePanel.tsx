@@ -2,7 +2,7 @@
  * 底部战斗面板 - 横向长条布局，6个Tab
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Box, Flex, IconButton, Tabs, Text, Tooltip } from "@radix-ui/themes";
 import { useUIStore } from "@/state/stores/uiStore";
@@ -27,6 +27,12 @@ export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs }) => {
 
 	const enabledTabs = tabs.filter((tab) => tab.enabled !== false);
 	const safeActiveTab = enabledTabs.some((tab) => tab.id === activeTab) ? activeTab : enabledTabs[0]?.id || "";
+	const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(safeActiveTab ? [safeActiveTab] : []));
+
+	useEffect(() => {
+		if (!safeActiveTab) return;
+		setMountedTabs((prev) => (prev.has(safeActiveTab) ? prev : new Set(prev).add(safeActiveTab)));
+	}, [safeActiveTab]);
 
 	return (
 		<Box className={`battle-bar ${collapsed ? "battle-bar--collapsed" : ""}`}>
@@ -56,12 +62,10 @@ export const BattlePanel: React.FC<BattlePanelProps> = ({ tabs }) => {
 
 			{!collapsed && (
 				<Box className="battle-bar__content">
-					{enabledTabs.map((tab) => (
-						<Tabs.Content key={tab.id} value={tab.id} forceMount>
-							<div style={{ display: safeActiveTab === tab.id ? undefined : "none" }}>
-								{tab.component}
-							</div>
-						</Tabs.Content>
+					{enabledTabs.filter((tab) => mountedTabs.has(tab.id) || tab.id === safeActiveTab).map((tab) => (
+						<div key={tab.id} style={{ display: safeActiveTab === tab.id ? undefined : "none" }}>
+							{tab.component}
+						</div>
 					))}
 				</Box>
 			)}

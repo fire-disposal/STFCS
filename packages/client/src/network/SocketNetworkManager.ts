@@ -10,6 +10,8 @@
 
 import { io, Socket } from "socket.io-client";
 import { create } from "mutative";
+import { BASE_PATH, SOCKET_PATH } from "@/config";
+import { randomId } from "@/utils/randomId";
 import type {
 	WsEventName,
 	WsPayload,
@@ -69,6 +71,7 @@ export class SocketNetworkManager {
 		if (this.socket?.connected) return true;
 
 		this.socket = io(this.serverUrl, {
+			path: SOCKET_PATH,
 			transports: ["websocket"],
 			reconnection: true,
 			reconnectionAttempts: 15,
@@ -98,7 +101,7 @@ export class SocketNetworkManager {
 	): Promise<WsResponseData<E>> {
 		if (!this.socket?.connected) throw new Error("Not connected");
 
-		const requestId = crypto.randomUUID();
+		const requestId = randomId();
 
 		return new Promise<WsResponseData<E>>((resolve, reject) => {
 			const timeout = setTimeout(() => {
@@ -269,7 +272,7 @@ export class SocketNetworkManager {
 	}
 
 	buildInviteLink(roomId: string): string {
-		return `${window.location.origin}/join/${roomId}`;
+		return `${window.location.origin}${BASE_PATH}join/${roomId}`;
 	}
 
 	getPlayerId(): string | null { return this.playerId; }

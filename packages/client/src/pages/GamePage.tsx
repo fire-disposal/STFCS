@@ -38,6 +38,7 @@ import { OverlayToolbar } from "@/ui/panels/OverlayToolbar";
 import { DicePanel } from "@/ui/panels/DicePanel";
 import { PLAYER_OVERLAY_COLORS } from "@vt/data";
 import { screenToWorld } from "@/utils/coordinateSystem";
+import { copyText } from "@/utils/clipboard";
 import "@/ui/panels/room-player-list.css";
 
 interface GamePageProps {
@@ -50,6 +51,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	const [showSettings, setShowSettings] = useState(false);
 	const [showPlayerRoster, setShowPlayerRoster] = useState(false);
+	const [showShortcuts, setShowShortcuts] = useState(false);
 	const [draftHpPerBar, setDraftHpPerBar] = useState(20);
 	const overlayClientRef = useRef<OverlayClient | null>(null);
 	const [overlayHandlers, setOverlayHandlers] = useState<OverlayHandlers | null>(null);
@@ -102,6 +104,10 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 	const suppressContextMenu = useUIStore((state) => state.suppressContextMenu);
 	const toggleSuppressContextMenu = useUIStore((state) => state.toggleSuppressContextMenu);
 
+	React.useEffect(() => {
+		if (showSettings) setDraftHpPerBar(hpPerBar);
+	}, [showSettings, hpPerBar]);
+
 	// 全局拦截右键菜单（设置页开关控制）
 	React.useEffect(() => {
 		const handleContextMenu = (e: MouseEvent) => {
@@ -115,16 +121,20 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	React.useEffect(() => {
 		if (!overlayClientRef.current || !playerId) return;
+		let lastKey = "";
 		const interval = setInterval(() => {
 			const cam = useUIStore.getState();
 			const idx = Object.keys(players ?? {}).indexOf(playerId);
 			const color = PLAYER_OVERLAY_COLORS[idx >= 0 ? (idx % PLAYER_OVERLAY_COLORS.length) : 0];
+			const key = `${cam.cameraPosition.x.toFixed(1)}|${cam.cameraPosition.y.toFixed(1)}|${cam.zoom.toFixed(3)}|${cam.viewRotation}`;
+			if (key === lastKey) return;
+			lastKey = key;
 			overlayClientRef.current?.sendViewport(
 				cam.cameraPosition.x, cam.cameraPosition.y,
 				cam.zoom, cam.viewRotation,
 				window.innerWidth, window.innerHeight, color
 			);
-		}, 200);
+		}, 500);
 		return () => clearInterval(interval);
 	}, [players, playerId]);
 
@@ -134,8 +144,12 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		const idx = Object.keys(players ?? {}).indexOf(playerId);
 		const color = PLAYER_OVERLAY_COLORS[idx >= 0 ? (idx % PLAYER_OVERLAY_COLORS.length) : 0];
 
+		let lastCursorAt = 0;
 		const onMove = (e: MouseEvent) => {
 			if (!overlayClientRef.current) return;
+			const now = performance.now();
+			if (now - lastCursorAt < 33) return;
+			lastCursorAt = now;
 			const rect = host.getBoundingClientRect();
 			const sx = e.clientX - rect.left - rect.width / 2;
 			const sy = e.clientY - rect.top - rect.height / 2;
@@ -149,14 +163,32 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 
 	React.useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			const active = document.activeElement;
+			if (
+				active instanceof HTMLElement &&
+				(active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)
+			) {
+				return;
+			}
+			if (e.target instanceof Element && e.target.closest('[role="dialog"]')) {
+				return;
+			}
 			const store = useUIStore.getState();
+			if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+				e.preventDefault();
+				setShowShortcuts((open) => !open);
+				return;
+			}
 			switch (e.key.toLowerCase()) {
 				case "d": store.setOverlayMode(store.overlayMode === "pen" ? "none" : "pen"); break;
 				case "a": store.setOverlayMode(store.overlayMode === "arrow" ? "none" : "arrow"); break;
 				case "p": store.setOverlayMode(store.overlayMode === "ping" ? "none" : "ping"); break;
 				case "t": store.setOverlayMode(store.overlayMode === "note" ? "none" : "note"); break;
-				case "escape": store.setOverlayMode("none"); break;
+				case "escape":
+					if (store.overlayMode !== "none") store.setOverlayMode("none");
+					else store.selectShip(null);
+					break;
 			}
 		};
 		window.addEventListener("keydown", onKey);
@@ -198,7 +230,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			component: <ShieldPanel canControl={true} />,
 			enabled: true,
 		},
-	], [networkManager, isHost]);
+	], []);
 
 	if (!gameState || !roomId) {
 		return (
@@ -221,7 +253,7 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 		);
 	}
 
-	const connectedPlayers = Object.values(players).filter((p) => p.connected);
+	const connectedPlayers = Object.entries(players).filter(([, p]) => p.connected);
 
 	return (
 		<ErrorBoundary>
@@ -229,6 +261,8 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			<TopBar
 				onSettings={() => setShowSettings(true)}
 				onLeave={onLeaveRoom}
+				onPlayers={() => setShowPlayerRoster(true)}
+				onHelp={() => setShowShortcuts(true)}
 				onFactionChange={(playerId, faction) => {
 					send("edit:room", { action: "set_faction", playerId, faction });
 				}}
@@ -255,43 +289,93 @@ export const GamePage: React.FC<GamePageProps> = ({ networkManager, onLeaveRoom 
 			<BattlePanel tabs={tabs} />
 
 			<Dialog.Root open={showPlayerRoster} onOpenChange={setShowPlayerRoster}>
-				<Dialog.Content style={{ maxWidth: 400 }}>
+				<Dialog.Content style={{ maxWidth: 460 }}>
 					<Dialog.Title>
 						<Flex align="center" gap="2">
-							<Users size={16} /> 玩家列表
+							<Users size={16} /> 玩家与邀请
 						</Flex>
 					</Dialog.Title>
+					<Dialog.Description size="1" color="gray" mb="3">
+						房间 {roomId} · {connectedPlayers.length} 人在线
+					</Dialog.Description>
 					<div className="room-player-list room-player-list--detailed">
-						{connectedPlayers.map((p) => (
+						{connectedPlayers.map(([id, p]) => (
 							<div
 								key={p.sessionId}
-								className={`room-player-item ${p.sessionId === playerId ? "room-player-item--self" : ""}`}
+								className={`room-player-item ${id === playerId ? "room-player-item--self" : ""}`}
 							>
 								<Avatar userName={p.nickname} size={32} />
 								<div className="room-player-info">
 									<span className="room-player-name">{p.nickname}</span>
-									{p.role === "HOST" && (
-										<span className="room-player-badge room-player-badge--dm">
-											<Crown size={12} />
+									<span className="room-player-meta">
+										{p.role === "HOST" ? (
+											<span className="room-player-badge room-player-badge--dm">
+												<Crown size={11} /> DM
+											</span>
+										) : null}
+										<span
+											className="room-player-faction"
+											style={p.faction ? { borderColor: gameState.factions?.[p.faction]?.color ?? "transparent" } : undefined}
+										>
+											{p.faction ? (gameState.factions?.[p.faction]?.name ?? "未命名派系") : "未选派系"}
 										</span>
-									)}
+									</span>
 								</div>
 								<div className={`room-player-status ${p.isReady ? "room-player-status--ready" : "room-player-status--not-ready"}`}>
 									{p.isReady ? <CheckCircle size={14} /> : <XCircle size={14} />}
 								</div>
+								{isHost && id !== playerId && (
+									<Button
+										size="1"
+										variant="ghost"
+										color="red"
+										onClick={() => void send("room:action", { action: "kick", targetId: id })}
+									>
+										移出
+									</Button>
+								)}
 							</div>
 						))}
 					</div>
-					<Flex justify="end" gap="2" mt="4">
-						{isHost && (
-							<Button variant="soft" onClick={() => {
-								navigator.clipboard.writeText(networkManager.buildInviteLink(roomId));
-								notify.success("邀请链接已复制");
-							}}>
-								邀请链接
-							</Button>
-						)}
+					<Flex justify="between" align="center" gap="2" mt="4">
+						<Button
+							variant="soft"
+							onClick={async () => {
+								const link = networkManager.buildInviteLink(roomId);
+								const copied = await copyText(link);
+								notify[copied ? "success" : "error"](copied ? "邀请链接已复制" : `复制失败：${link}`);
+							}}
+						>
+							复制邀请链接
+						</Button>
 						<Button variant="soft" color="red" onClick={onLeaveRoom}>离开房间</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
+
+			<Dialog.Root open={showShortcuts} onOpenChange={setShowShortcuts}>
+				<Dialog.Content style={{ maxWidth: 420 }}>
+					<Dialog.Title>快捷键</Dialog.Title>
+					<Dialog.Description size="1" color="gray" mb="3">
+						标注模式下左键绘制，标注外左键选择舰船。
+					</Dialog.Description>
+					<Flex direction="column" gap="2">
+						{[
+							["右键拖拽", "平移视野"],
+							["中键拖拽", "旋转视野"],
+							["滚轮", "缩放"],
+							["D", "画笔"],
+							["A", "箭头"],
+							["P", "信标"],
+							["T", "便签"],
+							["Esc", "退出标注 / 取消选中"],
+							["?", "打开或关闭本页"],
+						].map(([key, action]) => (
+							<Flex key={key} justify="between" align="center">
+								<Text size="2">{action}</Text>
+								<Text size="1" className="shortcut-key">{key}</Text>
+							</Flex>
+						))}
 					</Flex>
 				</Dialog.Content>
 			</Dialog.Root>
